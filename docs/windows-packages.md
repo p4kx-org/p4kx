@@ -200,14 +200,13 @@ finished. Diagnostics cannot replace the source-bound native runtime and exact-P
 proofs. The infrastructure tests execute synthetic PowerShell children and mocked native
 adapters; they are not a reproduction of an installer timeout.
 
-The package consumer records the original Finish supervisor launch locally, waits
-for its terminal receipt within the original deadline, and validates that receipt
-against the closed journal. A watchdog runs the hosted receipt check in a separate
-process. The receipt observer writes stdout and stderr to `finish-supervision/host-stdout.log`
-and `finish-supervision/host-stderr.log` for the final diagnostic upload. The original terminal
-evidence must upload successfully before package evidence and payload publication. The
-detached observer controls exercise the Finish observation and timeout paths with harmless
-native workers.
+The package consumer records the original Finish supervisor launch and its
+exact digest. The hosted Wait shell observes the original supervisor receipt
+under the existing collection cutoff and writes the request-bound
+`wait-result.json` with the exact launch digest. CollectFinish verifies that
+digest, the original receipt chain and the closed journal. The original terminal evidence must upload successfully
+before package evidence and payload publication. The detached observer
+controls exercise startup and timeout paths with harmless native workers.
 
 On hosted ARM64, a best-effort upload preserves the original phase checkpoints
 and caller results for phases 01 through 03 before the Finish supervisor starts.
@@ -215,14 +214,15 @@ This artifact contains the compact observation metadata. The upload has a
 one-minute limit inside the existing job budget, and release acceptance still
 requires the original terminal result and native runtime checks.
 
-After the original Finish waiter confirms readiness, the Windows consumer takes one
-read-only checkpoint and uploads a separate immutable `-finish-live`
-artifact. The checkpoint binds the original request, supervisor launch, readiness,
-bounded phase journal and process identities. It records the supervisor, monitor
-and waiter liveness, any retained receipt hashes and the allowlisted runner image
-and version values when the host supplies them. Sampling and upload each have a
-one-minute step limit. The required Wait and CollectFinish validation keep their
-original allowance and proceed if this optional evidence is unavailable.
+After launching the original Finish supervisor, the Windows consumer takes
+one read-only checkpoint and uploads a separate immutable `-finish-live`
+artifact. The checkpoint binds the original request, exact supervisor launch,
+bounded phase journal and supervisor identity. It records supervisor and
+original parent liveness, any observed receipt hashes and the allowlisted
+runner image and version values when the host supplies them. Sampling and
+upload each have a one-minute step limit. Required Wait and CollectFinish
+validation retain their original allowance and proceed when optional
+evidence is unavailable.
 
 The native AMD64 checkpoint passively follows the current product uninstall
 after the historical upgrade for up to 15 seconds within the original observer
@@ -738,3 +738,30 @@ The AMD64 live checkpoint archive SHA-256 is
 `216c17b3f6f811dfe9dff33f1f1431bb221bb073878839942df039a08feca514`.
 [AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/job/140154656694) ·
 [AMD64 live checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15151148864)
+
+### Native Windows execution on e0a9bdd
+
+Both native Windows package producers succeeded. GitHub cancelled both execution
+jobs at 23:31:11 UTC. The recorded durations were 55 minutes on AMD64 and
+55 minutes 1 second on ARM64. Each job's sole annotation cited its 45-minute
+maximum, and the final job logs returned HTTP 404. The workflow retained no
+terminal installer receipt or executed-package evidence for either architecture.
+[Release workflow](https://github.com/p4kx-org/p4kx/actions/runs/45900458773)
+
+The AMD64 job preserved its launch binding, waiter readiness and live checkpoint.
+That checkpoint recorded completion of the historical uninstall at 17.745 seconds
+into the worker and showed the worker in restore. GitHub's last step status was
+the wait for the original Finish receipt. The checkpoint establishes progress
+through the uninstall. The subsequent blocking operation and terminal MSI result
+remain unobserved.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/job/140202197327) ·
+[AMD64 live checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/artifacts/15157054910)
+
+The ARM64 job preserved its before-Finish diagnostics and original launch binding.
+The worker had reached the installed runtime phase. GitHub's last step status was
+the bound waiter start, and the job preserved neither waiter readiness nor a live
+checkpoint. The terminal MSI result and the reason the hosted step did not return
+remain unobserved.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/job/140202197290) ·
+[ARM64 before-Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/artifacts/15158350863) ·
+[ARM64 launch evidence](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/artifacts/15158053307)

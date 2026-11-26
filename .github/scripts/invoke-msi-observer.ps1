@@ -7,9 +7,13 @@ param(
     [ValidateRange(0,75000)][int]$WaitMilliseconds=75000,
     [ValidateRange(1,100000)][int]$ControlMilliseconds=10000,
     [switch]$ScheduledDelay, [switch]$OriginalRawBoundary, [switch]$OriginalInstallBoundary,
-    [ValidateRange(1,2147483647)][int]$FinishMaximumMilliseconds=[int]::MaxValue
+    [ValidateRange(1,2147483647)][int]$FinishMaximumMilliseconds=[int]::MaxValue,
+    [string]$LaunchDigest
 )
 $ErrorActionPreference = 'Stop'
+if ($PSBoundParameters.ContainsKey('LaunchDigest') -and $Stage -cne 'CollectFinish') {
+    throw 'The launch digest applies only to original Finish collection.'
+}
 if (($OriginalRawBoundary -or $OriginalInstallBoundary) -and $Stage -cne 'Snapshot') { throw 'An original phase boundary requires a passive snapshot.' }
 if ($OriginalRawBoundary -and $OriginalInstallBoundary) { throw 'A passive snapshot observes one original phase.' }
 $boundary = if ($OriginalRawBoundary) { 'preamble/original-raw' } elseif ($OriginalInstallBoundary) { 'lifecycle/install' }
@@ -46,7 +50,11 @@ if ($Stage -cin @('StartFinish','WaitFinish','CollectFinish')) {
     switch ($Stage) {
         'StartFinish' { Start-P4kxMsiFinishSupervision $Directory }
         'WaitFinish' { Wait-P4kxMsiSupervisedFinish $Directory }
-        'CollectFinish' { Read-P4kxMsiSupervisedFinish $Directory }
+        'CollectFinish' {
+            $parameters = @{Directory=$Directory}
+            if ($PSBoundParameters.ContainsKey('LaunchDigest')) { $parameters.LaunchDigest = $LaunchDigest }
+            Read-P4kxMsiSupervisedFinish @parameters
+        }
     }
     return
 }

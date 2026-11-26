@@ -1,24 +1,20 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
     [Parameter(Mandatory)][string]$CollectionCutoffUtc,
-    [Parameter(Mandatory)][string]$ReadyDigest
+    [Parameter(Mandatory)][string]$LaunchDigest
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
-. (Join-Path $PSScriptRoot 'msi-observer-finish-ready.ps1')
 . (Join-Path $PSScriptRoot 'msi-native-progress-liveness.ps1')
 
 $context = Get-P4kxMsiFinishContext $Directory
 $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $CollectionCutoffUtc
 if ($context.request.mode -cne 'Lifecycle' -or $cutoff -ne $context.collection_cutoff -or
-    [DateTimeOffset]::UtcNow -ge $cutoff -or $ReadyDigest -cnotmatch '\A[0-9a-f]{64}\z') {
-    throw 'A live checkpoint requires original Lifecycle readiness before the original cutoff.'
+    [DateTimeOffset]::UtcNow -ge $cutoff -or $LaunchDigest -cnotmatch '\A[0-9a-f]{64}\z') {
+    throw 'A live checkpoint requires the original Lifecycle launch before the original cutoff.'
 }
 
-$launch = Read-P4kxMsiFinishLaunch $context
-$launchDigest = Get-P4kxDetachedReceiptDigest (Join-Path $context.directory 'launch.json')
-$ready = Read-P4kxMsiHostedFinishReady (Join-Path $context.directory 'waiter-ready.json') $cutoff $ReadyDigest
-Assert-P4kxMsiProgressReadiness $context $ready $launchDigest
+$launch = Read-P4kxMsiFinishLaunch $context -ExpectedDigest $LaunchDigest
 
 $historicalProbe = $null
 if ($context.request.target -ceq 'x86_64-pc-windows-msvc') {
@@ -38,8 +34,6 @@ if ($context.request.target -ceq 'x86_64-pc-windows-msvc') {
 $observed = [DateTimeOffset]::UtcNow
 $processes = @{
     supervisor=(Get-P4kxMsiObservedProcess $launch.supervisor_pid $launch.supervisor_started_utc_ticks)
-    monitor=(Get-P4kxMsiObservedProcess $ready.monitor_pid $ready.monitor_started_utc_ticks)
-    waiter=(Get-P4kxMsiObservedProcess $ready.waiter_pid $ready.waiter_started_utc_ticks)
 }
 $parent = Get-P4kxMsiObserverParentState $context.request $context.handle
 $sequence = 4
@@ -53,7 +47,7 @@ if ($historicalProbe) {
     } catch { $historicalProbe.journal_failure_type = $_.Exception.GetType().FullName }
 }
 $files = @{}
-foreach ($name in @('result.json','wait-result.json','waiter-exit.json')) {
+foreach ($name in @('result.json','wait-result.json')) {
     $files[$name] = Copy-P4kxMsiObserverFile (Join-Path $context.directory $name) (Join-Path $checkpoint "finish-$name") 16KB
 }
 $runner = @{}
@@ -64,13 +58,13 @@ foreach ($key in $runnerVariables.Keys) {
 }
 if ([DateTimeOffset]::UtcNow -ge $cutoff) { throw 'The live checkpoint reached the original collection cutoff.' }
 $proof = @{
-    schema=1;role='native-msi-finish-live-checkpoint';revision=$context.request.revision
+    schema=1;role='native-msi-finish-launch-checkpoint';revision=$context.request.revision
     run=$context.request.run;attempt=$context.request.attempt;target=$context.request.target
-    sequence=$sequence;request_sha256=$context.digest;launch_sha256=$launchDigest
-    readiness_sha256=$ReadyDigest;checkpoint_sha256=(Get-P4kxDetachedReceiptDigest (Join-Path $checkpoint 'checkpoint.json'))
+    sequence=$sequence;request_sha256=$context.digest;launch_sha256=$LaunchDigest
+    checkpoint_sha256=(Get-P4kxDetachedReceiptDigest (Join-Path $checkpoint 'checkpoint.json'))
     observed_utc=$observed.ToString('o');collection_cutoff_utc=$cutoff.ToString('o')
     processes=$processes;files=$files;runner=$runner
     completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
 }
 if ($historicalProbe) { $proof.historical_uninstall = $historicalProbe }
-Write-P4kxDetachedReceipt (Join-Path $checkpoint 'post-ready.json') $proof
+Write-P4kxDetachedReceipt (Join-Path $checkpoint 'post-launch.json') $proof

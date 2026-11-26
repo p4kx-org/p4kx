@@ -8,7 +8,8 @@ function Invoke-P4kxMsiHostedFinishWait {
         [Parameter(Mandatory)][string]$Directory,
         [Parameter(Mandatory)][string]$CollectionCutoffUtc,
         [int]$MonitorPid,
-        [long]$MonitorStartedUtcTicks
+        [long]$MonitorStartedUtcTicks,
+        [string]$LaunchDigest
     )
     Write-P4kxMsiFinishWaitNotice context-binding begin -Hosted
     $context = Get-P4kxMsiFinishContext $Directory
@@ -21,10 +22,14 @@ function Invoke-P4kxMsiHostedFinishWait {
     $progress = @{Directory=$context.directory; RequestDigest=$context.digest; FileOnly=$true}
     Write-P4kxMsiObserverProgress finishWaitBinding begin @progress
     Write-P4kxMsiFinishWaitNotice launch-read begin -Hosted
-    $launch = Read-P4kxMsiFinishLaunch $context
+    $launchParameters = @{Context=$context}
+    if ($PSBoundParameters.ContainsKey('LaunchDigest')) { $launchParameters.ExpectedDigest = $LaunchDigest }
+    $launch = Read-P4kxMsiFinishLaunch @launchParameters
     Write-P4kxMsiFinishWaitNotice launch-read end -Hosted
     Write-P4kxMsiObserverProgress finishWaitBinding end @progress
     if ($MonitorPid -gt 0) { Write-P4kxMsiHostedFinishReady $context $MonitorPid $MonitorStartedUtcTicks }
-    Wait-P4kxMsiFinishReceipt $context $launch -Hosted
+    $waitParameters = @{Context=$context;Launch=$launch;Hosted=$true}
+    if ($launchParameters.ContainsKey('ExpectedDigest')) { $waitParameters.LaunchDigest = $LaunchDigest }
+    Wait-P4kxMsiFinishReceipt @waitParameters
     Write-Host '::notice title=Native MSI Finish wait host::The bound terminal receipt was observed. Native completion is unproven.'
 }

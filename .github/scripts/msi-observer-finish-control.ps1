@@ -55,8 +55,13 @@ function Start-P4kxMsiFinishSupervision([string]$Directory) {
     } finally { $process.Dispose() }
 }
 
-function Read-P4kxMsiFinishLaunch($Context) {
-    $launch = Read-P4kxDetachedReceipt (Join-Path $context.directory 'launch.json')
+function Read-P4kxMsiFinishLaunch($Context, [string]$ExpectedDigest) {
+    $path = Join-Path $context.directory 'launch.json'
+    if ($PSBoundParameters.ContainsKey('ExpectedDigest') -and
+        ($ExpectedDigest -cnotmatch '\A[0-9a-f]{64}\z' -or $ExpectedDigest -cne (Get-P4kxDetachedReceiptDigest $path))) {
+        throw 'Finish launch bytes differ from the original supervisor launch stage.'
+    }
+    $launch = Read-P4kxDetachedReceipt $path
     if ($launch.schema -ne 1 -or $launch.role -cne 'native-msi-finish-supervisor-launch' -or
         $launch.request_sha256 -cne $context.digest -or $launch.cutoff_utc -cne $context.cutoff.ToString('o') -or
         ($launch.Contains('collection_cutoff_utc') -and $launch.collection_cutoff_utc -cne $context.collection_cutoff.ToString('o')) -or
@@ -102,7 +107,7 @@ function Test-P4kxMsiFinishReceiptPresence {
 }
 
 function Wait-P4kxMsiFinishReceipt {
-    param($Context, $Launch, [switch]$Hosted)
+    param($Context, $Launch, [switch]$Hosted, [string]$LaunchDigest)
     $receiptPath = Join-Path $Context.directory 'result.json'
     $resultDigest = $null
     $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
@@ -144,6 +149,7 @@ function Wait-P4kxMsiFinishReceipt {
         result_sha256=$resultDigest;mutation_authority=$false
     }
     if ($null -ne $direct) { $wait.direct_probe = $direct }
+    if ($PSBoundParameters.ContainsKey('LaunchDigest')) { $wait.launch_sha256 = $LaunchDigest }
     if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt begin -Hosted:$Hosted }
     Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') $wait
     if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt end -Hosted:$Hosted }
@@ -159,10 +165,12 @@ function Wait-P4kxMsiSupervisedFinish([string]$Directory) {
     Wait-P4kxMsiFinishReceipt $context $launch
 }
 
-function Read-P4kxMsiSupervisedFinish([string]$Directory) {
+function Read-P4kxMsiSupervisedFinish([string]$Directory, [string]$LaunchDigest) {
     Write-P4kxMsiObserverProgress finishCollectBinding begin
     $context = Get-P4kxMsiFinishContext $Directory
-    $launch = Read-P4kxMsiFinishLaunch $context
+    $launchParameters = @{Context=$context}
+    if ($PSBoundParameters.ContainsKey('LaunchDigest')) { $launchParameters.ExpectedDigest = $LaunchDigest }
+    $launch = Read-P4kxMsiFinishLaunch @launchParameters
     Write-P4kxMsiObserverProgress finishCollectBinding end -RequestDigest $context.digest
     if ($env:GITHUB_ACTIONS -ceq 'true') {
         Write-Host '::notice title=Native MSI Finish progress::CollectFinish bound the original request and launch. Observation only.'
@@ -170,6 +178,9 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
     Write-P4kxMsiObserverProgress finishCollectWaitReceipt begin -RequestDigest $context.digest
     $receiptPath = Join-Path $context.directory 'result.json'
     $wait = Read-P4kxDetachedReceipt (Join-Path $context.directory 'wait-result.json')
+    if ($launchParameters.ContainsKey('ExpectedDigest') -and $wait.launch_sha256 -cne $LaunchDigest) {
+        throw 'Finish requires the Wait receipt bound to the original launch digest.'
+    }
     if ($wait.schema -ne 1 -or $wait.role -cne 'native-msi-finish-receipt-wait' -or
         $wait.request_sha256 -cne $context.digest -or $wait.supervisor_pid -ne $launch.supervisor_pid -or
         $wait.supervisor_started_utc_ticks -ne $launch.supervisor_started_utc_ticks -or

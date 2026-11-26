@@ -221,7 +221,9 @@ jobs:
           $observer = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer'
           .github/scripts/invoke-msi-observer.ps1 -Stage StartFinish -Directory $observer
           . .github/scripts/msi-detached-control.ps1
-          $launch = Read-P4kxDetachedReceipt (Join-Path $observer 'finish-supervision/launch.json')
+          $launchPath = Join-Path $observer 'finish-supervision/launch.json'
+          $launch = Read-P4kxDetachedReceipt $launchPath
+          "launch_digest=$(Get-P4kxDetachedReceiptDigest $launchPath)" >> $env:GITHUB_OUTPUT
           $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $launch.collection_cutoff_utc
           "collection_cutoff_utc=$($cutoff.ToString('o'))" >> $env:GITHUB_OUTPUT
       - name: Preserve the original MSI Finish launch binding
@@ -234,35 +236,15 @@ jobs:
           path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/launch.json
           if-no-files-found: error
           overwrite: false
-      - name: Start the bound MSI Finish waiter
-        id: msi-finish-observer-start
-        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
-        timeout-minutes: 1
-        env:
-          P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
-        run: |
-          $observer = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer'
-          $ready = .github/scripts/invoke-msi-finish-observation.ps1 -Stage Start -Directory $observer -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC
-          "ready_digest=$ready" >> $env:GITHUB_OUTPUT
-      - name: Preserve the original MSI Finish waiter readiness
-        id: msi-finish-ready
-        if: ${{ always() && !cancelled() && steps.msi-finish-observer-start.outcome == 'success' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-ready
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/waiter-ready.json
-          if-no-files-found: error
-          overwrite: false
-      - name: Observe the original MSI after Finish readiness
+      - name: Observe the original MSI after Finish launch
         id: msi-finish-live
-        if: ${{ always() && !cancelled() && steps.msi-finish-ready.outcome == 'success' }}
+        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
         continue-on-error: true
         timeout-minutes: 1
         env:
           P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
-          P4KX_MSI_FINISH_READY_DIGEST: ${{ steps.msi-finish-observer-start.outputs.ready_digest }}
-        run: .github/scripts/observe-msi-finish-ready.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -ReadyDigest $env:P4KX_MSI_FINISH_READY_DIGEST
+          P4KX_MSI_FINISH_LAUNCH_DIGEST: ${{ steps.msi-finish-start.outputs.launch_digest }}
+        run: .github/scripts/observe-msi-finish-launch.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -LaunchDigest $env:P4KX_MSI_FINISH_LAUNCH_DIGEST
       - name: Preserve the live original MSI checkpoint
         if: ${{ always() && !cancelled() && steps.msi-finish-live.outcome == 'success' }}
         continue-on-error: true
@@ -271,27 +253,27 @@ jobs:
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-live
           path: |
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/post-ready.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/post-launch.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/checkpoint.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/phase-journal.jsonl
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/original-diagnostic-inputs.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-result.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-wait-result.json
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-waiter-exit.json
           if-no-files-found: error
           overwrite: false
       - name: Wait for the original MSI Finish receipt
         id: msi-finish-wait
-        if: ${{ always() && !cancelled() && steps.msi-finish-ready.outcome == 'success' }}
+        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.observer_finish_minutes) }}
         env:
           P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
-          P4KX_MSI_FINISH_READY_DIGEST: ${{ steps.msi-finish-observer-start.outputs.ready_digest }}
+          P4KX_MSI_FINISH_LAUNCH_DIGEST: ${{ steps.msi-finish-start.outputs.launch_digest }}
         run: |
           $waitOutcome = 'error'
           Write-Host '::notice title=Native MSI Finish outer Wait::state=enter completion=unproven'
           try {
-            .github/scripts/invoke-msi-finish-observation.ps1 -Stage Wait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -ReadyDigest $env:P4KX_MSI_FINISH_READY_DIGEST
+            . .github/scripts/msi-observer-finish-wait-host.ps1
+            Invoke-P4kxMsiHostedFinishWait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -LaunchDigest $env:P4KX_MSI_FINISH_LAUNCH_DIGEST
             $waitOutcome = 'returned'
           } finally {
             Write-Host "::notice title=Native MSI Finish outer Wait::state=unwind outcome=$waitOutcome completion=unproven"
@@ -300,10 +282,12 @@ jobs:
         id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-finish-wait.outcome == 'success' }}
         timeout-minutes: 1
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage CollectFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer')
+        env:
+          P4KX_MSI_FINISH_LAUNCH_DIGEST: ${{ steps.msi-finish-start.outputs.launch_digest }}
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage CollectFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -LaunchDigest $env:P4KX_MSI_FINISH_LAUNCH_DIGEST
       - name: Upload final original MSI lifecycle evidence
         id: msi-finish-evidence
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish-observer-start.outcome != 'skipped' }}
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish-start.outcome == 'success' }}
         timeout-minutes: 1
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
