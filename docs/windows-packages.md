@@ -599,3 +599,36 @@ the blocking call or terminal installer outcome.
 
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140018890789) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140018890780)
+
+### Native ARM64 with detached Finish readiness
+
+Windows-only run `45872703215`, attempt 1, used the packages built at
+`bb2461a7754a042e331042a4ac78196b0041e5cc`. The native ARM64 consumer on Windows
+11 build 26200 completed in 4 minutes 57 seconds. Its waiter published a bound
+readiness receipt and exited zero before the original cutoff. CollectFinish
+validated the original lifecycle. The journal closed all 174 events and recorded
+one completed final cleanup. Install, repair, rollback, and profile preservation
+passed. The MSI and portable ZIP both passed native CLI, MCP, and GUI frame
+checks. Physical audio, clipboard, file-dialog, and hardware GPU checks remain
+unobserved for this hosted ARM64 run.
+
+The terminal evidence archive SHA-256 is
+`08677dd39cc0656ce699857e2c35544ae2b4885ef1dd3ddc5c63dcb03d0a7f06`.
+The executed package archive SHA-256 is
+`74b0e6d8d71da44cdc54b4cc6d0a4323a1ded9e5f84694c64c2099029f0291f1`.
+It contains the MSI with SHA-256
+`5cb060db3d54ef7c744fc142b4a4ef2c1aa3feb99eec8b83555fda250e126d10`
+and the portable ZIP with SHA-256
+`a91c2de67eac754d98f04c5e5e2c57a5ddc057159d969baf76d0beaaf8f46d34`.
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/job/140113609908) ·
+[ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/artifacts/15145488138) ·
+[ARM64 executed package](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/artifacts/15146112691)
+
+The separate AMD64 consumer uploaded its request-bound readiness receipt. At
+19:06:49 UTC GitHub still reported WaitFinish in progress after the collection
+cutoff at 19:06:01 UTC. The last validated original checkpoint had 63 events and
+placed the worker in `previous-install` waiting for `msiexec`. The readiness
+receipt establishes that the waiter bound to the original supervisor. The
+public snapshot contains no waiter exit or terminal installer result.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/job/140113609956) ·
+[AMD64 readiness](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/artifacts/15147036542)
