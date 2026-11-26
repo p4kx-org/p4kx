@@ -4,9 +4,11 @@
 use std::fs;
 use std::io::{self, Write};
 
+use crate::file_receipt::ordinary::LockFinishFailure;
 use crate::origin_file_io::{self, StageDisposition};
 use crate::{
-    CancelToken, ConflictPolicy, OriginArtifactBinding, SourceUses, write_origin_companion,
+    ArchiveWriteProtection, CancelToken, ConflictPolicy, OriginArtifactBinding,
+    OwnedOutputCleanupError, OwnedOutputError, SourceUses, write_origin_companion,
 };
 
 use super::{FilePublication, FileReceipt};
@@ -195,4 +197,68 @@ fn the_commit_observer_disambiguates_a_cancelled_receipt_after_artifact_placemen
         "there is no mismatched origin companion"
     );
     Ok(())
+}
+
+#[test]
+fn cancelled_owned_factory_failure_is_a_precommit_cancellation() -> io::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("Data.p4k");
+    let target = directory.path().join("asset.glb.part");
+    fs::write(&archive, b"original input")?;
+    let cancel = CancelToken::new();
+    let protection =
+        ArchiveWriteProtection::new(&archive, cancel.flag()).map_err(io::Error::other)?;
+    cancel.cancel();
+    let factory = crate::create_output_file(&target, Some(&protection), cancel.flag())
+        .expect_err("the cancelled factory refuses the staged file");
+    let error = factory.into_io_error();
+
+    assert_eq!(
+        error.kind(),
+        io::ErrorKind::PermissionDenied,
+        "the regular file factory preserves the protection error kind"
+    );
+    assert!(
+        FileReceipt::is_precommit_cancellation(&error, &cancel),
+        "the factory's typed cancellation survives the I/O wrapper"
+    );
+    assert!(!target.exists(), "cancellation left no staged output");
+    assert_eq!(fs::read(archive)?, b"original input", "original preserved");
+    Ok(())
+}
+
+#[test]
+fn retained_output_and_failed_lock_retirement_are_not_precommit_cancellation() {
+    let cancel = CancelToken::new();
+    cancel.cancel();
+    let missing = std::path::Path::new("unopened.p4k");
+    let protection = ArchiveWriteProtection::new(missing, cancel.flag())
+        .expect_err("the guard supplies a typed cancellation");
+    assert!(
+        protection.is_cancelled(),
+        "the primary error really is cancellation"
+    );
+    let output = missing.with_extension("glb.part");
+    let cleanup = OwnedOutputError::Cleanup {
+        primary: Box::new(OwnedOutputError::Protection(protection.clone())),
+        cleanup: OwnedOutputCleanupError::UnexpectedType {
+            path: output.clone(),
+        },
+    }
+    .into_io_error();
+    let retained = OwnedOutputError::RetainedCreation {
+        path: output,
+        source: io::Error::other("the staged file identity was not captured"),
+    }
+    .into_io_error();
+    let lease = io::Error::other(LockFinishFailure::Uncommitted {
+        primary: OwnedOutputError::Protection(protection).into_io_error(),
+        cleanup: io::Error::from(io::ErrorKind::PermissionDenied),
+    });
+    for error in [cleanup, retained, lease] {
+        assert!(
+            !FileReceipt::is_precommit_cancellation(&error, &cancel),
+            "a retained path or failed cleanup remains observable: {error}"
+        );
+    }
 }

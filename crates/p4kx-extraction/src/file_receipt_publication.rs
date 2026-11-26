@@ -8,7 +8,7 @@ use crate::origin_file_io::{self, StageDisposition};
 use crate::output_file::StagedOutput;
 use crate::{
     CancelToken, ConflictPolicy, OriginArtifactBinding, OriginArtifactDigest, OriginDigestWriter,
-    OwnedFileToken,
+    OwnedFileToken, WriteProtectionError, owned_output_failure,
 };
 
 use super::lock::{Contention, ReceiptLock, protection_error, regular_file};
@@ -37,6 +37,26 @@ pub enum FilePublication {
 }
 
 impl FileReceipt<'_> {
+    /// Identifies cancellation from a publication error before the artifact commits.
+    ///
+    /// A retained output or failed lock retirement takes precedence over cancellation.
+    #[must_use]
+    pub fn is_precommit_cancellation(error: &io::Error, cancel: &CancelToken) -> bool {
+        if super::retained_lock_failure(error) {
+            return false;
+        }
+        if let Some(cause) = owned_output_failure(error) {
+            return cause.is_cancelled();
+        }
+        if let Some(cause) = error
+            .get_ref()
+            .and_then(|inner| inner.downcast_ref::<WriteProtectionError>())
+        {
+            return cause.is_cancelled();
+        }
+        cancel.is_cancelled() && error.kind() == io::ErrorKind::Interrupted
+    }
+
     pub(super) fn publish_owned_companion(
         &self,
         held: &ReceiptLock<'_>,

@@ -135,18 +135,14 @@ impl ModelSource {
 }
 
 fn publication_io_error(out: &Path, error: io::Error, cancel: &CancelToken) -> ConversionError {
+    if FileReceipt::is_precommit_cancellation(&error, cancel) {
+        return ConversionError::Cancelled;
+    }
     if let Some(protection) = error
         .get_ref()
         .and_then(|inner| inner.downcast_ref::<WriteProtectionError>())
     {
-        return if protection.is_cancelled() {
-            ConversionError::Cancelled
-        } else {
-            ConversionError::Installation(protection.clone())
-        };
-    }
-    if cancel.is_cancelled() && error.kind() == io::ErrorKind::Interrupted {
-        return ConversionError::Cancelled;
+        return ConversionError::Installation(protection.clone());
     }
     write_error(out, error)
 }

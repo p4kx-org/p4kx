@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use p4kx_assembly::{ArchiveModels, Assembly, Interior};
 use p4kx_extraction::{
     Archive, ArchiveWriteProtection, CancelToken, ConversionError, FileReceipt, GlbMeshOrigins,
-    GlbOptions, GlbSummary, GltfError, TextureLoader, WriteProtectionError,
+    GlbOptions, GlbSummary, GltfError, TextureLoader,
 };
 
 use thiserror::Error;
@@ -112,21 +112,15 @@ impl Scene<'_> {
 fn conversion_error(request: &Request, cancel: &CancelToken, error: io::Error) -> ConversionError {
     match error.downcast::<GltfError>() {
         Ok(GltfError::Write(_)) if cancel.is_cancelled() => ConversionError::Cancelled,
-        Err(error) if cancel.is_cancelled() && interrupted(&error) => ConversionError::Cancelled,
+        Err(error) if FileReceipt::is_precommit_cancellation(&error, cancel) => {
+            ConversionError::Cancelled
+        }
         Ok(GltfError::Write(source)) | Err(source) => output_error(request, source),
         Ok(source) => ConversionError::Glb {
             file: request.name.clone(),
             source,
         },
     }
-}
-
-fn interrupted(error: &io::Error) -> bool {
-    error.kind() == io::ErrorKind::Interrupted
-        || error
-            .get_ref()
-            .and_then(|source| source.downcast_ref::<WriteProtectionError>())
-            .is_some_and(WriteProtectionError::is_cancelled)
 }
 
 fn output_error(request: &Request, source: io::Error) -> ConversionError {

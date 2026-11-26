@@ -81,18 +81,14 @@ fn uncommitted_error(request: &Request, cancel: &CancelToken, error: io::Error) 
             };
         }
     };
+    if FileReceipt::is_precommit_cancellation(&source, cancel) {
+        return ConversionError::Cancelled;
+    }
     if let Some(protection) = source
         .get_ref()
         .and_then(|error| error.downcast_ref::<WriteProtectionError>())
     {
-        return if protection.is_cancelled() {
-            ConversionError::Cancelled
-        } else {
-            ConversionError::Installation(protection.clone())
-        };
-    }
-    if cancel.is_cancelled() && source.kind() == io::ErrorKind::Interrupted {
-        return ConversionError::Cancelled;
+        return ConversionError::Installation(protection.clone());
     }
     ConversionError::Write {
         path: request.file.clone(),

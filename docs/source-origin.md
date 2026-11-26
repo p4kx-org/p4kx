@@ -482,6 +482,10 @@ The receipt uses the rigged Armour writer's observed mesh and worn-mount
 fields. Unobserved contributors leave the artifact origin incomplete.
 The export summary exposes the companion path for single-file GLB outputs.
 
+GUI Model, Character, Entity and Interior exports report a stop during
+precommit path identity checks as cancellation. A failed cleanup or lock
+retirement retains its error, including when the stop request is active.
+
 ## Rigid worn mounts
 
 `p4kx armour glb` publishes a sibling `<file>.p4kx-origin.jsonl` for emitted rigid
