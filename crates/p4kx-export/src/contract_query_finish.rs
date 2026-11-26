@@ -84,9 +84,9 @@ pub(super) fn finish<'source>(
                 .into_iter()
                 .map(ContractSummary::from_row)
                 .collect();
+            output.locations = transaction.pools.locations.into_values().collect();
         }
     }
-    output.locations = transaction.pools.locations.into_values().collect();
     coverage.diagnostics.extend(
         transaction
             .ledger
@@ -118,16 +118,11 @@ fn publish_details<'source>(
     }
     output.property_sets = std::mem::take(&mut transaction.sets)
         .publish(&projection.for_kind(Kind::MissionPropertySets), cancel)?;
-    output.ships = std::mem::take(&mut transaction.pools.ships)
-        .into_values()
-        .collect();
-    output.npcs = std::mem::take(&mut transaction.pools.npcs)
-        .into_values()
-        .map(|pool| pool.finish(&projection.for_kind(Kind::ContractNpcSpawns)))
-        .collect::<Result<_, _>>()?;
-    output.entities = std::mem::take(&mut transaction.pools.entities)
-        .into_values()
-        .collect();
+    let pools = std::mem::take(&mut transaction.pools).publish(projection, cancel)?;
+    output.ships = pools.ships;
+    output.npcs = pools.npcs;
+    output.entities = pools.entities;
+    output.locations = pools.locations;
     Ok(())
 }
 

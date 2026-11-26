@@ -5,14 +5,21 @@
 //! template, handler, contract and sub contract level, and two location templates.
 
 mod broker;
+#[cfg(test)]
+mod broker_query;
 mod broker_structures;
 pub(crate) mod generator_query;
+mod locales;
 mod npc;
+#[cfg(test)]
+mod pool_query_checks;
 mod structures;
 mod template;
 mod template_deep;
 mod template_parts;
 mod template_properties;
+#[cfg(test)]
+mod template_query;
 mod template_structures;
 mod template_values;
 mod unknown_conditions;
@@ -21,10 +28,10 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, TestInstance, TestRecord,
-    TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
 };
 
+use self::locales::{english, french};
 use self::npc::NpcKind;
 
 pub(crate) const GENERATOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
@@ -374,27 +381,13 @@ pub(crate) fn database() -> DataForgeBuilder {
         .fold(builder, DataForgeBuilder::record)
 }
 
-fn english() -> TestEntry {
-    TestEntry::zstd(
-        "Data\\Localization\\english\\global.ini",
-        GlobalIniBuilder::new()
-            .text("place_name", "Hijacked Ship")
-            .build(),
-    )
-}
-
 /// Writes the fixture Archive into `dir` and returns its path.
 pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
         .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
         .entry(english())
-        .entry(TestEntry::zstd(
-            p4kx_extraction::Language::French.global_ini_path(),
-            GlobalIniBuilder::new()
-                .text("place_name", "Site de mission")
-                .build(),
-        ))
+        .entry(french())
         .write_to(&path)?;
     Ok(path)
 }

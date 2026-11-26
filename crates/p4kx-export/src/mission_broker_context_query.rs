@@ -22,11 +22,13 @@ use crate::export_diagnostic::ExportSourceRole;
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_index::BrokerRewardReads;
 use crate::record_observation::RecordObservation;
+use crate::spawn_pools::SpawnPools;
 use crate::template_issues::Unknowns;
 use crate::template_tag_cache::{DeferredTemplateTags, TemplateTagInput};
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, CatalogReadFailure, Kind};
 
+pub use super::{EntitySpawnPool, LocationQuery, PublishedNpcPool, ShipSpawnPool};
 pub use crate::broker_definition::BrokerDefinition;
 pub use crate::broker_entry::BrokerProjection;
 pub use crate::broker_reputation_read::{BrokerReputationAmount, BrokerReputationResult};
@@ -44,6 +46,14 @@ pub struct MissionBrokerContextSnapshot<'source> {
     pub rows: Vec<BrokerProjection<'source>>,
     /// Original owners, including those whose required contextual interpretation failed.
     pub owners: Vec<BrokerDefinition<'source>>,
+    /// Distinct ship spawn descriptions from projected Brokers, in content ID order.
+    pub ship_spawns: Vec<ShipSpawnPool>,
+    /// Distinct NPC spawn descriptions from projected Brokers, with protected name links.
+    pub npc_spawns: Vec<PublishedNpcPool>,
+    /// Distinct entity spawn descriptions from projected Brokers, in content ID order.
+    pub entity_spawns: Vec<EntitySpawnPool>,
+    /// Distinct location queries from projected Brokers, in content ID order.
+    pub location_queries: Vec<LocationQuery>,
     /// Protected text rows registered while interpreting these owners.
     pub game_texts: Vec<CanonicalText<'source, GameTextRef>>,
     /// Requested locales actually read for these owners.
@@ -177,19 +187,15 @@ fn project<T>(
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(kind);
     let tags = DeferredTemplateTags::new(forge, &input, cancel);
-    let mut rewards = BrokerRewardReads::new();
-    let mut read = Selected {
-        coverage,
-        ..Selected::default()
-    };
-    read.project(
+    let read = Selected::read(
         owners,
+        coverage,
         &projection,
         TemplateTagInput::OnDemand(&tags),
-        &mut rewards,
         cancel,
     )?;
     let table = CatalogTable::new(forge, &[kind.records().type_name], read.rows);
+    let pools = read.pools.publish(&projection, cancel)?;
     let text_rows = projection.finish_rows()?;
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
     let available_languages = languages
@@ -197,20 +203,24 @@ fn project<T>(
         .copied()
         .filter(|language| text_sources.entry(*language).is_some())
         .collect();
-    let (reward_failures, incomplete_reward_fields) = rewards.finish();
+    checkpoint(cancel)?;
     Ok(inspect(MissionBrokerContextSnapshot {
         build: archive.build().cloned(),
         availability: table.availability,
         rows: table.rows,
         owners: read.owners,
+        ship_spawns: pools.ships,
+        npc_spawns: pools.npcs,
+        entity_spawns: pools.entities,
+        location_queries: pools.locations,
         game_texts: text_rows.game_texts,
         available_languages,
         localization_notes: texts.notes().to_vec(),
         source_inventory,
         coverage: read.coverage,
         contextual_failures: read.failures,
-        reward_failures,
-        incomplete_reward_fields,
+        reward_failures: read.reward_failures,
+        incomplete_reward_fields: read.incomplete_reward_fields,
         tag_ancestry_surveyed: tags.was_read(),
         tag_failures: tags.into_failures(),
     }))
@@ -220,19 +230,26 @@ fn project<T>(
 struct Selected<'source> {
     rows: Vec<BrokerProjection<'source>>,
     owners: Vec<BrokerDefinition<'source>>,
+    pools: SpawnPools<'source>,
     failures: Vec<CatalogReadFailure<'source>>,
     coverage: CatalogRecordCoverage,
+    reward_failures: Vec<CatalogReadFailure<'source>>,
+    incomplete_reward_fields: Vec<u32>,
 }
 
 impl<'source> Selected<'source> {
-    fn project(
-        &mut self,
+    fn read(
         owners: Vec<Owner<'source>>,
+        coverage: CatalogRecordCoverage,
         projection: &CatalogProjection<'_, 'source>,
         tags: TemplateTagInput<'_, 'source>,
-        rewards: &mut BrokerRewardReads<'source>,
         cancel: Option<&CancelToken>,
-    ) -> Result<(), CatalogError> {
+    ) -> Result<Self, CatalogError> {
+        let mut selected = Self {
+            coverage,
+            ..Self::default()
+        };
+        let mut rewards = BrokerRewardReads::new();
         let unknowns = Unknowns::default();
         let input = projection.original();
         for Owner { record, tree } in owners {
@@ -260,12 +277,13 @@ impl<'source> Selected<'source> {
                 unknowns: &unknowns,
             };
             let piece = broker_canonical_read::read(&mut context, &record, &tree, cancel)?;
-            let complete = self.append(piece);
+            let complete = selected.append(piece);
             if !original.field_projection_complete(0, 0) || !complete {
-                self.coverage.incomplete_fields.push(record.index());
+                selected.coverage.incomplete_fields.push(record.index());
             }
         }
-        Ok(())
+        (selected.reward_failures, selected.incomplete_reward_fields) = rewards.finish();
+        Ok(selected)
     }
 
     fn append(&mut self, piece: CanonicalBroker<'source>) -> bool {
@@ -273,12 +291,13 @@ impl<'source> Selected<'source> {
         match piece.projection {
             Ok(BrokerEmission {
                 projection,
+                pools,
                 ledger,
                 failures,
-                ..
             }) => {
                 let complete = ledger.field_projection_complete(0, 0) && failures.is_empty();
                 self.rows.push(projection);
+                self.pools.merge(pools);
                 self.failures.extend(failures);
                 complete
             }

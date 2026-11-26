@@ -1057,11 +1057,32 @@ source evidence. The query binds the authored target's exact physical Record and
 reports Reward read failures separately. Use `snapshot.owner()` to resolve
 contextual links into the original source arena.
 
+The snapshot's `ship_spawns`, `npc_spawns`, `entity_spawns` and `location_queries`
+contain the distinct content rows from successfully projected Brokers in this selection.
+They retain canonical content-ID order. A contextual read failure that prevents a Broker
+row also excludes its pools. An unreadable reached Reward still permits the Broker row
+and its pools, with the unreadable amount and Reward failure reported separately.
+Pool NPC name references resolve through the same snapshot's protected text rows and
+source inventory. Each list's length counts the rows after content deduplication.
+The family availability describes declaration of the Broker source family, including
+when no owner matches the selection.
+
 Use `contract_template_context::with_contract_template_context` or its decoded-Entry
 and session forms for `configurations.contractTemplates`. Select by physical Record
 index, GUID, or the complete Template family. The context row's `template()` points
 to the original owner returned by `snapshot.owner()`. Resolve its title, objective,
 Tag and localization bindings against that owner's source arena.
+
+The snapshot also returns the selected Templates' distinct `ship_spawns`, `npc_spawns`,
+`entity_spawns` and `location_queries` in canonical content-ID order. These are the
+content rows the same Templates contribute to `contractShipSpawns`, `contractNpcSpawns`,
+`contractEntitySpawns` and `contractLocationQueries` in the Catalog. Matching content
+from several selected owners appears once. Each list's length counts only the content
+emitted for this selection. Family `availability` describes the presence of the Template
+source declaration and can be available for an empty selection. The scope excludes
+independent Generator and Broker declarations, including their distinct pool IDs.
+NPC name references resolve in the same snapshot's protected `game_texts`, with its
+own `source_inventory` and requested locale policy.
 
 This query interprets the selected Templates and their reached Record dependencies.
 It reads the requested available locales for admitted owners and returns the protected

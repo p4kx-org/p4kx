@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::CancelToken;
+
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -52,21 +54,18 @@ impl<'f> Collected<'f> {
         templates: LocationTemplates<'f>,
         pools: SpawnPools<'f>,
         projection: &CatalogProjection<'_, 'f>,
+        cancel: Option<&CancelToken>,
     ) -> Result<(), CatalogError> {
-        let npc_projection = projection.for_kind(Kind::ContractNpcSpawns);
-        self.contract_npc_spawns = pools
-            .npcs
-            .into_values()
-            .map(|pool| pool.finish(&npc_projection))
-            .collect::<Result<_, _>>()?;
+        let pools = pools.publish(projection, cancel)?;
+        self.contract_npc_spawns = pools.npcs;
         self.ledger.merge(templates.ledger);
         self.mission_location_templates = templates.items;
         if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
             *slot = templates.skipped;
         }
-        self.contract_ship_spawns = pools.ships.into_values().collect();
-        self.contract_entity_spawns = pools.entities.into_values().collect();
-        self.contract_location_queries = pools.locations.into_values().collect();
+        self.contract_ship_spawns = pools.ships;
+        self.contract_entity_spawns = pools.entities;
+        self.contract_location_queries = pools.locations;
         self.add_failures(templates.failures);
         Ok(())
     }

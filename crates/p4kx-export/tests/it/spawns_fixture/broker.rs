@@ -22,7 +22,7 @@ fn flag(name: &str, value: bool) -> (String, TestValue) {
 }
 
 /// An empty entry; the deadline is a class every Record of the struct states.
-fn entry(guid: u128, name: &str, path: &str) -> TestRecord {
+pub(super) fn entry(guid: u128, name: &str, path: &str) -> TestRecord {
     TestRecord::new(
         guid,
         "MissionBrokerEntry",
