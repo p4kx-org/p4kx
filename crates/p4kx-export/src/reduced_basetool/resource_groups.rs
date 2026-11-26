@@ -10,16 +10,14 @@ use super::ReducedError;
 use super::cell::Cell;
 use super::completeness;
 use super::record_identity::RecordIdentity;
+use super::record_link::RecordLink;
 use super::record_targets::RecordTargets;
 use super::selected_texts::{SelectedTexts, TextRefs};
 use crate::Kind;
-use crate::catalog_queries::ResourceGroupSnapshot;
-use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
+use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries, ResourceGroupSnapshot};
 use crate::catalog_record_reference::CatalogRecordReference;
-use crate::catalog_reference;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_text_contract::PublicNameRef;
-use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
 
 const DEFINITIONS: &str = "definitions.resourceGroups";
@@ -173,69 +171,12 @@ struct Parent<'read> {
     parent: Cell<Option<RecordLink<'read>>>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RecordLink<'read> {
-    guid: Cell<&'read CatalogGuid>,
-    target_record_index: Cell<&'read u32>,
-    record_path: Cell<&'read str>,
-    target_type: Cell<&'read str>,
-    status: &'read DefinitionStatus,
-}
-
-impl<'read> RecordLink<'read> {
-    fn read(
-        path: &'static str,
-        link: &'read CatalogRecordReference,
-        target_kind: Kind,
-        targets: &RecordTargets,
-    ) -> Result<Self, ReducedError> {
-        let targets_reduced_family = match link.status() {
-            DefinitionStatus::Present => {
-                let source_type = link
-                    .target_type()
-                    .value()
-                    .ok_or(ReducedError::IncompleteScope(path))?;
-                catalog_reference::actual_kind(source_type) == Some(target_kind)
-            }
-            DefinitionStatus::Dangling | DefinitionStatus::UnexpectedTargetType => false,
-        };
-        if targets_reduced_family {
-            let index = link
-                .target_record_index()
-                .value()
-                .copied()
-                .ok_or(ReducedError::IncompleteScope(path))?;
-            let guid = link
-                .guid
-                .value()
-                .ok_or(ReducedError::IncompleteScope(path))?;
-            targets.verify(path, index, guid.get())?;
-        }
-        Ok(Self {
-            guid: (&link.guid).into(),
-            target_record_index: link.target_record_index().into(),
-            record_path: Cell::from(link.record_path()).map(String::as_str),
-            target_type: Cell::from(link.target_type()).map(String::as_str),
-            status: link.status(),
-        })
-    }
-}
-
 fn links<'read>(
     source: &'read SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>,
     target_kind: Kind,
     targets: &RecordTargets,
 ) -> Result<Cell<Vec<Cell<RecordLink<'read>>>>, ReducedError> {
-    completeness::value(MEMBERS, source)?;
-    Cell::from(source).try_map(|slots| {
-        slots
-            .iter()
-            .map(|slot| {
-                completeness::value(MEMBERS, slot)?;
-                Cell::from(slot)
-                    .try_map(|link| RecordLink::read(MEMBERS, link, target_kind, targets))
-            })
-            .collect()
+    completeness::list(MEMBERS, source, |link| {
+        RecordLink::read(MEMBERS, link, target_kind, targets)
     })
 }

@@ -248,6 +248,20 @@ The parent projection checks the group survey it depends on. It retains
 separate physical rows for aliases and preserves the source state and
 encryption marker of each selected parent choice.
 
+## Internal ResourceType producer slice
+
+The canonical ResourceType reader supplies the selected names, density and
+molar mass, refinement targets, direct group memberships, cargo slots and
+ordered resource properties. Numeric values retain their source widths and
+units, including distinguishable non-finite states. Quality data retains
+inline payloads, Record references and empty base declarations. Name
+references feed the same English and German closure as the group names.
+
+The refinement links and ordered group memberships validate physical
+targets against the staged ResourceType rows. The writer preserves both an
+absent declaration and an explicitly null slot. Raw float bits, thumbnails,
+validation flags and description references are outside this selection.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

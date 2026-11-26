@@ -4,6 +4,7 @@
 use p4kx_extraction::{SourceValueState, SourcedValue};
 
 use super::ReducedError;
+use super::cell::Cell;
 use crate::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 
 pub(super) fn inventory(
@@ -43,6 +44,26 @@ pub(super) fn value<T>(path: &'static str, value: &SourcedValue<T>) -> Result<()
     } else {
         Err(ReducedError::IncompleteScope(path))
     }
+}
+
+pub(super) fn cell<'source, T>(
+    path: &'static str,
+    source: &'source SourcedValue<T>,
+) -> Result<Cell<&'source T>, ReducedError> {
+    value(path, source)?;
+    Ok(Cell::from(source))
+}
+
+pub(super) fn list<'source, T, U>(
+    path: &'static str,
+    source: &'source SourcedValue<Vec<SourcedValue<T>>>,
+    mut project: impl FnMut(&'source T) -> Result<U, ReducedError>,
+) -> Result<Cell<Vec<Cell<U>>>, ReducedError> {
+    cell(path, source)?.try_map(|list| {
+        list.iter()
+            .map(|entry| cell(path, entry)?.try_map(&mut project))
+            .collect()
+    })
 }
 
 pub(super) fn rows(

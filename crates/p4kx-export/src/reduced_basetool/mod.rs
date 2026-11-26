@@ -26,8 +26,13 @@ mod manufacturer_definitions;
 mod number;
 mod plan;
 mod record_identity;
+mod record_link;
 mod record_targets;
+mod resource_density;
 mod resource_groups;
+mod resource_properties;
+mod resource_quality;
+mod resource_types;
 mod selected_texts;
 mod ship;
 mod ship_cargo;
@@ -40,9 +45,11 @@ mod cargo_globals_tests;
 #[cfg(test)]
 mod contract_scope_tests;
 #[cfg(test)]
+mod entity_tests;
+#[cfg(test)]
 mod resource_group_tests;
 #[cfg(test)]
-mod entity_tests;
+mod resource_type_tests;
 #[cfg(test)]
 mod ship_equipment_tests;
 
