@@ -172,9 +172,15 @@ pub(crate) fn click_shown_once<S>(
     harness: &mut Harness<'_, S>,
     label: &str,
 ) -> Result<(), Box<dyn Error>> {
-    wait_for(harness, &format!("`{label}` to be shown once"), |harness| {
-        harness.query_all_by_label_contains(label).count() == 1
-    })?;
+    wait_for_described(
+        harness,
+        &format!("`{label}` to be shown once"),
+        |harness| harness.query_all_by_label_contains(label).count() == 1,
+        |harness| {
+            let matches = harness.query_all_by_label_contains(label).count();
+            format!("{matches} matching nodes")
+        },
+    )?;
     harness.get_by_label_contains(label).click();
     Ok(())
 }

@@ -95,7 +95,7 @@ fn the_menu_entry_extracts_with_the_platform_shortcut_label() -> TestResult {
     ] {
         let (_dir, mut harness) = opened_on(os)?;
         check_first(&mut harness)?;
-        harness.get_by_label("Archive").click();
+        harness.get_by_label("Archive").click_accesskit();
         harness.run_quiet();
         click_shown_once(&mut harness, hint)?;
         harness.run_quiet();
@@ -142,7 +142,7 @@ fn the_menu_entry_opens_the_archive_again() -> TestResult {
     let (_dir, mut harness) = opened()?;
     check_first(&mut harness)?;
 
-    harness.get_by_label("Archive").click();
+    harness.get_by_label("Archive").click_accesskit();
     harness.run_quiet();
     click_shown_once(&mut harness, "F5")?;
     wait_until(&mut harness, reopened)?;
