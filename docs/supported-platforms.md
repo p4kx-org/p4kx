@@ -158,15 +158,15 @@ Tagged assembly compares the observed runner version with the release pin in
 [macOS host evidence](../.github/scripts/macos-host-evidence.ps1). The current approval
 covers the `xcode-27` guest running macOS 27.0.1. Dry runs record the actual macOS
 version and build. Update the pin when GitHub supplies and verifies the newer guest.
-For PR merge `4d334e716cbc87e27525e8e095410a19103c51f5`, both native
+For PR merge `2b4434893ea7092853f24eaf04950e8c3fedb9c8`, both native
 guest lanes mounted the original DMG read-only and ran the relocated app.
 They also verified the exact add-on ZIP in Blender 5.2.4. The minimum
 guest reported macOS 26.7.2 (25G332). The current guest reported macOS
-27.0.1 (26A434). The native assembly verified both receipts before
+27.0.1 (26A434). The assembly job verified both receipts before
 publishing the tested PR artifact.
-[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139106444957) ·
-[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139106444987) ·
-[Native assembly](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139107694349)
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140019115224) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140019115170) ·
+[Native assembly](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140020239754)
 
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged

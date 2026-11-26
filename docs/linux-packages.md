@@ -418,6 +418,15 @@ artifacts for their respective CPUs.
 [AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15122711905) ·
 [ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15121443860)
 
+At PR #1117 merge `2b4434893ea7092853f24eaf04950e8c3fedb9c8`, the AMD64 and ARM64
+consumers validated their target-bound archives and ran all four packaged launchers,
+desktop frames and Documents portal grants. Each consumer published the executed
+payload for its target.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140012583781) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140012583827) ·
+[AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/artifacts/15132867497) ·
+[ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/artifacts/15133381584)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
