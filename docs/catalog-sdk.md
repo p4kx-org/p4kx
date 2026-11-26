@@ -14,10 +14,9 @@ canonical queries. Choose the route that matches the required output.
 
 Return owned values from a `with_*` callback if they must outlive the query. A visitor can call
 the consumer before a later failure or cancellation. Stage changes until the operation returns
-successfully and review its coverage before replacing cached data. For a complete parts inventory,
-use `visit_item_definitions(ItemDefinitionSelection::Records(CatalogRecordSelection::All), …)` and the applicable Loadout or port view. A batch of
-`RecordIndices` collected from ship Loadouts covers only the selected physical
-Items installed in those Loadouts.
+successfully and review its coverage before replacing cached data. Build ship, parts and mining
+indices on the same parsed session. The [equipment selection guide](#choose-the-equipment-scope)
+lists the queries for original definitions, declared constraints and resolved default equipment.
 
 For a file export, use `CatalogFile::create_protected` inside the lazy file factory with the
 Archive's write protection. Create an `ArchiveWatch` for the same opened Archive and pass it
@@ -801,6 +800,21 @@ preserve physical aliases. Only selected owner bodies and demanded requested ref
 read; ResourceType/group/world discovery and a complete Catalog are unnecessary. Examine sourced
 states and owner/dependency coverage and publish caches only after outer success. See the
 [complete contract](catalog-mining-refining.md).
+
+## Choose the equipment scope
+
+| Consumer data | Method on the parsed session |
+| --- | --- |
+| Resolved default equipment and nested ports for ship roots | `visit_loadout_owners(LoadoutOwnerSelection::Ships, …)`. |
+| Definitions of all admitted parts, including unused parts, clothing and paints | `visit_item_definitions(ItemDefinitionSelection::Records(CatalogRecordSelection::All), …)`. Keep the consumer's mining selection across these Items when building its mining index. |
+| Authored port containers and attachment constraints for all admitted Ships and Items | `visit_declared_equipment(CatalogRecordSelection::All, …)`. Use this when the index needs authored types, sizes, tags and restrictions. |
+| Resolved ports, XML overrides and default equipment for standalone Items as well as Ships | `visit_loadouts(CatalogRecordSelection::All, …)`. All selects the canonical Ship and Item Loadout roots, including Items with an authored Loadout or port slots. |
+
+A `RecordIndices` batch derived from ship Loadouts contains only the selected physical Items
+reached as default equipment. For a complete parts index, run the all-Item definition visit.
+Compare ordered identities, coverage and the emitted business data before switching a
+consumer from resolved loadouts to declarations. Stage the cache until all requested visits
+succeed.
 
 ## Declared ship and item equipment
 
