@@ -3324,6 +3324,17 @@ owner sequence, including published Ships with no Interior rows. The separate
 `installed_all_facility_interior_placements_cold_visit`
 test measures the default provenance mode with the same installed Build.
 
+On installed LIVE `13220821`, the selected placement query verified
+`AEGS_Hammerhead_GS` at physical Record index `98717`. An unoptimized native
+Windows AMD64 test binary with one Rayon worker returned 18 room coverage rows,
+one Interior placement, 396 contributing uses and 19 physical sources. Its
+lifetime peak was 1,091,923,968 B private commit and 1,024,147,456 B working set.
+The test process elapsed time was 15.657 s with the archive-free verifier
+running on the same host. The binary SHA-256 was
+`879b1b59a248c712fb154672b8d52ac7e7b106cdc7ef4fc16a4a2b90562cb6e7`.
+Same-Build Catalog comparison and final-candidate resource validation remain
+pending.
+
 ## Installed flight configurations
 
 Use `equipment::read_installed_configurations`, its decoded-Entry form or the equivalent
