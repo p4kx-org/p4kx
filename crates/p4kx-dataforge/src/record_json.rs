@@ -85,12 +85,26 @@ impl RecordJson {
         out: &mut W,
         observer: &mut dyn RecordJsonObserver,
     ) -> io::Result<()> {
+        self.write_observed_annotated(input, Annotations::none(), out, observer)
+    }
+
+    /// Writes the annotated Record and observes the original values and annotation selections.
+    ///
+    /// # Errors
+    /// Returns the first output or observation error.
+    pub fn write_observed_annotated<W: Write>(
+        &mut self,
+        input: &PositionedRecord<'_>,
+        annotations: Annotations<'_>,
+        out: &mut W,
+        observer: &mut dyn RecordJsonObserver,
+    ) -> io::Result<()> {
         self.write_inner(
             input.tree(),
             Out {
                 sink: out,
                 pretty: self.layout == JsonLayout::Pretty,
-                annotations: Annotations::none(),
+                annotations,
                 observation: Some(Observation::new(input, observer)),
             },
         )
@@ -256,7 +270,9 @@ impl RecordJson {
         depth: usize,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
-        if let Some(observation) = &mut out.observation {
+        if !matches!(value, Value::Locale(_))
+            && let Some(observation) = &mut out.observation
+        {
             observation.value(slot, Some(value))?;
         }
         match value {

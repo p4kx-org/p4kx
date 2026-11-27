@@ -96,6 +96,19 @@ include the original reference scan and retain incomplete evidence when the
 scan has gaps. If the source positions cannot be kept, navigation and queries
 continue with unknown provenance where the positions are required.
 
+## Record JSON files
+
+The unannotated per-Record JSON export publishes a sibling
+.p4kx-origin.jsonl companion for each written file. Its JSON Pointers address
+the emitted fields and its digest binds the original JSON bytes. The
+dcb export --json summary lists newly published paths under origin_receipts
+and reports companion failures separately under origin_failures.
+
+Keep decisions retain the existing file and its companion. Before a
+replacement of an individual Record JSON file, the writer retires its owned
+companion. A later companion publication failure leaves the committed JSON
+available for inspection.
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.

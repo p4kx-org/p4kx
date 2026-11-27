@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
+use std::io::{self, Write};
 
 use p4kx_dataforge::{
     DataForge, PositionedRecord, RecordJson, RecordJsonObserver, RecordJsonSource, RecordJsonUse,
@@ -9,8 +9,9 @@ use p4kx_dataforge::{
 
 use crate::{
     ConflictPolicy, DataForgeEntry, DataForgeOrigin, FieldOrigin, FieldPath, FilePublication,
-    FileReceipt, InputScope, OriginOutputAddress, RecordJsonLocation, SourceEvidenceError,
-    SourceInput, SourceInventory, SourceScope, SourceUses, write_origin_companion,
+    FileReceipt, InputScope, OriginArtifactBinding, OriginOutputAddress, RecordJsonLocation,
+    SourceEvidenceError, SourceInput, SourceInventory, SourceScope, SourceUses,
+    write_origin_companion,
 };
 
 /// Canonical, unannotated Record JSON and the contributors to its emitted fields.
@@ -68,15 +69,23 @@ impl RecordJsonReceipt {
         policy: ConflictPolicy,
     ) -> io::Result<FilePublication> {
         receipt.publish_bytes(&self.bytes, policy, |out, binding| {
-            write_origin_companion(
-                out,
-                binding,
-                &self.inventory,
-                self.fields
-                    .iter()
-                    .map(|(address, origin)| (address, origin)),
-            )
+            self.describe(out, binding)
         })
+    }
+
+    pub(crate) fn describe(
+        &self,
+        out: &mut dyn Write,
+        binding: &OriginArtifactBinding,
+    ) -> io::Result<()> {
+        write_origin_companion(
+            out,
+            binding,
+            &self.inventory,
+            self.fields
+                .iter()
+                .map(|(address, origin)| (address, origin)),
+        )
     }
 }
 

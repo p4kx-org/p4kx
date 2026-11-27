@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
+use std::path::PathBuf;
 
 use p4kx_dataforge::{Annotations, DataForgeError, Guid, TagResolver, TextResolver};
 use thiserror::Error;
@@ -172,9 +173,23 @@ pub struct RecordExportReport {
     pub(crate) error_values: usize,
     pub(crate) records_with_errors: usize,
     pub(crate) written_record_indices: Option<Vec<u32>>,
+    pub(crate) origin_receipts: Vec<PathBuf>,
+    pub(crate) origin_failures: Vec<ExtractionError>,
 }
 
 impl RecordExportReport {
+    /// Returns the field companions committed by this run.
+    #[must_use]
+    pub fn origin_receipts(&self) -> &[PathBuf] {
+        &self.origin_receipts
+    }
+
+    /// Returns failures publishing origin evidence for committed Record files.
+    #[must_use]
+    pub fn origin_failures(&self) -> &[ExtractionError] {
+        &self.origin_failures
+    }
+
     /// Returns the number of Records written.
     #[must_use]
     pub const fn written(&self) -> usize {

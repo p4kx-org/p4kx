@@ -3,6 +3,8 @@
 
 use std::io;
 
+use crate::{Guid, Resolution};
+
 /// Observes original inputs at addresses emitted by the canonical Record JSON writer.
 pub trait RecordJsonObserver {
     /// Receives one emitted value's JSON Pointer and its original contributors.
@@ -28,6 +30,36 @@ pub trait RecordJsonObserver {
     ) -> io::Result<()> {
         let coordinates: Vec<_> = sources.iter().map(|input| input.source).collect();
         self.value(pointer, &coordinates, complete)
+    }
+
+    /// Receives the actual localisation decision and its original Record selectors.
+    ///
+    /// # Errors
+    /// Returns an error to stop emission at this value.
+    fn localization(
+        &mut self,
+        pointer: &str,
+        _key: &str,
+        _resolution: &Resolution<'_>,
+        selectors: &[RecordJsonUse],
+        _selectors_complete: bool,
+    ) -> io::Result<()> {
+        self.reference_value(pointer, selectors, false)
+    }
+
+    /// Receives the chosen tag path, its target GUID and the original selecting Reference.
+    ///
+    /// # Errors
+    /// Returns an error to stop emission at this value.
+    fn tag(
+        &mut self,
+        pointer: &str,
+        _guid: Guid,
+        _path: &str,
+        selectors: &[RecordJsonUse],
+        _selectors_complete: bool,
+    ) -> io::Result<()> {
+        self.reference_value(pointer, selectors, false)
     }
 }
 

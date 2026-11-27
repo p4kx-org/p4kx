@@ -359,7 +359,7 @@ pub use query_export::{
 pub use record_combined::export_combined;
 pub use record_export::{
     export_planned_record_files, export_planned_record_files_with_receipt, export_record_files,
-    export_records,
+    export_record_json_files_with_origins, export_records,
 };
 pub use record_format::{RecordFileFormat, RecordJsonReceipt};
 pub use record_plan::RecordFilePlan;

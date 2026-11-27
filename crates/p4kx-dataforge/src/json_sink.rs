@@ -129,7 +129,7 @@ pub(super) fn leaf<'source, Writer: Write>(
         Value::Reference(value) => reference(out, value, slot, depth),
         Value::Null => out.sink.write_all(b"null"),
         Value::Error(error) => error_value(out, error, slot, depth),
-        Value::Locale(key) => locale(out, key, depth),
+        Value::Locale(key) => locale(out, key, slot, depth),
         scalar => value_json::write_json_value(out.sink, scalar),
     }
 }
@@ -161,21 +161,42 @@ fn error_value<'source, Writer: Write>(
     out.close(depth, b"}")
 }
 
-fn locale<Writer: Write>(out: &mut Out<'_, '_, Writer>, key: &str, depth: usize) -> io::Result<()> {
+fn locale<'source, Writer: Write>(
+    out: &mut Out<'_, 'source, Writer>,
+    key: &str,
+    slot: Option<ValueSlot<'source>>,
+    depth: usize,
+) -> io::Result<()> {
     let Some(resolution) = texts::annotation(&out.annotations, key) else {
+        observe_key(out, slot, key)?;
         return value_json::write_json_string(out.sink, key);
     };
     out.sink.write_all(b"{")?;
     out.key(true, depth + 1, "key")?;
+    observe_key(out, slot, key)?;
     value_json::write_json_string(out.sink, key)?;
-    if let Resolution::Text(text) = resolution {
+    if let Resolution::Text(text) = &resolution {
         out.key(false, depth + 1, "text")?;
-        value_json::write_json_string(out.sink, &text)?;
+        value_json::write_json_string(out.sink, text)?;
     } else {
         out.key(false, depth + 1, "missing")?;
         out.sink.write_all(b"true")?;
     }
+    if let Some(observation) = &mut out.observation {
+        observation.localization(slot, key, &resolution)?;
+    }
     out.close(depth, b"}")
+}
+
+fn observe_key<'source, Writer: Write>(
+    out: &mut Out<'_, 'source, Writer>,
+    slot: Option<ValueSlot<'source>>,
+    key: &str,
+) -> io::Result<()> {
+    if let Some(observation) = &mut out.observation {
+        observation.value(slot, Some(&Value::Locale(key)))?;
+    }
+    Ok(())
 }
 
 fn reference<'source, Writer: Write>(
@@ -207,6 +228,9 @@ fn reference<'source, Writer: Write>(
     if let Some(path) = out.annotations.tag_path(reference) {
         out.key(false, depth + 1, "tag")?;
         value_json::write_json_string(out.sink, path.as_ref())?;
+        if let Some(observation) = &mut out.observation {
+            observation.tag(sources, reference.guid(), path.as_ref())?;
+        }
     }
     out.close(depth, b"}")
 }

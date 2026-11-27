@@ -17,8 +17,14 @@ pub(super) fn summarise(
     };
     for (index, outcome) in outcomes {
         let errors = match outcome {
-            RecordOutcome::Written { errors } => {
+            RecordOutcome::Written {
+                errors,
+                receipt,
+                origin_failure,
+            } => {
                 report.written += 1;
+                report.origin_receipts.extend(receipt);
+                report.origin_failures.extend(origin_failure);
                 if let (Some(written), Some(record)) =
                     (&mut report.written_record_indices, records.get(index))
                 {

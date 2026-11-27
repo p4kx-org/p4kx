@@ -7,8 +7,9 @@ use std::io;
 use crate::positioned_record::ValueSlot;
 use crate::positioned_reference_members::DanglingReferenceMember;
 use crate::{
-    PositionedRecord, PositionedReferenceSources, PositionedSources, RecordJsonReferenceMember,
-    RecordJsonReferenceSources, RecordJsonUse, Reference, StructValue, Value,
+    Guid, PositionedRecord, PositionedReferenceSources, PositionedSources,
+    RecordJsonReferenceMember, RecordJsonReferenceSources, RecordJsonUse, RecordJsonUseRole,
+    Reference, Resolution, StructValue, Value,
 };
 
 use super::source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
@@ -197,6 +198,44 @@ impl<'observer, 'source> Observation<'observer, 'source> {
             sources.member(member)
         });
         self.emit_reference(&local)
+    }
+
+    pub(super) fn localization(
+        &mut self,
+        slot: Option<ValueSlot<'source>>,
+        key: &str,
+        resolution: &Resolution<'_>,
+    ) -> io::Result<()> {
+        let (sources, local_complete) = self.slot(slot, Some(&Value::Locale(key)));
+        let mut selectors = Vec::new();
+        let complete =
+            self.append_routes(&mut selectors, RecordJsonUse::selection) && local_complete;
+        selectors.extend(sources.into_iter().map(RecordJsonUse::selection));
+        self.observer
+            .localization(&self.pointer, key, resolution, &selectors, complete)
+    }
+
+    pub(super) fn tag(
+        &mut self,
+        sources: Option<&PositionedReferenceSources>,
+        guid: Guid,
+        path: &str,
+    ) -> io::Result<()> {
+        let local = sources.map_or_else(RecordJsonReferenceSources::unavailable, |sources| {
+            sources.member(RecordJsonReferenceMember::Guid)
+        });
+        let mut selectors = Vec::new();
+        let complete =
+            self.append_routes(&mut selectors, RecordJsonUse::selection) && local.complete();
+        selectors.extend(local.sources().iter().map(|used| {
+            let role = match used.role {
+                RecordJsonUseRole::Payload => RecordJsonUseRole::Selector,
+                role => role,
+            };
+            RecordJsonUse::new(used.source, role)
+        }));
+        self.observer
+            .tag(&self.pointer, guid, path, &selectors, complete)
     }
 
     pub(super) fn dangling_reference(
