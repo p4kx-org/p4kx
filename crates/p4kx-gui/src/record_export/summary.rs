@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 
 use p4kx_export::RecordForm;
 use p4kx_extraction::{
-    DataForgeOrigin, RecordFailure, RecordRenamed, RenameCause, SourceEvidenceError,
+    DataForgeOrigin, RecordExportProvenance, RecordFailure, RecordRenamed, RenameCause,
+    SourceEvidenceError,
 };
 
-use super::provenance::RecordExportProvenance;
 use crate::model::describe;
 
 /// One Record a Record export did not write, with the reason.
