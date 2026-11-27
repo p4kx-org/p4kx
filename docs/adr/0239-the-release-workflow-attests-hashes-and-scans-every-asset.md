@@ -30,8 +30,11 @@ Decided for issue #822.
 - The `rust-cache` step of the package job carries `zizmor: ignore[cache-poisoning]`. This is acceptable because
   `lookup-only` is true on tags: a Release build never restores a cache and never saves one, so
   a cache poisoned from a pull request cannot reach a published asset.
-- Release notes: the `CHANGELOG.md` section, the scan result, the verification commands, then
-  GitHub's generated "What's Changed" list.
+- Release notes include the `CHANGELOG.md` section, the legal notice, the scan result, macOS
+  distribution information, and the verification commands. Assembly retains the complete notes
+  as a workflow artifact. If the notes exceed GitHub's release body limit, the public release
+  links to the complete changelog at the release commit and retains the legal notice, scan,
+  distribution, provenance and checksum sections.
 
 ## Consequences
 

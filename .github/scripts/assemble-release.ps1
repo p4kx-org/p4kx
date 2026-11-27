@@ -6,8 +6,8 @@ Writes SHA256SUMS.txt and SHA3-512SUMS.txt for the assets of a release and assem
 Requires the complete native package, SBOM and runtime evidence matrix. Hashes every file in -AssetDirectory (the release assets: ZIPs, MSI, SBOM and attestation
 bundles) and writes the two hash files next to them in the usual "<hash>  <file>" format. Then
 joins the notes in this order: the CHANGELOG section, the optional VirusTotal section, the
-"Build provenance" section and the "Checksums" section. GitHub appends its generated "What's
-Changed" list when the release is created with --generate-notes.
+"Build provenance" section and the "Checksums" section. The optional GitHub body links to the
+complete changelog when the assembled text exceeds the release body limit.
 
 Needs PowerShell 7 on a platform whose crypto library supports SHA3-512.
 
@@ -18,7 +18,10 @@ The directory holding exactly the files to publish.
 The CHANGELOG section produced by `cargo xtask release-notes`.
 
 .PARAMETER OutputNotesPath
-Where the assembled notes are written.
+Where the complete assembled notes are written.
+
+.PARAMETER OutputReleaseBodyPath
+Where the GitHub release body is written.
 
 .PARAMETER VirusTotalNotePath
 The section written by virustotal-scan.ps1. Optional; omitted from the notes when absent.
@@ -43,6 +46,7 @@ param(
     [Parameter(Mandatory)][string]$AssetDirectory,
     [Parameter(Mandatory)][string]$NotesPath,
     [Parameter(Mandatory)][string]$OutputNotesPath,
+    [string]$OutputReleaseBodyPath,
     [string]$VirusTotalNotePath,
     [Parameter(Mandatory)][string]$Repository,
     [string]$Version,
@@ -53,6 +57,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($OutputReleaseBodyPath) {
+    $completePath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputNotesPath)
+    $bodyPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputReleaseBodyPath)
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if ($completePath.Equals($bodyPath, $comparison)) { throw 'Complete notes and GitHub body require separate paths.' }
+}
 if ($TagAttestations -and (-not $WindowsDesktopEvidencePath -or -not $ReleaseRunId)) {
     throw 'Tagged release assembly requires signed Windows AMD64 desktop evidence for its candidate run.'
 }
@@ -184,12 +194,30 @@ openssl dgst -sha3-512 <file>
 The hash printed must equal the line of the file in the hash file.
 "@
 
+$changes = (Get-Content -LiteralPath $NotesPath -Raw -Encoding utf8).TrimEnd()
 $sections = [System.Collections.Generic.List[string]]::new()
-$sections.Add((Get-Content -LiteralPath $NotesPath -Raw -Encoding utf8).TrimEnd())
 if ($VirusTotalNotePath -and (Test-Path -LiteralPath $VirusTotalNotePath -PathType Leaf)) {
     $sections.Add((Get-Content -LiteralPath $VirusTotalNotePath -Raw -Encoding utf8).TrimEnd())
 }
 $sections.Add($macosDistribution.TrimEnd())
 $sections.Add($provenance.TrimEnd())
 $sections.Add($checksums.TrimEnd())
-Set-Content -LiteralPath $OutputNotesPath -Value ($sections -join "`n`n") -Encoding utf8NoBOM
+$details = $sections -join "`n`n"
+$notes = $changes + "`n`n" + $details
+if ($OutputReleaseBodyPath) {
+    $githubReleaseBodyLimit = 125000
+    $limit = $githubReleaseBodyLimit - [Environment]::NewLine.Length
+    $body = $notes
+    if ($body.Length -gt $limit) {
+        $separator = "`n`n---`n`n"
+        $normalizedChanges = $changes.Replace("`r`n", "`n")
+        $noticeStart = $normalizedChanges.LastIndexOf($separator, [StringComparison]::Ordinal)
+        if ($noticeStart -lt 0) { throw 'The changelog notes have no legal notice separator.' }
+        $changelog = "https://github.com/$Repository/blob/$Revision/CHANGELOG.md"
+        $link = "## Changes`n`n[Complete changelog for P4KX $Version]($changelog)"
+        $body = $link + $normalizedChanges.Substring($noticeStart) + "`n`n" + $details
+        if ($body.Length -gt $limit) { throw 'Required release information exceeds the GitHub release body limit.' }
+    }
+    Set-Content -LiteralPath $OutputReleaseBodyPath -Value $body -Encoding utf8NoBOM
+}
+Set-Content -LiteralPath $OutputNotesPath -Value $notes -Encoding utf8NoBOM

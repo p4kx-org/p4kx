@@ -148,11 +148,18 @@ foreach ($fixture in Get-ChildItem -LiteralPath $Directory -File) {
 }
 $notesInput = Join-Path $notesFixture 'changes.md'
 $notesOutput = Join-Path $notesFixture 'notes.md'
+$releaseBody = Join-Path $notesFixture 'release-body.md'
 Set-Content -LiteralPath $notesInput -Value 'Synthetic release notes' -Encoding utf8NoBOM
 $assembler = Join-Path $PSScriptRoot 'assemble-release.ps1'
 $assembly = @{
     AssetDirectory = $notesAssets; NotesPath = $notesInput; OutputNotesPath = $notesOutput
+    OutputReleaseBodyPath = $releaseBody
     Repository = 'p4kx-org/p4kx'; Version = $version; Revision = $revision
+}
+$duplicatePath = Join-Path $notesFixture './notes.md'
+$failure = try { & $assembler @assembly -OutputReleaseBodyPath $duplicatePath | Out-Null } catch { $_.Exception.Message }
+if ($failure -cne 'Complete notes and GitHub body require separate paths.') {
+    throw 'Release assembly accepted identical paths for its two outputs.'
 }
 & $assembler @assembly
 $failure = try { & $assembler @assembly -TagAttestations | Out-Null } catch { $_.Exception.Message }
@@ -175,6 +182,42 @@ if ($notes -cnotmatch 'ad-hoc signed because Developer ID was unavailable' -or $
 if ($notes -cmatch 'gh attestation verify' -or
     $notes -cnotmatch '(?m)^This validation run did not generate Sigstore attestations\.\r?$') {
     throw 'Validation-only release notes claimed attestations that this run did not generate.'
+}
+$body = Get-Content -LiteralPath $releaseBody -Raw
+if ($body -cne $notes) { throw 'A short release body differs from the assembled notes.' }
+$limit = 125000
+$notice = 'Synthetic legal notice.'
+$changes = "### Added`n`n- " + ('a' * $limit) + "`n`n---`n`n$notice"
+$scan = Join-Path $notesFixture 'scan.md'
+$scanText = '## Security scan'
+Set-Content -LiteralPath $notesInput -Value $changes -Encoding utf8NoBOM
+Set-Content -LiteralPath $scan -Value $scanText -Encoding utf8NoBOM
+& $assembler @assembly -VirusTotalNotePath $scan
+$body = Get-Content -LiteralPath $releaseBody -Raw
+$full = Get-Content -LiteralPath $notesOutput -Raw
+$link = "[Complete changelog for P4KX $version](https://github.com/p4kx-org/p4kx/blob/$revision/CHANGELOG.md)"
+if ($body.Length -gt $limit -or $body.Contains($changes) -or -not $body.Contains($link) -or
+    -not $full.StartsWith($changes, [StringComparison]::Ordinal) -or $full.Length -le $limit) {
+    throw 'Oversized release notes lost the complete copy or produced an invalid GitHub body.'
+}
+foreach ($required in @($notice, $scanText, '## macOS distribution', '## Build provenance', '## Checksums')) {
+    if (-not $full.Contains($required) -or -not $body.Contains($required)) {
+        throw "Release bodies lost required information '$required'."
+    }
+}
+Set-Content -LiteralPath $scan -Value ($scanText + ('b' * $limit)) -Encoding utf8NoBOM
+$failure = try { & $assembler @assembly -VirusTotalNotePath $scan | Out-Null } catch { $_.Exception.Message }
+if ($failure -cne 'Required release information exceeds the GitHub release body limit.') {
+    throw 'Release assembly accepted required information that does not fit the GitHub body.'
+}
+Set-Content -LiteralPath $notesInput -Value 'Synthetic release notes' -Encoding utf8NoBOM
+
+$releaseWorkflow = (Get-Content -LiteralPath (Join-Path $PSScriptRoot '../workflows/release.yml') -Raw).Replace("`r`n", "`n")
+if (-not $releaseWorkflow.Contains("-OutputReleaseBodyPath notes/release-body.md") -or
+    -not $releaseWorkflow.Contains("'--notes-file', 'notes/release-body.md'") -or
+    -not $releaseWorkflow.Contains("notes/final-notes.md`n            notes/release-body.md") -or
+    $releaseWorkflow.Contains('--generate-notes')) {
+    throw 'The release workflow must retain complete notes and publish the bounded body directly.'
 }
 $desktopRow = $contract.targets | Where-Object { Test-P4kxWindowsDesktopTarget $_ }
 $desktopRuntime = Get-Content -LiteralPath (Join-Path $notesAssets "P4KX-$version-$($desktopRow.target)-runtime.json") -Raw | ConvertFrom-Json
