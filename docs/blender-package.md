@@ -733,8 +733,13 @@ and the GLB meshes it supplies. `coverage` names the original Item Record and
 its definite `covers` and unresolved `conditional` zones. A null coverage means
 the part has no retained Item Record coverage. The `chunks_complete` flag
 describes the original chunk list. Damaged chunk rows cannot make a zone definite.
-The field origins retain observed IVO and
-clothing inputs and mark unresolved contributions explicitly.
+Optional `primitives` entries within a worn part use the same GLB address fields
+as the body rows. They identify the garment's own submeshes whose IVO table
+word matches one unique readable `MeshChunk` name from that item's Record.
+The table index comes from the physical submesh descriptor and the word matches
+FNV-1a-32 over the uppercase ASCII name and the terminating zero byte.
+Unmapped primitives remain in the GLB. The field origins retain the observed
+descriptor, table word and clothing Record locations.
 
 Select the clothing meshes from each package and apply the union of their
 definite masks to the intact base primitives. Check the shared joint names and

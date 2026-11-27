@@ -317,7 +317,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   head's expressions as morph targets and the animations (`--anim`, `--anim-from`,
   `--anim-folder`), listed in `scene.json`; `--materials` and `--texture-mip` pick plain colours or
   textures. The optional `--vertex-maps` records the GLB's source-stream vertex ordinals.
-  Add `--body-zones` to record the body primitive addresses and the authored clothing coverage
+  Add `--body-zones` to record body and identifiable garment primitive addresses and authored clothing coverage
   for each emitted part. See [modular Character outfits](blender-package.md#modular-character-outfits).
   A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
   own head, hair and eyes. An explicit CHF head takes precedence over the Loadout head.

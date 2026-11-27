@@ -21,7 +21,7 @@ _U32_MAX = (1 << 32) - 1
 
 @dataclass(frozen=True, slots=True)
 class BodyZonePrimitive:
-    """A visible body zone at an exact mesh and primitive in the GLB."""
+    """A named clothing zone at an exact mesh and primitive in the GLB."""
 
     zone: str
     mesh: int
@@ -65,6 +65,7 @@ class PartBodyZones:
     part: int
     meshes: tuple[int, ...]
     coverage: ClothingBodyCoverage | None
+    primitives: tuple[BodyZonePrimitive, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +97,8 @@ class BodyZoneMap:
         for row in self.parts:
             if any(mesh >= len(primitive_counts) for mesh in row.meshes):
                 raise PackageError(f"Worn rig part {row.part} references an out-of-range GLB mesh.")
+            if any(primitive.primitive >= primitive_counts[primitive.mesh] for primitive in row.primitives):
+                raise PackageError(f"Worn rig part {row.part} references an out-of-range GLB primitive.")
 
 
 def read(value: object, where: str, part_origins: tuple[str, ...]) -> BodyZoneMap:
@@ -176,10 +179,22 @@ def _part(value: object, where: str) -> PartBodyZones:
     if "coverage" not in entry:
         raise PackageError(f"{where}: coverage must be an object or null.")
     coverage = entry["coverage"]
+    primitives = tuple(
+        _primitive(item, f"{where}.primitives[{index}]")
+        for index, item in enumerate(read_array(entry.get("primitives", []), f"{where}.primitives"))
+    )
+    addresses = {(row.mesh, row.primitive) for row in primitives}
+    if len(addresses) != len(primitives):
+        raise PackageError(f"{where}: duplicate GLB primitive address.")
+    if any(mesh not in meshes for mesh, _ in addresses):
+        raise PackageError(f"{where}: a primitive uses a GLB mesh outside its worn part.")
+    if primitives and coverage is None:
+        raise PackageError(f"{where}: worn primitive zones require authored coverage.")
     return PartBodyZones(
         _unsigned(entry.get("part"), f"{where}.part"),
         meshes,
         None if coverage is None else _coverage(coverage, f"{where}.coverage"),
+        primitives,
     )
 
 

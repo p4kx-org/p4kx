@@ -7,6 +7,7 @@ use p4kx_chunks::{Chunk, ivo};
 use p4kx_foundation::{ByteReader, ParseError};
 
 use crate::CorruptChunk;
+use crate::mesh_extra_words::{MeshExtraWord, MeshExtraWords};
 use crate::mesh_stream_source::{MeshStreamOccurrence, StreamScan, StreamStep};
 use crate::reader::{ReadValues, to_usize};
 use crate::skin::RawSubmesh;
@@ -87,6 +88,7 @@ pub struct MeshChunkSource<'input> {
     counts: MeshCounts,
     submeshes: &'input [[u8; SUBMESH_BYTES]],
     submeshes_at: u64,
+    extra_words: MeshExtraWords<'input>,
     streams: &'input [u8],
     streams_at: u64,
 }
@@ -121,7 +123,7 @@ impl<'input> MeshChunkSource<'input> {
             .read_bytes(to_usize(header.counts.submeshes).saturating_mul(SUBMESH_BYTES))?
             .as_chunks()
             .0;
-        reader.skip(to_usize(header.counts.extra_words).saturating_mul(size_of::<u32>()))?;
+        let extra_words = MeshExtraWords::read(&mut reader, header.counts.extra_words)?;
         let streams_at = reader.offset();
         let streams = reader.read_bytes(reader.remaining())?;
         Ok(Some(Self {
@@ -138,6 +140,7 @@ impl<'input> MeshChunkSource<'input> {
             counts: header.counts,
             submeshes,
             submeshes_at,
+            extra_words,
             streams_at,
             streams,
         }))
@@ -162,6 +165,7 @@ impl<'input> MeshChunkSource<'input> {
                 ordinal,
                 self.submeshes_at + ordinal as u64 * SUBMESH_BYTES as u64,
                 row,
+                self.extra_words,
             )
         })
     }
@@ -182,25 +186,37 @@ impl<'input> MeshChunkSource<'input> {
 pub struct MeshSubmeshSource {
     ordinal: usize,
     inner: RawSubmesh,
+    extra_word: Option<MeshExtraWord>,
 }
 
 impl MeshSubmeshSource {
-    fn new(ordinal: usize, start: u64, row: &[u8; SUBMESH_BYTES]) -> Self {
+    fn new(
+        ordinal: usize,
+        start: u64,
+        row: &[u8; SUBMESH_BYTES],
+        words: MeshExtraWords<'_>,
+    ) -> Self {
         // A fixed-width row admits every known field before iteration.
         #[expect(
             clippy::expect_used,
             reason = "the caller supplies exactly one complete submesh row"
         )]
-        let inner = read_submesh(&mut ByteReader::new(row)).expect("fixed-width submesh row");
-        Self::from_raw(ordinal, inner).with_base(start)
+        let inner =
+            read_submesh(&mut ByteReader::with_base(row, start)).expect("fixed-width submesh row");
+        Self::from_raw(ordinal, inner, words)
     }
 
-    pub(crate) const fn from_raw(ordinal: usize, inner: RawSubmesh) -> Self {
-        Self { ordinal, inner }
+    pub(crate) fn from_raw(ordinal: usize, inner: RawSubmesh, words: MeshExtraWords<'_>) -> Self {
+        Self {
+            ordinal,
+            inner,
+            extra_word: words.get(inner.node),
+        }
     }
 
-    pub(crate) const fn with_base(mut self, base: u64) -> Self {
+    pub(crate) fn with_base(mut self, base: u64) -> Self {
         self.inner.start += base;
+        self.extra_word = self.extra_word.map(|word| word.with_base(base));
         self
     }
 
@@ -220,6 +236,12 @@ impl MeshSubmeshSource {
     #[must_use]
     pub const fn node(self) -> u16 {
         self.inner.node
+    }
+
+    /// Returns the post-descriptor word indexed by this submesh's node, when present.
+    #[must_use]
+    pub const fn extra_word(self) -> Option<MeshExtraWord> {
+        self.extra_word
     }
 
     /// Returns the original material ID word's interval.

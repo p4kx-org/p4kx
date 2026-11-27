@@ -16,6 +16,12 @@ use crate::manifest_body_zones::ClothingBodyCoverage;
 
 pub(super) type OriginalZoneWord = Option<(EntryOrigin, Range<u64>)>;
 
+pub(super) struct SkinZoneEvidence<'a> {
+    pub(super) entry: &'a EntryOrigin,
+    pub(super) node: Range<u64>,
+    pub(super) word: Range<u64>,
+}
+
 pub(super) struct BodyZoneOrigins {
     uses: SourceUses,
     fields: FieldOrigins,
@@ -71,14 +77,7 @@ impl BodyZoneOrigins {
         clothing: &ClothingZones,
         coverage: &ClothingBodyCoverage,
     ) -> io::Result<()> {
-        let scope = match clothing.forge_origin() {
-            Some(DataForgeOrigin::Archive(entry)) => Some(SourceInput::Archive(entry)),
-            Some(DataForgeOrigin::File(file)) => Some(SourceInput::File(file)),
-            _ => None,
-        }
-        .map(|source| self.uses.observe(source, InputScope::Payload))
-        .transpose()
-        .map_err(io::Error::other)?;
+        let scope = self.clothing_scope(clothing)?;
         let base = format!("/parts/{index}/coverage");
         self.insert_record(&base, scope.as_ref(), clothing.record_index())?;
         for (name, zones) in [
@@ -109,6 +108,58 @@ impl BodyZoneOrigins {
             self.insert(&path, &contributors)?;
         }
         Ok(())
+    }
+
+    pub(super) fn worn_primitive(
+        &mut self,
+        path: &str,
+        clothing: &ClothingZones,
+        zone: &str,
+        geometry: Option<SkinZoneEvidence<'_>>,
+    ) -> io::Result<()> {
+        let mut used = Vec::new();
+        if let Some(geometry) = geometry {
+            let source = self
+                .uses
+                .observe(SourceInput::Archive(geometry.entry), InputScope::Payload)
+                .map_err(io::Error::other)?;
+            for (field, span) in [
+                ("clothingZoneNode", geometry.node),
+                ("clothingZoneHash", geometry.word),
+            ] {
+                let location = SourceLocation::Subresource {
+                    namespace: "model-byte-range".into(),
+                    indices: vec![span.start, span.end],
+                    field: field.into(),
+                };
+                used.push(
+                    source
+                        .at(location, SourceUseRole::Selector)
+                        .map_err(io::Error::other)?,
+                );
+            }
+        }
+        if let Some(scope) = self.clothing_scope(clothing)? {
+            for location in clothing.coverage_sources(zone) {
+                used.push(
+                    scope
+                        .at(location, SourceUseRole::Conversion)
+                        .map_err(io::Error::other)?,
+                );
+            }
+        }
+        self.insert(path, &used)
+    }
+
+    fn clothing_scope(&self, clothing: &ClothingZones) -> io::Result<Option<SourceScope>> {
+        match clothing.forge_origin() {
+            Some(DataForgeOrigin::Archive(entry)) => Some(SourceInput::Archive(entry)),
+            Some(DataForgeOrigin::File(file)) => Some(SourceInput::File(file)),
+            _ => None,
+        }
+        .map(|source| self.uses.observe(source, InputScope::Payload))
+        .transpose()
+        .map_err(io::Error::other)
     }
 
     fn insert_record(

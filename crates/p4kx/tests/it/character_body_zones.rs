@@ -6,7 +6,10 @@ use std::fs;
 use std::path::Path;
 
 use p4kx_assembly::BodyVariant;
-use p4kx_testkit::{TestZoneChunk, ZONE_JACKET, ZONE_SHIRT, armour_entries, jacketed_entries};
+use p4kx_testkit::{
+    TestEntry, TestModel, TestZoneChunk, ZONE_JACKET, ZONE_SHIRT, armour_entries,
+    armour_male_skeleton, jacketed_entries,
+};
 use serde_json::{Value, json};
 
 mod package;
@@ -183,6 +186,59 @@ fn assert_zone_evidence(map: &Value) -> TestResult {
             "coverage retains partial evidence explicitly at {path}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn worn_primitives_report_only_the_zones_bound_by_the_original_skin() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let [male, female] = BodyVariant::ALL.map(zone_positions);
+    let shirt = [TestZoneChunk::new(TORSO, 1)];
+    let mut entries = jacketed_entries([&male, &female], (&shirt, &[]), &[], &[]);
+    let stem = "Data\\Objects\\Characters\\Human\\male_v7\\armor\\test\\m_suit";
+    let skin = format!("{stem}.skin");
+    let mesh = format!("{stem}.skinm");
+    entries.retain(|entry| {
+        !entry.path().eq_ignore_ascii_case(&skin) && !entry.path().eq_ignore_ascii_case(&mesh)
+    });
+    let model = TestModel::zoned(&[[0.0, 1.2], [0.0, 1.3], [0.0, 1.4]])
+        .with_skeleton(&armour_male_skeleton())
+        .with_bone_map(false, vec![vec![(0, 255)]; 9])
+        .with_mesh_extra_words(vec![0xEBBD_944A, 0xDEAD_BEEF]);
+    entries.push(TestEntry::stored(skin, model.cgf()));
+    entries.push(TestEntry::stored(mesh, model.cgfm()));
+    let archive = crate::chf_glb::archive(dir.path(), entries)?;
+    let package = build_package(
+        &archive,
+        &dir.path().join("shirt"),
+        BodyVariant::Male,
+        &[ZONE_SHIRT],
+    )?;
+    let map = body_map(&package.manifest)?;
+    let mesh = map
+        .pointer("/parts/0/meshes/0")
+        .ok_or("emitted shirt mesh")?;
+    assert_eq!(
+        map.pointer("/parts/0/primitives"),
+        Some(&json!([{"zone": TORSO, "mesh": mesh, "primitive": 0, "model_lod": 0}])),
+        "only the descriptor whose physical table word matches the shirt Record is labelled"
+    );
+    assert_eq!(
+        package.part_primitives(ZONE_SHIRT)?.len(),
+        3,
+        "unmatched and out-of-table geometry stays in the GLB"
+    );
+    let evidence = map
+        .pointer("/field_origins/~1parts~10~1primitives~10~1zone")
+        .ok_or("physical primitive provenance")?;
+    assert_eq!(
+        evidence
+            .get("sourceUsesRefs")
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(3),
+        "zone needs the original descriptor, hash word and clothing Record"
+    );
     Ok(())
 }
 

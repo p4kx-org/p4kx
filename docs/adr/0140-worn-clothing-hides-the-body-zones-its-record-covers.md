@@ -21,8 +21,14 @@ drawn when the Entity is worn (a hat hides the hair).
 
 The game does not put the clothing over a complete body. The body skin (`m_body.skin`,
 `f_body.skin`) is cut into one submesh per zone, and the zones that clothing covers are not
-drawn. The Archive keeps no name of a zone in any skin: the `.skinm` stores per submesh a node
-number, and no file holds the table of the numbers. Where a static model of a garment has the
+drawn. A `.skinm` descriptor stores a node number. In the version 0x900 IVO layout the
+node can index a table after the descriptors. A table word can be matched to a clothing Record's
+`MeshChunk` by FNV-1a-32 over the uppercase ASCII name with a terminating zero. The Character
+package records a garment primitive's zone only for a unique readable match. On LIVE 13220821
+every geometry node of the standard male and female skins resolves this way, to the same zone
+as the body table. Hashing without the terminating zero or without uppercasing yields no matches
+in either skin. On the same build, the CDS undersuit's two glove node indices match the
+item Record. A third node has an unmatched word and its primitives stay in the GLB. Where a static model of a garment has the
 zone names (`m_marine_bdu_shirt_01_prop.cgf` names its nodes `torso01_zone`, `l_arm01_zone` …),
 its skin's submeshes follow the same order, so the names are real, but the body has no such
 file.
@@ -35,9 +41,8 @@ Chunks on layer 0 and chunks with visibility conditions cover nothing: the condi
 evaluated, and the body is never cut away on a chunk that might not apply. The names are compared
 ignoring case.
 
-**The table.** The node number of a body submesh is its zone's rank among the zones of the skin,
-by an order of the names that no file states (it is no alphabetical order and no common hash of
-the names). The male body has 30 zones, numbered 0 to 29; the female body has the bra zone
+**The table.** The body mask uses the submesh's node number as an ordinal into the variant's
+checked zone-name table. The ordinal indexes a name within the skin and differs from the hash. The male body has 30 zones, numbered 0 to 29; the female body has the bra zone
 `underwear_top_zone` as well, which takes 27 and moves the zones after it up (31 zones). All six
 levels of detail number alike. `BodyVariant::zone_names` holds the table. It was found by
 comparing the two skins: the numbers agree between the male and the female skin zone by zone, and
@@ -72,9 +77,9 @@ belly, the thighs and the shorts showed through the shirt and the pants.
 ## Not decided here
 
 - **Clothing under clothing.** The zones of a garment's own skin are not hidden by a garment on
-  a higher layer; the garments' skins carry no zone names (only their static models do).
-  ADR-0279 hides whole garments by `HiddenParts` and records why a partly covered garment stays
-  whole.
+  a higher layer. ADR-0279 hides whole garments by `HiddenParts` and records why a partly
+  covered garment stays whole. The optional Character package map identifies garment primitives
+  when the skin word matches an authored zone; applying layer and port conditions is separate.
 - **`HiddenParts`.** Applied by ADR-0279: the hat that hides the hair, the suit that hides the
   clothing.
 - **Conditions.** ADR-0279 evaluates a condition that names no port and no tag and reports the

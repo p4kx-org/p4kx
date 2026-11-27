@@ -34,7 +34,7 @@ pub(crate) fn skin_chunk(model: &TestModel) -> Vec<u8> {
     put_vector(&mut out, min);
     put_vector(&mut out, max);
     put_u32(&mut out, 4);
-    put_u32(&mut out, 0);
+    put_u32(&mut out, count(model.mesh_extra_words.len()));
     out.resize(out.len() + HEADER_PADDING, 0);
     for submesh in &model.submeshes {
         put_u16(&mut out, submesh.material_id);
@@ -48,6 +48,9 @@ pub(crate) fn skin_chunk(model: &TestModel) -> Vec<u8> {
         put_vector(&mut out, [0.0; 3]);
         put_u32(&mut out, 0);
         put_u32(&mut out, 0);
+    }
+    for &word in &model.mesh_extra_words {
+        put_u32(&mut out, word);
     }
     put_indices(&mut out, model);
     put_vertices(&mut out, model, min, max);

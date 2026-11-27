@@ -139,7 +139,7 @@ pub(crate) struct CharacterOutputArgs {
     /// Writes a source vertex map for the rigged GLB.
     #[arg(long)]
     pub(crate) vertex_maps: bool,
-    /// Writes authored body-zone coverage and the emitted body primitives.
+    /// Writes authored body-zone coverage and identifiable body and garment primitives.
     #[arg(long)]
     pub(crate) body_zones: bool,
 }

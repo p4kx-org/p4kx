@@ -158,7 +158,7 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
             first_index: first,
             index_count: self.mesh.indices.len() - first,
             origin: Some(MeshSubmeshOrigin::new(
-                MeshSubmeshSource::from_raw(position, *submesh),
+                MeshSubmeshSource::from_raw(position, *submesh, self.skin.extra_words),
                 self.skin.streams.indices.word_start(submesh.first_index),
             )),
         });

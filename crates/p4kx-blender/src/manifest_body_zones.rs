@@ -52,17 +52,17 @@ pub enum BodyZoneGeometry {
     },
 }
 
-/// One body surface addressed in the rigged GLB.
+/// One named clothing zone surface addressed in the rigged GLB.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct BodyZonePrimitive {
-    /// The body's canonical zone name.
+    /// The canonical zone name.
     pub zone: String,
     /// The zero-based GLB mesh index.
     pub mesh: usize,
     /// The zero-based primitive in that mesh.
     pub primitive: usize,
-    /// The actual geometry level used by this body mesh.
+    /// The actual geometry level used by this mesh.
     pub model_lod: u32,
 }
 
@@ -74,6 +74,9 @@ pub struct PartBodyZones {
     pub part: usize,
     /// The zero-based GLB mesh indices produced by this part.
     pub meshes: Vec<usize>,
+    /// Emitted primitives with a unique zone match in the worn part's Record.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub primitives: Vec<BodyZonePrimitive>,
     /// Authored clothing coverage when a physical item Record supplied it.
     pub coverage: Option<ClothingBodyCoverage>,
 }

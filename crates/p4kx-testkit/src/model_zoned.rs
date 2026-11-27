@@ -5,6 +5,13 @@ use crate::model::{CUBE_CAPS_MATERIAL, TestSubmesh, TestVertex};
 use crate::{TestModel, TestPositions};
 
 impl TestModel {
+    /// Stores the extra words between the mesh descriptors and streams.
+    #[must_use]
+    pub fn with_mesh_extra_words(mut self, words: Vec<u32>) -> Self {
+        self.mesh_extra_words = words;
+        self
+    }
+
     /// Returns a skin without nodes with one triangle per place, each its own submesh numbered by
     /// its position as the node and drawn with material ID [`CUBE_CAPS_MATERIAL`]: the shape of
     /// a body skin, whose submeshes are its zones. A place is the `[x, z]` of the triangle's

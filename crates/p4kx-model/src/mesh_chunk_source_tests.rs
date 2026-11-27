@@ -142,6 +142,51 @@ fn assert_renderer(file: &ChunkFile<Vec<u8>>) -> TestResult {
 }
 
 #[test]
+fn indexed_extra_word_uses_the_same_file_range_in_raw_and_drawn_submeshes() -> TestResult {
+    let word = 0xEBBD_944A_u32;
+    let body = TestModel::cube()
+        .with_mesh_extra_words(vec![0, word])
+        .skin_chunk();
+    let wrapped = TestChunkFile::ivo().chunk(ivo::SKIN_2.id(), 0x900, body);
+    let file = ChunkFile::parse(wrapped.bytes())?;
+    let chunk = file.chunks().first().ok_or("physical mesh chunk")?;
+    let source = MeshChunkSource::read(chunk, file.chunk_data(0).ok_or("bounded mesh")?)?
+        .ok_or("mesh source")?;
+    let raw = source
+        .submeshes()
+        .find_map(crate::MeshSubmeshSource::extra_word)
+        .ok_or("indexed table word")?;
+    let start = chunk.offset() + SUBMESH_AT + u64::from(source.counts().submeshes) * 48 + 4;
+    assert_eq!(
+        raw.value(),
+        word,
+        "little-endian word addressed by node one"
+    );
+    assert_eq!(
+        raw.range(),
+        start..start + 4,
+        "decoded-file word coordinates"
+    );
+    let model = Model::read("source.cgf", &file, &mut MissingCompanions)?;
+    let from_model = model
+        .lods
+        .iter()
+        .flat_map(|lod| &lod.meshes)
+        .find_map(|mesh| {
+            mesh.submeshes.iter().enumerate().find_map(|(index, _)| {
+                mesh.source_submesh(index, model.chunks.first()?)?
+                    .extra_word()
+            })
+        });
+    assert_eq!(
+        from_model,
+        Some(raw),
+        "drawn primitive works from the same physical descriptor"
+    );
+    Ok(())
+}
+
+#[test]
 fn unknown_tail_keeps_prior_streams_and_does_not_invent_payload() -> TestResult {
     let mut body = TestModel::cube().skin_chunk();
     let expected = mesh_streams(&body)

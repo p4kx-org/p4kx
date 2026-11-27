@@ -59,6 +59,7 @@ def zoned_character() -> dict[str, Any]:
         "parts": [{
             "part": 1,
             "meshes": [1],
+            "primitives": [{"zone": "torso01_zone", "mesh": 1, "primitive": 0, "model_lod": 2}],
             "coverage": {
                 "guid": "01234567-89ab-cdef-0123-456789abcdef",
                 "record_index": 7,
@@ -112,6 +113,8 @@ def test_reads_typed_body_zones_and_checks_their_glb(tmp_path: Path, zoned_chara
     )
     part, = rig.body_zones.parts
     assert (rig.parts[part.part].name, part.meshes) == ("vest", (1,))
+    zone, = part.primitives
+    assert (zone.zone, zone.mesh, zone.primitive, zone.model_lod) == ("torso01_zone", 1, 0, 2)
     assert part.coverage is not None
     assert part.coverage.guid == "01234567-89ab-cdef-0123-456789abcdef"
     assert part.coverage.record_path == "libs/foundry/records/vest.xml"
@@ -120,6 +123,22 @@ def test_reads_typed_body_zones_and_checks_their_glb(tmp_path: Path, zoned_chara
     assert part.coverage.covers == ("torso01_zone",)
     assert part.coverage.conditional == ("neck_zone",)
     assert preflight_meshes(package).problems == ()
+
+
+def test_rejects_worn_zone_pointing_at_another_parts_mesh(zoned_character: dict[str, Any]) -> None:
+    _rig(zoned_character)["body_zones"]["parts"][0]["primitives"][0]["mesh"] = 0
+    with pytest.raises(PackageError, match="GLB mesh outside its worn part"):
+        parse_manifest(zoned_character, Path("."))
+
+
+def test_rejects_worn_zone_pointing_outside_its_mesh(
+    tmp_path: Path, zoned_character: dict[str, Any],
+) -> None:
+    _rig(zoned_character)["body_zones"]["parts"][0]["primitives"][0]["primitive"] = 1
+    package = load_package(_write_package(tmp_path, zoned_character))
+    problems = preflight_meshes(package).problems
+    problem, = problems
+    assert "out-of-range GLB primitive" in problem.detail
 
 
 def test_rejects_changed_glb_with_the_same_geometry_counts(
@@ -147,6 +166,7 @@ def test_retains_worn_meshes_when_body_mapping_and_coverage_are_unavailable(
     zones = _rig(zoned_character)["body_zones"]
     zones["body"] = {"state": "unavailable", "reason": "body geometry is unavailable"}
     zones["parts"][0]["coverage"] = None
+    zones["parts"][0].pop("primitives")
     zones["source_inventory"] = {"sources": [], "uses": []}
     zones["field_origins"] = {}
     package = load_package(_write_package(tmp_path, zoned_character))
@@ -195,7 +215,10 @@ def test_creature_rigs_cannot_carry_a_character_body_map(zoned_character: dict[s
         (lambda zones: zones["parts"][0].update(part=0), "part must reference a worn rig piece"),
         (lambda zones: zones["parts"][0].update(part=4), "part must reference a worn rig piece"),
         (lambda zones: zones["parts"][0].update(meshes=[]), "at least one GLB mesh"),
-        (lambda zones: zones["parts"][0].update(meshes=[0]), "GLB mesh is assigned more than once"),
+        (
+            lambda zones: zones["parts"][0].update(meshes=[0], primitives=[]),
+            "GLB mesh is assigned more than once",
+        ),
         (lambda zones: zones["parts"].extend(zones["parts"][:]), "duplicate worn rig part"),
         (lambda zones: zones["parts"][0]["coverage"].update(guid="not-a-guid"), "DataForge Record GUID"),
         (lambda zones: zones["parts"][0]["coverage"].update(chunks_complete=0), "chunks_complete must be a boolean"),
@@ -215,7 +238,10 @@ def test_rejects_malformed_manifest_references(
     [
         (lambda zones: zones["body"]["primitives"][0].update(mesh=2), "out-of-range GLB primitive"),
         (lambda zones: zones["body"]["primitives"][0].update(primitive=1), "out-of-range GLB primitive"),
-        (lambda zones: zones["parts"][0].update(meshes=[2]), "out-of-range GLB mesh"),
+        (
+            lambda zones: zones["parts"][0].update(meshes=[2], primitives=[]),
+            "out-of-range GLB mesh",
+        ),
     ],
 )
 def test_rejects_addresses_outside_glb_bounds(

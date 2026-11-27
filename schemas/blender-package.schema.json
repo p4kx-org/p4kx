@@ -442,7 +442,7 @@
       "type": "object"
     },
     "BodyZonePrimitive": {
-      "description": "One body surface addressed in the rigged GLB.",
+      "description": "One named clothing zone surface addressed in the rigged GLB.",
       "properties": {
         "mesh": {
           "description": "The zero-based GLB mesh index.",
@@ -451,7 +451,7 @@
           "type": "integer"
         },
         "model_lod": {
-          "description": "The actual geometry level used by this body mesh.",
+          "description": "The actual geometry level used by this mesh.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -463,7 +463,7 @@
           "type": "integer"
         },
         "zone": {
-          "description": "The body's canonical zone name.",
+          "description": "The canonical zone name.",
           "type": "string"
         }
       },
@@ -4465,6 +4465,13 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "primitives": {
+          "description": "Emitted primitives with a unique zone match in the worn part's Record.",
+          "items": {
+            "$ref": "#/$defs/BodyZonePrimitive"
+          },
+          "type": "array"
         }
       },
       "required": [

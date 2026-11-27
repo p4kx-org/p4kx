@@ -49,6 +49,19 @@ impl ClothingZones {
         &self.zones.chunks
     }
 
+    /// Returns the unique authored zone whose name matches the original skin word.
+    #[must_use]
+    pub fn name_for_skin_word(&self, word: u32) -> Option<&str> {
+        let mut names = self
+            .chunks()
+            .iter()
+            .map(ZoneChunk::zone)
+            .filter(|name| name.is_ascii() && zone_hash(name) == word);
+        let name = names.next()?;
+        (names.all(|other| other == name) && self.known_chunks().any(|chunk| chunk.zone() == name))
+            .then_some(name)
+    }
+
     /// Returns whether the complete clothing chunk list was readable from a physical Record.
     #[must_use]
     pub const fn chunks_complete(&self) -> bool {
@@ -88,6 +101,17 @@ impl ClothingZones {
     pub fn coverage(&self, variant: BodyVariant) -> ClothingZoneCoverage<'_> {
         ClothingZoneCoverage::of(self.zones.known_chunks(), variant)
     }
+}
+
+fn zone_hash(name: &str) -> u32 {
+    const FNV_OFFSET: u32 = 0x811C_9DC5;
+    const FNV_PRIME: u32 = 0x0100_0193;
+    name.bytes()
+        .map(|byte| byte.to_ascii_uppercase())
+        .chain(std::iter::once(0))
+        .fold(FNV_OFFSET, |hash, byte| {
+            (hash ^ u32::from(byte)).wrapping_mul(FNV_PRIME)
+        })
 }
 
 impl ArmourPart {

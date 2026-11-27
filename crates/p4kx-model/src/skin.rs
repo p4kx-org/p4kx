@@ -4,6 +4,7 @@
 use p4kx_foundation::ByteReader;
 
 use crate::mesh_chunk_source::{MeshHeader, SUBMESH_BYTES, read_submesh};
+use crate::mesh_extra_words::MeshExtraWords;
 use crate::reader::to_usize;
 use crate::streams::{StreamCounts, Streams, read_streams};
 use crate::{CorruptChunk, PositionBox};
@@ -25,6 +26,7 @@ pub(crate) struct SkinMesh<'a> {
     pub(crate) vertex_count: u32,
     pub(crate) index_count: u32,
     pub(crate) submeshes: Vec<RawSubmesh>,
+    pub(crate) extra_words: MeshExtraWords<'a>,
     pub(crate) streams: Streams<'a>,
 }
 
@@ -52,7 +54,7 @@ pub(crate) fn read_skin(
     for _ in 0..submesh_count {
         submeshes.push(read_submesh(&mut reader)?);
     }
-    reader.skip(to_usize(header.counts.extra_words).saturating_mul(size_of::<u32>()))?;
+    let extra_words = MeshExtraWords::read(&mut reader, header.counts.extra_words)?;
     let counts = StreamCounts {
         vertices: header.counts.vertices,
         indices: header.counts.indices,
@@ -64,6 +66,7 @@ pub(crate) fn read_skin(
         vertex_count: header.counts.vertices,
         index_count: header.counts.indices,
         submeshes,
+        extra_words,
         streams,
     })
 }
