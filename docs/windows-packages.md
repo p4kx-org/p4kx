@@ -796,3 +796,30 @@ The executed package archive SHA-256 is
 
 Physical audio, clipboard, file dialogs and hardware GPU require separate
 desktop device evidence.
+
+### Native Windows execution on 3b2c90ab
+
+Release run `45963862816` built both Windows packages and passed the two
+detached control jobs. Both original native consumers executed the portable
+runtime checks and uploaded byte-verified lifecycle checkpoints. AMD64
+completed the legacy install and uninstall, rename upgrade, installed
+runtime and historical uninstall. The checkpoint ended during baseline
+restore. ARM64 completed the fresh install, installed runtime and feature
+no-op. Its checkpoint ended at msiexec/pre-capture in the rollback-disabled phase.
+
+Both jobs started at 09:04:02 UTC and GitHub cancelled them at 09:59:03 UTC.
+The only job annotation on each cited the 45-minute job limit. GitHub still
+listed the original Finish wait as in progress, and the per-job logs returned
+HTTP 404 after cancellation. The terminal MSI receipts and Windows execution
+payloads were absent. The outcome of the original installer remains
+unverified.
+
+The successful Windows-only run above used the same Windows executor and
+Finish observer code. Its AMD64 image, `20261116.315.1`, also matches this
+run's AMD64 consumer. This run's ARM64 consumer used `20261123.225.2`, the
+same image as its successful ARM64 detached control. The available evidence
+does not locate the blocking operation.
+
+[Release run](https://github.com/p4kx-org/p4kx/actions/runs/45963862816) ·
+[AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15184917035) ·
+[ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15184922365)
