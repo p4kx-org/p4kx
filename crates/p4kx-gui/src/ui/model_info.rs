@@ -3,25 +3,24 @@
 
 use std::sync::Arc;
 
-use egui::{
-    Align2, Color32, CornerRadius, Galley, Id, Rect, Response, Role, ScrollArea, Sense, Ui,
-    WidgetInfo, pos2, vec2,
-};
+use egui::{Galley, Id, Rect, ScrollArea, Sense, Ui, vec2};
 
-use p4kx_extraction::{FieldOrigin, MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
+use p4kx_extraction::{MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
 
 use super::model_info_rows::{Rows, facts, tables};
 use super::{model_preview, source_origin};
 use crate::theme::desktop::{
     DETAIL_COLUMN_GAP, DETAIL_ROW_GAP, PANEL_TITLE_MARGIN_BOTTOM, PANEL_TITLE_MARGIN_TOP,
-    PANEL_TITLE_PADDING_BOTTOM, ROW_HEIGHT, ZEBRA,
+    PANEL_TITLE_PADDING_BOTTOM,
 };
 use crate::theme::palette;
 use crate::widgets::frames;
-use crate::widgets::rows::paint_divider;
 use crate::widgets::text::hairline_below;
 use crate::widgets::tooltip;
 use crate::{Language, ModelInfo, ModelInfoProvenance, ModelInfoText as T, ModelPreview, Texts};
+
+#[path = "model_info_grid.rs"]
+mod grid;
 
 pub(super) type Labelled = (String, Arc<Galley>);
 pub(super) struct Fact {
@@ -52,7 +51,13 @@ pub(super) struct Table {
     pub(super) heading: Labelled,
     pub(super) head: Vec<Labelled>,
     pub(super) rows: Vec<Vec<Labelled>>,
-    pub(super) chunk_notes: bool,
+    pub(super) kind: TableKind,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum TableKind {
+    Lods,
+    UnreadChunks,
 }
 
 /// Shows the Info tab of the model at `path`: what its file holds, or why there is nothing to
@@ -118,7 +123,7 @@ impl Laid {
             );
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
             let text_rect = rect.with_max_y(rect.bottom() - PANEL_TITLE_PADDING_BOTTOM);
-            labelled(
+            grid::labelled(
                 ui,
                 (1, index, 0),
                 &table.heading,
@@ -126,7 +131,7 @@ impl Laid {
             );
             hairline_below(ui, rect);
             ui.add_space(PANEL_TITLE_MARGIN_BOTTOM);
-            grid(ui, index, table, texts, origins);
+            grid::show(ui, index, table, texts, origins);
         }
     }
 }
@@ -142,6 +147,10 @@ fn fact(
     let proof = match name {
         T::Nodes => Some((T::Nodes, origins.map(ModelInfoProvenance::node_count))),
         T::Bones => Some((T::Bones, origins.map(ModelInfoProvenance::bone_count))),
+        T::MaterialIds => Some((
+            T::ListedMaterialIds,
+            origins.map(|proof| &proof.mesh_summary().material_ids),
+        )),
         T::Chunks => Some((
             T::ChunksTotal,
             origins.map(ModelInfoProvenance::chunk_total),
@@ -158,13 +167,13 @@ fn fact(
         cell.with_min_y(content.bottom() - galley.size().y)
             .with_max_y(content.bottom())
     };
-    labelled(
+    grid::labelled(
         ui,
         (0, index, 0),
         key,
         (on_baseline(key_rect, &key.1), palette::GRAY_2_TEXT),
     );
-    let shown = labelled(
+    let shown = grid::labelled(
         ui,
         (0, index, 1),
         value,
@@ -207,107 +216,6 @@ fn material_origins(ui: &mut Ui, texts: &Texts, origins: Option<&MaterialSummary
         _ => return,
     };
     source_origin::row(ui, texts, label, Some(origin));
-}
-
-fn grid(
-    ui: &mut Ui,
-    table: usize,
-    data: &Table,
-    texts: &Texts,
-    origins: Option<&ModelInfoProvenance>,
-) {
-    let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
-    let painter = ui.painter();
-    painter.rect_filled(head, CornerRadius::ZERO, palette::SURFACE_INPUT);
-    let rule = Rect::from_min_max(pos2(head.left(), head.bottom() - 2.0), head.max);
-    painter.rect_filled(rule, CornerRadius::ZERO, palette::PRIMARY);
-    cells(ui, (2, table, 0), head, &data.head, None);
-    for (index, row) in data.rows.iter().enumerate() {
-        let (rect, _) =
-            ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
-        if ui.rect_contains_pointer(rect) {
-            ui.painter()
-                .rect_filled(rect, CornerRadius::ZERO, palette::CONTROL_BG);
-        } else if index % 2 == 1 {
-            ui.painter().rect_filled(rect, CornerRadius::ZERO, ZEBRA);
-        }
-        paint_divider(ui.painter(), rect);
-        let markers = data.chunk_notes.then(|| {
-            let fields = origins
-                .and_then(|origins| origins.unread_chunks().get(index))
-                .map(|origins| {
-                    [
-                        &origins.file,
-                        &origins.kind,
-                        &origins.type_id,
-                        &origins.usage,
-                    ]
-                });
-            ChunkMarkers { texts, fields }
-        });
-        cells(ui, (3, table, index + 1), rect, row, markers.as_ref());
-    }
-}
-
-struct ChunkMarkers<'a> {
-    texts: &'a Texts,
-    fields: Option<[&'a FieldOrigin; 4]>,
-}
-
-fn cells(
-    ui: &Ui,
-    (section, table, row): (u8, usize, usize),
-    rect: Rect,
-    cells: &[Labelled],
-    markers: Option<&ChunkMarkers<'_>>,
-) {
-    let columns = u16::try_from(cells.len()).map_or(1.0, f32::from).max(1.0);
-    let width = rect.width() / columns;
-    for ((column, step), cell) in (0_usize..).zip(0_u16..).zip(cells) {
-        let left = f32::from(step).mul_add(width, rect.left());
-        let cell_rect = Rect::from_min_size(pos2(left, rect.top()), vec2(width, rect.height()))
-            .shrink2(vec2(crate::theme::desktop::CELL_PADDING_X, 0.0));
-        let shown = labelled(
-            ui,
-            (section, table * 1_000_000 + row, column),
-            cell,
-            (cell_rect, palette::GRAY_1),
-        );
-        if cell.1.elided || markers.is_some() {
-            tooltip::hover(shown, |ui| {
-                if cell.1.elided {
-                    tooltip::line(ui, cell.0.as_str());
-                }
-                if let Some(markers) = markers {
-                    let origin = markers
-                        .fields
-                        .as_ref()
-                        .and_then(|fields| fields.get(column))
-                        .copied();
-                    tooltip::line(ui, markers.texts.get(source_origin::label(origin)));
-                }
-            });
-        }
-    }
-}
-
-fn labelled(
-    ui: &Ui,
-    salt: (u8, usize, usize),
-    (name, galley): &Labelled,
-    (rect, colour): (Rect, Color32),
-) -> Response {
-    let at = Align2::LEFT_CENTER
-        .align_size_within_rect(galley.size(), rect)
-        .min;
-    let response = ui.interact(
-        rect,
-        ui.scope_id().with(("model-info-text", salt)),
-        Sense::hover(),
-    );
-    response.widget_info(|| WidgetInfo::labeled(Role::Label, true, name));
-    ui.painter().galley(at, Arc::clone(galley), colour);
-    response
 }
 
 #[cfg(test)]

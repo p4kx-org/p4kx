@@ -982,6 +982,7 @@ model-info-materials-status = Library status
 model-info-material-count = Material count
 model-info-material-single = Single material
 model-info-material-ids = Material IDs
+model-info-material-ids-listed = Listed material IDs
 model-info-material-ids-none = None
 model-info-bones = Bones
 model-info-animations = Animations

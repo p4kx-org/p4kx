@@ -15,6 +15,7 @@ const MAIN: &str = "Data/Objects/skin.skin";
 const GEOMETRY: &str = "Data/Objects/skin_lod1.skinm";
 const MAIN_TYPE: u32 = 0xDEAD_BEEF;
 const GEOMETRY_TYPE: u32 = 0xCAFE_BABE;
+const SCROLL_STEPS: usize = 6;
 
 #[test]
 fn visible_chunk_markers_follow_the_clear_model_and_encrypted_lod_geometry() -> TestResult {
@@ -48,10 +49,14 @@ fn visible_chunk_markers_follow_the_clear_model_and_encrypted_lod_geometry() -> 
     assert_chunk_provenance(preview, &main, &geometry)?;
 
     scroll_to_chunks(&mut harness)?;
-    assert_marker(&mut harness, MAIN_TYPE, "Unencrypted source data")?;
     assert_marker(
         &mut harness,
-        GEOMETRY_TYPE,
+        &format!("0x{MAIN_TYPE:08X}"),
+        "Unencrypted source data",
+    )?;
+    assert_marker(
+        &mut harness,
+        &format!("0x{GEOMETRY_TYPE:08X}"),
         "Includes encrypted source data",
     )?;
     Ok(())
@@ -105,33 +110,55 @@ fn scroll_to_chunks(harness: &mut Harness<'_, Model>) -> TestResult {
     let nodes = visible_point(harness, "Nodes")?;
     harness.event(Event::PointerMoved(nodes));
     harness.run_steps(2);
-    for _ in 0..6 {
-        harness.event(Event::MouseWheel {
-            unit: MouseWheelUnit::Line,
-            delta: vec2(0.0, -4.0),
-            modifiers: Modifiers::NONE,
-            phase: TouchPhase::Move,
-            source: MouseWheelSource::Wheel,
-        });
-        harness.run_steps(2);
+    for _ in 0..SCROLL_STEPS {
+        scroll_info(harness);
     }
     Ok(())
 }
 
-fn assert_marker(harness: &mut Harness<'_, Model>, type_id: u32, marker: &str) -> TestResult {
+pub(super) fn reveal_info_row(harness: &mut Harness<'_, Model>, label: &str) -> TestResult {
+    let panel = p4kx_gui::ui::regions(&harness.ctx)
+        .preview
+        .ok_or("visible model preview")?;
+    harness.event(Event::PointerMoved(panel.center()));
+    harness.run_steps(2);
+    for _ in 0..SCROLL_STEPS {
+        if visible_point(harness, label).is_ok() {
+            return Ok(());
+        }
+        scroll_info(harness);
+    }
+    visible_point(harness, label).map(|_| ())
+}
+
+fn scroll_info(harness: &mut Harness<'_, Model>) {
+    harness.event(Event::MouseWheel {
+        unit: MouseWheelUnit::Line,
+        delta: vec2(0.0, -4.0),
+        modifiers: Modifiers::NONE,
+        phase: TouchPhase::Move,
+        source: MouseWheelSource::Wheel,
+    });
+    harness.run_steps(2);
+}
+
+pub(super) fn assert_marker(
+    harness: &mut Harness<'_, Model>,
+    label: &str,
+    marker: &str,
+) -> TestResult {
     harness.ctx.style_mut_of(harness.ctx.theme(), |style| {
         style.interaction.tooltip_delay = 0.0;
         style.interaction.show_tooltips_only_when_still = false;
     });
     harness.event(Event::PointerGone);
     harness.run_steps(2);
-    let label = format!("0x{type_id:08X}");
-    let point = visible_point(harness, &label)?;
+    let point = visible_point(harness, label)?;
     harness.event(Event::PointerMoved(point));
     harness.run_steps(5);
     assert!(
         harness.query_by_label(marker).is_some(),
-        "chunk {label}: {marker}"
+        "field {label}: {marker}"
     );
     Ok(())
 }

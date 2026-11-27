@@ -14,8 +14,29 @@ use super::submesh_origins::{
 use crate::model_geometry_scope::ModelGeometryScope;
 use crate::source_provenance::ChunkHeaderField;
 use crate::{
-    FieldOrigins, FieldPath, ModelSource, SourceLocation, SourceUse, SourceUseRole, SourceUses,
+    CancelToken, FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceLocation, SourceUse,
+    SourceUseRole, SourceUses,
 };
+
+/// Geometry origins of the displayed model summary.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ModelMeshSummaryOrigins {
+    /// Counts in the emitted LOD row order.
+    pub lod_counts: Vec<ModelLodCountOrigins>,
+    /// The material IDs included in the supplied display list.
+    pub material_ids: FieldOrigin,
+}
+
+/// Proven contributors to the counts derived from one decoded LOD.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ModelLodCountOrigins {
+    /// The number of vertices retained by the decoder.
+    pub vertices: FieldOrigin,
+    /// The number of triangles retained by the decoder.
+    pub triangles: FieldOrigin,
+}
 
 /// Writes retained geometry inputs for LOD counts and the distinct material IDs.
 pub struct ModelOverviewMeshOrigins<'a> {
@@ -30,6 +51,25 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
         Self { source, uses }
     }
 
+    /// Captures counts and the supplied visible material IDs from the same model read.
+    ///
+    /// # Errors
+    /// Returns an interruption or source evidence error.
+    pub fn capture_summary(
+        &self,
+        visible_material_ids: &[u16],
+        cancel: &CancelToken,
+    ) -> io::Result<ModelMeshSummaryOrigins> {
+        let observed = self.observe(MeshObservation {
+            material_ids: Some(visible_material_ids),
+            cancel: Some(cancel),
+        })?;
+        Ok(ModelMeshSummaryOrigins {
+            lod_counts: observed.lod_counts,
+            material_ids: material_ids_origin(self.uses, observed.materials),
+        })
+    }
+
     /// Writes exact original word runs at the caller's summary paths.
     ///
     /// # Errors
@@ -40,27 +80,24 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
         material_ids: &[u16],
         fields: &mut FieldOrigins,
     ) -> io::Result<()> {
-        let mut materials = BTreeMap::<u16, Vec<SourceUse>>::new();
+        let observed = self.observe(MeshObservation::default())?;
         let mut path = root.clone();
         path.push_field("lods").map_err(io::Error::other)?;
-        for (index, lod) in self.source.model().lods.iter().enumerate() {
+        for (index, origins) in observed.lod_counts.into_iter().enumerate() {
             path.push_index(index).map_err(io::Error::other)?;
-            let inputs = self.lod_words(lod, &mut materials)?;
-            for (name, words) in [
-                ("triangles", inputs.triangles),
-                ("vertices", inputs.vertices),
+            for (name, origin) in [
+                ("triangles", origins.triangles),
+                ("vertices", origins.vertices),
             ] {
                 path.push_field(name).map_err(io::Error::other)?;
                 fields
-                    .insert(path.clone(), self.uses.origin(&words, false))
+                    .insert(path.clone(), origin)
                     .map_err(io::Error::other)?;
                 path.pop();
             }
             path.pop();
         }
-        if let Some(selector) = self.generated_material_selector()? {
-            materials.entry(0).or_default().push(selector);
-        }
+        let materials = observed.materials;
         path.pop();
         path.push_field("material_ids").map_err(io::Error::other)?;
         for (index, material) in material_ids.iter().enumerate() {
@@ -71,20 +108,44 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
                 .map_err(io::Error::other)?;
             path.pop();
         }
-        let aggregate: Vec<_> = materials.into_values().flatten().collect();
         fields
-            .insert(path, self.uses.origin(&aggregate, false))
+            .insert(path, material_ids_origin(self.uses, materials))
             .map_err(io::Error::other)
+    }
+
+    fn observe(&self, observation: MeshObservation<'_>) -> io::Result<OverviewUses> {
+        observation.check_cancelled()?;
+        let mut materials = BTreeMap::new();
+        let mut lod_counts = Vec::with_capacity(self.source.model().lods.len());
+        for lod in &self.source.model().lods {
+            let counts = self.lod_words(lod, &mut materials, observation)?;
+            lod_counts.push(ModelLodCountOrigins {
+                vertices: self.uses.origin(&counts.vertices, false),
+                triangles: self.uses.origin(&counts.triangles, false),
+            });
+        }
+        observation.check_cancelled()?;
+        if observation.includes_material(0)
+            && let Some(selector) = self.generated_material_selector()?
+        {
+            materials.entry(0).or_default().push(selector);
+        }
+        Ok(OverviewUses {
+            lod_counts,
+            materials,
+        })
     }
 
     fn lod_words(
         &self,
         lod: &Lod,
         materials: &mut BTreeMap<u16, Vec<SourceUse>>,
+        observation: MeshObservation<'_>,
     ) -> io::Result<LodCountUses> {
         let mut counts = LodCountUses::default();
         let model = self.source.model();
         for mesh in &lod.meshes {
+            observation.check_cancelled()?;
             if let Some(physics) = mesh.crch_physics_source(&model.chunks) {
                 if let Some(scope) =
                     ModelGeometryScope::capture(self.uses, self.source, ModelFile::Model)?
@@ -96,7 +157,7 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
             let Some(chunk) = source_chunk(self.source, mesh) else {
                 continue;
             };
-            let words = MeshWords::capture(mesh, chunk);
+            let words = MeshWords::capture(mesh, chunk, observation)?;
             let Some(scope) = ModelGeometryScope::capture(self.uses, self.source, chunk.file)?
             else {
                 continue;
@@ -144,6 +205,35 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
     }
 }
 
+struct OverviewUses {
+    lod_counts: Vec<ModelLodCountOrigins>,
+    materials: BTreeMap<u16, Vec<SourceUse>>,
+}
+
+fn material_ids_origin(uses: &SourceUses, materials: BTreeMap<u16, Vec<SourceUse>>) -> FieldOrigin {
+    let combined: Vec<_> = materials.into_values().flatten().collect();
+    uses.origin(&combined, false)
+}
+
+#[derive(Clone, Copy, Default)]
+struct MeshObservation<'a> {
+    material_ids: Option<&'a [u16]>,
+    cancel: Option<&'a CancelToken>,
+}
+
+impl MeshObservation<'_> {
+    fn includes_material(self, id: u16) -> bool {
+        self.material_ids.is_none_or(|ids| ids.contains(&id))
+    }
+
+    fn check_cancelled(self) -> io::Result<()> {
+        if self.cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(io::ErrorKind::Interrupted.into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 struct LodCountUses {
     triangles: Vec<SourceUse>,
@@ -185,9 +275,14 @@ struct MeshWords {
 }
 
 impl MeshWords {
-    fn capture(mesh: &Mesh, chunk: &ModelChunk) -> Self {
+    fn capture(
+        mesh: &Mesh,
+        chunk: &ModelChunk,
+        observation: MeshObservation<'_>,
+    ) -> io::Result<Self> {
         let mut words = Self::default();
         for (index, submesh) in mesh.submeshes.iter().enumerate() {
+            observation.check_cancelled()?;
             let Some(original) = mesh.source_submesh(index, chunk) else {
                 continue;
             };
@@ -197,7 +292,9 @@ impl MeshWords {
                 words.observed_counts += 1;
                 WordRun::push(&mut words.counts, count, stride);
             }
-            if let Some(material) = original_material(Some(original), submesh.material_id) {
+            if observation.includes_material(submesh.material_id)
+                && let Some(material) = original_material(Some(original), submesh.material_id)
+            {
                 WordRun::push(
                     words.materials.entry(submesh.material_id).or_default(),
                     material,
@@ -205,7 +302,7 @@ impl MeshWords {
                 );
             }
         }
-        words
+        Ok(words)
     }
 }
 

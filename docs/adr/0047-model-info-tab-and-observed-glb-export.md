@@ -20,6 +20,9 @@ Decided for issue #109.
 - The material row tooltip reports separate markers for the library name, read status and
   displayed material count or single-material declaration. They use the library selected by
   the drawn model reader. A failed library read retains its attempted use in the inventory.
+- The LOD table shows source markers on the vertex and triangle counts of each displayed
+  level. The IVO vertex count carries an unknown origin. The material-ID tooltip covers
+  the IDs visible in the Info tab and displays that scope when the list is shortened.
 - Export as GLB reads the model again for the chosen level only, on its own thread, and writes
   through `ModelSource::write_glb_observed`. The stream reports the bytes written against the length
   the GLB header states and fails with a marker once the caller's `CancelToken` is set; the

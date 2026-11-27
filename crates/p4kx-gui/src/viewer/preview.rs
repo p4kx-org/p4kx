@@ -310,7 +310,7 @@ fn finish_model(
         AnimationCount::Counted(0)
     };
     let info = ModelInfo::of(source.model()).with_animations(count);
-    let info_provenance = ModelInfoProvenance::capture(source);
+    let info_provenance = ModelInfoProvenance::capture(source, &info, stop);
     if stop.is_cancelled() {
         return;
     }

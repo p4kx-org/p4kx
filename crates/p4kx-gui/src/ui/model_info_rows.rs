@@ -3,7 +3,7 @@
 
 use egui::Ui;
 
-use super::model_info::{Fact, Labelled, Table};
+use super::model_info::{Fact, Labelled, Table, TableKind};
 use crate::theme::desktop::{
     CELL_PADDING_X, DETAIL_COLUMN_GAP, DETAIL_KEY_MIN_WIDTH, DETAIL_KEY_TRACKING,
     DETAIL_VALUE_SIZE, PANEL_TITLE_SIZE, ROW_FONT, TABLE_HEAD_SIZE, TABLE_HEAD_TRACKING,
@@ -14,8 +14,6 @@ use crate::{
     AnimationCount, ChunkFile, ChunkNote, MaterialsInfo, ModelInfo, ModelInfoText as T, Texts,
     format,
 };
-
-const LISTED_IDS: usize = 24;
 
 /// What the rows of the Info tab are laid out with.
 pub(super) struct Rows<'a> {
@@ -155,13 +153,9 @@ fn material_ids(rows: &Rows<'_>, info: &ModelInfo) -> String {
     if info.material_ids.is_empty() {
         return rows.texts.get(T::MaterialIdsNone);
     }
-    let mut ids: Vec<String> = info
-        .material_ids
-        .iter()
-        .take(LISTED_IDS)
-        .map(u16::to_string)
-        .collect();
-    if info.material_ids.len() > LISTED_IDS {
+    let listed = info.listed_material_ids();
+    let mut ids: Vec<String> = listed.iter().map(u16::to_string).collect();
+    if info.material_ids.len() > listed.len() {
         ids.push("…".to_owned());
     }
     ids.join(", ")
@@ -196,7 +190,7 @@ pub(super) fn tables(rows: &Rows<'_>, info: &ModelInfo) -> Vec<Table> {
         heading: rows.heading(texts.get(T::LodsHeading)),
         head: rows.head(&columns),
         rows: lods,
-        chunk_notes: false,
+        kind: TableKind::Lods,
     }];
     if !info.unread.is_empty() {
         tables.push(unread(rows, info));
@@ -239,7 +233,7 @@ fn unread(rows: &Rows<'_>, info: &ModelInfo) -> Table {
             .heading(texts.format(T::ChunksHeading, &[("number", rows.number(number).into())])),
         head: rows.head(&columns),
         rows: cells,
-        chunk_notes: true,
+        kind: TableKind::UnreadChunks,
     }
 }
 

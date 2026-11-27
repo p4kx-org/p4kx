@@ -11,6 +11,8 @@ pub const MAX_LISTED_CHUNKS: usize = 200;
 /// The most animations an export summary lists by name; the count covers all of them.
 pub const MAX_LISTED_ANIMATIONS: usize = 200;
 
+const LISTED_MATERIAL_IDS: usize = 24;
+
 static SERIAL: AtomicU64 = AtomicU64::new(1);
 
 /// One level of detail of a model.
@@ -178,6 +180,12 @@ impl ModelInfo {
     #[must_use]
     pub const fn serial(&self) -> u64 {
         self.serial
+    }
+
+    pub(crate) fn listed_material_ids(&self) -> &[u16] {
+        self.material_ids
+            .get(..LISTED_MATERIAL_IDS)
+            .unwrap_or(&self.material_ids)
     }
 
     /// Returns the number of meshes of the most detailed level.

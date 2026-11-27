@@ -26,10 +26,8 @@ mod chunk_origins;
 mod field_origins;
 #[path = "glb_animation_origins.rs"]
 mod glb_animation_origins;
-
 #[path = "model_mesh_info.rs"]
 mod mesh_info;
-
 #[path = "model_node_origins.rs"]
 mod node_origins;
 
@@ -47,7 +45,9 @@ use field_origins::ModelFieldOrigins;
 pub use glb_animation_origins::{ArchiveClipFieldOrigins, write_glb_animation_origins};
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
-pub use overview_mesh_origins::ModelOverviewMeshOrigins;
+pub use overview_mesh_origins::{
+    ModelLodCountOrigins, ModelMeshSummaryOrigins, ModelOverviewMeshOrigins,
+};
 pub use submesh_origins::{write_mesh_origins, write_submesh_origins};
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
