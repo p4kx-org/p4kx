@@ -431,6 +431,15 @@ payload for its target.
 [AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/artifacts/15132867497) ·
 [ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/artifacts/15133381584)
 
+At PR #1117 merge `3b2c90ab301587c58e3b0b3c4b07d23d55901bb6`, both native
+Linux execution jobs ran all four package launchers, software-rendered
+desktop frames and Documents-portal grants. The AMD64 and ARM64 jobs each
+uploaded their executed release payload.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/job/140402095744) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/job/140402095755) ·
+[AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15182984939) ·
+[ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15183144885)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
