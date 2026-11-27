@@ -29,7 +29,7 @@ function New-TestBundle($Entry, [string]$Directory) {
         verificationResult = @{
             signature = @{ certificate = @{
                 buildTrigger = 'push'
-                runInvocationURI = "$repo/actions/runs/$env:GITHUB_RUN_ID/attempts/1"
+                runInvocationURI = "$repo/actions/runs/$env:GITHUB_RUN_ID/attempts/2"
                 sourceRepositoryIdentifier = $env:GITHUB_REPOSITORY_ID
                 sourceRepositoryURI = $repo
                 sourceRepositoryRef = $env:GITHUB_REF
@@ -63,6 +63,7 @@ $variables = @{
     GITHUB_REPOSITORY_ID = '123'
     GITHUB_SHA = $Assembly.Revision
     GITHUB_RUN_ID = $Desktop.ReleaseRunId
+    GITHUB_RUN_ATTEMPT = '3'
     GITHUB_REF = "refs/tags/v$($Assembly.Version)"
     GITHUB_EVENT_NAME = 'push'
     RUNNER_TEMP = $FixtureDirectory
@@ -121,6 +122,17 @@ try {
         Save-TestBundle (Join-Path $assets $entry.name) (New-TestBundle $entry $assets)
     }
     & $assembler @Assembly @Desktop
+
+    $receipt = $Desktop.WindowsDesktopEvidencePath
+    $originalReceipt = [IO.File]::ReadAllBytes($receipt)
+    $replay = @(Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json)
+    $replay[0].workflow_attempt = '2'
+    try {
+        Save-TestBundle $receipt $replay
+        Assert-Rejected { & $assembler @Assembly @Desktop } 'Windows AMD64 desktop receipt workflow_attempt differs'
+    } finally {
+        [IO.File]::WriteAllBytes($receipt, $originalReceipt)
+    }
 
     $checksums = @('SHA256SUMS.txt', 'SHA3-512SUMS.txt')
     $initial = @{}

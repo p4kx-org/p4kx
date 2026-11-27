@@ -35,6 +35,7 @@ foreach ($row in $contract.targets) {
         $sbom | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
     }
     $proof = New-P4kxTestEvidence -Platform $row -Version $version -Revision $revision -Compiler $compiler -Nextest $nextest
+    if ($row.target -ceq 'aarch64-pc-windows-msvc') { $proof.workflow_attempt = '2' }
     if ($row.os -cin @('windows', 'linux', 'macos')) {
         $smokes = @(foreach ($package in $row.packages) {
             $asset = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
@@ -290,14 +291,14 @@ foreach ($row in $contract.targets) {
         Set-Content -LiteralPath $proofPath -Value $original -Encoding utf8NoBOM
     }
 }
-$windows = @($contract.targets | Where-Object os -EQ windows)[0]
+$windows = Get-P4kxPlatform -Target 'aarch64-pc-windows-msvc'
 $windowsProofPath = Join-Path $Directory "P4KX-$version-$($windows.target)-runtime.json"
 $originalProof = Get-Content -LiteralPath $windowsProofPath -Raw
 foreach ($mutation in @(
     { param($proof) $proof.PSObject.Properties.Remove('installer') },
     { param($proof) $proof.installer.repair = 'skipped' },
     { param($proof) $proof.installer.path_contract.run = '2' },
-    { param($proof) $proof.workflow_attempt = '2' },
+    { param($proof) $proof.workflow_attempt = '1' },
     { param($proof) $proof.installer.path_contract.raw_cases = @($proof.installer.path_contract.raw_cases | Select-Object -Skip 1) },
     { param($proof) $proof.package_smokes = @($proof.package_smokes | Select-Object -First 1) },
     { param($proof) $proof.package_smokes[0].archive_sha256 = 'f' * 64 },
