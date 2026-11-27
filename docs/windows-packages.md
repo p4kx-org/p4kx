@@ -823,3 +823,31 @@ does not locate the blocking operation.
 [Release run](https://github.com/p4kx-org/p4kx/actions/runs/45963862816) ·
 [AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15184917035) ·
 [ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15184922365)
+
+### Native Windows execution on db093cc92
+
+Release run 45978787079 built both Windows packages from PR head
+db093cc92f1b643e5c738b9e70a930900b5a9f7e and the tested merge
+ba3805738b40bb9e9a63ee08aea2793004ea25ab.
+
+AMD64 passed the complete native lifecycle. The original Finish wait took
+96 seconds, and CollectFinish verified the original request and terminal
+receipt. The job uploaded the terminal evidence and the executed package
+with SHA-256 digests
+`1f9ddc62d6e01abb07f41be2df5e4a88e79576c0d1b040dec3d119482f296261`
+and `a264e62834f351dc583b63f04e1ed92d060c05eb8e6e18fdd65c22b903ca2b76`.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/job/140456588445) ·
+[Terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191830708) ·
+[Executed package](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191122308)
+
+On ARM64, the original worker reached the installed runtime phase at
+10:47:01 UTC. GitHub marked the passive observation cancelled at 10:47:07
+UTC after two seconds and skipped Wait and CollectFinish. GitHub ended the
+job at 11:38:40 UTC, 55 minutes after it started. Its sole annotation
+reported the 45-minute job limit. The final job log returned HTTP 404,
+and the run retained no terminal receipt or executed ARM64 package. The
+cause of the early observation cancellation and the original installer
+outcome remain unknown.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/job/140456588362) ·
+[Before-Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15190712078) ·
+[Launch evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191555821)
