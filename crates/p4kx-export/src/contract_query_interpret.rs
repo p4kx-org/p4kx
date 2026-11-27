@@ -82,13 +82,8 @@ impl<'context, 'source> Interpreter<'context, 'source> {
         } else {
             ExportSourceRole::Dependency
         };
-        crate::catalog_query_session::checkpoint(self.cancel)?;
-        let record = self
-            .forge
-            .record(tree.record_index())
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let admission = RecordObservation::capture(self.projection.original(), &record)?;
         loop {
+            crate::catalog_query_session::checkpoint(self.cancel)?;
             self.dependencies.prepared.begin_attempt()?;
             let registry = CatalogTextRegistry::default();
             let projection = self
@@ -96,7 +91,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
                 .with_text_registry(&registry)
                 .for_kind(Kind::Contracts);
             let places = self.dependencies.places();
-            match self.attempt(&admission, tree, role, &projection, &places)? {
+            match self.attempt(tree, role, &projection, &places)? {
                 ContractAttempt::Dependency(key) => {
                     let place_registry = CatalogTextRegistry::default();
                     let place_projection = CatalogProjection::new(
@@ -112,7 +107,6 @@ impl<'context, 'source> Interpreter<'context, 'source> {
                     };
                     self.dependencies
                         .prepare(key, &inputs, &mut self.index, coverage)?;
-                    crate::catalog_query_session::checkpoint(self.cancel)?;
                 }
                 ContractAttempt::Complete(observed) => {
                     return self.complete(
@@ -130,12 +124,16 @@ impl<'context, 'source> Interpreter<'context, 'source> {
 
     fn attempt(
         &self,
-        admission: &RecordObservation<'_, 'source>,
         tree: &RecordTree<'source>,
         role: ExportSourceRole,
         projection: &CatalogProjection<'_, 'source>,
         places: &Places<'_, 'source>,
     ) -> Result<ContractAttempt<'source>, CatalogError> {
+        let record = self
+            .forge
+            .record(tree.record_index())
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let admission = RecordObservation::capture(self.projection.original(), &record)?;
         let context = MissionEntryContext {
             index: &self.index,
             projection,
@@ -144,7 +142,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
         };
         try_project_contracts_tree(
             self.projection.original(),
-            admission,
+            &admission,
             tree,
             &context,
             role,

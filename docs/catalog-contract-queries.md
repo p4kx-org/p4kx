@@ -151,6 +151,32 @@ identities, `notForRelease` and `workInProgress`. Both flags were stated on ever
 row in this Build. A filter that excludes rows when either flag is `true` removed
 415 rows from that complete query.
 
+### Generator admission comparison
+
+A matched Windows AMD64 comparison used LIVE 13220821, English, MarkersOnly,
+one worker and fresh processes. The signed baseline `9499f7d58` captures
+each admission inside the attempt. The trial `bae8d5eb3` captures it once per
+Generator and reuses it across demand retries. Both binaries used the same
+Rust 1.100.0 test profile and measurement overlay.
+
+| Count order | Query excluding callback (s) | Whole process (s) | Peak private commit (B) |
+| --- | ---: | ---: | ---: |
+| Baseline | 80.781 | 85.516 | 1,162,678,272 |
+| Trial | 81.931 | 86.717 | 1,162,522,624 |
+| Trial | 81.889 | 86.542 | 1,161,994,240 |
+| Baseline | 80.778 | 85.512 | 1,162,231,808 |
+
+All six processes returned 5,188 summaries, 1,886 location-query rows and
+the same coverage. The separate digest runs took 81.527 s for the trial
+and 81.621 s for the baseline, excluding callbacks. Their full semantic
+and component digests matched. Maximum private commit was 1,163,726,848 B
+and maximum working set was 1,170,354,176 B across the comparison.
+
+Both count runs with reused admission were about 1.4% slower and memory
+peaks were close. The release retains per-attempt admission. The paired
+measurement receipt SHA-256 is
+`97baadb338f7fee9db6a34be06e894726833ad160c30b3809c8343c15062e1cc`.
+
 ## Coverage and cache updates
 
 The result separates selected-owner coverage, reverse-survey scope, related Generator owners,
