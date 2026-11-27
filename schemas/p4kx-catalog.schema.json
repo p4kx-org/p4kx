@@ -36485,6 +36485,7 @@
       "description": "Source discriminator and the directly authored fields of that alternative.",
       "oneOf": [
         {
+          "description": "A perk with only the shared presentation.",
           "properties": {
             "type": {
               "const": "base",
@@ -36497,9 +36498,11 @@
           "type": "object"
         },
         {
+          "description": "A perk granting an original item reference.",
           "properties": {
             "rewardItem": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The original reward item link."
             },
             "type": {
               "const": "item",
@@ -36513,9 +36516,11 @@
           "type": "object"
         },
         {
+          "description": "An authored shop item category.",
           "properties": {
             "category": {
-              "$ref": "#/$defs/PerkCategory"
+              "$ref": "#/$defs/PerkCategory",
+              "description": "The original category selectors."
             },
             "type": {
               "const": "shopItemCategory",
@@ -36529,9 +36534,11 @@
           "type": "object"
         },
         {
+          "description": "A perk enabling an item category.",
           "properties": {
             "category": {
-              "$ref": "#/$defs/PerkCategory"
+              "$ref": "#/$defs/PerkCategory",
+              "description": "The original category selectors."
             },
             "type": {
               "const": "enabledItemCategory",
@@ -36545,12 +36552,15 @@
           "type": "object"
         },
         {
+          "description": "A perk discounting an item category.",
           "properties": {
             "category": {
-              "$ref": "#/$defs/PerkCategory"
+              "$ref": "#/$defs/PerkCategory",
+              "description": "The original category selectors."
             },
             "discountPercentage": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "The authored discount percentage."
             },
             "type": {
               "const": "discountItemCategory",
@@ -36565,6 +36575,7 @@
           "type": "object"
         },
         {
+          "description": "A concrete authored variant with no typed projection.",
           "properties": {
             "type": {
               "const": "authored",
@@ -45264,6 +45275,7 @@
       "type": "object"
     },
     "ScopeContext": {
+      "description": "One authored scope selection in a reputation display context.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
