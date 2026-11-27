@@ -94,9 +94,11 @@ exported actions. The archived DNA rig binds all 179 joints. In the capture, two
 markers align within one rectified pixel across eight sampled frames. Isolated Blender 5.2.5 LTS
 imports preserved all 5,584 original head vertex positions and their index order. At 16 landmarks
 and 11 source frames, the differences between the four actions reached 0.47 to 1.24 mm in the
-frontal model projection for the six candidate pairs. The CAF-to-video clock, the runtime rig
-initialization and the projection of the face still require independent evidence before the
-candidate comparison can select an order.
+frontal model projection for the six candidate pairs. Fits of the same archived head to two
+near-neutral video frames projected the tested expression differences to at most 2.37 pixels
+at the best common focal length. The best held-out anatomical-group RMS residuals across the
+focal sweep were 9.73 and 9.40 pixels. The capture identifies the authored take. Its projected
+face and CAF-to-video clock do not yet distinguish the rotations.
 
 The 495 activations are also the weights of the morph targets: the targets of the head are the
 blendshapes that move a vertex, in the order of their numbers, and the build keeps the number of
