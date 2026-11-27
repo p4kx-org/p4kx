@@ -117,7 +117,7 @@ impl OriginCapture {
         let bound = query_source_evidence::bind_cell_inputs(forge, &scope, sites.iter().copied())
             .map_err(origin_error::evidence)?;
         self.complete &= bound.is_complete();
-        if input.details_limited && bound.uses().iter().any(|used| contributes(used.role())) {
+        if input.details_limited && bound.uses().iter().any(|used| used.role().contributes()) {
             self.cut(OriginCut::InputMetadata);
         }
         for used in bound.uses().iter().cloned() {
@@ -136,7 +136,7 @@ impl OriginCapture {
         if !self.owner.is_same_inventory(&input.owner) {
             return Err(origin_error::foreign());
         }
-        let contributes = contributes(role);
+        let contributes = role.contributes();
         if input.details_limited && contributes {
             self.cut(OriginCut::InputMetadata);
         }
@@ -273,7 +273,7 @@ impl OriginCapture {
     }
 
     fn retain(&mut self, actual: SourceUse, limit: u64) -> Result<(), MediaError> {
-        if !contributes(actual.role()) {
+        if !actual.role().contributes() {
             return Ok(());
         }
         if self.cut {
@@ -341,13 +341,6 @@ impl OriginCapture {
             self.cuts.push(cut);
         }
     }
-}
-
-fn contributes(role: SourceUseRole) -> bool {
-    matches!(
-        role,
-        SourceUseRole::Payload | SourceUseRole::Selector | SourceUseRole::Conversion
-    )
 }
 
 fn witness_rank(actual: &SourceUse) -> u8 {

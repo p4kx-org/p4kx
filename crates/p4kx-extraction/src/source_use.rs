@@ -147,7 +147,9 @@ pub enum SourceUseRole {
 }
 
 impl SourceUseRole {
-    pub(crate) const fn contributes(self) -> bool {
+    /// Returns whether this role contributes to the emitted data value.
+    #[must_use]
+    pub const fn contributes(self) -> bool {
         matches!(self, Self::Payload | Self::Selector | Self::Conversion)
     }
 
