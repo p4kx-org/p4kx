@@ -21,6 +21,8 @@ mod size_witness;
 #[path = "../tests/real_archive/real_archive_resource_oracles.rs"]
 mod resource_oracle;
 #[cfg(test)]
+pub(crate) use resource_oracle::{OverrideEntryTarget, resource_fixture};
+#[cfg(test)]
 #[path = "build_resource_oracle.rs"]
 mod resource_projection;
 

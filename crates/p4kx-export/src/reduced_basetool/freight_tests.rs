@@ -18,7 +18,7 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[test]
 fn missing_flag_and_same_guid_at_wrong_physical_owner_do_not_certify_freight() -> TestResult {
-    let guid = CatalogGuid("00000000-0000-4000-8000-000000000001".parse()?);
+    let attachment_guid = CatalogGuid("00000000-0000-4000-8000-000000000001".parse()?);
     let cargo = CanonicalCargo {
         scu: cell(Some(4.0)),
         grids_with_issue: cell(Some(0)),
@@ -27,7 +27,7 @@ fn missing_flag_and_same_guid_at_wrong_physical_owner_do_not_certify_freight() -
             position: cell(Some(LoadoutPosition::from_port_ordinals(12, &[0, 1])?)),
             capacity_scu: cell(Some(4.0)),
             attachment_index: Some(100),
-            attachment_guid: Some(guid),
+            attachment_guid: Some(attachment_guid),
             inventory_index: Some(200),
         }],
     };
@@ -41,7 +41,7 @@ fn missing_flag_and_same_guid_at_wrong_physical_owner_do_not_certify_freight() -
         let grid = GridFacts {
             key: ComponentKey {
                 record,
-                guid,
+                guid: attachment_guid,
                 ordinal: 4,
             },
             capacity: Some(Capacity {

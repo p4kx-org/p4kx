@@ -40,6 +40,10 @@ impl RecordTargets {
         Ok(())
     }
 
+    pub(super) fn iter(&self) -> impl Iterator<Item = (u32, Guid)> + '_ {
+        self.records.iter().map(|(&index, &guid)| (index, guid))
+    }
+
     pub(super) fn verify(
         &self,
         path: &'static str,
@@ -52,6 +56,12 @@ impl RecordTargets {
         Ok(())
     }
 
+    pub(super) fn verify_index(&self, path: &'static str, index: u32) -> Result<(), ReducedError> {
+        if !self.records.contains_key(&index) {
+            return Err(ReducedError::UnresolvedRecordLink { path, index });
+        }
+        Ok(())
+    }
     pub(super) fn verify_variant(
         &self,
         path: &'static str,

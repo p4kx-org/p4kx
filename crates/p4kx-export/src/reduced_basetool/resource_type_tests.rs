@@ -1,37 +1,28 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
+
 use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, test_key};
 use serde_json::Value;
 
 use super::resource_types;
 use super::selected_texts::SelectedTexts;
+use crate::build::api::{OverrideEntryTarget, resource_fixture};
 use crate::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 
-#[path = "../../tests/it/resource_density_schema_fixture.rs"]
-mod resource_density_schema_fixture;
-#[path = "../../tests/it/resource_fixture.rs"]
-pub(super) mod resource_fixture;
-#[path = "../../tests/it/resource_fixture_values.rs"]
-mod resource_fixture_values;
-#[path = "../../tests/it/resource_quality_schema_fixture.rs"]
-mod resource_quality_schema_fixture;
-#[path = "../../tests/it/resource_schema_fixture.rs"]
-mod resource_schema_fixture;
-
-pub(super) use self::resource_quality_schema_fixture::OverrideEntryTarget;
+type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]
-fn resource_types_retain_units_quality_and_member_links() -> Result<(), Box<dyn std::error::Error>>
-{
+fn resource_types_retain_units_quality_and_member_links() -> TestResult {
     for target in [OverrideEntryTarget::Base, OverrideEntryTarget::Concrete] {
         verify(target)?;
     }
     Ok(())
 }
 
-fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>> {
+fn verify(target: OverrideEntryTarget) -> TestResult {
     let database = resource_fixture::database(target);
     let (scratch, archive) = open_fixture(&database)?;
     let session = CatalogQuerySession::open(
@@ -44,6 +35,12 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
     let resources = serde_json::to_value(result.definitions)?;
     let groups = serde_json::to_value(result.groups.members)?;
     let globals = serde_json::to_value(result.crafting_global)?;
+    let components = serde_json::to_value(result.components)?;
+    assert_eq!(
+        components.get("availability").and_then(Value::as_str),
+        Some("absent"),
+        "absence of a resource component declaration preserves the selected empty table"
+    );
     assert_eq!(
         globals.get("availability").and_then(Value::as_str),
         Some("absent")
@@ -56,6 +53,26 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
         return Err("three canonical ResourceTypes".into());
     };
 
+    assert_density_cells(alpha, beta, unused)?;
+    assert_selected_properties(alpha, beta)?;
+    assert!(
+        groups
+            .get("rows")
+            .and_then(Value::as_array)
+            .is_some_and(|groups| groups.len() == 2)
+    );
+
+    let wire = serde_json::to_string(&resources)?;
+    assert!(!wire.contains("sourceUsesRefs"));
+    assert!(!wire.contains("sourceSetComplete"));
+    assert!(!wire.contains("rawBits"));
+    assert!(!wire.contains("defaultThumbnailPath"));
+    assert!(!wire.contains("description"));
+    assert_selected_names(&serde_json::to_value(texts)?);
+    Ok(())
+}
+
+fn assert_density_cells(alpha: &Value, beta: &Value, unused: &Value) -> TestResult {
     for (row, expected_kind, expected_value) in [
         (alpha, "gramsPerCubicCentimeter", 3.25),
         (beta, "kilogramsPerCubicMeter", 12.5),
@@ -83,6 +100,10 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
             .and_then(Value::as_f64),
         Some(6.75)
     );
+    Ok(())
+}
+
+fn assert_selected_properties(alpha: &Value, beta: &Value) -> TestResult {
     assert_eq!(
         alpha
             .pointer("/refinedVersion/value/targetRecordIndex/value")
@@ -130,20 +151,10 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
         }),
         "the authored cargo location retains the physical Entity link"
     );
-    assert!(
-        groups
-            .get("rows")
-            .and_then(Value::as_array)
-            .is_some_and(|groups| groups.len() == 2)
-    );
+    Ok(())
+}
 
-    let wire = serde_json::to_string(&resources)?;
-    assert!(!wire.contains("sourceUsesRefs"));
-    assert!(!wire.contains("sourceSetComplete"));
-    assert!(!wire.contains("rawBits"));
-    assert!(!wire.contains("defaultThumbnailPath"));
-    assert!(!wire.contains("description"));
-    let texts = serde_json::to_value(texts)?;
+fn assert_selected_names(texts: &Value) {
     assert!(
         texts
             .get("publicNames")
@@ -174,12 +185,11 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
             .map(Vec::len),
         Some(0)
     );
-    Ok(())
 }
 
 pub(super) fn open_fixture(
     database: &DataForgeBuilder,
-) -> Result<(tempfile::TempDir, Archive), Box<dyn std::error::Error>> {
+) -> Result<(tempfile::TempDir, Archive), Box<dyn Error>> {
     let scratch = tempfile::tempdir()?;
     let path = scratch.path().join("Data.p4k");
     let forge = database.build();

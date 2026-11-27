@@ -20,8 +20,8 @@ use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::guid_text::CatalogGuid;
 
-const DEFINITIONS: &str = "definitions.commodities";
-const PRESENTATIONS: &str = "projections.commodityPresentation";
+pub(super) const DEFINITIONS: &str = "definitions.commodities";
+pub(super) const PRESENTATIONS: &str = "projections.commodityPresentation";
 
 pub(super) struct Commodities {
     pub(super) definitions: StagedCatalogTable,

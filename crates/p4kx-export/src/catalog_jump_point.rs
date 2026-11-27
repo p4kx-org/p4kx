@@ -60,7 +60,6 @@ impl<'source> JumpPointConfiguration<'source> {
         &self.linking_range
     }
 
-    #[cfg(test)]
     pub(crate) const fn largest_ship_size(
         &self,
     ) -> &SourcedValue<Box<SourceRecordReference<'source>>> {

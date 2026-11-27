@@ -75,7 +75,10 @@ impl StarmapObjectPlacementCoverage {
             && self.source_entries.failed_selection_candidates == 0
     }
 
-    fn measure(archive: &Archive, placements: &mut Placements) -> Result<Self, CatalogError> {
+    pub(super) fn measure(
+        archive: &Archive,
+        placements: &mut Placements,
+    ) -> Result<Self, CatalogError> {
         let ledger = std::mem::take(&mut placements.ledger);
         let counts = placements.counts;
         let entries = export_health_entries::compile(ledger.entries)?;

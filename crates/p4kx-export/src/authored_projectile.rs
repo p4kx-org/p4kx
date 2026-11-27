@@ -5,6 +5,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::authored_damage::AuthoredDamage;
 use super::authored_fields::Observed;
 use super::projectile_range as range;
 use crate::schema_fields::every_field_required;
@@ -52,12 +53,20 @@ impl<'source> AuthoredProjectile<'source> {
         matches!(&self.kind, ProjectileKind::Countermeasure { .. })
     }
 
-    pub(super) fn bullet_damage(
-        &self,
-    ) -> Option<&SourcedValue<super::authored_damage::AuthoredDamage<'source>>> {
+    pub(super) fn bullet_damage(&self) -> Option<&SourcedValue<AuthoredDamage<'source>>> {
+        if let ProjectileDamage::Bullet(damage) = self.damage() {
+            Some(damage)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn damage(&self) -> ProjectileDamage<'_, 'source> {
         match &self.kind {
-            ProjectileKind::Bullet { value } => Some(value.damage()),
-            _ => None,
+            ProjectileKind::Base => ProjectileDamage::Base,
+            ProjectileKind::Bullet { value } => ProjectileDamage::Bullet(value.damage()),
+            ProjectileKind::Tachyon { value } => ProjectileDamage::Tachyon(value.damage()),
+            ProjectileKind::Countermeasure { .. } => ProjectileDamage::Countermeasure,
         }
     }
 
@@ -88,6 +97,13 @@ impl<'source> AuthoredProjectile<'source> {
             kind: ProjectileKind::read(source, notes)?,
         })
     }
+}
+
+pub(crate) enum ProjectileDamage<'read, 'source> {
+    Base,
+    Bullet(&'read SourcedValue<AuthoredDamage<'source>>),
+    Tachyon(&'read SourcedValue<AuthoredDamage<'source>>),
+    Countermeasure,
 }
 
 /// Concrete behavior of the original projectile occurrence.

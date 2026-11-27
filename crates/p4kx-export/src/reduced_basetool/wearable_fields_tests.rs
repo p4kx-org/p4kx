@@ -35,6 +35,11 @@ fn worn_fields_retain_selected_protection_and_aim_ranges_with_original_markers()
     let suit = row(&clothing, 0)?;
     let radar = row(&radars, 0)?;
     let radar_alias = row(&radars, 1)?;
+    assert_component_positions(suit, radar, radar_alias);
+    assert_worn_quantities(suit, radar)
+}
+
+fn assert_component_positions(suit: &Value, radar: &Value, radar_alias: &Value) {
     assert_eq!(suit.pointer("/componentOrdinal/value"), Some(&json!(2)));
     assert_eq!(radar.pointer("/componentOrdinal/value"), Some(&json!(1)));
     assert_eq!(
@@ -51,6 +56,9 @@ fn worn_fields_retain_selected_protection_and_aim_ranges_with_original_markers()
             .pointer("/aimAssist/value/outsideRangeBufferDistance")
             .is_none()
     );
+}
+
+fn assert_worn_quantities(suit: &Value, radar: &Value) -> TestResult {
     for (row, pointer, expected) in [
         (
             suit,

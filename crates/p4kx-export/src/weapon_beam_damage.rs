@@ -18,7 +18,7 @@ pub(super) const BASE: &str = "DamageBase";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct BeamDamage<'source> {
+pub(crate) struct BeamDamage<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     inputs: BeamDamageInputs<'source>,
@@ -28,7 +28,7 @@ pub(super) struct BeamDamage<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-enum BeamDamageInputs<'source> {
+pub(crate) enum BeamDamageInputs<'source> {
     Base,
     Channels(Box<DamageInfo>),
     Parameters(Box<DamageParameters<'source>>),
@@ -62,5 +62,15 @@ impl<'source> BeamDamage<'source> {
             inputs,
             authored,
         })
+    }
+}
+
+impl<'source> BeamDamage<'source> {
+    pub(crate) const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    pub(crate) const fn inputs(&self) -> &BeamDamageInputs<'source> {
+        &self.inputs
     }
 }

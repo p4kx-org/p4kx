@@ -35,7 +35,7 @@ enum PlacementStorage<'directory> {
     OpenedContainers,
     Object(ObjectSelection<'directory>),
     ShopNames(&'directory [Guid]),
-    JumpEndpoints,
+    JumpEndpoints(Option<&'directory [Guid]>),
 }
 
 impl PlacementStorage<'_> {
@@ -44,9 +44,10 @@ impl PlacementStorage<'_> {
             Self::Spool(_) | Self::ShopNames(_) => true,
             #[cfg(test)]
             Self::Typed => true,
-            Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) | Self::JumpEndpoints => {
-                false
-            }
+            Self::Harvest(_)
+            | Self::OpenedContainers
+            | Self::Object(_)
+            | Self::JumpEndpoints(_) => false,
         }
     }
 
@@ -54,12 +55,13 @@ impl PlacementStorage<'_> {
         match self {
             Self::Harvest(_) => DescriptorScope::Harvest,
             Self::Object(ObjectSelection::Loot(_)) => DescriptorScope::LootPlacements,
-            Self::OpenedContainers | Self::Object(ObjectSelection::One(_)) => {
+            Self::OpenedContainers
+            | Self::Object(ObjectSelection::One(_) | ObjectSelection::Records(_)) => {
                 DescriptorScope::OpenedContainers
             }
             Self::ShopNames(_) => DescriptorScope::ShopNames,
             Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
-            Self::JumpEndpoints => DescriptorScope::Catalog {
+            Self::JumpEndpoints(_) => DescriptorScope::Catalog {
                 jump_endpoints: true,
             },
             #[cfg(test)]
@@ -206,7 +208,11 @@ impl Placements {
         capture: &EntryCapture<'_>,
         scope: PlacementScope,
         endpoints: &JumpEndpointRecords,
+        records: Option<&[Guid]>,
     ) -> Result<Self, CatalogError> {
+        if records.is_some_and(|guids| !guids.is_sorted()) {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
         Self::read_scoped(
             archive,
             cancel,
@@ -214,7 +220,7 @@ impl Placements {
             capture,
             scope,
             Some(endpoints),
-            PlacementStorage::JumpEndpoints,
+            PlacementStorage::JumpEndpoints(records),
         )
     }
 

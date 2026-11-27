@@ -273,7 +273,6 @@ mod record_read;
 mod record_source_status;
 mod record_summary;
 mod recovery;
-#[cfg(test)]
 mod reduced_basetool;
 mod scan;
 mod scan_health;

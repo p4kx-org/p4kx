@@ -37,9 +37,12 @@ enum Payload<'source> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CraftingData<'source> {
-    quality_distribution: Cell<Quality<'source, Curve<'source>>>,
-    quality_location_override: Cell<Quality<'source, Overrides<'source>>>,
-    quality_quantization: Cell<Quality<'source, Quantization<'source>>>,
+    #[serde(rename = "qualityDistribution")]
+    distribution: Cell<Quality<'source, Curve<'source>>>,
+    #[serde(rename = "qualityLocationOverride")]
+    location_override: Cell<Quality<'source, Overrides<'source>>>,
+    #[serde(rename = "qualityQuantization")]
+    quantization: Cell<Quality<'source, Quantization<'source>>>,
 }
 
 pub(super) fn read<'source>(
@@ -60,15 +63,15 @@ pub(super) fn read<'source>(
                 },
                 ResourcePropertyPayload::CraftingData(source) => {
                     Payload::CraftingData(Box::new(CraftingData {
-                        quality_distribution: resource_quality::distribution(
+                        distribution: resource_quality::distribution(
                             path,
                             source.quality_distribution(),
                         )?,
-                        quality_location_override: resource_quality::location_overrides(
+                        location_override: resource_quality::location_overrides(
                             path,
                             source.quality_location_override(),
                         )?,
-                        quality_quantization: resource_quality::quantization(
+                        quantization: resource_quality::quantization(
                             path,
                             source.quality_quantization(),
                         )?,

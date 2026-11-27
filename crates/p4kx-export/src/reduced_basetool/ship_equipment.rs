@@ -16,7 +16,7 @@ use crate::catalog_queries::ParsedCatalogQueries;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogSequence, StagedCatalogTable};
 use crate::contract_loadout::EntityKind;
 
-const LOADOUTS: &str = "loadouts";
+pub(super) const LOADOUTS: &str = "loadouts";
 
 pub(super) struct ShipEquipment {
     pub(super) loadouts: StagedCatalogSequence,
@@ -51,7 +51,7 @@ pub(super) fn collect(
                 .remove(&owner.record_index)
                 .ok_or(ReducedError::IncompleteScope(ship_cargo::PATH))?;
             if base.ship_record_index.value != Some(owner.record_index)
-                || base.ship_guid.value.map(|guid| guid.get()) != Some(owner.guid)
+                || base.ship_guid.value.map(crate::guid_text::CatalogGuid::get) != Some(owner.guid)
             {
                 return Err(ReducedError::IncompleteScope(ship_cargo::PATH));
             }

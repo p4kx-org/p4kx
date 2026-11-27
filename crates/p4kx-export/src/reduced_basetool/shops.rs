@@ -9,6 +9,7 @@ use serde::Serialize;
 use super::ReducedError;
 use super::cell::Cell;
 use super::inventory::Inventory;
+use super::selected_tables::SelectedTables;
 use crate::catalog_queries::DatasetAvailability;
 use crate::catalog_queries::shops::{
     ResolutionStatus, Shop, ShopInventorySelection, ShopResolutionSelection, read_shop_inventories,
@@ -107,6 +108,19 @@ pub(super) fn collect(
 }
 
 impl ShopSlice {
+    pub(super) fn add_to(self, tables: &mut SelectedTables) -> Result<(), ReducedError> {
+        tables.sequence("shops", self.shops)?;
+        tables.table(
+            "definitions.shopInventories",
+            self.definitions.shop_inventories,
+        )?;
+        tables.table(
+            "declarations.shopInventoryResolution",
+            self.declarations.shop_inventory_resolution,
+        )
+    }
+
+    #[cfg(test)]
     pub(super) fn take_spool_failure(&self) -> Option<crate::catalog_rows::spool::RowSpoolError> {
         self.shops
             .take_failure()

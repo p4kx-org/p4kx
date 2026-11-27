@@ -44,14 +44,9 @@ impl<'source> From<&'source ResourceNumber> for Number<'source> {
     fn from(number: &'source ResourceNumber) -> Self {
         match number {
             ResourceNumber::Single(value) => value.into(),
-            ResourceNumber::Double(value) => Self::Double(Float {
-                kind: FloatKind::Double,
-                finite: value.finite(),
-                non_finite: value
-                    .finite()
-                    .is_none()
-                    .then(|| non_finite(f64::from_bits(value.raw_bits()))),
-            }),
+            ResourceNumber::Double(value) => {
+                Self::Double(Float::from(f64::from_bits(value.raw_bits())))
+            }
             _ => Self::Integer(number),
         }
     }
@@ -59,18 +54,33 @@ impl<'source> From<&'source ResourceNumber> for Number<'source> {
 
 impl From<&ResourceFloat32> for Number<'_> {
     fn from(value: &ResourceFloat32) -> Self {
-        let finite = value.finite();
-        Self::Single(Float {
-            kind: FloatKind::Single,
-            finite,
-            non_finite: finite
-                .is_none()
-                .then(|| non_finite(f64::from(f32::from_bits(value.raw_bits())))),
-        })
+        Self::Single(Float::from(f32::from_bits(value.raw_bits())))
     }
 }
 
-fn non_finite(value: f64) -> NonFinite {
+impl From<f32> for Float<f32> {
+    fn from(value: f32) -> Self {
+        let finite = value.is_finite().then_some(value);
+        Self {
+            kind: FloatKind::Single,
+            finite,
+            non_finite: finite.is_none().then(|| non_finite(f64::from(value))),
+        }
+    }
+}
+
+impl From<f64> for Float<f64> {
+    fn from(value: f64) -> Self {
+        let finite = value.is_finite().then_some(value);
+        Self {
+            kind: FloatKind::Double,
+            finite,
+            non_finite: finite.is_none().then(|| non_finite(value)),
+        }
+    }
+}
+
+const fn non_finite(value: f64) -> NonFinite {
     if value.is_nan() {
         NonFinite::NaN
     } else if value.is_sign_negative() {

@@ -36,7 +36,7 @@ pub(super) struct RankTargets<'read> {
 
 pub(super) fn stage<'read>(
     source: &'read ReputationRows<ReputationPerkList<'_>>,
-    ranks: RankTargets<'_>,
+    ranks: &RankTargets<'_>,
     scratch: &Path,
     cancel: Option<&CancelToken>,
     references: &mut TextRefs<'read>,
@@ -52,7 +52,7 @@ pub(super) fn stage<'read>(
         output.append(&List {
             identity: header.into(),
             perks: completeness::list(PATH, row.perks(), |perk| {
-                Entry::read(perk, &ranks, references)
+                Entry::read(perk, ranks, references)
             })?,
         })?;
     }

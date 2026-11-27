@@ -3,7 +3,6 @@
 
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
-#[cfg(test)]
 use super::owner_visit::{EntityScope, EquipmentVisitSummary};
 use super::{read, rows};
 use crate::CatalogError;
@@ -83,7 +82,6 @@ impl CatalogQuerySession<'_> {
 }
 
 impl ParsedCatalogQueries<'_> {
-    #[cfg(test)]
     pub(crate) fn visit_cargo_grid_owners<E: From<CatalogError>>(
         &self,
         cancel: Option<&CancelToken>,

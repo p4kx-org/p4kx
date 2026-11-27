@@ -3,10 +3,11 @@
 
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
-use super::projectile_ammo_read::{self, ProjectileAmmoOwner};
+use super::projectile_ammo_read::{self, ProjectileAmmoOwner, ProjectileInputs};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
+use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::weapon_combat_base::{self, WeaponCombatBase};
 use crate::record_observation::RecordObservation;
 
@@ -27,6 +28,37 @@ pub(super) fn read<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ScopedSourceRead<Vec<WeaponCombatOwner<'source>>>, CatalogError> {
+    Ok(
+        prepare(forge, tree, projection, admission, cancel)?.map(|read| {
+            (!read.bases.is_empty())
+                .then(|| read.into_owner(forge))
+                .into_iter()
+                .collect()
+        }),
+    )
+}
+
+struct PreparedCombat<'source> {
+    bases: Vec<WeaponCombatBase<'source>>,
+    inputs: ProjectileInputs<'source>,
+}
+
+impl<'source> PreparedCombat<'source> {
+    fn into_owner(self, forge: &DataForge<'_>) -> WeaponCombatOwner<'source> {
+        WeaponCombatOwner {
+            combat_bases: self.bases,
+            projectile_ammo: self.inputs.into_owner(forge),
+        }
+    }
+}
+
+fn prepare<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<PreparedCombat<'source>>, CatalogError> {
     let read = projectile_ammo_read::read_inputs(forge, tree, projection, admission, cancel)?;
     let combat_bases = weapon_combat_base::rows(
         &projection.origins().uses,
@@ -35,13 +67,33 @@ pub(super) fn read<'source>(
         &read.value.ammunition,
         cancel,
     )?;
-    Ok(read.map(|inputs| {
-        (!combat_bases.is_empty())
-            .then(|| WeaponCombatOwner {
-                combat_bases,
-                projectile_ammo: inputs.into_owner(forge),
-            })
-            .into_iter()
-            .collect()
+    Ok(read.map(|inputs| PreparedCombat {
+        bases: combat_bases,
+        inputs,
     }))
+}
+
+pub(crate) struct CombinedWeaponOwner<'source> {
+    pub(crate) actions: Vec<WeaponActions<'source>>,
+    pub(crate) combat: WeaponCombatOwner<'source>,
+}
+
+pub(super) fn read_combined<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<CombinedWeaponOwner<'source>>>, CatalogError> {
+    Ok(
+        prepare(forge, tree, projection, admission, cancel)?.map(|mut read| {
+            (!(read.inputs.actions.is_empty() && read.inputs.selections.is_empty()))
+                .then(|| CombinedWeaponOwner {
+                    actions: std::mem::take(&mut read.inputs.actions),
+                    combat: read.into_owner(forge),
+                })
+                .into_iter()
+                .collect()
+        }),
+    )
 }

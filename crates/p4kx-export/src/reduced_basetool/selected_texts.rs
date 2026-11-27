@@ -3,13 +3,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, SourcedValue};
 use serde::Serialize;
 
 use super::ReducedError;
 use super::cell::{self, Cell};
+use crate::catalog_queries::CatalogPublicName;
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
+use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef, TextForms};
 
 #[derive(Default)]
 pub(super) struct TextRefs<'source> {
@@ -51,17 +52,63 @@ impl SelectedTexts {
         add_rows(
             &mut self.public_names,
             selected.names,
-            names,
+            names.iter().map(TextInput::from),
             PublicNameRef::as_str,
             cancel,
         )?;
         add_rows(
             &mut self.game_texts,
             selected.descriptions,
-            descriptions,
+            descriptions.iter().map(TextInput::from),
             GameTextRef::as_str,
             cancel,
         )
+    }
+
+    pub(super) fn add_owned_names(
+        &mut self,
+        selected: TextRefs<'_>,
+        names: &[CatalogPublicName],
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), ReducedError> {
+        if !selected.descriptions.is_empty() {
+            return Err(ReducedError::IncompleteScope("texts.gameTexts"));
+        }
+        add_rows(
+            &mut self.public_names,
+            selected.names,
+            names.iter().map(TextInput::from),
+            PublicNameRef::as_str,
+            cancel,
+        )
+    }
+}
+
+struct TextInput<'read, 'source, R, K> {
+    id: &'read SourcedValue<R>,
+    key: &'read SourcedValue<K>,
+    translations: &'read SourcedValue<BTreeMap<String, TextForms<'source>>>,
+}
+
+impl<'read, 'source, R> From<&'read CanonicalText<'source, R>>
+    for TextInput<'read, 'source, R, &'source str>
+{
+    fn from(text: &'read CanonicalText<'source, R>) -> Self {
+        Self {
+            id: text.id(),
+            key: text.key(),
+            translations: text.translations(),
+        }
+    }
+}
+
+impl<'read> From<&'read CatalogPublicName> for TextInput<'read, 'static, PublicNameRef, String> {
+    fn from(text: &'read CatalogPublicName) -> Self {
+        Self {
+            id: &text.id,
+            key: &text.key,
+            translations: &text.translations,
+        }
     }
 }
 
@@ -72,10 +119,10 @@ fn text_rows<S: serde::Serializer>(
     serializer.collect_seq(rows.values())
 }
 
-fn add_rows<R>(
+fn add_rows<'read, 'source: 'read, R: 'read, K: AsRef<str> + 'read>(
     rows: &mut BTreeMap<String, TextRow>,
     mut selected: BTreeSet<&str>,
-    canonical: &[CanonicalText<'_, R>],
+    canonical: impl IntoIterator<Item = TextInput<'read, 'source, R, K>>,
     key: impl Fn(&R) -> &str,
     cancel: Option<&CancelToken>,
 ) -> Result<(), ReducedError> {
@@ -84,12 +131,12 @@ fn add_rows<R>(
     for text in canonical {
         checkpoint(cancel)?;
         let id = text
-            .id()
+            .id
             .value()
             .map(&key)
             .ok_or(ReducedError::IncompleteScope("texts"))?;
         if selected.remove(id) {
-            let reduced = TextRow::project(text, id);
+            let reduced = TextRow::project(&text, id);
             match rows.entry(id.to_owned()) {
                 Entry::Occupied(mut row) => row.get_mut().join(&reduced)?,
                 Entry::Vacant(row) => {
@@ -120,19 +167,17 @@ struct Forms {
 }
 
 impl TextRow {
-    fn project<R>(text: &CanonicalText<'_, R>, id: &str) -> Self {
-        let id = Cell::from(text.id()).map(|_| id.to_owned());
-        let key = Cell::from(text.key()).map(|key| (*key).to_owned());
-        let translations = Cell::from(text.translations()).map(|rows| {
+    fn project<R, K: AsRef<str>>(text: &TextInput<'_, '_, R, K>, id: &str) -> Self {
+        let id = Cell::from(text.id).map(|_| id.to_owned());
+        let key = Cell::from(text.key).map(|key| key.as_ref().to_owned());
+        let translations = Cell::from(text.translations).map(|rows| {
             rows.iter()
                 .map(|(language, forms)| {
                     (
                         language.clone(),
                         Forms {
-                            source_text: Cell::from(&forms.source_text)
-                                .map(|value| value.to_string()),
-                            display_text: Cell::from(&forms.display_text)
-                                .map(|value| value.to_string()),
+                            source_text: Cell::from(&forms.source_text).map(ToString::to_string),
+                            display_text: Cell::from(&forms.display_text).map(ToString::to_string),
                         },
                     )
                 })

@@ -9,7 +9,7 @@ use p4kx_extraction::ProvenanceMode;
 /// Arguments of `p4kx catalog`.
 #[derive(Debug, Args)]
 pub(crate) struct CatalogArgs {
-    /// Prints the schema instead of writing a catalog.
+    /// Selects a named catalog export or prints the catalog schema.
     #[command(subcommand)]
     pub(crate) command: Option<CatalogCommand>,
     /// Path of the Data.p4k Archive.
@@ -60,6 +60,21 @@ impl From<CatalogProvenanceArg> for ProvenanceMode {
 /// The subcommands of `p4kx catalog`.
 #[derive(Debug, Subcommand)]
 pub(crate) enum CatalogCommand {
+    /// Writes the reduced Basetool catalog as compressed JSON.
+    Basetool(crate::catalog_basetool::BasetoolArgs),
     /// Prints the JSON Schema (draft 2020-12) of the selected catalog profile.
-    Schema,
+    Schema(CatalogSchemaArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CatalogSchemaArgs {
+    /// Selects the standard or reduced Basetool wire format.
+    #[arg(long, value_enum, default_value_t = CatalogSchemaProfile::Standard)]
+    pub(crate) profile: CatalogSchemaProfile,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum CatalogSchemaProfile {
+    Standard,
+    Basetool,
 }

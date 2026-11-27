@@ -119,3 +119,27 @@ impl<'source> ParallelAction<'source> {
         })
     }
 }
+
+impl<'source> SequenceAction<'source> {
+    pub(crate) const fn mode(&self) -> &SourcedValue<&'source str> {
+        &self.mode
+    }
+
+    pub(crate) const fn sequence_entries(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SequenceActionEntry<'source>>>> {
+        &self.sequence_entries
+    }
+}
+
+impl SequenceActionEntry<'_> {
+    pub(crate) const fn weapon_action(&self) -> &SourcedValue<u32> {
+        &self.weapon_action
+    }
+}
+
+impl ParallelAction<'_> {
+    pub(crate) const fn weapon_actions(&self) -> &SourcedValue<Vec<SourcedValue<u32>>> {
+        &self.weapon_actions
+    }
+}

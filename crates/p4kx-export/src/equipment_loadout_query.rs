@@ -18,7 +18,6 @@ pub use crafter_host::{
     CrafterHost, CrafterHostSnapshot, read_crafter_hosts, read_crafter_hosts_from,
 };
 
-#[cfg(test)]
 #[path = "equipment_loadout_cargo_visit.rs"]
 mod cargo_visit;
 #[path = "equipment_loadout_facility_query.rs"]

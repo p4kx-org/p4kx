@@ -39,7 +39,7 @@ pub(super) fn database() -> DataForgeBuilder {
             RESOURCE,
             "ResourceType",
             "ResourceType.Fixture",
-            "libs/foundry/records/resourcetypes/fixture_resource.xml",
+            "libs/foundry/records/resourcetypedatabase/fixture_resource.xml",
         ))
 }
 

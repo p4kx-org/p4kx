@@ -13,6 +13,7 @@ use super::crafting_global;
 use super::record_identity::RecordIdentity;
 use super::record_link::RecordLink;
 use super::record_targets::RecordTargets;
+use super::resource_components;
 use super::resource_density::{self, Density};
 use super::resource_groups::{self, ResourceGroups};
 use super::resource_properties::{self, Property};
@@ -24,12 +25,13 @@ use crate::catalog_text_contract::PublicNameRef;
 use crate::guid_text::CatalogGuid;
 use crate::resource_type_contract::ResourceDefinition;
 
-const PATH: &str = "definitions.resourceTypes";
+pub(super) const PATH: &str = "definitions.resourceTypes";
 
 pub(super) struct Resources {
     pub(super) definitions: StagedCatalogTable,
     pub(super) groups: ResourceGroups,
     pub(super) crafting_global: StagedCatalogTable,
+    pub(super) components: StagedCatalogTable,
 }
 
 pub(super) fn collect(
@@ -44,10 +46,12 @@ pub(super) fn collect(
         })??;
     let groups = resource_groups::collect(parsed, scratch, cancel, &targets, texts)?;
     let crafting_global = crafting_global::collect(parsed, scratch, cancel, &targets)?;
+    let components = resource_components::collect(parsed, scratch, cancel, &targets)?;
     Ok(Resources {
         definitions,
         groups,
         crafting_global,
+        components,
     })
 }
 

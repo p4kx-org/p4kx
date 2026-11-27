@@ -95,7 +95,8 @@ fn stage_standings<'read>(
 struct Scope<'read> {
     #[serde(flatten)]
     identity: RecordIdentity<'read>,
-    scope_name: Cell<&'read str>,
+    #[serde(rename = "scopeName")]
+    name: Cell<&'read str>,
     display_name: Cell<&'read GameTextRef>,
     standing_map: Cell<StandingMap<'read>>,
 }
@@ -115,7 +116,7 @@ impl<'read> Scope<'read> {
         references.game_text(display_name.value);
         Ok(Self {
             identity: header.into(),
-            scope_name: completeness::cell(SCOPES, source.scope_name())?.map(|name| *name),
+            name: completeness::cell(SCOPES, source.scope_name())?.map(|name| *name),
             display_name,
             standing_map: completeness::cell(SCOPES, source.standing_map())?
                 .try_map(|map| StandingMap::read(map, targets))?,

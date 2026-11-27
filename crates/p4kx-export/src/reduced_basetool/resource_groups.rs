@@ -20,9 +20,9 @@ use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_text_contract::PublicNameRef;
 use crate::guid_text::CatalogGuid;
 
-const DEFINITIONS: &str = "definitions.resourceGroups";
-const MEMBERS: &str = "declarations.resourceGroupMembers";
-const PARENTS: &str = "projections.resourceGroupParents";
+pub(super) const DEFINITIONS: &str = "definitions.resourceGroups";
+pub(super) const MEMBERS: &str = "declarations.resourceGroupMembers";
+pub(super) const PARENTS: &str = "projections.resourceGroupParents";
 
 pub(super) struct ResourceGroups {
     pub(super) definitions: StagedCatalogTable,

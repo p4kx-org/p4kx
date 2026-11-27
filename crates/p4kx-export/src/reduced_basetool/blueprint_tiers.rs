@@ -66,7 +66,8 @@ impl Recipe<'_, '_> {
 #[serde(rename_all = "camelCase")]
 struct Tier<'read, 'source> {
     blueprint: BlueprintKey,
-    tier_index: Cell<&'read u32>,
+    #[serde(rename = "tierIndex")]
+    index: Cell<&'read u32>,
     craft_time_seconds: Cell<&'read ResourceInt64>,
     mandatory: Option<CostPosition>,
     optional: Vec<CostPosition>,
@@ -88,7 +89,7 @@ impl<'read, 'source> Tier<'read, 'source> {
         }
         Ok(Self {
             blueprint,
-            tier_index: completeness::cell(PATH, source.tier_index())?,
+            index: completeness::cell(PATH, source.tier_index())?,
             craft_time_seconds: completeness::cell(PATH, source.craft_time_seconds())?,
             mandatory: source
                 .mandatory()

@@ -8,6 +8,29 @@ the inputs that selected projections require.
 This selection was made against Catalog v3 at `6f3cda47`. Validate the source path
 for each field against the release candidate before fixing the reduced schema.
 
+## Export and import
+
+```text
+p4kx catalog basetool <archive> --out <file.json.zst>
+```
+
+The command writes one Zstandard frame with the decoded content size. The output
+is limited to 64,000,000 compressed bytes and 1,000,000,000 decoded bytes,
+including the final JSON newline. The previous file remains in place until
+preparation and the final archive stamp check succeed.
+
+The outer document contains `format: "p4kx-basetool-catalog"`,
+`formatVersion: 1` and a `catalog` object with `schemaVersion: 3`. Consumers
+select the wire contract by the outer format and version. Generate the
+structural schema with `p4kx catalog schema --profile basetool` or Rust's
+`p4kx_export::basetool_catalog_schema()`. It validates the envelope, source
+metadata, required selected datasets, coverage entries and text containers.
+The per-dataset field shapes and reference joins are specified below and
+exercised by the projection tests.
+
+The producer identifies the Channel and Build when available. The importer
+checks LIVE eligibility and selected completeness before applying the upload.
+
 ## Envelope, text and completeness
 
 - Retain `schemaVersion`, `source`, `exportHealth` and `completeness`. The
@@ -16,9 +39,17 @@ for each field against the release candidate before fixing the reduced schema.
   encrypted Entry count. Health assesses the source closure needed for this
   export. A Normal export requires complete selected data, and the importer
   requires a healthy export before applying it.
-- For every published dataset, retain the selection status and filter needed
-  to validate import and decide whether to remove absent rows. Report the exact
-  selected populations. Ship-only Loadouts must carry that scope explicitly.
+- `catalog.exportHealth.status` is `complete` for the selected profile.
+  `catalog.exportHealth.scope` lists all 76 accepted dataset and container
+  paths. `catalog.completeness` lists the 65 staged data leaves in scope order
+  with `path`, emitted `rows` and `selection`. The selection is `all`,
+  `shipAndVehicleRoots` for Loadouts or `boundStarmapObjects` for Starmap
+  Placements. The text and pledge snapshots, source metadata and section
+  containers use the overall scope.
+- The top-level data leaves are arrays. Child datasets in `configurations`,
+  `declarations`, `definitions`, `placements` and `projections` have
+  `availability` and `rows`. An absent source family has an empty row array.
+  A surveyed family can have zero selected rows and remain available.
 - Preserve canonical order and stable identities. Keep physical Record indexes
   where an emitted relationship uses them. Compute selected projections with
   their canonical inputs, including inputs whose datasets are omitted.
@@ -187,7 +218,7 @@ The Shop slice uses normalized inventory paths and physical Entry order. It
 shares the canonical registry and inventory-resolution readers. It resolves original JSON cells before discarding their
 arena and retains the exact JSON number tokens and classification of text cells.
 It checks the reduced byte limits through the same zstd framing as the full Catalog.
-The complete reduced wire format and command require all selected datasets.
+The complete reduced wire contract requires every selected dataset container.
 
 ## Internal entity producer slice
 
@@ -371,10 +402,9 @@ for other board variants.
 
 ## Acceptance
 
-#1177 tracks the wire contract, generation and import. Use a distinct versioned
-format or profile for the reduced field shapes and omission rules. The complete
-v3 schema describes a different payload. Record exact scope and import support
-for the new profile before publication.
+#1177 tracks the wire contract, generation and import for
+`p4kx-basetool-catalog` format v1. Record the verified scope and importer
+revision before publication.
 
 Produce from scoped reads and verify at most 40,000,000,000 bytes of peak
 memory, including helper processes. Estimate headroom on a 64 GiB system.

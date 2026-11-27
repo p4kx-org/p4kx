@@ -7,7 +7,8 @@ canonical queries. Choose the route that matches the required output.
 
 | Need | Rust entry point |
 | --- | --- |
-| Generate a versioned document | `p4kx_export::build_catalog` for in-memory bytes or `write_catalog_file` for a staged file. Choose `catalog_schema_for(provenance_mode)` for the publication profile. `catalog_marker_schema()` matches the default output and `catalog_schema()` matches Full. |
+| Generate a versioned Catalog v3 document | `p4kx_export::build_catalog` for in-memory bytes or `write_catalog_file` for a staged file. Choose `catalog_schema_for(provenance_mode)` for the publication profile. `catalog_marker_schema()` matches the default output and `catalog_schema()` matches Full. |
+| Generate the reduced Basetool upload | `p4kx_export::write_basetool_catalog_file` with `BasetoolCatalogOptions`. See the staged file example and scope below. |
 | Read one canonical dataset or Record | A domain reader under `p4kx_export::catalog_queries`, such as `read_blueprint_categories` for an owned snapshot or `with_item_ports` for a borrow scoped to a callback. |
 | Query the same Archive repeatedly | Open one `CatalogQuerySession`, call `parsed` once and use the resulting view to reuse decoding and lookup indexes. [Session example](#reuse-an-archive-session) |
 | Build a consumer-owned equipment index | Use an `equipment` visitor such as `visit_item_definitions` or `visit_loadout_owners` to process readable owners one at a time. Publish staged results after successful traversal and the required coverage checks. |
@@ -24,6 +25,49 @@ to `file.commit_if_current(&watch)` after writing succeeds. The commit checks th
 immediately before replacing the destination. A changed Build or cancellation preserves the
 prior file and reports any separate cleanup failure. A generic `Write` sink leaves staging
 and rollback with the caller.
+
+## Export a reduced Basetool file
+
+`write_basetool_catalog_file` builds the fixed Basetool scope from one opened
+Archive. It takes a caller-owned scratch directory and a lazy `CatalogFile`
+factory. The source reads and decoded size check complete before the factory
+runs. The returned summary carries the format and wire version plus the
+decoded and compressed byte counts. Publish the returned file with a watch
+created before the export.
+
+```rust,no_run
+use std::error::Error;
+use std::path::Path;
+use std::time::SystemTime;
+
+use p4kx_export::{BasetoolCatalogOptions, BasetoolCatalogSummary, CatalogFile};
+use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken};
+
+fn export_basetool(
+    archive: &Archive,
+    scratch: &Path,
+    output: &Path,
+) -> Result<BasetoolCatalogSummary, Box<dyn Error>> {
+    let cancel = CancelToken::default();
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    protection.ensure_writable(scratch, cancel.flag())?;
+    let watch = ArchiveWatch::new(archive);
+    let mut options = BasetoolCatalogOptions::new(SystemTime::now());
+    options.cancel = Some(&cancel);
+    let (summary, file) = p4kx_export::write_basetool_catalog_file(archive, &options, scratch, || {
+        CatalogFile::create_protected(output, &protection, &cancel)
+    })?;
+    file.commit_if_current(&watch)?;
+    Ok(summary)
+}
+```
+
+The archive-to-file operation uses the reduced producer's memory acceptance
+limit. The per-query memory limit applies to individual scoped data reads.
+The CLI takes an explicit `.json.zst` destination using
+`p4kx catalog basetool <archive> --out <file.json.zst>`. Use
+`p4kx_export::basetool_catalog_schema()` for structural validation of the wire
+format. [Reduced format and selected fields](catalog-basetool-scope.md)
 
 ## Blueprint categories and gameplay properties
 

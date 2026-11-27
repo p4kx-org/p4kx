@@ -29,7 +29,7 @@ pub(super) fn stage(
     let mut targets = RecordTargets::default();
     for original in &source.rows {
         targets.insert(PATH, original.source())?;
-        output.append(&Context::read(original, scopes)?)?;
+        output.append(&Definition::read(original, scopes)?)?;
     }
     let result = output.finish(source.availability)?;
     completeness::rows(PATH, source.rows.len(), result.len())?;
@@ -38,7 +38,7 @@ pub(super) fn stage(
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Context<'read> {
+struct Definition<'read> {
     #[serde(flatten)]
     identity: RecordIdentity<'read>,
     sort_order_scope: Cell<&'read str>,
@@ -46,7 +46,7 @@ struct Context<'read> {
     scope_context_list: Cell<Vec<Cell<Scope<'read>>>>,
 }
 
-impl<'read> Context<'read> {
+impl<'read> Definition<'read> {
     fn read(
         source: &'read ReputationContextDefinition<'_>,
         scopes: &RecordTargets,

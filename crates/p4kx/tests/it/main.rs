@@ -26,6 +26,7 @@ mod bnk_objects;
 mod bnk_objects_limits;
 mod bnk_raw_extract_origins;
 mod catalog;
+mod catalog_basetool;
 mod catalog_facility_cargo_grid;
 mod catalog_failures;
 mod catalog_health_origins;

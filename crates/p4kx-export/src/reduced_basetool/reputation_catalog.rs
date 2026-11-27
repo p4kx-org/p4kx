@@ -19,6 +19,7 @@ use crate::catalog_rows::staged::StagedCatalogTable;
 
 pub(super) struct Reputation {
     pub(super) factions: StagedCatalogTable,
+    pub(super) faction_targets: RecordTargets,
     pub(super) scopes: StagedCatalogTable,
     pub(super) standings: StagedCatalogTable,
     pub(super) contexts: StagedCatalogTable,
@@ -44,6 +45,7 @@ pub(super) fn collect(
     let mission_boards = mission_boards::collect(parsed, scratch, cancel, &staged.faction_targets)?;
     Ok(Reputation {
         factions: staged.factions,
+        faction_targets: staged.faction_targets,
         scopes: staged.scopes,
         standings: staged.standings,
         contexts: staged.contexts,
@@ -86,7 +88,7 @@ fn stage(
         .ok_or(ReducedError::IncompleteScope(reputation_perks::PATH))?;
     let perks = reputation_perks::stage(
         perk_rows,
-        RankTargets {
+        &RankTargets {
             scopes: &scope_targets,
             standings: &standing_targets,
         },

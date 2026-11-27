@@ -5,7 +5,8 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_assembly::Entities;
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, DataForgeEntry, ProvenanceMode, SourceInventory,
+    Archive, ArchiveWatch, Build, CancelToken, DataForge, DataForgeEntry, Guid, ProvenanceMode,
+    SourceInventory,
 };
 use serde::Serialize;
 
@@ -111,24 +112,66 @@ pub fn read_jump_inventory_with_provenance_mode(
     let forge = entry.open().map_err(CatalogError::DataForge)?;
     let origins =
         CatalogOrigins::for_archive_records_with_provenance_mode(archive, &entry, provenance_mode)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
+    let (mut placements, candidates) =
+        read_placements(archive, &forge, &origins, budget, cancel, None)?;
+    let entries = export_health_entries::compile(std::mem::take(&mut placements.ledger.entries))?;
+    let source_entries = export_health_entries::counts(Kind::StarmapObjects, &entries.sources)?;
+    let jumps = finish_jumps(
+        archive,
+        placements,
+        &candidates,
+        source_entries,
+        &origins,
+        cancel,
+    )?;
+    watch.check()?;
+    checkpoint(cancel)?;
+    Ok(jumps)
+}
+
+fn read_placements(
+    archive: &Archive,
+    forge: &DataForge<'_>,
+    origins: &CatalogOrigins,
+    budget: StarmapTraversalBudget,
+    cancel: Option<&CancelToken>,
+    records: Option<&[Guid]>,
+) -> Result<(Placements, JumpEndpointRecords), CatalogError> {
+    let input = OriginalCatalogInput::new(forge, origins);
     let capture = EntryCapture::for_input(&input);
     let options = CatalogOptions {
         cancel,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let candidates = JumpEndpointRecords::read(&forge, &input, &options)?;
-    let scope = PlacementScope::for_catalog(&forge, None)
+    let candidates = JumpEndpointRecords::read(forge, &input, &options)?;
+    let scope = PlacementScope::for_catalog(forge, None)
         .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    let mut placements =
-        Placements::read_for_jump_endpoints(archive, cancel, budget, &capture, scope, &candidates)?;
-    let entities = Entities::new(&forge);
+    let mut placements = Placements::read_for_jump_endpoints(
+        archive,
+        cancel,
+        budget,
+        &capture,
+        scope,
+        &candidates,
+        records,
+    )?;
+    let entities = Entities::new(forge);
     placements.join_jump_operators(&entities, &input, cancel)?;
+    Ok((placements, candidates))
+}
+
+fn finish_jumps(
+    archive: &Archive,
+    mut placements: Placements,
+    candidates: &JumpEndpointRecords,
+    source_entries: ExportEntryCounts,
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+) -> Result<JumpInventorySnapshot, CatalogError> {
     let connections = JumpConnectionInventory(CatalogTable::empty(
         placements.jump_connection_availability(),
     ));
     let endpoints = placements.take_jump_endpoints();
-    let entries = export_health_entries::compile(placements.ledger.entries)?;
     let coverage = JumpInventoryCoverage {
         directory_complete: export_archive_health::inventory(archive).is_none(),
         record_classifications_complete: candidates.is_complete(),
@@ -142,11 +185,9 @@ pub fn read_jump_inventory_with_provenance_mode(
             .iter()
             .filter(|endpoint| !endpoint.partner_scope_complete())
             .count(),
-        source_entries: export_health_entries::counts(Kind::StarmapObjects, &entries.sources)?,
+        source_entries,
     };
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
-    watch.check()?;
-    checkpoint(cancel)?;
     Ok(JumpInventorySnapshot {
         build: archive.build().cloned(),
         endpoint_availability: endpoints.availability,
@@ -156,3 +197,6 @@ pub fn read_jump_inventory_with_provenance_mode(
         source_inventory,
     })
 }
+
+#[path = "starmap_joint_placement_query.rs"]
+mod joint;

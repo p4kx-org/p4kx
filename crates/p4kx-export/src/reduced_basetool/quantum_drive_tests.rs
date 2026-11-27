@@ -35,34 +35,7 @@ fn quantum_drives_keep_both_physical_components_and_selected_standard_values() -
             Some(2)
         );
         for (row, speed) in [(first, 1.0), (second, 2049.0)] {
-            let standard = row.pointer("/standard/value").ok_or("standard profile")?;
-            for (field, offset) in [
-                ("driveSpeed", 0.0),
-                ("cooldownTime", 1.0),
-                ("spoolUpTime", 2.0),
-                ("stageOneAccelRate", 3.0),
-                ("stageTwoAccelRate", 4.0),
-                ("engageSpeed", 5.0),
-                ("calibrationDelayInSeconds", 11.0),
-            ] {
-                let quantity = standard.get(field).ok_or("selected quantity")?;
-                assert_eq!(
-                    quantity.pointer("/value/finite").and_then(Value::as_f64),
-                    Some(speed + offset),
-                    "the original standard profile supplies {field}"
-                );
-                assert_eq!(
-                    quantity
-                        .get("containsEncryptedSource")
-                        .and_then(Value::as_bool),
-                    Some(true),
-                    "{field} came from the encrypted DataForge"
-                );
-                assert!(
-                    quantity.pointer("/value/rawBits").is_none(),
-                    "the selected quantity carries the numeric projection"
-                );
-            }
+            assert_standard_profile(row, speed)?;
             let fuel = row
                 .pointer("/fuelRequirement/value/finite")
                 .and_then(Value::as_f64)
@@ -80,6 +53,38 @@ fn quantum_drives_keep_both_physical_components_and_selected_standard_values() -
         }
         Ok(())
     })
+}
+
+fn assert_standard_profile(row: &Value, speed: f64) -> TestResult {
+    let standard = row.pointer("/standard/value").ok_or("standard profile")?;
+    for (field, offset) in [
+        ("driveSpeed", 0.0),
+        ("cooldownTime", 1.0),
+        ("spoolUpTime", 2.0),
+        ("stageOneAccelRate", 3.0),
+        ("stageTwoAccelRate", 4.0),
+        ("engageSpeed", 5.0),
+        ("calibrationDelayInSeconds", 11.0),
+    ] {
+        let quantity = standard.get(field).ok_or("selected quantity")?;
+        assert_eq!(
+            quantity.pointer("/value/finite").and_then(Value::as_f64),
+            Some(speed + offset),
+            "the original standard profile supplies {field}"
+        );
+        assert_eq!(
+            quantity
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(true),
+            "{field} came from the encrypted DataForge"
+        );
+        assert!(
+            quantity.pointer("/value/rawBits").is_none(),
+            "the selected quantity carries the numeric projection"
+        );
+    }
+    Ok(())
 }
 
 #[test]

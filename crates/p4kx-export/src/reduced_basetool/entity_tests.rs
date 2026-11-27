@@ -35,6 +35,17 @@ fn selected_entity_tables_preserve_bilingual_domains_and_reviewed_pledges() -> T
     let slice = entities::collect(&session.parsed(None)?, scratch.path(), None, &mut texts)?;
     assert_eq!(slice.items.len(), 0, "no Item records in fixture");
     assert_eq!(slice.item_definitions.len(), 0, "no Item definition rows");
+    assert_eq!(
+        slice.item_targets.iter().count(),
+        0,
+        "no selected Item targets"
+    );
+    assert_eq!(slice.equipment.ports.len(), 0, "no port declarations");
+    assert_eq!(
+        slice.equipment.attachments.len(),
+        0,
+        "no attachment declarations"
+    );
     assert_eq!(slice.ships.len(), 0, "no Ship records in fixture");
     assert!(
         slice.ship_cargo.is_empty(),

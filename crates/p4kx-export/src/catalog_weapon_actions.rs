@@ -21,6 +21,7 @@ mod operating;
 #[path = "weapon_action_recoil.rs"]
 mod recoil;
 
+pub(crate) use action::{BeamDamageInputs, WeaponActionKind};
 pub(super) use action::{ProjectileAction, ProjectileSelector};
 pub use action::{ProjectileCombatInputs, WeaponAction, WeaponModeKind};
 use operating::WeaponOperatingConfiguration;

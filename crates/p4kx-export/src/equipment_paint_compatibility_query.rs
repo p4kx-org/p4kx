@@ -14,7 +14,6 @@ use crate::catalog_queries::{
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::tag_catalog;
-#[cfg(test)]
 use crate::paint::ShipPaintMatches;
 use crate::paint::{PaintCandidate, PaintRequirements};
 use crate::texts::{TextSources, Texts};
@@ -115,7 +114,6 @@ impl CatalogQuerySession<'_> {
 }
 
 impl ParsedCatalogQueries<'_> {
-    #[cfg(test)]
     pub(crate) fn with_paint_matches<T, E: From<CatalogError>>(
         &self,
         cancel: Option<&CancelToken>,

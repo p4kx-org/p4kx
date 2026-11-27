@@ -59,6 +59,10 @@ pub use crate::record_export::{
     write_record_export,
 };
 pub use crate::record_summary::{RecordExportReceipt, RecordExportSummary};
+pub use crate::reduced_basetool::{
+    BasetoolCatalogError, BasetoolCatalogOptions, BasetoolCatalogSummary, basetool_catalog_schema,
+    write_basetool_catalog_file,
+};
 pub use crate::selection::{
     EXCLUDED_TOKENS, Kind, KindRule, SHIP_EXCLUDED_TOKENS, is_kind_leftover,
 };

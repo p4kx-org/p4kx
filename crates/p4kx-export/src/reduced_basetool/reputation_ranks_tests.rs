@@ -34,6 +34,13 @@ fn reduced_rank_tables_close_standing_slots_and_keep_authored_precision() -> Tes
     let scopes = serde_json::to_value(ranks.scopes)?;
     let standings = serde_json::to_value(ranks.standings)?;
     let contexts = serde_json::to_value(ranks.contexts)?;
+    verify_contexts(&contexts, &scopes);
+    let scope = scopes.pointer("/rows/0").ok_or("original scope row")?;
+    verify_standings(scope, &standings)?;
+    verify_scope_name(scope, &serde_json::to_value(texts)?)
+}
+
+fn verify_contexts(contexts: &Value, scopes: &Value) {
     assert_eq!(
         contexts.pointer("/rows/0/primaryScopeContext/value/scope/value/targetRecordIndex/value"),
         scopes.pointer("/rows/0/recordIndex/value")
@@ -47,7 +54,9 @@ fn reduced_rank_tables_close_standing_slots_and_keep_authored_precision() -> Tes
         contexts.pointer("/rows/0/scopeContextList/value/1/value/scope/value/targetType/value"),
         Some(&json!("Placeholder"))
     );
-    let scope = scopes.pointer("/rows/0").ok_or("original scope row")?;
+}
+
+fn verify_standings(scope: &Value, standings: &Value) -> TestResult {
     let map = scope.pointer("/standingMap/value").ok_or("selected map")?;
     let slots = map
         .pointer("/standings/value")
@@ -84,7 +93,10 @@ fn reduced_rank_tables_close_standing_slots_and_keep_authored_precision() -> Tes
         standings.pointer("/rows/1/minReputation/containsEncryptedSource"),
         Some(&json!(true))
     );
-    let texts = serde_json::to_value(texts)?;
+    Ok(())
+}
+
+fn verify_scope_name(scope: &Value, texts: &Value) -> TestResult {
     let selected_key = scope
         .pointer("/displayName/value")
         .ok_or("protected scope name")?;

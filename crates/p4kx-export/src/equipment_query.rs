@@ -182,6 +182,9 @@ mod weapon_animation;
 mod weapon_combat;
 #[path = "equipment_weapon_combat_read.rs"]
 mod weapon_combat_read;
+#[path = "equipment_weapon_combat_visit.rs"]
+mod weapon_combat_visit;
+pub(crate) use weapon_combat_read::CombinedWeaponOwner;
 #[path = "equipment_weapon_magazine_query.rs"]
 mod weapon_magazine;
 #[path = "equipment_weapon_magazine_dependency_read.rs"]

@@ -39,75 +39,9 @@ fn resource_groups_keep_physical_links_order_and_only_selected_names() -> TestRe
         assert!(definition.get("description").is_none());
         assert!(definition.get("defaultThumbnailPathSVG").is_none());
         let membership = row(&members, 0)?;
-        let children = membership
-            .pointer("/groups/value")
-            .and_then(Value::as_array)
-            .ok_or("child slots")?;
-        let [empty, wrong_type, dangling, child, repeated_child, _self] = children.as_slice()
-        else {
-            return Err("six ordered child slots".into());
-        };
-        assert_eq!(
-            empty.pointer("/state").and_then(Value::as_str),
-            Some("null")
-        );
-        assert_eq!(
-            wrong_type.pointer("/value/status").and_then(Value::as_str),
-            Some("present"),
-            "the source link resolves to the actual Record independently of reduced membership"
-        );
-        assert_eq!(
-            wrong_type
-                .pointer("/value/targetType/value")
-                .and_then(Value::as_str),
-            Some("Other")
-        );
-        assert_eq!(
-            wrong_type
-                .pointer("/value/targetRecordIndex/value")
-                .and_then(Value::as_u64),
-            Some(2)
-        );
-        assert_eq!(
-            dangling.pointer("/value/status").and_then(Value::as_str),
-            Some("dangling")
-        );
-        assert_eq!(child, repeated_child);
-
-        let resources = membership
-            .pointer("/resources/value")
-            .and_then(Value::as_array)
-            .ok_or("resource slots")?;
-        let [resource, empty, repeated_resource] = resources.as_slice() else {
-            return Err("three ordered resource slots".into());
-        };
-        assert_eq!(
-            resource
-                .pointer("/value/targetRecordIndex/value")
-                .and_then(Value::as_u64),
-            Some(3)
-        );
-        assert_eq!(
-            empty.pointer("/state").and_then(Value::as_str),
-            Some("null")
-        );
-        assert_eq!(resource, repeated_resource);
-
-        for physical in [1, 5] {
-            let parent = row(&parents, physical)?;
-            assert_eq!(
-                parent
-                    .pointer("/parent/value/targetRecordIndex/value")
-                    .and_then(Value::as_u64),
-                Some(0)
-            );
-            assert_eq!(
-                parent
-                    .pointer("/parent/containsEncryptedSource")
-                    .and_then(Value::as_bool),
-                Some(true)
-            );
-        }
+        assert_child_links(membership)?;
+        assert_resource_links(membership)?;
+        assert_parent_links(&parents)?;
         let texts = serde_json::to_value(texts)?;
         let name = texts
             .pointer("/publicNames/0")
@@ -122,6 +56,86 @@ fn resource_groups_keep_physical_links_order_and_only_selected_names() -> TestRe
         );
         Ok(())
     })
+}
+
+fn assert_child_links(membership: &Value) -> TestResult {
+    let children = membership
+        .pointer("/groups/value")
+        .and_then(Value::as_array)
+        .ok_or("child slots")?;
+    let [empty, wrong_type, dangling, child, repeated_child, _self] = children.as_slice() else {
+        return Err("six ordered child slots".into());
+    };
+    assert_eq!(
+        empty.pointer("/state").and_then(Value::as_str),
+        Some("null")
+    );
+    assert_eq!(
+        wrong_type.pointer("/value/status").and_then(Value::as_str),
+        Some("present"),
+        "the source link resolves to the actual Record independently of reduced membership"
+    );
+    assert_eq!(
+        wrong_type
+            .pointer("/value/targetType/value")
+            .and_then(Value::as_str),
+        Some("Other")
+    );
+    assert_eq!(
+        wrong_type
+            .pointer("/value/targetRecordIndex/value")
+            .and_then(Value::as_u64),
+        Some(2)
+    );
+    assert_eq!(
+        dangling.pointer("/value/status").and_then(Value::as_str),
+        Some("dangling")
+    );
+    assert_eq!(child, repeated_child);
+
+    Ok(())
+}
+
+fn assert_resource_links(membership: &Value) -> TestResult {
+    let resources = membership
+        .pointer("/resources/value")
+        .and_then(Value::as_array)
+        .ok_or("resource slots")?;
+    let [resource, empty, repeated_resource] = resources.as_slice() else {
+        return Err("three ordered resource slots".into());
+    };
+    assert_eq!(
+        resource
+            .pointer("/value/targetRecordIndex/value")
+            .and_then(Value::as_u64),
+        Some(3)
+    );
+    assert_eq!(
+        empty.pointer("/state").and_then(Value::as_str),
+        Some("null")
+    );
+    assert_eq!(resource, repeated_resource);
+
+    Ok(())
+}
+
+fn assert_parent_links(parents: &Value) -> TestResult {
+    for physical in [1, 5] {
+        let parent = row(parents, physical)?;
+        assert_eq!(
+            parent
+                .pointer("/parent/value/targetRecordIndex/value")
+                .and_then(Value::as_u64),
+            Some(0)
+        );
+        assert_eq!(
+            parent
+                .pointer("/parent/containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+    }
+    Ok(())
 }
 
 #[test]

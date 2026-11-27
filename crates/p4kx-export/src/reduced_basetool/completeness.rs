@@ -7,7 +7,7 @@ use super::ReducedError;
 use super::cell::Cell;
 use crate::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 
-pub(super) fn inventory(
+pub(super) const fn inventory(
     path: &'static str,
     availability: DatasetAvailability,
     coverage: &CatalogRecordCoverage,
@@ -66,7 +66,7 @@ pub(super) fn list<'source, T, U>(
     })
 }
 
-pub(super) fn rows(
+pub(super) const fn rows(
     path: &'static str,
     observed: usize,
     emitted: usize,

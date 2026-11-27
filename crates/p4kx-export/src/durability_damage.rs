@@ -168,7 +168,7 @@ impl<T> DamageChannels<T> {
         &self.stun
     }
 
-    pub(super) const fn as_ref(&self) -> DamageChannels<&T> {
+    pub(crate) const fn as_ref(&self) -> DamageChannels<&T> {
         DamageChannels {
             physical: &self.physical,
             energy: &self.energy,
@@ -179,7 +179,7 @@ impl<T> DamageChannels<T> {
         }
     }
 
-    pub(super) fn try_map<U, E>(
+    pub(crate) fn try_map<U, E>(
         self,
         mut apply: impl FnMut(T) -> Result<U, E>,
     ) -> Result<DamageChannels<U>, E> {

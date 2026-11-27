@@ -17,6 +17,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 mod damage;
 
 use damage::BeamDamage;
+pub(crate) use damage::BeamDamageInputs;
 
 /// Original beam damage, ranges, thermal inputs and activation timing.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -94,5 +95,15 @@ impl<'source> BeamAction<'source> {
             fire_during_charge_up,
             authored,
         })
+    }
+}
+
+impl<'source> BeamAction<'source> {
+    pub(crate) const fn damage_per_second(&self) -> &SourcedValue<BeamDamage<'source>> {
+        &self.damage_per_second
+    }
+
+    pub(crate) const fn hit_type(&self) -> &SourcedValue<&'source str> {
+        &self.hit_type
     }
 }

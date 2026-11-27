@@ -27,7 +27,7 @@ mod record_header;
 #[path = "../it/resource_density_schema_fixture.rs"]
 mod resource_density_schema_fixture;
 #[path = "../it/resource_fixture.rs"]
-mod resource_fixture;
+pub(crate) mod resource_fixture;
 #[path = "../it/resource_fixture_values.rs"]
 mod resource_fixture_values;
 #[path = "../it/resource_quality_schema_fixture.rs"]
@@ -36,6 +36,8 @@ mod resource_quality_schema_fixture;
 mod resource_schema_fixture;
 #[path = "resource_oracle/values.rs"]
 mod values;
+
+pub(crate) use resource_quality_schema_fixture::OverrideEntryTarget;
 
 pub(super) type Result<T> = std::result::Result<T, Failure>;
 

@@ -4,7 +4,8 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use p4kx_export::Compression;
+use p4kx_export::{CatalogError, Compression};
+use p4kx_extraction::ProvenanceMode;
 use thiserror::Error;
 
 /// An export time that no system time can hold.
@@ -51,11 +52,37 @@ pub(crate) struct GzipNotSupported(String);
 #[error("--zstd-level requires an --out filename ending in .zst")]
 struct ZstdLevelNeedsCompressedOutput;
 
+/// A provenance option outside the fixed Basetool profile.
+#[derive(Debug, Error)]
+#[error("the Basetool catalog uses the fixed markers-only provenance profile")]
+pub(crate) struct InvalidBasetoolProvenance;
+
+/// Checks the fixed provenance profile of the Basetool catalog.
+pub(crate) const fn require_basetool_markers(
+    provenance: ProvenanceMode,
+) -> Result<(), InvalidBasetoolProvenance> {
+    match provenance {
+        ProvenanceMode::MarkersOnly => Ok(()),
+        _ => Err(InvalidBasetoolProvenance),
+    }
+}
+
+/// Maps shared catalog failures to the CLI input and Archive error classes.
+pub(crate) fn into_anyhow(error: CatalogError) -> anyhow::Error {
+    match error {
+        CatalogError::Load(error) => error.into(),
+        CatalogError::LoadTexts(error) => error.into(),
+        CatalogError::DataForge(error) => error.into(),
+        other => other.into(),
+    }
+}
+
 /// Returns whether `error` is invalid catalog command-line input.
 pub(crate) fn is_invalid_input(error: &anyhow::Error) -> bool {
     error.downcast_ref::<InvalidExportTime>().is_some()
         || error.downcast_ref::<MissingCatalogArgs>().is_some()
         || error.downcast_ref::<GzipNotSupported>().is_some()
+        || error.downcast_ref::<InvalidBasetoolProvenance>().is_some()
         || error
             .downcast_ref::<ZstdLevelNeedsCompressedOutput>()
             .is_some()

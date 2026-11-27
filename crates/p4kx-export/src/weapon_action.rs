@@ -27,11 +27,14 @@ mod launcher;
 mod sequence;
 #[path = "weapon_action_tractor.rs"]
 mod tractor;
+#[path = "weapon_action_view.rs"]
+mod view;
 
 use super::recoil::WeaponActionRecoil;
 
 use aim::AimAction;
 use beam::BeamAction;
+pub(crate) use beam::BeamDamageInputs;
 use charge::ChargedAction;
 use condition::{ConditionalAction, ToggleAction};
 use launcher::WeaponLauncher;
@@ -132,59 +135,6 @@ pub struct ProjectileCombatInputs<'action> {
     pub pellet_count: &'action SourcedValue<i32>,
     /// The original launcher damage multiplier.
     pub damage_multiplier: &'action SourcedValue<ResourceFloat32>,
-}
-
-impl<'source> WeaponAction<'source> {
-    /// Borrows the original local value ordinal within the physical Record.
-    #[must_use]
-    pub const fn source_ordinal(&self) -> &SourcedValue<DecimalU64> {
-        &self.source_value_ordinal
-    }
-
-    /// Borrows the original concrete action type.
-    #[must_use]
-    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
-        &self.source_type
-    }
-
-    /// Borrows the original recoil links and interval.
-    #[must_use]
-    pub const fn recoil(&self) -> &WeaponActionRecoil<'source> {
-        &self.recoil
-    }
-
-    /// Returns the action family used to select combat derivations.
-    #[must_use]
-    pub const fn mode_kind(&self) -> WeaponModeKind {
-        match self.kind {
-            WeaponActionKind::Single(_) | WeaponActionKind::Rapid(_) => WeaponModeKind::SimpleShot,
-            WeaponActionKind::Burst(_) => WeaponModeKind::Burst,
-            WeaponActionKind::Beam(_) => WeaponModeKind::Beam,
-            WeaponActionKind::Charged(_) => WeaponModeKind::Charge,
-            WeaponActionKind::Conditional(_) | WeaponActionKind::DynamicConditional(_) => {
-                WeaponModeKind::Conditional
-            }
-            _ => WeaponModeKind::Other,
-        }
-    }
-
-    /// Borrows the sourced operands when a single or rapid action declares a projectile launcher.
-    #[must_use]
-    pub fn combat_inputs(&self) -> Option<ProjectileCombatInputs<'_>> {
-        let shot = match &self.kind {
-            WeaponActionKind::Single(shot) => shot.as_ref(),
-            WeaponActionKind::Rapid(rapid) => &rapid.shot,
-            _ => return None,
-        };
-        let WeaponLauncher::Projectile { settings } = shot.launch_params.value()? else {
-            return None;
-        };
-        Some(ProjectileCombatInputs {
-            fire_rate: &shot.fire_rate,
-            pellet_count: settings.pellet_count(),
-            damage_multiplier: settings.damage_multiplier(),
-        })
-    }
 }
 
 /// Typed action inputs and the original bodies of other admitted action declarations.

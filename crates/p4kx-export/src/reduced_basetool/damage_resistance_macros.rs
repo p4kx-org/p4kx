@@ -19,7 +19,7 @@ use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::resource_float::ResourceFloat32;
 
-const PATH: &str = "definitions.damageResistanceMacros";
+pub(super) const PATH: &str = "definitions.damageResistanceMacros";
 
 pub(super) fn collect(
     parsed: &ParsedCatalogQueries<'_>,

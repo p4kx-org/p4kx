@@ -220,6 +220,7 @@ impl SelectedPlacementRows {
 #[derive(Clone, Copy)]
 pub(crate) enum ObjectSelection<'records> {
     One(Guid),
+    Records(&'records [Guid]),
     Loot(&'records [Guid]),
 }
 
@@ -227,7 +228,7 @@ impl ObjectSelection<'_> {
     fn matches(self, guid: Guid) -> bool {
         match self {
             Self::One(selected) => selected == guid,
-            Self::Loot(records) => records.binary_search(&guid).is_ok(),
+            Self::Records(records) | Self::Loot(records) => records.binary_search(&guid).is_ok(),
         }
     }
 }

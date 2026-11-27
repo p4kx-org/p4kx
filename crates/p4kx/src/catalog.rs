@@ -16,8 +16,9 @@ use p4kx_extraction::{Archive, ArchiveWatch, ProvenanceMode};
 
 use super::catalog_json::summary_json;
 use super::catalog_size::warn_about_size;
-use crate::catalog_input::{MissingCatalogArgs, compression, export_time};
+use crate::catalog_input::{self, MissingCatalogArgs};
 use crate::cli::{CatalogArgs, CatalogCommand};
+use crate::cli_catalog::CatalogSchemaProfile;
 use crate::exit;
 use crate::extract::cancel_on_interrupt;
 use crate::json;
@@ -31,15 +32,35 @@ mod refusal_progress;
 /// Returns exit code 1 for incomplete diagnostic output; normal incomplete output is refused.
 pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     let provenance_mode = args.provenance.into();
-    if matches!(args.command, Some(CatalogCommand::Schema)) {
-        print_schema(provenance_mode, as_json)?;
-        return Ok(ExitCode::from(exit::SUCCESS));
+    match &args.command {
+        Some(CatalogCommand::Basetool(args)) => {
+            crate::catalog_basetool::run(args, as_json, provenance_mode)
+        }
+        Some(CatalogCommand::Schema(args)) => {
+            let schema = match args.profile {
+                CatalogSchemaProfile::Standard => catalog_schema_for(provenance_mode),
+                CatalogSchemaProfile::Basetool => {
+                    catalog_input::require_basetool_markers(provenance_mode)?;
+                    p4kx_export::basetool_catalog_schema()
+                }
+            };
+            print_schema(&schema, as_json)?;
+            Ok(ExitCode::from(exit::SUCCESS))
+        }
+        None => write_standard(args, as_json, provenance_mode),
     }
+}
+
+fn write_standard(
+    args: &CatalogArgs,
+    as_json: bool,
+    provenance_mode: ProvenanceMode,
+) -> Result<ExitCode> {
     let (Some(archive), Some(out)) = (&args.archive, &args.out) else {
         return Err(MissingCatalogArgs.into());
     };
-    let compression = compression(out, args.zstd_level)?;
-    let exported_at = export_time(args.exported_at)?;
+    let compression = catalog_input::compression(out, args.zstd_level)?;
+    let exported_at = catalog_input::export_time(args.exported_at)?;
     let archive = crate::key::open(archive)?;
     let filter = args.filter.as_deref().map(Filter::parse).transpose()?;
     let cancel = cancel_on_interrupt()?;
@@ -189,7 +210,7 @@ fn write_file(
         phase,
         || CatalogFile::create_protected(out, &protection, cancel),
     );
-    let (summary, file) = written.map_err(into_anyhow)?;
+    let (summary, file) = written.map_err(catalog_input::into_anyhow)?;
     file.commit_if_current(&watch)
         .with_context(|| format!("cannot write {}", out.display()))?;
     Ok(summary)
@@ -217,25 +238,15 @@ fn print_warnings(warnings: &[CraftingWarning]) -> io::Result<()> {
     Ok(())
 }
 
-fn print_schema(provenance_mode: ProvenanceMode, as_json: bool) -> Result<()> {
-    let schema = catalog_schema_for(provenance_mode);
+fn print_schema(schema: &serde_json::Value, as_json: bool) -> Result<()> {
     if as_json {
-        json::print(&schema)?;
+        json::print(schema)?;
         return Ok(());
     }
-    let mut text = serde_json::to_string_pretty(&schema)?;
+    let mut text = serde_json::to_string_pretty(schema)?;
     text.push('\n');
     io::stdout().lock().write_all(text.as_bytes())?;
     Ok(())
-}
-
-fn into_anyhow(error: CatalogError) -> anyhow::Error {
-    match error {
-        CatalogError::Load(error) => error.into(),
-        CatalogError::LoadTexts(error) => error.into(),
-        CatalogError::DataForge(error) => error.into(),
-        other => other.into(),
-    }
 }
 
 /// Returns the explicit diagnostic-export option for a refused incomplete catalog.

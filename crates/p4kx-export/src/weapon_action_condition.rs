@@ -113,3 +113,27 @@ impl<'source> ToggleAction<'source> {
         })
     }
 }
+
+impl<'source> ConditionalAction<'source> {
+    pub(crate) const fn conditional_weapon_actions(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ConditionalActionEntry<'source>>>> {
+        &self.conditional_weapon_actions
+    }
+
+    pub(crate) const fn default_weapon_action(&self) -> &SourcedValue<u32> {
+        &self.default_weapon_action
+    }
+}
+
+impl ConditionalActionEntry<'_> {
+    pub(crate) const fn weapon_action(&self) -> &SourcedValue<u32> {
+        &self.weapon_action
+    }
+}
+
+impl ToggleAction<'_> {
+    pub(crate) const fn weapon_action(&self) -> &SourcedValue<u32> {
+        &self.weapon_action
+    }
+}

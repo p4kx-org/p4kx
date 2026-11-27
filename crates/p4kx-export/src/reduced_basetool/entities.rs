@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use super::ReducedError;
 use super::completeness;
+use super::declared_equipment::{self, Declarations, EquipmentTargets};
 use super::item::Item;
 use super::item_definitions;
 use super::manufacturer_definitions;
@@ -27,14 +28,16 @@ use crate::ship_store_pledge::{ShipStorePledges, ship_store_pledges};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::source_value_catalog::SourceRecordReference;
 
-const ITEMS: &str = "items";
-const SHIPS: &str = "ships";
-const PAINTS: &str = "paints";
-const STORE_SLUGS: &str = "shipStoreSlugs";
+pub(super) const ITEMS: &str = "items";
+pub(super) const SHIPS: &str = "ships";
+pub(super) const PAINTS: &str = "paints";
+pub(super) const STORE_SLUGS: &str = "shipStoreSlugs";
 
 pub(super) struct Entities {
     pub(super) items: StagedCatalogSequence,
     pub(super) item_definitions: StagedCatalogTable,
+    pub(super) item_targets: RecordTargets,
+    pub(super) equipment: Declarations,
     pub(super) ships: StagedCatalogSequence,
     pub(super) paints: StagedCatalogSequence,
     pub(super) ship_store_slugs: StagedCatalogSequence,
@@ -62,9 +65,21 @@ pub(super) fn collect(
     let (items, paints) = collect_items(parsed, scratch, cancel, &ships.targets)?;
     let item_definitions =
         item_definitions::collect(parsed, scratch, cancel, texts, &manufacturer_targets)?;
+    let equipment = declared_equipment::collect(
+        parsed,
+        scratch,
+        cancel,
+        &EquipmentTargets {
+            ships: &ships.targets,
+            items: &item_definitions.targets,
+        },
+        texts,
+    )?;
     Ok(Entities {
         items,
-        item_definitions,
+        item_definitions: item_definitions.table,
+        item_targets: item_definitions.targets,
+        equipment,
         ships: ships.rows,
         paints,
         ship_store_slugs: ships.store_slugs,

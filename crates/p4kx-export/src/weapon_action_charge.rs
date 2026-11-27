@@ -92,3 +92,9 @@ impl<'source> ChargedAction<'source> {
         })
     }
 }
+
+impl ChargedAction<'_> {
+    pub(crate) const fn weapon_action(&self) -> &SourcedValue<u32> {
+        &self.weapon_action
+    }
+}

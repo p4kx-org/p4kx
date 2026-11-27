@@ -12,6 +12,7 @@ mod bnk;
 mod bnk_objects;
 mod bnk_objects_text;
 mod catalog;
+mod catalog_basetool;
 mod catalog_failure_json;
 mod catalog_input;
 
@@ -209,7 +210,7 @@ fn prepare_command(cli: &Cli) -> Result<(), ExitCode> {
     if matches!(
         cli.command,
         Command::Catalog(CatalogArgs {
-            command: Some(CatalogCommand::Schema),
+            command: Some(CatalogCommand::Schema(_)),
             ..
         }) | Command::Media(MediaArgs {
             action: MediaAction::Schema { .. },

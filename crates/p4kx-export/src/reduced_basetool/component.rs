@@ -58,7 +58,8 @@ impl ComponentKey {
 pub(super) struct Component<'source> {
     owner_guid: Cell<&'source CatalogGuid>,
     owner_record_index: Cell<&'source u32>,
-    component_ordinal: Cell<&'source u32>,
+    #[serde(rename = "componentOrdinal")]
+    ordinal: Cell<&'source u32>,
 }
 
 impl<'source> From<&'source ComponentOwner> for Component<'source> {
@@ -66,7 +67,7 @@ impl<'source> From<&'source ComponentOwner> for Component<'source> {
         Self {
             owner_guid: owner.guid().into(),
             owner_record_index: owner.record_index().into(),
-            component_ordinal: owner.component_ordinal().into(),
+            ordinal: owner.component_ordinal().into(),
         }
     }
 }

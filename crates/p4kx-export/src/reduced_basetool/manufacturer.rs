@@ -21,7 +21,8 @@ pub(super) struct Manufacturer<'source> {
     component_ordinal: Cell<&'source u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     attach_def_present: Option<Cell<&'source bool>>,
-    manufacturer: Cell<ManufacturerValue<'source>>,
+    #[serde(rename = "manufacturer")]
+    selected: Cell<ManufacturerValue<'source>>,
 }
 
 #[derive(Serialize)]
@@ -38,7 +39,8 @@ enum ManufacturerValue<'source> {
 struct Record<'source> {
     target_record_index: Cell<&'source u32>,
     guid: Cell<&'source CatalogGuid>,
-    record_path: Cell<&'source str>,
+    #[serde(rename = "recordPath")]
+    path: Cell<&'source str>,
     target_type: Cell<&'source str>,
     status: &'source DefinitionStatus,
 }
@@ -48,7 +50,7 @@ impl<'source> From<&'source SourceRecordReference<'source>> for Record<'source> 
         Self {
             target_record_index: Cell::from(reference.target_record_index()),
             guid: Cell::from(&reference.guid),
-            record_path: Cell::from(reference.record_path()).map(|path| *path),
+            path: Cell::from(reference.record_path()).map(|path| *path),
             target_type: Cell::from(reference.target_type()).map(|name| *name),
             status: reference.status(),
         }
@@ -64,7 +66,7 @@ impl<'source> Manufacturer<'source> {
         Ok(Self {
             component_ordinal: Cell::from(input.component_ordinal()),
             attach_def_present: None,
-            manufacturer: project(input.manufacturer(), record_index, verify)?,
+            selected: project(input.manufacturer(), record_index, verify)?,
         })
     }
 
@@ -76,7 +78,7 @@ impl<'source> Manufacturer<'source> {
         Ok(Self {
             component_ordinal: Cell::from(input.component_ordinal()),
             attach_def_present: Some(Cell::from(input.attach_def_present())),
-            manufacturer: project(input.manufacturer(), record_index, verify)?,
+            selected: project(input.manufacturer(), record_index, verify)?,
         })
     }
 }

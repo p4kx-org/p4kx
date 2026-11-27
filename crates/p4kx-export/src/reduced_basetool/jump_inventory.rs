@@ -52,7 +52,7 @@ pub(super) fn stage(
     })
 }
 
-fn require_available_scope(
+const fn require_available_scope(
     path: &'static str,
     availability: DatasetAvailability,
 ) -> Result<(), ReducedError> {

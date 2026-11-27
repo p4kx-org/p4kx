@@ -13,7 +13,8 @@ use crate::{ItemClass, Playability};
 pub(super) struct Item<'source> {
     #[serde(flatten)]
     identity: RecordIdentity<'source>,
-    item_class: Cell<&'source ItemClass>,
+    #[serde(rename = "itemClass")]
+    class: Cell<&'source ItemClass>,
     playability: Cell<&'source Playability>,
     variant_of: Cell<Variant<'source>>,
 }
@@ -23,7 +24,7 @@ impl<'source> From<&'source CanonicalItem<'source>> for Item<'source> {
         let source = item.source();
         Self {
             identity: source.source().into(),
-            item_class: source.item_class().into(),
+            class: source.item_class().into(),
             playability: source.playability().into(),
             variant_of: record_identity::variant(item.variant_of()),
         }

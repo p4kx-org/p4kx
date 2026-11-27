@@ -558,6 +558,14 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   containing the v3 dataset. Select `--provenance full` for the standalone v3 document with
   proof references. `p4kx catalog schema` prints the default marker schema. Use
   `p4kx catalog schema --provenance full` for the standalone schema.
+- `p4kx catalog basetool <archive> --out <file.json.zst> [--exported-at <seconds>]`
+  writes the fixed Basetool selection as `p4kx-basetool-catalog` format v1. It retains
+  English and German text references and per-value encryption markers. The export
+  refuses an incomplete selected dependency and leaves the previous file in place.
+  The single Zstandard frame is limited to 64,000,000 compressed bytes and its JSON
+  to 1,000,000,000 decoded bytes. With `--json`, stdout reports the format, version
+  and both byte counts. Use `p4kx catalog schema --profile basetool` for its
+  structural schema. [Basetool export scope](catalog-basetool-scope.md)
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
   ([docs/ship-base-data.md](ship-base-data.md)): hull mass and hit points summed from the

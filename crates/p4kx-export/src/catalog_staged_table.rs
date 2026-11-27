@@ -206,6 +206,10 @@ impl StagedCatalogTable {
         }
     }
 
+    pub(crate) const fn availability(&self) -> DatasetAvailability {
+        self.availability
+    }
+
     pub(crate) const fn len(&self) -> usize {
         self.rows.len()
     }
@@ -223,7 +227,7 @@ impl Serialize for StagedCatalogTable {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.rows.clear_failure();
         let mut table = serializer.serialize_struct("CatalogTable", 2)?;
-        table.serialize_field("availability", &self.availability)?;
+        table.serialize_field("availability", &self.availability())?;
         table.serialize_field("rows", &self.rows)?;
         table.end()
     }

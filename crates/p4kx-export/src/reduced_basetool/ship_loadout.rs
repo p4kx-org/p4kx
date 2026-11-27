@@ -38,7 +38,8 @@ struct Port<'source> {
     max_size: Cell<&'source u32>,
     types: Cell<Vec<AcceptedType<'source>>>,
     flags: Cell<&'source [String]>,
-    port_tags: Cell<&'source [String]>,
+    #[serde(rename = "portTags")]
+    tags: Cell<&'source [String]>,
     required_tags: Cell<&'source [String]>,
     item_guid: Cell<&'source CatalogGuid>,
     item_class_name: Cell<&'source str>,
@@ -57,7 +58,7 @@ impl<'source> From<&'source LoadoutPort> for Port<'source> {
             types: Cell::from(port.source_types())
                 .map(|types| types.iter().map(AcceptedType::from).collect()),
             flags: Cell::from(port.source_flags()).map(Vec::as_slice),
-            port_tags: Cell::from(port.source_port_tags()).map(Vec::as_slice),
+            tags: Cell::from(port.source_port_tags()).map(Vec::as_slice),
             required_tags: Cell::from(port.source_required_tags()).map(Vec::as_slice),
             item_guid: port.source_item_guid().into(),
             item_class_name: Cell::from(port.source_item_class_name()).map(String::as_str),

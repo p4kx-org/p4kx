@@ -18,7 +18,7 @@ use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, SystemRootCandidates};
 use crate::starmap_parse::{self, Body, DescriptorScope, DescriptorSurvey, Read};
-use crate::starmap_walk::{PlacementRows, System, SystemRead};
+use crate::starmap_walk::{ObjectSelection, PlacementRows, System, SystemRead};
 use crate::{ExportAccountingError, Kind};
 
 pub(super) struct SystemDescriptors {
@@ -64,6 +64,13 @@ pub(super) fn walk_systems(
     (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
     storage: PlacementStorage<'_>,
 ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
+    let descriptors = DescriptorWalk {
+        index,
+        bodies,
+        systems,
+        cancel,
+        limits,
+    };
     match storage {
         PlacementStorage::Spool(directory) => walk_spooled_systems(
             index,
@@ -74,44 +81,23 @@ pub(super) fn walk_systems(
             (archive, capture, endpoints),
             directory,
         ),
-        PlacementStorage::Harvest(harvest) => walk_descriptor_systems(
-            index,
-            bodies,
-            systems,
-            cancel,
-            limits,
-            (archive, capture, None),
-            || PlacementRows::Harvest(harvest),
-        ),
-        PlacementStorage::OpenedContainers | PlacementStorage::JumpEndpoints => {
-            walk_descriptor_systems(
-                index,
-                bodies,
-                systems,
-                cancel,
-                limits,
-                (archive, capture, endpoints),
-                || PlacementRows::OpenedContainers,
-            )
+        PlacementStorage::Harvest(harvest) => {
+            descriptors.walk((archive, capture, None), || PlacementRows::Harvest(harvest))
         }
-        PlacementStorage::ShopNames(guids) => walk_descriptor_systems(
-            index,
-            bodies,
-            systems,
-            cancel,
-            limits,
-            (archive, capture, None),
-            || PlacementRows::ShopNames(guids),
-        ),
-        PlacementStorage::Object(selection) => walk_descriptor_systems(
-            index,
-            bodies,
-            systems,
-            cancel,
-            limits,
-            (archive, capture, None),
-            || PlacementRows::Object(selection),
-        ),
+        PlacementStorage::OpenedContainers | PlacementStorage::JumpEndpoints(None) => descriptors
+            .walk((archive, capture, endpoints), || {
+                PlacementRows::OpenedContainers
+            }),
+        PlacementStorage::JumpEndpoints(Some(records)) => descriptors
+            .walk((archive, capture, endpoints), || {
+                PlacementRows::Object(ObjectSelection::Records(records))
+            }),
+        PlacementStorage::ShopNames(guids) => {
+            descriptors.walk((archive, capture, None), || PlacementRows::ShopNames(guids))
+        }
+        PlacementStorage::Object(selection) => descriptors.walk((archive, capture, None), || {
+            PlacementRows::Object(selection)
+        }),
         #[cfg(test)]
         PlacementStorage::Typed => walk_typed_systems(
             index,
@@ -150,34 +136,41 @@ fn walk_typed_systems(
     Ok((reads, PlacementSpools::default()))
 }
 
-fn walk_descriptor_systems<'a>(
-    index: &'a Index<'a>,
-    bodies: &'a HashMap<usize, Body>,
-    systems: &[(Arc<str>, usize)],
-    cancel: Option<&'a CancelToken>,
+struct DescriptorWalk<'read, 'roots> {
+    index: &'read Index<'read>,
+    bodies: &'read HashMap<usize, Body>,
+    systems: &'roots [(Arc<str>, usize)],
+    cancel: Option<&'read CancelToken>,
     limits: Limits,
-    (archive, capture, endpoints): (
-        &'a Archive,
-        &'a EntryCapture<'a>,
-        Option<&'a JumpEndpointRecords>,
-    ),
-    rows: impl Fn() -> PlacementRows<'a>,
-) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
-    let reads = systems
-        .iter()
-        .map(|(name, entry)| {
-            System::run_with_output(
-                index,
-                bodies,
-                name,
-                *entry,
-                cancel,
-                limits,
-                (archive, capture, endpoints, rows()),
-            )
-        })
-        .collect::<Result<_, _>>()?;
-    Ok((reads, PlacementSpools::default()))
+}
+
+impl<'read> DescriptorWalk<'read, '_> {
+    fn walk(
+        &self,
+        (archive, capture, endpoints): (
+            &'read Archive,
+            &'read EntryCapture<'read>,
+            Option<&'read JumpEndpointRecords>,
+        ),
+        rows: impl Fn() -> PlacementRows<'read>,
+    ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
+        let reads = self
+            .systems
+            .iter()
+            .map(|(name, entry)| {
+                System::run_with_output(
+                    self.index,
+                    self.bodies,
+                    name,
+                    *entry,
+                    self.cancel,
+                    self.limits,
+                    (archive, capture, endpoints, rows()),
+                )
+            })
+            .collect::<Result<_, _>>()?;
+        Ok((reads, PlacementSpools::default()))
+    }
 }
 
 fn walk_spooled_systems(

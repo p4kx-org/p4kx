@@ -13,6 +13,7 @@ use super::record_targets::RecordTargets;
 use super::selected_texts::{SelectedTexts, TextRefs};
 use crate::build::original_input::test_support::TestResult;
 use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_queries::FactionReputationDefinition;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ReputationRows,
     ReputationSelection, ReputationSnapshot,
@@ -59,10 +60,13 @@ fn validate(snapshot: &ReputationSnapshot<'_>, scratch: &Path) -> TestResult {
     };
     let mut references = TextRefs::default();
     let staged = faction_reputations::stage(rows, &dependencies, scratch, None, &mut references)?;
-    verify_targets(rows.rows.iter().map(|row| row.source()), &staged.targets)?;
+    verify_targets(
+        rows.rows.iter().map(FactionReputationDefinition::source),
+        &staged.targets,
+    )?;
     let table = serde_json::to_value(staged.table)?;
     let original = table.pointer("/rows/0").ok_or("primary faction row")?;
-    verify_links(original)?;
+    verify_links(original);
     let mut texts = SelectedTexts::default();
     texts.add(
         references,
@@ -123,7 +127,7 @@ fn targets<'read, T: 'read>(
     Ok(targets)
 }
 
-fn verify_links(row: &Value) -> TestResult {
+fn verify_links(row: &Value) {
     assert_eq!(
         row.pointer("/recordIndex/value"),
         Some(&json!(5)),
@@ -178,7 +182,6 @@ fn verify_links(row: &Value) -> TestResult {
         Some(&json!("textures/fixture/relation.dds")),
         "the typed relation marker retains its authored icon"
     );
-    Ok(())
 }
 
 fn verify_texts(row: &Value, texts: &Value) -> TestResult {

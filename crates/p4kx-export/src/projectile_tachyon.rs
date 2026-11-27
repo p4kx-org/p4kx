@@ -30,6 +30,10 @@ pub(crate) struct TachyonProjectile<'source> {
 }
 
 impl<'source> TachyonProjectile<'source> {
+    pub(super) const fn damage(&self) -> &SourcedValue<AuthoredDamage<'source>> {
+        &self.damage
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

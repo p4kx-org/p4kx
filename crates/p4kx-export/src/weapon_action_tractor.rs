@@ -65,3 +65,29 @@ impl<'source> TractorBeamAction<'source> {
         })
     }
 }
+
+impl TractorBeamAction<'_> {
+    pub(crate) const fn min_force(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.min_force
+    }
+
+    pub(crate) const fn max_force(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_force
+    }
+
+    pub(crate) const fn min_distance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.min_distance
+    }
+
+    pub(crate) const fn max_distance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_distance
+    }
+
+    pub(crate) const fn full_strength_distance(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.full_strength_distance
+    }
+
+    pub(crate) const fn max_volume(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.max_volume
+    }
+}

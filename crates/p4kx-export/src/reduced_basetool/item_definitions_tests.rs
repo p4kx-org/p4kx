@@ -41,8 +41,13 @@ fn reduced_item_definitions_keep_canonical_order_physical_slots_and_text_domains
             [Some(1), Some(0), Some(2)],
             "canonical sorted GUID and physical aliases"
         );
-        let reduced = serde_json::to_value(reduced)?;
-        let items = rows(&reduced)?;
+        let wire = serde_json::to_value(reduced.table)?;
+        let items = rows(&wire)?;
+        assert_eq!(
+            reduced.targets.iter().count(),
+            items.len(),
+            "the staged body index retains every emitted physical Item"
+        );
         let [low, first, alias] = items else {
             return Err("the complete original Item census".into());
         };

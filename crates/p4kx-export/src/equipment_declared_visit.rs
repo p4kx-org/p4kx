@@ -104,7 +104,24 @@ impl CatalogQuerySession<'_> {
     }
 }
 
+pub(crate) struct DeclaredEquipmentAvailability {
+    pub(crate) ports: crate::catalog_queries::DatasetAvailability,
+    pub(crate) attachments: crate::catalog_queries::DatasetAvailability,
+}
+
 impl ParsedCatalogQueries<'_> {
+    pub(crate) fn declared_equipment_availability(
+        &self,
+        cancel: Option<&CancelToken>,
+    ) -> Result<DeclaredEquipmentAvailability, CatalogError> {
+        self.project(cancel, |_, _, forge| {
+            Ok(DeclaredEquipmentAvailability {
+                ports: Family::ItemPorts.availability(forge, 0),
+                attachments: Family::Attachments.availability(forge, 0),
+            })
+        })
+    }
+
     /// Visits declared equipment in physical Record order using this parsed DataForge.
     /// Commit staged consumer changes after successful traversal and coverage review.
     ///

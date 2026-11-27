@@ -27,6 +27,7 @@ pub(super) const WEIGHTS: &str = "projections.blueprintPoolWeights";
 pub(super) struct Pools {
     pub(super) definitions: StagedCatalogTable,
     pub(super) weights: StagedCatalogTable,
+    pub(super) targets: RecordTargets,
 }
 
 pub(super) fn collect_categories(
@@ -72,6 +73,7 @@ fn stage_pools(
     completeness::rows(WEIGHTS, snapshot.rows().len(), snapshot.weights().len())?;
     let mut definitions = StagedCatalogRows::new(scratch, cancel);
     let mut weights = StagedCatalogRows::new(scratch, cancel);
+    let mut targets = RecordTargets::default();
     for (definition, weight) in snapshot.rows().iter().zip(snapshot.weights()) {
         let pool = weight.pool();
         if pool.record_index().value() != definition.source().record_index().value()
@@ -79,6 +81,7 @@ fn stage_pools(
         {
             return Err(ReducedError::IncompleteScope(WEIGHTS));
         }
+        targets.insert(POOLS, definition.source())?;
         definitions.append(&Definition {
             identity: definition.source().into(),
             blueprint_rewards: completeness::list(POOLS, definition.blueprint_rewards(), |slot| {
@@ -100,6 +103,7 @@ fn stage_pools(
     Ok(Pools {
         definitions,
         weights,
+        targets,
     })
 }
 

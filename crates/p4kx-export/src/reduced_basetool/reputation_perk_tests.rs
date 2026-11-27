@@ -45,6 +45,16 @@ fn reduced_perks_keep_authored_slots_variants_and_their_display_text() -> TestRe
         reputation_catalog::collect(&session.parsed(None)?, scratch.path(), None, &mut texts)?;
     let perks = serde_json::to_value(staged.perks)?;
     let list = perks.pointer("/rows/0").ok_or("authored perk list")?;
+    verify_perks(list, &serde_json::to_value(texts)?)?;
+    let factions = serde_json::to_value(staged.factions)?;
+    assert_eq!(
+        factions.pointer("/rows/0/perkReputationRewardList/value/0/value/targetRecordIndex/value"),
+        list.pointer("/recordIndex/value")
+    );
+    Ok(())
+}
+
+fn verify_perks(list: &Value, texts: &Value) -> TestResult {
     let entries = list
         .pointer("/perks/value")
         .and_then(Value::as_array)
@@ -91,13 +101,7 @@ fn reduced_perks_keep_authored_slots_variants_and_their_display_text() -> TestRe
         perk.pointer("/description/value"),
         Some(&json!(fixture::LITERAL))
     );
-    verify_text(perk, &serde_json::to_value(texts)?)?;
-    let factions = serde_json::to_value(staged.factions)?;
-    assert_eq!(
-        factions.pointer("/rows/0/perkReputationRewardList/value/0/value/targetRecordIndex/value"),
-        list.pointer("/recordIndex/value")
-    );
-    Ok(())
+    verify_text(perk, texts)
 }
 
 fn verify_text(perk: &Value, texts: &Value) -> TestResult {

@@ -9,7 +9,9 @@ use serde::Serialize;
 
 use super::ammo_presentation::AmmoPresentation;
 use super::authored_ammo_inputs::AuthoredAmmoInputs;
+pub(crate) use super::authored_damage::{AuthoredDamage, DamageChannels};
 use super::authored_fields::Observed;
+pub(crate) use super::authored_projectile::{AuthoredProjectile, ProjectileDamage};
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -85,6 +87,10 @@ impl<'source> AmmoDefinition<'source> {
     #[must_use]
     pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
         &self.source
+    }
+
+    pub(crate) const fn projectile(&self) -> &SourcedValue<AuthoredProjectile<'source>> {
+        self.inputs.projectile()
     }
 
     /// Borrows the original speed and its source evidence.

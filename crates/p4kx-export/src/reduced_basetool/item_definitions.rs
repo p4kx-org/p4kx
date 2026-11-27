@@ -27,14 +27,20 @@ use crate::definition_reference::DefinitionStatus;
 
 pub(super) const PATH: &str = "definitions.items";
 
+pub(super) struct ItemDefinitions {
+    pub(super) table: StagedCatalogTable,
+    pub(super) targets: RecordTargets,
+}
+
 pub(super) fn collect(
     parsed: &ParsedCatalogQueries<'_>,
     scratch: &Path,
     cancel: Option<&CancelToken>,
     texts: &mut SelectedTexts,
     manufacturers: &RecordTargets,
-) -> Result<StagedCatalogTable, ReducedError> {
+) -> Result<ItemDefinitions, ReducedError> {
     let mut staged = IndexedCatalogRows::new(scratch, cancel);
+    let mut targets = RecordTargets::default();
     let mut previous = None;
     let selected = ItemDefinitionSelection::Records(CatalogRecordSelection::All);
     let summary = parsed.visit_item_definitions(selected, cancel, |index, snapshot| {
@@ -50,6 +56,7 @@ pub(super) fn collect(
         let guid = completeness::cell(PATH, &header.guid)?
             .value
             .ok_or(ReducedError::IncompleteScope(PATH))?;
+        targets.insert(PATH, header)?;
         let mut references = TextRefs::default();
         staged.append(
             (guid.text(), index),
@@ -66,7 +73,7 @@ pub(super) fn collect(
     completeness::rows(PATH, summary.owner_count(), summary.row_count())?;
     let table = staged.finish_with_availability(summary.availability())?;
     completeness::rows(PATH, summary.row_count(), table.len())?;
-    Ok(table)
+    Ok(ItemDefinitions { table, targets })
 }
 
 #[derive(Serialize)]
