@@ -6,6 +6,16 @@ expression: json
   "archive_changed": false,
   "cancelled": [],
   "converted": 1,
+  "cryxml_artifacts": [
+    {
+      "digest": {
+        "byteLength": "70",
+        "sha256": "3f999f6635b797f8552ca700c268c990baf2417f20e4e5eb519d2eeb1306c760"
+      },
+      "origin_receipt": "Data/vehicle.xml.p4kx-origin.jsonl",
+      "path": "Data/vehicle.xml"
+    }
+  ],
   "extracted": 2,
   "failed": [
     {

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeMap;
 use std::fs;
+use std::io::{self, Write as _};
 use std::path::Path;
 
-use p4kx_extraction::RecordExportReport;
+use p4kx_extraction::{OriginDigestWriter, RecordExportReport};
 use p4kx_testkit::check_dds_origin_pair;
 
 use super::{Fixture, TestResult, tree};
@@ -53,6 +55,7 @@ fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestRes
         assert_eq!(opaque_encryption(&folder_raw)?, None);
     }
     check_cryxml_origin_pair(&mut archived, &mut written)?;
+    check_record_origin_pair(&mut archived, &mut written)?;
     assert_eq!(written, archived, "identical payload files");
     assert!(
         written
@@ -96,8 +99,8 @@ fn loose_merge_replaces_old_archive_proof_for_identical_payload_bytes() -> TestR
 }
 
 fn check_cryxml_origin_pair(
-    archive: &mut std::collections::BTreeMap<String, Vec<u8>>,
-    loose: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    archive: &mut BTreeMap<String, Vec<u8>>,
+    loose: &mut BTreeMap<String, Vec<u8>>,
 ) -> TestResult {
     use serde_json::{Value, json};
 
@@ -137,6 +140,55 @@ fn check_cryxml_origin_pair(
             }
         }
         assert!(seen, "the companion covers the original XML root name");
+    }
+    Ok(())
+}
+
+fn check_record_origin_pair(
+    archive: &mut BTreeMap<String, Vec<u8>>,
+    loose: &mut BTreeMap<String, Vec<u8>>,
+) -> TestResult {
+    use serde_json::{Value, json};
+
+    const XML: &str = "Data/libs/items/one.xml";
+    const RECEIPT: &str = "Data/libs/items/one.xml.p4kx-origin.jsonl";
+    for (files, kind, marker) in [
+        (archive, "archiveEntry", json!(false)),
+        (loose, "file", Value::Null),
+    ] {
+        let bytes = files.get(XML).ok_or("written Record XML")?;
+        let mut measure = OriginDigestWriter::new(io::sink());
+        measure.write_all(bytes)?;
+        let digest = measure.finish()?;
+        let receipt = files.remove(RECEIPT).ok_or("Record XML companion")?;
+        let rows: Vec<Value> = std::str::from_utf8(&receipt)?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<Result<_, _>>()?;
+        let header = rows.first().ok_or("Record XML companion header")?;
+        assert_eq!(header["type"], "header");
+        assert_eq!(header["binding"]["sha256"], digest.sha256());
+        assert_eq!(
+            header["binding"]["byteLength"],
+            digest.byte_length().to_string()
+        );
+        let source = rows
+            .iter()
+            .find(|row| row["type"] == "source")
+            .ok_or("physical Record source")?;
+        assert_eq!(source["source"]["kind"], kind);
+        assert!(rows.iter().any(|row| {
+            row.pointer("/address/type").and_then(Value::as_str) == Some("xmlBytes")
+                && row["sourceSetComplete"] == true
+                && row.get("containsEncryptedSource") == Some(&marker)
+                && row["sourceUsesRefs"]
+                    .as_array()
+                    .is_some_and(|refs| !refs.is_empty())
+        }));
+        assert_eq!(
+            rows.last().ok_or("Record XML companion end")?["type"],
+            "end"
+        );
     }
     Ok(())
 }
