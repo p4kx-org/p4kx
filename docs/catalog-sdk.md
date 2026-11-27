@@ -4182,22 +4182,24 @@ The ordinary schema suite rejects any canonical dataset without a typed query wi
 any unclassified schema boundary and any incompatible row shape. The explicit release
 audit also requires complete selection and same-Build parity evidence.
 
-The explicit audit on PR head `9499f7d58d4bc348230b427c1fcd190959b37321`
-ran natively on Windows AMD64 with Rust 1.100.0. Every documented canonical
-boundary had a typed witness of the compatible shape. The strict audit still
-reported 88 routes with pending acceptance.
+The audit ran natively on Windows AMD64 with Rust 1.100.0 and the SDK
+sources from `d0f2a83a0`. The ordinary canonical witness test passed.
+All canonical boundaries have a typed witness of the compatible shape.
+The strict test reports 85 routes with outstanding acceptance. The
+installed definitions, roots and paths of Tags passed paired LIVE and
+PTU parity. Entity Tag declarations retain their own acceptance check.
 
 | Catalog boundary | Routes with pending acceptance |
 | --- | ---: |
-| Definitions | 31 |
+| Definitions | 30 |
 | Configurations | 7 |
-| Declarations | 5 |
+| Declarations | 4 |
 | Placements | 10 |
-| Projections | 12 |
+| Projections | 11 |
 | Texts | 3 |
 | Standalone top-level datasets, including provenance | 20 |
 
-Of these, 86 require installed or same-Build producer parity. Harvestable
+Of these, 83 require installed or same-Build producer parity. Harvestable
 locations require the integrated memory check after the existing logical
 comparison. The provenance witness covers the canonical Item inventory.
 The strict test reports the specific outstanding evidence for each route.
