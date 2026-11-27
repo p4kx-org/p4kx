@@ -978,6 +978,21 @@ The six queries took 6.039–10.458 seconds. The executable SHA-256 was
 The cold tests measure the SDK scope. The retained comparison checks the same
 tables and contributing source inventories against the complete Catalog.
 
+On PTU `13284307`, the signed Windows AMD64 verifier at
+`84e0a9ca95ca03da3cae281e24240be9377c7ea5` repeated the Full SDK queries in
+three separate, one-worker processes. Each verified the same installed
+Archive before and after the query, reported one physical source, and
+skipped zero owners. The executable SHA-256 was
+`a7d90528bd267b98823076568bf82f1a08d9f06a3b342fd2dbd358b147fd33f9`.
+
+| Dataset | Rows | Source uses | Elapsed (s) | Private commit peak (B) | Working-set peak (B) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `/definitions/tags` | 19,688 | 255,815 | 8.832 | 1,115,107,328 | 1,032,069,120 |
+| `/declarations/tagRoots` | 1 | 356 | 5.557 | 1,115,103,232 | 1,032,069,120 |
+| `/projections/tagPaths` | 19,688 | 315,026 | 8.811 | 1,115,070,464 | 1,043,304,448 |
+
+All three SDK processes stayed below 2,000,000,000 B of private commit.
+
 ### Installed Tag retained parity
 
 The Windows AMD64 verifier at `00e050aa9f487b54a3c4310981f299612e454d7e`
