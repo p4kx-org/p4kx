@@ -447,6 +447,19 @@ checks on PR #1117 head `db093cc92`, tested merge `ba3805738b40bb9e9a63ee08aea27
 [AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191180695) ·
 [ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191375348)
 
+On PR head `8a58c8d2f` and tested merge `127366f76ca889b4d90b380a613d37a90c872cd5`,
+both native package jobs again executed all four formats, including GUI and Documents-portal
+checks. The Linux checks completed even though the overall Release run was cancelled.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/job/140499787753) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/job/140499787841) ·
+[AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/artifacts/15196647683) ·
+[ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/artifacts/15195919421)
+
+The same merge passed the CI X11 and HiDPI Wayland frame checks on each CPU.
+[AMD64 CI receipt](https://github.com/p4kx-org/p4kx/actions/runs/45993359457/artifacts/15196697289) ·
+[ARM64 CI receipt](https://github.com/p4kx-org/p4kx/actions/runs/45993359457/artifacts/15195779253)
+[Other CI stages](supported-platforms.md) have their own outcomes.
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with

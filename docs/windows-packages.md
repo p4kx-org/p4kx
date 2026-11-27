@@ -889,3 +889,47 @@ Local Windows AMD64 synthetic Finish checks passed the original launch
 and receipt binding, timeout and negative-receipt cases, and the bounded
 watchdog cleanup. They used harmless workers and a synthetic runner
 identity.
+
+### Native Windows execution on 9499f7d58
+
+Release run 46008246999 tested merge
+`8e2ab5df97cf7c08bd6378606ed232930875586e`. ARM64 completed the full native
+lifecycle, and its final observer receipt binds success to the original
+request and this merge.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140561404015) ·
+[Terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15206067925) ·
+[Executed payload](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15206092989)
+
+The AMD64 observation checkpoint reached sequence 90, entering baseline
+restore 18.693 seconds into the worker. The verified interim artifact for
+the successful AMD64 run 45978787079 stopped at the same phase and sequence.
+Its terminal journal closes that restore 177 ms later and continues to
+sequence 200. Sequence 90 alone locates the snapshot. The AMD64 terminal
+receipt was still pending at the 14:35 UTC observation.
+
+GitHub cancelled AMD64 at 15:18:27 UTC, 55 minutes after the job started.
+The single annotation cited the configured 45-minute job limit. GitHub
+still listed the original Finish receipt wait as in progress after
+cancellation. Its raw log endpoint returned HTTP 404, and the first
+attempt produced no AMD64 terminal observer or executed package evidence.
+The AMD64-only debug retry passed on the same tested merge. The original
+worker reached its terminal success event after 99.223 seconds.
+The hosted Wait completed in 80 seconds and CollectFinish verified the
+original request and terminal receipt. The successful worker used runner image
+`win25-vs2026` version `20261123.321.1`.
+The first attempt used `20261116.315.1`, also verified in the successful
+AMD64 run 45978787079. The terminal artifact SHA-256 is
+`69972bc207e614c8151d87b375298b5d0944802193b826a9340f260a3336ec05`.
+[AMD64 retry](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140590488746) ·
+[AMD64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15212381041) ·
+[AMD64 executed payload](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15211186405)
+
+The pull-request Release workflow passed on attempt 2. Its aggregate
+validated 13 packages, 15 target and binary SBOMs, and five native runtime
+receipts. Tagged publication and the physical AMD64 desktop receipt have
+their own checks.
+[Release matrix](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140592737824)
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140561404014)
+[Current AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15205992619) ·
+[Successful AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191246318) ·
+[Successful AMD64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191830708)

@@ -85,6 +85,16 @@ The verifier compared manifests across the four sources and imported all
 12 assembly, character and livery scenes. The Linux AMD64 producer and
 the hosted exchange for all five targets remain separate acceptance checks.
 
+On PR head `9499f7d58`, both Linux focused jobs completed with the Ubuntu-only
+APT helper. The Linux AMD64 Blender consumer also installed its libraries
+and completed. All five native Blender exchange jobs passed for tested merge
+`8e2ab5df97cf7c08bd6378606ed232930875586e`. The overall CI workflow passed
+with 39 successful jobs. The separate Apple Silicon archive-consumer
+job was skipped because its complete native suite ran inside its build job.
+[CI run](https://github.com/p4kx-org/p4kx/actions/runs/46008246929) ·
+[Linux AMD64 producer](https://github.com/p4kx-org/p4kx/actions/runs/46008246929/job/140537163639) ·
+[Linux AMD64 consumer](https://github.com/p4kx-org/p4kx/actions/runs/46008246929/job/140543764753)
+
 ## Package identity and update links
 
 Each package carries `p4kx-distribution.json` to identify its target and format.
