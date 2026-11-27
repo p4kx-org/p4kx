@@ -932,3 +932,31 @@ their own checks.
 [Current AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15205992619) ·
 [Successful AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191246318) ·
 [Successful AMD64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191830708)
+
+### Native Windows execution on bae8d5eb3
+
+Release run 46042721274 tested merge
+`dfb1a9873a21113015bfe80a1db111641f5bd8da`. AMD64 finished its native
+lifecycle in the first attempt and transferred its terminal receipt and
+executed package.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/job/140676544863) ·
+[Terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/artifacts/15224286231) ·
+[Executed payload](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/artifacts/15224151392)
+
+ARM64 began the optional live-checkpoint upload at 18:29:24 UTC. GitHub
+created the 3,811 B artifact at 18:29:26 UTC with SHA-256
+`b21f9bcccc8537bb13c81a7679c6f4512f7315efa37a6bfecb9b678fe9b20a7b`.
+The verified snapshot was collected at 18:29:24.308 UTC on
+`win11-vs2026-arm64` image `20261123.225.2`. Its original journal stops at
+sequence 53, entering `msiexec/post-capture` 13.462 seconds into the worker.
+The preceding `msiexec/wait` phase closed after 13.431 seconds.
+
+The upload step remained in progress in GitHub's record. Wait, CollectFinish
+and final transfer never started in that record. At 18:53:51 UTC the job was
+cancelled by workflow concurrency when the updated PR run took priority.
+The raw job logs returned HTTP 404 and no original ARM64 terminal receipt
+was available. The live checkpoint was merged into the existing final
+transfer to remove this separate action before terminal validation.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/job/140676544875) ·
+[Verified checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/artifacts/15223294860) ·
+[Replacement run](https://github.com/p4kx-org/p4kx/actions/runs/46052213476)
