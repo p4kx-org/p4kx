@@ -3599,22 +3599,29 @@ processes showed 45.8% lower elapsed time. The earlier PTU measurement shares
 the host with other builds, so its elapsed time is contextual. The separate
 Full retained comparison covers occurrence and contributor parity.
 
-The retained LIVE 13220821 comparison used the same a518 verifier, its exact
-Marker receipt, and the complete Normal Full Catalog from
-`84e0a9ca95ca03da3cae281e24240be9377c7ea5`. The installed Archive stayed stable
-and the 1,576,271,368-byte compressed frame hash was verified before replay.
+The retained LIVE and PTU comparisons used the same a518 verifier and its
+exact Marker receipt for each Build. The complete Normal Full Catalogs came
+from `84e0a9ca95ca03da3cae281e24240be9377c7ea5`. Both installed Archives
+stayed stable and both compressed frame hashes verified before replay.
 
-The test matched all 20,630 ordered placements for 1,033 physical Ships,
-including the terminal census, values and immediate encryption markers. It
-reconciled 108,961 distinct contributing source uses with one original
-physical source. The census retains 67 incomplete owners, 56 owners with
-empty present placements and 80 skipped leftovers.
+| Build | Physical Ships | Ordered placements | Present-empty | Incomplete | Skipped leftovers | Contributing uses |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 1,033 | 20,630 | 56 | 67 | 80 | 108,961 |
+| PTU 13284307 | 1,041 | 20,905 | 55 | 79 | 76 | 110,217 |
 
-The scoped Full visit and evidence comparison took 1,177.618 s. The bounded
-process, including the 95,109,379,589-byte decoded Catalog replay, took
-3,271.411 s. It peaked at 1,091,399,680 bytes of private commit and
-1,023,107,072 bytes of working set. The receipt SHA-256 is
-`768ed7de2c51a782a2f1d8b055cc84da6802d880947b2df047614555b7935e51`.
+The tests matched the terminal census, ordered values and immediate
+encryption markers. Each Build matched one referenced original physical
+source and had zero absent or unreadable owners.
+
+| Build | Decoded Catalog bytes | Full visit and evidence (s) | Process elapsed (s) | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 95,109,379,589 | 1,177.618 | 3,271.411 | 1,091,399,680 | 1,023,107,072 |
+| PTU 13284307 | 98,173,166,243 | 1,184.556 | 3,282.121 | 1,115,090,944 | 1,033,609,216 |
+
+Both processes remained below 2,000,000,000 bytes. The receipt SHA-256
+digests are `768ed7de2c51a782a2f1d8b055cc84da6802d880947b2df047614555b7935e51`
+for LIVE and `10e41132f27a51a10473c91f4eb400c53ced0a35310faec1945d294950862158`
+for PTU.
 
 ## Original cargo manifests
 
@@ -4153,3 +4160,23 @@ The report names every dataset with an absent witness or outstanding acceptance 
 The ordinary schema suite rejects any canonical dataset without a typed query witness,
 any unclassified schema boundary and any incompatible row shape. The explicit release
 audit also requires complete selection and same-Build parity evidence.
+
+The explicit audit on PR head `9499f7d58d4bc348230b427c1fcd190959b37321`
+ran natively on Windows AMD64 with Rust 1.100.0. Every documented canonical
+boundary had a typed witness of the compatible shape. The strict audit still
+reported 88 routes with pending acceptance.
+
+| Catalog boundary | Routes with pending acceptance |
+| --- | ---: |
+| Definitions | 31 |
+| Configurations | 7 |
+| Declarations | 5 |
+| Placements | 10 |
+| Projections | 12 |
+| Texts | 3 |
+| Standalone top-level datasets, including provenance | 20 |
+
+Of these, 86 require installed or same-Build producer parity. Harvestable
+locations require the integrated memory check after the existing logical
+comparison. The provenance witness covers the canonical Item inventory.
+The strict test reports the specific outstanding evidence for each route.

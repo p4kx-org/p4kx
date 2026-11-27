@@ -1134,3 +1134,40 @@ set. Minimum host availability was 25,365,000,192 B of physical memory and
 45,997,916,160 B of commit headroom. These local producer and replay
 measurements bind to the signed source revision above. The packaged release
 candidate requires its own producer and replay measurements.
+
+### Packaged Normal Full measurement on 9499f7d58
+
+The Windows AMD64 CLI from the Release producer tested merge
+`8e2ab5df97cf7c08bd6378606ed232930875586e`. Its verified executable SHA-256
+is `2842f28976d0fefbf72546a388362b36e240d7d3efc9f6ff70594ed53dd4ca2b`.
+The run selected one worker, Normal Full coverage, the default languages
+and Zstandard level 3. The Windows Installer consumer has its own test.
+[Native Windows producer](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140537108090) ·
+[Packaged producer artifact](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15204943084)
+
+| Build | Elapsed (s) | Peak private commit (bytes) | Peak working set (bytes) | Compressed frame (bytes) | Producer decoded count (bytes) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 2,624.272 | 35,377,819,648 | 32,591,794,176 | 1,576,280,717 | 95,109,379,589 |
+| PTU 13284307 | 2,932.659 | 36,296,839,168 | 33,681,752,064 | 1,625,070,804 | 98,173,166,243 |
+
+Both producers exited 0. Each Archive stamp and binary digest remained
+stable. Windows lifetime counters kept both peaks below decimal 40 GB.
+The 64 GiB headroom estimate subtracts the greater process peak before OS
+and background workload. Paging is measured across the host.
+
+| Build | Minimum physical RAM available (bytes) | Minimum host commit headroom (bytes) | Estimated 64 GiB headroom (bytes) | Host page reads | Host page writes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 17,661,386,752 | 37,267,369,984 | 33,341,657,088 | 817,200 | 53 |
+| PTU 13284307 | 18,904,772,608 | 39,197,872,128 | 32,422,637,568 | 1,030,917 | 0 |
+
+| Build | Process logical writes (bytes) | Staged row spools (bytes) | Exact writer temporary peak (bytes) |
+| --- | ---: | ---: | ---: |
+| LIVE 13220821 | 2,358,032,612 | 781,742,138 | 2,358,022,855 |
+| PTU 13284307 | 2,466,890,460 | 841,809,588 | 2,466,880,392 |
+
+| Build | Compressed frame SHA-256 | Producer receipt SHA-256 |
+| --- | --- | --- |
+| LIVE 13220821 | `447f8805ca5fdeafa5ef0b6f9af74bf4c7d21db60874fe50880c9cf5c88e0041` | `b6dbec62b1f72447d55e7a5b5feae9c81d4c31633b45f31663af036ca451a340` |
+| PTU 13284307 | `25e43ed28c3e603606cbe58f68933fb5bb1c1a28dd5a0e8132fb1c2f5689623c` | `5fa5adc674e9cff54f8f485fc6e0cae9f40a1c76cb630cf5ef2ac263b08ae827` |
+
+The independent frame replay has its own acceptance receipts.
