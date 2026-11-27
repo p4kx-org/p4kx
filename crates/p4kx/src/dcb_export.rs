@@ -6,7 +6,10 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_export::{Language, RecordExportOptions, RecordExportSummary, RecordFailure, RecordForm};
+use p4kx_export::{
+    Language, RecordExportOptions, RecordExportReceipt, RecordExportSummary, RecordFailure,
+    RecordForm,
+};
 use p4kx_extraction::{
     Archive, ArchiveWriteProtection, DataForge, Filter, LocalizationSet, Record,
     RecordExportReport, RecordLocalization, TextResolver,
@@ -21,12 +24,15 @@ use crate::json;
 use crate::loc::{LanguageNotInArchive, print_notes};
 use crate::renamed_report::{RenamedJson, renamed_json};
 
+#[path = "dcb_export_count_origins.rs"]
+mod count_origins;
 #[path = "dcb_export_publication.rs"]
 mod publication;
 #[path = "dcb_export_report.rs"]
 mod report;
 #[path = "dcb_export_tags.rs"]
 mod tags;
+use count_origins::CountOrigin;
 pub(crate) use report::print_report;
 use report::{Outcome, reason};
 use tags::RecordExportTags;
@@ -116,6 +122,8 @@ struct ReportJson<'a> {
     origin_receipts: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     origin_failures: Vec<String>,
+    #[serde(flatten)]
+    count_origin: Option<&'a CountOrigin>,
 }
 
 #[derive(Serialize)]
@@ -218,12 +226,29 @@ impl Job<'_, '_> {
             tags: tags.map(RecordExportTags::resolver),
         };
         let combined = args.combined.then(|| combined_name(input.entry().path()));
-        let exported = self.publish(&options, &target, combined.as_deref(), localization)?;
+        let mut exported = self.publish(&options, &target, combined.as_deref(), localization)?;
+        let count_origin = self
+            .as_json
+            .then(|| {
+                let indices = exported.take_committed_definitions();
+                let report = exported.outcome();
+                count_origins::capture(
+                    input.entry().origin_of(self.forge),
+                    indices,
+                    report.written,
+                    report.error.is_some(),
+                )
+            })
+            .flatten();
         let report = exported.outcome();
-        if let Err(error) = self.print_outcome(&report, &target, combined.as_deref())
+        if let Err(error) =
+            self.print_outcome(&report, &target, combined.as_deref(), count_origin.as_ref())
             && error.kind() != io::ErrorKind::BrokenPipe
         {
             return Err(error.into());
+        }
+        if count_origin.as_ref().is_some_and(CountOrigin::failed) {
+            return Ok(ExitCode::from(crate::exit::PARTIAL_FAILURE));
         }
         Ok(report.exit_code())
     }
@@ -233,6 +258,7 @@ impl Job<'_, '_> {
         report: &Outcome<'_>,
         target: &Path,
         combined: Option<&str>,
+        count_origin: Option<&CountOrigin>,
     ) -> io::Result<()> {
         let Self {
             args,
@@ -268,6 +294,7 @@ impl Job<'_, '_> {
                     .iter()
                     .map(|error| reason(error))
                     .collect(),
+                count_origin,
             })
         } else {
             let into = combined.map(|name| target.join(name));
@@ -287,6 +314,15 @@ enum ExportedRecords {
 }
 
 impl ExportedRecords {
+    fn take_committed_definitions(&mut self) -> Option<Vec<u32>> {
+        match self {
+            Self::Files(report) => report.take_written_record_indices(),
+            Self::Summary(summary) => summary
+                .take_receipt()
+                .map(RecordExportReceipt::into_indices),
+        }
+    }
+
     fn outcome(&self) -> Outcome<'_> {
         match self {
             Self::Files(report) => report.into(),

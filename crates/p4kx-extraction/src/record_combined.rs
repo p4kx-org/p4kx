@@ -15,8 +15,8 @@ use crate::record_format::xml_receipt::XmlAnnotationSources;
 use crate::write::{read_existing_error, write_error};
 use crate::{
     ConflictPolicy, DataForgeEntry, DataForgeOrigin, ExtractionError, ObservedTagTree,
-    RecordExportError, RecordExportOptions, RecordExportReport, RecordFailure, RecordLocalization,
-    SourceEvidenceError,
+    RecordExportError, RecordExportOptions, RecordExportReport, RecordExportSources, RecordFailure,
+    RecordLocalization, SourceEvidenceError,
 };
 
 #[path = "record_combined_document.rs"]
@@ -57,6 +57,7 @@ pub fn export_combined(
         options,
         None,
         XmlAnnotationSources::default(),
+        false,
     )
 }
 
@@ -84,6 +85,7 @@ pub fn export_combined_with_origins(
         options,
         original,
         XmlAnnotationSources::default(),
+        false,
     )
 }
 
@@ -123,6 +125,43 @@ pub fn export_annotated_combined(
     localization: Option<&RecordLocalization<'_>>,
     tags: Option<&ObservedTagTree>,
 ) -> Result<RecordExportReport, ExtractionError> {
+    export_annotated(
+        RecordExportSources::new(input, localization, tags),
+        forge,
+        records,
+        file,
+        options,
+        false,
+    )
+}
+
+/// Writes annotated combined Record XML and retains the committed definition indices.
+///
+/// # Errors
+/// Returns an output error for foreign input or independently supplied annotations.
+pub fn export_annotated_combined_with_receipt(
+    sources: RecordExportSources<'_, '_>,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+) -> Result<RecordExportReport, ExtractionError> {
+    export_annotated(sources, forge, records, file, options, true)
+}
+
+fn export_annotated(
+    sources: RecordExportSources<'_, '_>,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+) -> Result<RecordExportReport, ExtractionError> {
+    let RecordExportSources {
+        input,
+        localization,
+        tags,
+    } = sources;
     if options.annotations().is_active() {
         return Err(write_error(
             file.to_path_buf(),
@@ -137,7 +176,15 @@ pub fn export_annotated_combined(
     sources
         .validate(forge)
         .map_err(|source| write_error(file.to_path_buf(), source))?;
-    export(forge, records, file, options, Some(original), sources)
+    export(
+        forge,
+        records,
+        file,
+        options,
+        Some(original),
+        sources,
+        retain_receipt,
+    )
 }
 
 fn original_of<'input>(
@@ -163,8 +210,12 @@ fn export(
     options: &RecordExportOptions<'_>,
     original: Option<&DataForgeOrigin>,
     sources: XmlAnnotationSources<'_, '_>,
+    retain_receipt: bool,
 ) -> Result<RecordExportReport, ExtractionError> {
-    let mut report = RecordExportReport::default();
+    let mut report = RecordExportReport {
+        written_record_indices: retain_receipt.then(Vec::new),
+        ..RecordExportReport::default()
+    };
     let mut selected = records.len();
     match (Job {
         forge,
@@ -176,11 +227,8 @@ fn export(
     {
         Ok(()) => Ok(report),
         Err(error) if crate::guard_cancellation::extraction_cancelled(&error) => {
-            Ok(RecordExportReport {
-                cancelled: selected.saturating_sub(report.failures.len()),
-                failures: report.failures,
-                ..RecordExportReport::default()
-            })
+            cancel_report(&mut report, selected, 0);
+            Ok(report)
         }
         Err(error) => Err(error),
     }
@@ -264,6 +312,7 @@ fn cancel_report(report: &mut RecordExportReport, selected: usize, foreign: usiz
     *report = RecordExportReport {
         cancelled: selected.saturating_sub(failed),
         failures: std::mem::take(&mut report.failures),
+        written_record_indices: report.written_record_indices.as_ref().map(|_| Vec::new()),
         ..RecordExportReport::default()
     };
 }

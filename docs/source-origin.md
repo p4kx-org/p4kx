@@ -136,10 +136,15 @@ bytes and its logical row and column. See [Record JSON](record-json.md#files)
 and [Flat value export](record-flat.md#field-origins).
 
 `dcb export --json` lists committed companions under `origin_receipts` and
-reports publication failures under `origin_failures`. Skip and unchanged
-decisions retain the file and companion. On replacement the writer retires its
-owned companion before installing the new artifact. A companion error after
-that leaves the committed Record file available.
+reports publication failures under `origin_failures`. Its `fieldOrigins`
+entry for `/exported` links to the exact original definition ranges in
+`provenance`. Flat exports count a committed Record even when it has no leaf
+rows. Kept, failed and cancelled Record writes do not contribute to this
+count. A summary-evidence error appears under `provenanceError`.
+
+Skip and unchanged decisions retain the file and companion. On replacement
+the writer retires its owned companion before installing the new artifact. A
+companion error after that leaves the committed Record file available.
 
 The GUI Record export uses the same companions for per-Record files and
 single-file CSV and NDJSON. The result lists committed companion paths

@@ -3,7 +3,6 @@
 
 mod job;
 mod progress;
-mod provenance;
 mod selection;
 mod summary;
 
@@ -15,8 +14,8 @@ use p4kx_extraction::{ConflictPolicy, Filter, FilterError, WriteProtectionError}
 
 pub use job::{RecordExport, RecordExportStatus};
 pub(crate) use job::{Request, Selection, start};
+pub use p4kx_extraction::RecordExportProvenance;
 pub use progress::{RecordExportProgress, RecordExportStage};
-pub use provenance::RecordExportProvenance;
 pub(crate) use selection::records_below;
 pub use summary::{FailedRecord, RecordExportSummary, RenamedRecord};
 

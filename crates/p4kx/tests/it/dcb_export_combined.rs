@@ -219,7 +219,8 @@ fn combined_prints_one_line_of_json() -> TestResult {
 
     let stdout = export(&archive, &dir.path().join("out"), &["--json"], 0)?;
 
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!("combined_json", serde_json::to_string_pretty(&value)?);
     Ok(())
 }

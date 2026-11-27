@@ -5,12 +5,14 @@ use std::path::Path;
 
 use anyhow::Result;
 use p4kx_export::{
-    RecordExportOptions, RecordForm, write_annotated_ndjson_with_origins,
-    write_record_stream_with_origins,
+    RecordExportOptions, RecordFilePlans, RecordForm, write_annotated_ndjson_with_origins,
+    write_planned_record_export_with_origins, write_record_stream_with_origins,
 };
 use p4kx_extraction::{
-    ObservedTagTree, RecordLocalization, export_annotated_combined,
+    ObservedTagTree, RecordExportSources, RecordFilePlan, RecordLocalization,
+    export_annotated_combined, export_annotated_combined_with_receipt,
     export_annotated_record_json_files, export_annotated_record_xml_files,
+    export_planned_record_json_files_with_origins, export_planned_record_xml_files_with_origins,
 };
 
 use super::tags::RecordExportTags;
@@ -30,6 +32,10 @@ impl Job<'_, '_> {
             ..*options
         };
         let tags = self.tags.and_then(RecordExportTags::observed);
+        let sources = RecordExportSources::new(self.input.entry(), localization, tags);
+        if self.as_json {
+            return self.publish_tracked(sources, &physical_options, target, combined);
+        }
         if let Some(name) = combined {
             return Ok(ExportedRecords::Files(export_annotated_combined(
                 self.input.entry(),
@@ -66,6 +72,54 @@ impl Job<'_, '_> {
             return Ok(ExportedRecords::Files(report));
         }
         Ok(self.publish_stream(options, target, localization, tags))
+    }
+
+    fn publish_tracked(
+        &self,
+        sources: RecordExportSources<'_, '_>,
+        options: &RecordExportOptions<'_>,
+        target: &Path,
+        combined: Option<&str>,
+    ) -> Result<ExportedRecords> {
+        let report = match (combined, self.form) {
+            (Some(name), _) => export_annotated_combined_with_receipt(
+                sources,
+                self.forge,
+                self.records,
+                &target.join(name),
+                options,
+            )?,
+            (None, RecordForm::Json) => export_planned_record_json_files_with_origins(
+                sources,
+                self.forge,
+                &RecordFilePlan::new(self.forge),
+                self.records,
+                target,
+                options,
+            )?,
+            (None, RecordForm::Xml) => export_planned_record_xml_files_with_origins(
+                sources,
+                self.forge,
+                &RecordFilePlan::new(self.forge),
+                self.records,
+                target,
+                options,
+            )?,
+            _ => {
+                return Ok(ExportedRecords::Summary(
+                    write_planned_record_export_with_origins(
+                        sources,
+                        self.forge,
+                        &RecordFilePlans::default(),
+                        self.records,
+                        self.form,
+                        target,
+                        options,
+                    ),
+                ));
+            }
+        };
+        Ok(ExportedRecords::Files(report))
     }
 
     fn publish_stream(

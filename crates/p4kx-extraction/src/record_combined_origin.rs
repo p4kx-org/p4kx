@@ -39,6 +39,9 @@ impl Origin {
 pub(super) fn kept(name: String, report: &mut RecordExportReport) {
     report.skipped.push(name);
     report.written = 0;
+    if let Some(indices) = &mut report.written_record_indices {
+        indices.clear();
+    }
 }
 
 pub(super) fn place(

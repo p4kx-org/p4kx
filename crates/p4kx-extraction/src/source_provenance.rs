@@ -25,6 +25,8 @@ pub(crate) mod model_material_origins;
 mod observed_tag_tree;
 #[path = "source_origin_applicability.rs"]
 mod origin_applicability;
+#[path = "record_export_provenance.rs"]
+mod record_export_provenance;
 #[path = "record_json_location.rs"]
 mod record_json_location;
 #[path = "sourced_value_seed.rs"]
@@ -38,6 +40,7 @@ pub use self::entity_material_effects::{
 pub use self::mode::ProvenanceMode;
 pub use self::observed_tag_tree::{ObservedTagTree, TagPathOrigins};
 pub use self::origin_applicability::OriginApplicability;
+pub use self::record_export_provenance::RecordExportProvenance;
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use self::xml_render_origins::{XmlRenderOrigin, XmlRenderOrigins};
@@ -66,7 +69,9 @@ pub use crate::origin_companion::{
 };
 pub use crate::origin_file_io::write_replacing_io_protected;
 pub use crate::origin_reader_limits::OriginReaderLimits;
-pub use crate::record_combined::{export_annotated_combined, export_localized_combined};
+pub use crate::record_combined::{
+    export_annotated_combined, export_annotated_combined_with_receipt, export_localized_combined,
+};
 pub use crate::record_export::export_annotated_record_xml_files;
 pub use crate::record_export::{
     RecordExportSources, export_planned_record_json_files_with_origins,

@@ -263,6 +263,7 @@ fn dcb_export_prints_one_line_of_json() -> TestResult {
         3,
         "every XML payload has a companion"
     );
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

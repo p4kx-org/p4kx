@@ -81,9 +81,9 @@ impl RecordExportSummary {
         mut summary: p4kx_export::RecordExportSummary,
         source: Option<&DataForgeOrigin>,
     ) -> Self {
-        let provenance = summary
-            .take_receipt()
-            .map(|receipt| RecordExportProvenance::capture(source, receipt).map(Box::new));
+        let provenance = summary.take_receipt().map(|receipt| {
+            RecordExportProvenance::capture(source, receipt.into_indices()).map(Box::new)
+        });
         Self {
             form: summary.form(),
             target: Some(target),

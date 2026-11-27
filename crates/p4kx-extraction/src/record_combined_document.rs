@@ -41,6 +41,7 @@ impl Payload<'_> {
 enum Built<'entry> {
     Xml {
         payload: Payload<'entry>,
+        record_index: u32,
         error_values: usize,
     },
     Failed(RecordFailure),
@@ -101,6 +102,7 @@ fn build<'source, 'entry>(
     match rendered {
         Ok((payload, error_values)) => Built::Xml {
             payload,
+            record_index: record.index(),
             error_values,
         },
         Err(error) => Built::Failed(failure(record, error)),
@@ -261,10 +263,14 @@ impl<'p> Document<'p> {
             match built {
                 Built::Xml {
                     payload,
+                    record_index,
                     error_values,
                 } => {
                     self.put_record(payload)?;
                     report.written = report.written.saturating_add(1);
+                    if let Some(indices) = &mut report.written_record_indices {
+                        indices.push(record_index);
+                    }
                     report.error_values = report.error_values.saturating_add(error_values);
                     report.records_with_errors = report
                         .records_with_errors

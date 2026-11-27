@@ -161,8 +161,13 @@ could not be published.
 `origin_receipts` lists the paths of companions committed by the export.
 `origin_failures` lists companion publication errors, including errors that
 occurred after the Record data was committed. Each key is omitted when its
-list is empty. See [Record file origins](source-origin.md#record-files) for
-the companion addresses and conflict behavior.
+list is empty.
+
+The `fieldOrigins` entry for `/exported` links to the original definition ranges
+in the `provenance` inventory. A committed Record with zero flat rows still
+counts as one Record. `provenanceError` reports a failure to build the count
+evidence. See [Record file origins](source-origin.md#record-files) for the
+companion addresses and conflict behavior.
 
 With `--lang <language>` the report also holds `"language": "de"`, the code of the language the
 texts were resolved in; without it the field is absent.

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::RecordExportReceipt;
-use p4kx_extraction::{
+use crate::{
     DataForgeOrigin, FieldOrigin, InputScope, SourceEvidenceError, SourceInput, SourceInventory,
     SourceLocation, SourceUse, SourceUseRole, SourceUses,
 };
@@ -23,12 +22,21 @@ impl RecordExportProvenance {
         &self.inventory
     }
 
-    pub(super) fn capture(
+    /// Takes the written count origin and its source inventory.
+    #[must_use]
+    pub fn into_parts(self) -> (FieldOrigin, SourceInventory) {
+        (self.written, self.inventory)
+    }
+
+    /// Binds the observed source to the committed definition indices from a Record export.
+    ///
+    /// # Errors
+    /// Returns an error if the original use inventory cannot be recorded.
+    pub fn capture(
         source: Option<&DataForgeOrigin>,
-        receipt: RecordExportReceipt,
+        mut indices: Vec<u32>,
     ) -> Result<Self, SourceEvidenceError> {
         let uses = SourceUses::new();
-        let mut indices = receipt.into_indices();
         let (written, complete) = if indices.is_empty() {
             (Vec::new(), true)
         } else {

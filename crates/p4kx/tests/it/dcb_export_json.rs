@@ -270,7 +270,8 @@ fn ndjson_prints_one_line_of_json() -> TestResult {
     )?;
 
     assert_eq!(stdout.lines().count(), 1, "one line: {stdout}");
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
