@@ -122,6 +122,7 @@ fn one_use_fleet_owner_releases_successful_and_partial_vehicle_payloads() -> Tes
                     files.reused.is_empty(),
                     "this physical root was resolved once"
                 );
+                drop(files);
                 assert!(
                     resolver.vehicles.is_empty(),
                     "successful one-use payload leaves the resolver cache"
@@ -180,6 +181,7 @@ fn duplicate_physical_vehicle_keys_keep_exact_success_and_failure_operations() -
                     "failed originals never observe a usable vehicle"
                 );
             }
+            drop(users);
             Ok(())
         })?;
     }
@@ -242,6 +244,7 @@ fn assert_original_replay(events: &Events) -> TestResult {
             .all(|(read, reused)| read.is_same_operation(reused)),
         "each successive cache event reuses the exact original read or error in order"
     );
+    drop(files);
     Ok(())
 }
 

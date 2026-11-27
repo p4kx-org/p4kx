@@ -187,14 +187,8 @@ impl Job<'_, '_> {
     /// Writes the Records with `texts` resolved and prints the report.
     fn write(&self, texts: Option<&dyn TextResolver>) -> Result<ExitCode> {
         let Self {
-            args,
-            as_json,
-            form,
-            input,
-            tags,
-            ..
+            args, input, tags, ..
         } = *self;
-        let entry = input.entry();
         let cancel = cancel_on_interrupt()?;
         let protection = p4kx_extraction::ArchiveWriteProtection::new(input.path(), cancel.flag())?;
         let target =
@@ -207,16 +201,37 @@ impl Job<'_, '_> {
             texts,
             tags: tags.map(|tags| tags as &dyn TagResolver),
         };
-        let combined = args.combined.then(|| combined_name(entry.path()));
+        let combined = args.combined.then(|| combined_name(input.entry().path()));
         let exported = self.publish(&options, &target, combined.as_deref())?;
         let report = exported.outcome();
-        let printed = if as_json {
+        if let Err(error) = self.print_outcome(&report, &target, combined.as_deref())
+            && error.kind() != io::ErrorKind::BrokenPipe
+        {
+            return Err(error.into());
+        }
+        Ok(report.exit_code())
+    }
+
+    fn print_outcome(
+        &self,
+        report: &Outcome<'_>,
+        target: &Path,
+        combined: Option<&str>,
+    ) -> io::Result<()> {
+        let Self {
+            args,
+            form,
+            input,
+            tags,
+            ..
+        } = *self;
+        if self.as_json {
             json::print(&ReportJson {
                 archive: json::path(input.path()),
-                entry: entry.path(),
+                entry: input.entry().path(),
                 format: form.name(),
-                target: json::path(&target),
-                file: combined.as_deref(),
+                target: json::path(target),
+                file: combined,
                 language: args.lang.map(Language::code),
                 tags: tags.is_some(),
                 exported: report.written,
@@ -239,15 +254,14 @@ impl Job<'_, '_> {
                     .collect(),
             })
         } else {
-            let into = combined.map_or_else(|| target.clone(), |name| target.join(name));
-            print_report(&report, &into, args.conflict, form)
-        };
-        if let Err(error) = printed
-            && error.kind() != io::ErrorKind::BrokenPipe
-        {
-            return Err(error.into());
+            let into = combined.map(|name| target.join(name));
+            print_report(
+                report,
+                into.as_deref().unwrap_or(target),
+                args.conflict,
+                form,
+            )
         }
-        Ok(report.exit_code())
     }
 
     fn publish(
