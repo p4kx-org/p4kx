@@ -414,3 +414,22 @@ storage and minimum available host memory. Verify a LIVE `.json.zst` upload with
 including expected refusal for an ineligible Channel or incomplete selected
 data. Compare ordered selected values, reference closure, source states and
 encryption markers against the complete same-Build Catalog and SDK.
+
+### LIVE archive coverage
+
+On LIVE 13220821, a reduced producer built from `bb267306d34bf961c8c1eb87b332da04bd3d97e2`
+stopped at `IncompleteScope("ships")` before opening the output destination. The
+Windows AMD64 producer ran for 30.496 s. Peak process and job private commit were
+1,789,984,768 bytes, peak working set was 1,775,845,376 bytes, sampled scratch
+peaked at 72,384 bytes and available host memory stayed at or above 55,512,784,896
+bytes. These measurements cover the refusal. Generation, compressed size,
+decoded size and import require a completed artifact.
+
+An independent keyed scan found four incomplete selected Ship rows among
+1,033 physical Records with readable headers and bodies. For three Starfarer
+wreck Records, the authored vehicle modification is absent from the Archive.
+Their base measurements remain available, while the missing modification leaves
+`vehicleKind` evidence incomplete. The `VNCL_Hunter_AI_VAN` Record names a
+vehicle implementation that is absent from the Archive. Its selected `mass`,
+`massBasis` and `hullHealth` are unreadable. The reduced producer requires those
+selected dependencies before publication.
