@@ -1150,15 +1150,19 @@ and Zstandard level 3. The Windows Installer consumer has its own test.
 | LIVE 13220821 | 2,624.272 | 35,377,819,648 | 32,591,794,176 | 1,576,280,717 | 95,109,379,589 |
 | PTU 13284307 | 2,932.659 | 36,296,839,168 | 33,681,752,064 | 1,625,070,804 | 98,173,166,243 |
 
+The interactive Windows 11 Pro 26H2 host (build `26300.9974`) had an AMD Ryzen 9
+9950X3D, 32 logical processors and 100,573,523,968 B of RAM. The packaged
+binary used Rust 1.100.0. Interactive desktop latency remains unmeasured.
+
 Both producers exited 0. Each Archive stamp and binary digest remained
 stable. Windows lifetime counters kept both peaks below decimal 40 GB.
 The 64 GiB headroom estimate subtracts the greater process peak before OS
 and background workload. Paging is measured across the host.
 
-| Build | Minimum physical RAM available (bytes) | Minimum host commit headroom (bytes) | Estimated 64 GiB headroom (bytes) | Host page reads | Host page writes |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| LIVE 13220821 | 17,661,386,752 | 37,267,369,984 | 33,341,657,088 | 817,200 | 53 |
-| PTU 13284307 | 18,904,772,608 | 39,197,872,128 | 32,422,637,568 | 1,030,917 | 0 |
+| Build | Available RAM before launch (bytes) | Host commit headroom before launch (bytes) | Minimum physical RAM available (bytes) | Minimum host commit headroom (bytes) | Estimated 64 GiB headroom (bytes) | Host page reads | Host page writes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 53,853,392,896 | 75,989,966,848 | 17,661,386,752 | 37,267,369,984 | 33,341,657,088 | 817,200 | 53 |
+| PTU 13284307 | 51,693,539,328 | 73,356,611,584 | 18,904,772,608 | 39,197,872,128 | 32,422,637,568 | 1,030,917 | 0 |
 
 | Build | Process logical writes (bytes) | Staged row spools (bytes) | Exact writer temporary peak (bytes) |
 | --- | ---: | ---: | ---: |
