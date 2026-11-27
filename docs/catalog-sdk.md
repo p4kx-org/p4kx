@@ -1017,8 +1017,19 @@ and Build, signed verifier, and complete compressed input. With the exact
 capitalization, the transcript reader accepted the three family counts
 and rejected a deliberately mismatched summary count. The original
 launcher receipt remains available unchanged. The retained `13260598`
-frame still needs a matching installed Archive, and the current PTU
-Build needs its own complete Normal frame.
+frame still needs a matching installed Archive.
+
+On PTU `13284307`, the verifier and complete Normal Catalog both came from
+signed revision `84e0a9ca95ca03da3cae281e24240be9377c7ea5`. The replay
+matched 19,688 Tag definitions, one root declaration and 19,688 Tag paths in
+canonical order. It matched 295,330 contributing source uses and their one
+physical source. The installed Archive and compressed frame seals verified.
+
+The one-worker comparison took 2,206.339 s with 1,114,779,648 B peak private
+commit and 1,046,933,504 B peak working set. Minimum available host memory
+was 36,210,360,320 B and minimum commit headroom was 59,859,345,408 B.
+The elapsed time includes streaming the retained Catalog.
+[Same-revision producer and offline replay](catalog-partitioning.md#offline-ptu-replay)
 
 ## Original Entity tag declarations
 
