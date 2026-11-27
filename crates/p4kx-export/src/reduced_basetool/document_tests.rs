@@ -5,15 +5,23 @@ use std::fs::File;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-use p4kx_extraction::{Archive, ArchiveWatch, CancelToken};
-use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestStruct};
+use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, SourceValueState};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestStruct};
 use serde_json::{Value, json};
 
 use super::document;
 use super::plan;
+use crate::catalog_queries::equipment::ShipSnapshot;
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+};
 use crate::{BasetoolCatalogOptions, CatalogError, CatalogFile, CatalogOptions};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+const SHIP_PATH: &str = "libs/foundry/records/entities/spaceships/FixtureShip";
+const MISSING_IMPLEMENTATION: &str =
+    "Scripts/Entities/Vehicles/Implementations/Xml/FixtureShip.xml";
 
 #[test]
 fn reduced_document_publishes_every_accepted_dataset_with_the_recorded_boundaries() -> TestResult {
@@ -159,6 +167,122 @@ fn reduced_sdk_retires_staged_output_when_the_build_changes() -> TestResult {
         std::fs::read(output)?,
         preceding,
         "the changed source leaves the previous generation in place"
+    );
+    Ok(())
+}
+
+#[test]
+fn missing_selected_vehicle_implementation_refuses_reduced_publication() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let folder = scratch.path();
+    let database = p4kx_testkit::entity_schema(DataForgeBuilder::new().version(8))
+        .record(
+            TestEntity::new(1, "FixtureShip", format!("{SHIP_PATH}.xml"))
+                .vehicle(MISSING_IMPLEMENTATION, "")
+                .record(),
+        )
+        .build();
+    let input = folder.join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", database))
+        .write_to(&input)?;
+    let archive = Archive::open(input)?;
+    let session = CatalogQuerySession::open(
+        &archive,
+        CatalogLanguageSelection::Selected(&plan::LOCALES),
+        None,
+    )?;
+    session.with_ships(CatalogRecordSelection::All, None, |snapshot| {
+        check_unavailable_ship(&snapshot)
+    })??;
+
+    let output = folder.join("catalog.json.zst");
+    let preceding = b"preceding generation";
+    std::fs::write(&output, preceding)?;
+    let mut factory_called = false;
+    let error = crate::write_basetool_catalog_file(
+        &archive,
+        &BasetoolCatalogOptions::new(UNIX_EPOCH),
+        folder,
+        || {
+            factory_called = true;
+            CatalogFile::create(&output)
+        },
+    )
+    .err()
+    .ok_or("the missing selected vehicle source must prevent reduced publication")?;
+    assert_eq!(
+        error.to_string(),
+        "the selected data is incomplete at ships",
+        "the reduced writer reports the exact blocking dataset"
+    );
+    assert!(
+        !factory_called,
+        "the destination factory runs only for complete inputs"
+    );
+    assert_eq!(
+        std::fs::read(output)?,
+        preceding,
+        "the preceding file remains intact"
+    );
+    Ok(())
+}
+
+fn check_unavailable_ship(snapshot: &ShipSnapshot<'_>) -> TestResult {
+    let [ship] = snapshot.rows() else {
+        return Err("expected the selected physical Ship".into());
+    };
+    assert_eq!(
+        ship.source().record_index().value(),
+        Some(&0),
+        "physical Record index"
+    );
+    assert_eq!(
+        ship.source().record_path().value(),
+        Some(&SHIP_PATH),
+        "canonical Record path retains the original physical owner"
+    );
+    assert_eq!(
+        ship.vehicle_definition().value(),
+        Some(&MISSING_IMPLEMENTATION),
+        "the authored implementation selector remains readable"
+    );
+    for (field, state, origin) in [
+        ("mass", ship.mass().state(), ship.mass().origin()),
+        (
+            "massBasis",
+            ship.mass_basis().state(),
+            ship.mass_basis().origin(),
+        ),
+        (
+            "hullHealth",
+            ship.hull_health().state(),
+            ship.hull_health().origin(),
+        ),
+    ] {
+        assert_eq!(
+            state,
+            SourceValueState::Unreadable,
+            "{field} needs the requested implementation"
+        );
+        assert!(
+            !origin.source_set_complete(),
+            "{field} has no complete value evidence"
+        );
+    }
+    let sources = snapshot.sources();
+    assert_eq!(
+        sources.coverage().incomplete_fields,
+        [0],
+        "the physical Record is incomplete"
+    );
+    assert!(
+        sources.dependency_coverage().directory_complete(),
+        "the directory survey closed despite the unresolved authored dependency"
+    );
+    assert!(
+        !sources.dependency_coverage().is_complete(),
+        "directory evidence alone does not establish the selected values"
     );
     Ok(())
 }
