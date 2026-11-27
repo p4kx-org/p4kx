@@ -960,3 +960,31 @@ transfer to remove this separate action before terminal validation.
 [ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/job/140676544875) ·
 [Verified checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/46042721274/artifacts/15223294860) ·
 [Replacement run](https://github.com/p4kx-org/p4kx/actions/runs/46052213476)
+
+### Native Windows execution on b97e48894
+
+The CI workflow for merge `96ab25990830b5f60c6017e3aac7c6b37b6c36e7`
+completed with 39 successful jobs. The separately named Apple Silicon
+archive-consumer job was skipped because its native suite ran inside the
+Apple Silicon build job. Both Windows Release jobs completed the local
+live checkpoint after removal of the intermediate upload.
+[CI run](https://github.com/p4kx-org/p4kx/actions/runs/46052213247) ·
+[Release run](https://github.com/p4kx-org/p4kx/actions/runs/46052213476)
+
+AMD64's Wait step observed its bound receipt and completed at 19:38:19 UTC.
+GitHub continued to report the one-minute CollectFinish step as active.
+ARM64 entered Wait at 19:38:56 UTC and its step status stayed active past
+the maximum configured Wait allowance. Both jobs started at 19:35:15 UTC
+and GitHub cancelled them at 20:30:15 UTC. Each sole failure annotation
+cited the 45-minute job limit. Both raw job logs returned HTTP 404 and
+neither job uploaded its final original lifecycle evidence. The retained
+launch artifacts verify the start of supervision. Installer completion
+and the exact host operation remain unresolved for attempt 1.
+[AMD64 attempt 1](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140704240393) ·
+[ARM64 attempt 1](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140704240368)
+
+The failed-jobs retry requested debug logging for the same PR source
+and reusable Windows workflow. Its AMD64 and ARM64 execution jobs retain
+separate completion receipts.
+[AMD64 retry](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140725255982) ·
+[ARM64 retry](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140725255992)
