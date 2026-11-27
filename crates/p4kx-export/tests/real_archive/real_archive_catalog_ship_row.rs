@@ -34,7 +34,7 @@ pub(in super::super) fn interior_placement_root<E: Error>(row: &Value) -> Result
     Ok(Some(index))
 }
 
-fn physical_ship_index<E: Error>(row: &Value) -> Result<u32, E> {
+pub(in super::super) fn physical_ship_index<E: Error>(row: &Value) -> Result<u32, E> {
     let index = row
         .pointer("/shipRecordIndex/value")
         .and_then(record_index)

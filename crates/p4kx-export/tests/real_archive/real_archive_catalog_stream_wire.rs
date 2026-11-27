@@ -26,6 +26,7 @@ pub(super) enum EncounterRow {
     Placement,
     InteriorPlacement,
     InteriorCoverage,
+    InstalledFlight,
     MissionProperties,
     MissionFlows,
     MissionArena,
@@ -38,6 +39,7 @@ impl EncounterRow {
     pub(super) fn project(self, row: Value) -> TestResult<(Fingerprint, Value)> {
         match self {
             Self::Placement => Ok((encounter_key(&row)?, row)),
+            Self::InstalledFlight => Ok((super::flight::occurrence_key(&row)?, row)),
             Self::InteriorPlacement => Ok((interior_placement_key(&row)?, row)),
             Self::InteriorCoverage => {
                 ship_row::interior_room_root::<serde_json::Error>(&row)?;

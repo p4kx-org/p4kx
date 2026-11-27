@@ -130,6 +130,7 @@ pub(super) fn project_mission_row(
         }
         EncounterRow::MissionArena => arena_row(row),
         EncounterRow::Placement
+        | EncounterRow::InstalledFlight
         | EncounterRow::InteriorPlacement
         | EncounterRow::InteriorCoverage
         | EncounterRow::LootOriginal

@@ -19,7 +19,7 @@ const ENCRYPTED: &str = "containsEncryptedSource";
 const REFS: &str = "sourceUsesRefs";
 const COMPLETE: &str = "sourceSetComplete";
 
-pub(super) struct Rows {
+pub(crate) struct Rows {
     mode: ProbeMode,
     count: usize,
     values: Sha256,
@@ -32,7 +32,7 @@ pub(super) struct Rows {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Evidence {
+pub(crate) struct Evidence {
     values_sha256: String,
     tri_state_sha256: String,
     typed_completeness_sha256: String,
@@ -48,7 +48,7 @@ pub(super) struct Evidence {
 }
 
 impl Rows {
-    pub(super) fn new(mode: ProbeMode, workload: Workload) -> TestResult<Self> {
+    pub(crate) fn new(mode: ProbeMode, workload: Workload) -> TestResult<Self> {
         let snapshot = match workload {
             Workload::Verification => None,
             Workload::CountedSnapshot => Some(CountedSnapshot::new()?),
@@ -74,7 +74,7 @@ impl Rows {
             .update([u8::from(origin.source_set_complete())]);
     }
 
-    pub(super) fn observe_inventory(&mut self, inventory: &SourceInventory) -> TestResult {
+    pub(crate) fn observe_inventory(&mut self, inventory: &SourceInventory) -> TestResult {
         let uses = inventory.use_count();
         let sources = inventory.source_count();
         if inventory.provenance_mode() != self.mode.sdk() {
@@ -97,7 +97,7 @@ impl Rows {
         Ok(())
     }
 
-    pub(super) fn observe_row(&mut self, row: &impl Serialize) -> TestResult {
+    pub(crate) fn observe_row(&mut self, row: &impl Serialize) -> TestResult {
         self.count = self.count.checked_add(1).ok_or("SDK row count overflow")?;
         self.typed_complete.update([2]);
         if let Some(snapshot) = &mut self.snapshot {
@@ -112,7 +112,7 @@ impl Rows {
         record_digest(&mut self.values, &value)
     }
 
-    pub(super) fn finish(self, terminal: &Value) -> TestResult<Evidence> {
+    pub(crate) fn finish(self, terminal: &Value) -> TestResult<Evidence> {
         let refs = self.markers.source_refs;
         if self.markers.encrypted + self.markers.unencrypted + self.markers.unknown == 0
             || (matches!(self.mode, ProbeMode::Full) && refs == 0)
@@ -140,6 +140,16 @@ impl Rows {
             max_owner_physical_sources: self.max_owner_physical_sources,
             snapshot,
         })
+    }
+}
+
+impl Evidence {
+    pub(crate) fn value_marker_digests(&self) -> [&str; 3] {
+        [
+            &self.values_sha256,
+            &self.tri_state_sha256,
+            &self.scope_coverage_sha256,
+        ]
     }
 }
 
@@ -235,7 +245,7 @@ fn record_digest(hash: &mut Sha256, value: &impl Serialize) -> TestResult {
     Ok(())
 }
 
-fn finish_lower(hash: Sha256) -> Result<String, fmt::Error> {
+pub(crate) fn finish_lower(hash: Sha256) -> Result<String, fmt::Error> {
     let digest = hash.finalize();
     let mut output = String::with_capacity(digest.len() * 2);
     for byte in digest {

@@ -22,7 +22,7 @@ mod origins;
 
 #[path = "sdk_marker_ab_rows.rs"]
 mod rows;
-use rows::{Evidence, Rows};
+pub(crate) use rows::{Evidence, Rows, finish_lower};
 
 const BUILD: &str = "13220821";
 const OWNER_INDEX: u32 = 71;
@@ -51,7 +51,7 @@ fn installed_marker_sdk_cold_query() -> TestResult {
     )
 }
 
-fn write_receipt(path: &Path, receipt: &Receipt) -> TestResult {
+pub(crate) fn write_receipt(path: &Path, receipt: &impl Serialize) -> TestResult {
     let parent = path.parent().ok_or("the private receipt needs a parent")?;
     if !path.is_absolute() || parent.canonicalize()? != env::temp_dir().canonicalize()? {
         return Err(
@@ -231,7 +231,7 @@ struct Receipt {
 }
 
 #[derive(Clone, Copy)]
-enum ProbeMode {
+pub(crate) enum ProbeMode {
     Full,
     MarkersOnly,
 }
@@ -245,7 +245,7 @@ impl ProbeMode {
         }
     }
 
-    const fn sdk(self) -> ProvenanceMode {
+    pub(crate) const fn sdk(self) -> ProvenanceMode {
         match self {
             Self::Full => ProvenanceMode::Full,
             Self::MarkersOnly => ProvenanceMode::MarkersOnly,
@@ -291,7 +291,7 @@ impl Scope {
 }
 
 #[derive(Clone, Copy)]
-enum Workload {
+pub(crate) enum Workload {
     Verification,
     CountedSnapshot,
 }

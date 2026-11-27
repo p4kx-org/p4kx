@@ -23,6 +23,9 @@ use crate::real_archive_catalog_table_parity::{Origins, TestResult, wire_row};
 #[path = "installed_flight_retained_parity.rs"]
 pub(super) mod retained_parity;
 
+#[path = "installed_flight_fleet_witness.rs"]
+mod fleet_witness;
+
 pub(super) const TABLE: &str = "/placements/installedConfigurations";
 const SHIP_RECORD: &str = "P4KX_FLIGHT_SDK_RECORD";
 

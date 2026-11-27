@@ -40,8 +40,8 @@ pub(crate) use loadout_census::ProducerSeal;
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 pub(crate) use stream_parity::{
     DefinitionOwner, LootHarvestDataset, LootHarvestDigests, MissionDisposition,
-    StreamedComponentDigests, StreamedDefinitionDigests, StreamedInteriorDigests,
-    StreamedMissionDigests, StreamedPlacementDigests,
+    StreamedComponentDigests, StreamedDefinitionDigests, StreamedFlightDigests,
+    StreamedInteriorDigests, StreamedMissionDigests, StreamedPlacementDigests,
 };
 
 #[path = "real_archive_catalog_selected_origins.rs"]

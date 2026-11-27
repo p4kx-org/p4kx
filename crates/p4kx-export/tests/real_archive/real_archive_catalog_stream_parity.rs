@@ -18,6 +18,8 @@ use crate::catalog_capture::CatalogCapture;
 mod definitions;
 #[path = "real_archive_catalog_digest_runs.rs"]
 mod digest_runs;
+#[path = "real_archive_installed_flight_digests.rs"]
+mod flight;
 #[path = "real_archive_facility_interior_digests.rs"]
 mod interior;
 #[path = "real_archive_catalog_ship_loadout_rows.rs"]
@@ -31,6 +33,7 @@ mod placement;
 #[path = "real_archive_catalog_stream_wire.rs"]
 mod wire;
 
+pub(crate) use flight::StreamedFlightDigests;
 pub(crate) use interior::StreamedInteriorDigests;
 pub(super) use interior_loadouts::ShipLoadoutRows;
 pub(crate) use loot_harvest::{LootHarvestDataset, LootHarvestDigests};
