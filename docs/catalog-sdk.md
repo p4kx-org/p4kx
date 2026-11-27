@@ -3565,6 +3565,25 @@ the retained Catalog. The terminal census reports incomplete owners separately
 from parity. Measure memory in the cold process independently of the retained
 comparison.
 
+A native Windows AMD64 verifier at `a5908ee05513f35c4a790b4f7ea106a8eb7e6b5c`
+visited every admitted Ship with one Rayon worker and an empty application
+cache. Its executable SHA-256 was
+`b5f8c29863b2b226c1a03de9a920938bda92626198849acc0457ee5af1bbf274`.
+Both Archive stamps remained stable. The measurements cover the cold Marker
+visitor and its verification receipt. The PTU run overlapped unrelated
+compiler processes, so its elapsed time describes that shared host run.
+
+| Build | Ship owners | Placements | Incomplete owners | Elapsed (s) | Peak private commit (bytes) | Peak working set (bytes) | Minimum available host RAM (bytes) | Peak scratch (bytes) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,033 | 20,630 | 67 | 517.133 | 1,091,563,520 | 1,021,820,928 | 50,312,564,736 | 872 |
+| PTU `13284307` | 1,041 | 20,905 | 79 | 561.211 | 1,114,730,496 | 1,031,749,632 | 39,858,872,320 | 870 |
+
+Both processes stayed below the 2 GB query ceiling. The larger peak leaves
+an estimated 16,065,138,688 bytes for the OS and other processes on a 16 GiB
+system. The cold results establish the census and process footprint.
+The retained Full comparison independently verifies canonical occurrence
+parity and contributor coverage.
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for
