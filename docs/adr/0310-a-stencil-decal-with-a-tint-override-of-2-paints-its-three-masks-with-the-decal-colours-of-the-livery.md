@@ -53,6 +53,12 @@ Screenshots and registered texture measurements cover one livery of one vehicle.
   emblem slot (`$TintPaletteDecal`, `StencilTintOverride` 0), not the decal this ADR draws. Its
   three masks coincide, and red shows.
 
+The Hammerhead GS base and Camo B exterior materials on LIVE `13220821` were
+checked as a second candidate. Both `Custom_decal` materials use the `Illum`
+shader and a diffuse image in `TexSlot1`. Both libraries lack `STENCIL_MAP`
+and `StencilTintOverride = 2`. The checked exterior decals cannot supply
+the mixed-green stencil reference.
+
 ## Decision
 
 A stencil decal drawn by its stencil map with a `StencilTintOverride` that rounds to 2 paints its
