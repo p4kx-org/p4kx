@@ -55,14 +55,12 @@ historical version-boundary fixture. Moving ResourceTypes to their canonical tab
 carriers is part of the breaking v3 migration, not an additive change to the released v2 shape.
 
 Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
-Canonical definition tables cover Blueprints, BlueprintCategories, ContractGenerators,
-ContractTemplates, MissionBrokerEntries, LootPoolFilters, GameplayProperties, QualityDistributions,
-QualityQuantizations, Tags, ResourceGroups, ResourceTypes, Commodities and Manufacturers.
-Their authored values retain immediate source metadata. Entity GUID-tag declarations and
-documented memberships, presentation choices and text rows use their corresponding canonical tables.
-Generator logical identities and derived mission texts use sourced projections.
-Further contract facts and additional catalog and tool-output carriers remain in progress.
-The complete target is [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md).
+The schema organizes canonical data under `definitions`, `configurations`, `declarations`,
+`placements`, `projections` and `texts`. The [v3 data-family map](catalog-v3-data-map.md)
+links each family's canonical location to its detailed contract. Authored values in those tables
+carry immediate source metadata. Generator logical identities and derived mission texts use
+sourced projections. The schema defines the emitted shape and the map also tracks the full
+contract from [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md).
 Other exported formats retain their independently documented versions.
 
 

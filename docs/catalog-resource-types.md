@@ -8,11 +8,9 @@ The catalog uses schema version 3. The ResourceType family is published at
 nested list element. Its localized names and descriptions use canonical text tables. Commodities
 also use canonical definitions and presentation as described below. ResourceGroups have canonical
 definition, membership and parent-projection tables with the same per-value origin contract.
-Other catalog families still have their existing shapes; the complete canonical migration and origin coverage of
-the 45 tool-output carrier families remain open work under [#1125](https://github.com/p4kx-org/p4kx/issues/1125).
-[ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md) defines the full target;
-[ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md) defines source origin.
-Those targets do not imply that every family is already migrated.
+The [v3 data-family map](catalog-v3-data-map.md) links the other families to their canonical
+tables and contracts. [#1125](https://github.com/p4kx-org/p4kx/issues/1125) tracks the audit of
+all 45 output carrier families against the field-level [source origin contract](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md).
 
 ## Commodity identity and resource joins
 
