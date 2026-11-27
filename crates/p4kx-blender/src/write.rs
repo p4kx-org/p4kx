@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Assembly, Issue as AssemblyIssue, ModelProvider};
 use p4kx_extraction::ArchiveDefaultMaterial;
-use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
+use p4kx_gltf::{GlbOptions, TextureLoader};
 
 use crate::build::{Inputs, manifest};
 use crate::collect::Collected;
@@ -15,19 +15,15 @@ use crate::entity_classification::EntityClassifications;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
 use crate::manifest::{
-    BuildInfo, EntityRef, Issue, MESHES_FOLDER, Manifest, Replacement, TEXTURES_FOLDER,
+    BuildInfo, EntityRef, MESHES_FOLDER, Manifest, Replacement, TEXTURES_FOLDER,
 };
 use crate::package_receipt::{self, PackageFile};
 use crate::package_scene_provenance::{self, SceneFields};
+use crate::package_summary;
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
 use crate::textures;
-use crate::{PackageError, PackageResult, PackageWriteContext, meshes};
-
-#[path = "write_summary.rs"]
-mod summary;
-
-use self::summary::summarise;
+use crate::{PackageError, PackageResult, PackageSummary, PackageWriteContext, meshes};
 
 /// What the package records about where the Assembly comes from and how it was chosen.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -61,67 +57,6 @@ impl PackageInfo {
         self.exclude = exclude;
         self.replace = replace;
         self
-    }
-}
-
-/// What a package consists of.
-#[derive(Debug, Clone, Default, PartialEq)]
-#[non_exhaustive]
-pub struct PackageSummary {
-    /// The number of nodes of the scene.
-    pub nodes: usize,
-    /// The number of nodes of the kind `container`, the Interior's groups.
-    pub containers: usize,
-    /// The number of nodes of the kind `object`, the models and props of the Interior.
-    pub objects: usize,
-    /// The number of nodes of the kind `light`.
-    pub lights: usize,
-    /// The number of nodes that draw a mesh.
-    pub drawn_nodes: usize,
-    /// The number of GLB meshes, one per distinct mesh set.
-    pub meshes: usize,
-    /// The number of nodes that draw a mesh another node already draws.
-    pub shared_meshes: usize,
-    /// The number of PNG textures written.
-    pub textures: usize,
-    /// The number of pixels of all textures written.
-    pub texture_pixels: u64,
-    /// The number of textures that could not be written; the materials keep their plain colours.
-    pub texture_failures: usize,
-    /// The number of material descriptions, layer materials included.
-    pub materials: usize,
-    /// The number of tint palettes.
-    pub palettes: usize,
-    /// The number of files in the package, including metadata and optional companions.
-    pub files: usize,
-    /// The size of all files in bytes.
-    pub bytes: u64,
-    /// The number of vertices of all meshes, each counted once.
-    pub vertices: usize,
-    /// The number of triangles of all meshes, each counted once.
-    pub triangles: usize,
-    /// The number of meshes whose model lacks the level of detail asked for and is written at the
-    /// nearest lower one.
-    pub lod_fallbacks: usize,
-    /// The number of bones of a Character's skeleton; 0 for an Assembly.
-    pub bones: usize,
-    /// The number of meshes of a Character that carry bone weights.
-    pub skinned_meshes: usize,
-    /// The number of morph targets of a Character.
-    pub morph_targets: usize,
-    /// The number of PNG images embedded in a Character's GLB file.
-    pub embedded_textures: usize,
-    /// What became of each animation asked for, including those left out; empty for an Assembly.
-    pub clips: Vec<AnimationSummary>,
-    /// The issues the manifest lists.
-    pub issues: Vec<Issue>,
-}
-
-impl PackageSummary {
-    /// Returns the number of animations a Character's file holds: those with at least one channel.
-    #[must_use]
-    pub fn animations(&self) -> usize {
-        self.clips.iter().filter(|clip| clip.channels > 0).count()
     }
 }
 
@@ -301,7 +236,7 @@ fn write_scene_files(
         mut manifest,
         authored_soc,
     } = complete_manifest(&inputs, scene, fallback.as_deref(), staging, context)?;
-    let summary = summarise(&manifest, &outcomes, &written);
+    let summary = package_summary::summarise(&manifest, &outcomes, &written);
     let mut files = package_receipt::scene_files(written, &outcomes, authored_soc);
     files.append(&mut authored_files);
     finish_scene(

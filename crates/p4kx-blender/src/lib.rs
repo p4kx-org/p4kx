@@ -64,6 +64,7 @@ mod package_receipt;
 mod package_replacement;
 mod package_scene_provenance;
 mod package_soc_scene;
+mod package_summary;
 mod package_write_context;
 mod palette_fields;
 mod palette_selection;
@@ -160,6 +161,7 @@ pub use package_material_emission::{
     PackageMaterialEmission, StaticEmission,
 };
 pub use package_soc_scene::ManifestSocScene;
+pub use package_summary::PackageSummary;
 pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};
@@ -171,7 +173,7 @@ pub use texture_dds::{
 pub use texture_encoding::{TextureChannelTransform, TextureEncoding, TextureRendition};
 pub use texture_format::TextureFormat;
 pub use texture_source_metadata::TextureSourceMetadata;
-pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
+pub use write::{PackageInfo, write_package, write_package_with_context};
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
 

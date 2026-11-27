@@ -5,10 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use p4kx_comparison::{
-    CancelToken, EntryChange, EntrySummaryProvenance, EntrySummaryProvenanceError, Filter,
-    OwnedComparison,
-};
+use p4kx_comparison::{CancelToken, EntryChange, Filter, OwnedComparison};
 
 use super::ComparisonSide;
 use super::diff::EntryDiff;
@@ -21,6 +18,9 @@ use super::schema_view::SchemaView;
 use super::selection::{ChangeSelection, selected_len};
 use super::summary::Summary;
 use crate::SortDirection;
+
+#[path = "entry_summary_provenance.rs"]
+mod entry_summary_provenance;
 
 static GENERATIONS: AtomicU64 = AtomicU64::new(0);
 
@@ -120,31 +120,6 @@ impl ComparisonView {
         self.matched
             .as_ref()
             .map_or(&self.totals, |matched| &matched.summary)
-    }
-
-    /// Captures original inputs for the currently displayed Entry summary on demand.
-    ///
-    /// The previous display remains the source while a new Filter is running.
-    /// Returns `None` on cancellation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the selected counts cannot be bound to their original inputs.
-    pub fn entry_summary_provenance(
-        &self,
-        cancel: &CancelToken,
-    ) -> Result<Option<EntrySummaryProvenance>, EntrySummaryProvenanceError> {
-        if cancel.is_cancelled() {
-            return Ok(None);
-        }
-        let comparison = self.matched.as_ref().map_or_else(
-            || self.comparison.comparison(),
-            |matched| {
-                self.comparison
-                    .comparison_of_filter(&matched.mask, matched.filter.as_ref())
-            },
-        );
-        comparison.entry_summary_provenance(cancel)
     }
 
     /// Returns the text of the Filter.
