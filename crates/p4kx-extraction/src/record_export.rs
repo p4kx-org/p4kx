@@ -14,7 +14,7 @@ use crate::record_format::{RecordFileFormat, xml_receipt};
 use crate::record_plan::RecordFilePlan;
 use crate::{
     ConflictPolicy, DataForgeEntry, ExtractionError, RecordExportError, RecordExportOptions,
-    RecordExportReport, RecordRenamed,
+    RecordExportProvenance, RecordExportReport, RecordRenamed,
 };
 
 #[path = "record_export_accounting.rs"]
@@ -226,7 +226,13 @@ pub(crate) fn write_converted_record_xml(
 ) -> RecordExportReport {
     let plan = RecordFiles::plan(forge, RecordXml::EXTENSION);
     let observation = Some(Observation::new(input, &xml_receipt::render));
-    write_records_inner(forge, &plan, records, target, run, false, observation)
+    let mut report = write_records_inner(forge, &plan, records, target, run, true, observation);
+    let indices = report.take_written_record_indices();
+    report.written_provenance = Some(
+        RecordExportProvenance::capture_count(input.origin_of(forge), indices, report.written())
+            .map(Box::new),
+    );
+    report
 }
 
 fn write_records_inner<'f, F: RecordFileFormat>(

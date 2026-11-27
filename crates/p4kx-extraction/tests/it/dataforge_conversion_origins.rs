@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::{
-    Exclusion, ExtractionError, FolderSource, OriginDigestWriter, convert_folder, extract,
+    Exclusion, ExtractionError, FolderSource, OriginDigestWriter, RecordExportReport,
+    SourceLocation, SourceUseRole, convert_folder, extract,
 };
 use p4kx_testkit::{
     CryXmlByteOrder, CryXmlSignature, SplitDds, TestElement, TestEntry, TestTextureFormat,
@@ -47,6 +49,22 @@ fn record_receipt_uses_the_exact_selected_entry_among_duplicate_paths() -> TestR
     let rows = receipt(&fixture.target)?;
     let source = original(&rows)?;
     assert_eq!(
+        committed_positions(records, Some(true))?,
+        BTreeSet::from([0, 1]),
+        "both committed records are bound to this selection"
+    );
+    let count_source = written_count_source(records)?;
+    assert_eq!(
+        count_source.pointer("/entryIndex"),
+        source.pointer("/entryIndex"),
+        "the count binds the selected original Entry"
+    );
+    assert_eq!(
+        count_source.get("kind"),
+        source.get("kind"),
+        "same source kind"
+    );
+    assert_eq!(
         source.pointer("/entryIndex"),
         Some(&json!(selected.index())),
         "the observed selected Entry supplies the payload"
@@ -76,6 +94,12 @@ fn folder_record_receipt_retains_the_loose_reader_and_unknown_archive_encryption
     let target = root.path().join("out");
     let report = convert_folder(&source, &selection, false, &target, &converting())?;
     assert!(report.is_complete(), "complete conversion: {report:?}");
+    let records = report.records().ok_or("Record report")?;
+    assert_eq!(
+        committed_positions(records, None)?,
+        BTreeSet::from([0, 1]),
+        "a loose DataForge retains its exact committed positions"
+    );
     let rows = receipt(&target)?;
     assert_eq!(
         original(&rows)?.get("kind"),
@@ -109,6 +133,11 @@ fn a_foreign_record_companion_keeps_both_payloads_and_reports_its_failure() -> T
     );
     let records = report.records().ok_or("Record report")?;
     assert_eq!(records.written(), 2, "both XML payloads were written");
+    assert_eq!(
+        committed_positions(records, Some(false))?,
+        BTreeSet::from([0, 1]),
+        "a separate companion failure cannot remove committed definitions"
+    );
     assert!(records.failures().is_empty(), "no Record payload failed");
     let companion = fixture.target.join(RECEIPT);
     assert_eq!(
@@ -125,6 +154,73 @@ fn a_foreign_record_companion_keeps_both_payloads_and_reports_its_failure() -> T
         "only the actual companion failure is reported: {records:?}"
     );
     Ok(())
+}
+
+fn written_count_source(records: &RecordExportReport) -> Result<Value, Box<dyn std::error::Error>> {
+    let proof = records
+        .written_provenance()
+        .ok_or("written count proof")??;
+    let usage = proof
+        .inventory()
+        .iter_uses()
+        .find(|usage| proof.written.source_uses_refs().contains(usage.id()))
+        .ok_or("the count's actual derived use")?;
+    let source = proof
+        .inventory()
+        .iter_sources()
+        .find(|source| source.id() == usage.source())
+        .ok_or("the physical source of the written count")?;
+    serde_json::to_value(source).map_err(Into::into)
+}
+
+pub(super) fn committed_positions(
+    records: &RecordExportReport,
+    encrypted: Option<bool>,
+) -> Result<BTreeSet<u64>, Box<dyn std::error::Error>> {
+    let proof = records
+        .written_provenance()
+        .ok_or("written count proof")??;
+    assert_eq!(
+        proof.written.contains_encrypted_source(),
+        encrypted,
+        "source encryption"
+    );
+    assert!(
+        proof.written.source_set_complete(),
+        "complete committed source set"
+    );
+    let mut positions = BTreeSet::new();
+    let references = proof.written.source_uses_refs();
+    let mut bound = 0;
+    for source in proof
+        .inventory()
+        .iter_uses()
+        .filter(|usage| references.contains(usage.id()))
+    {
+        assert_eq!(source.role(), SourceUseRole::Conversion, "derived count");
+        bound += 1;
+        let SourceLocation::Subresource {
+            namespace,
+            indices,
+            field,
+        } = source.location()
+        else {
+            return Err("a written count must identify original definition ranges".into());
+        };
+        let [start, end] = indices.as_slice() else {
+            return Err("each definition range is half-open".into());
+        };
+        assert_eq!(namespace, "dataforgeRecordTable", "original table");
+        assert_eq!(field, "committedDefinitions", "actual committed subset");
+        positions.extend(*start..*end);
+    }
+    assert_eq!(bound, references.len(), "every count reference resolves");
+    assert_eq!(
+        positions.len(),
+        records.written(),
+        "each committed record is covered"
+    );
+    Ok(positions)
 }
 
 fn receipt(target: &Path) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
@@ -220,9 +316,7 @@ fn cryxml_textures_and_the_dataforge_convert_in_one_run() -> TestResult {
         "CryXml as XML"
     );
     assert_eq!(
-        report
-            .records()
-            .map(p4kx_extraction::RecordExportReport::written),
+        report.records().map(RecordExportReport::written),
         Some(2),
         "both Records"
     );

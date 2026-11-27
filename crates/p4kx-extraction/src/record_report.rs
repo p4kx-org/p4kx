@@ -7,7 +7,10 @@ use std::path::PathBuf;
 use p4kx_dataforge::{Annotations, DataForgeError, Guid, TagResolver, TextResolver};
 use thiserror::Error;
 
-use crate::{CancelToken, ConflictPolicy, ExtractionError, NameRule};
+use crate::{
+    CancelToken, ConflictPolicy, ExtractionError, NameRule, RecordExportProvenance,
+    RecordExportProvenanceError,
+};
 
 /// The settings of one Record export.
 #[derive(Clone, Copy, Default)]
@@ -173,6 +176,8 @@ pub struct RecordExportReport {
     pub(crate) error_values: usize,
     pub(crate) records_with_errors: usize,
     pub(crate) written_record_indices: Option<Vec<u32>>,
+    pub(crate) written_provenance:
+        Option<Result<Box<RecordExportProvenance>, RecordExportProvenanceError>>,
     pub(crate) origin_receipts: Vec<PathBuf>,
     pub(crate) origin_failures: Vec<ExtractionError>,
 }
@@ -206,6 +211,16 @@ impl RecordExportReport {
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Returns the written count's original definition evidence for a DataForge conversion.
+    #[must_use]
+    pub fn written_provenance(
+        &self,
+    ) -> Option<Result<&RecordExportProvenance, RecordExportProvenanceError>> {
+        self.written_provenance
+            .as_ref()
+            .map(|origin| origin.as_deref().map_err(|error| *error))
     }
 
     /// Takes the original definition indices of the Records committed by this run, when requested.

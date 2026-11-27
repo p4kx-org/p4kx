@@ -362,7 +362,11 @@ impl ExtractionReport {
     #[must_use]
     pub const fn is_complete(&self) -> bool {
         let records = match &self.records {
-            Some(records) => records.is_complete() && records.origin_failures.is_empty(),
+            Some(records) => {
+                records.is_complete()
+                    && records.origin_failures.is_empty()
+                    && !matches!(records.written_provenance.as_ref(), Some(Err(_)))
+            }
             None => true,
         };
         records

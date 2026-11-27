@@ -3,7 +3,10 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{Entry, EntryFailure, ExtractionReport, RecordExportReport};
+use p4kx_extraction::{
+    Entry, EntryFailure, ExtractionReport, RecordExportProvenance, RecordExportProvenanceError,
+    RecordExportReport,
+};
 
 use crate::model::describe;
 use crate::record_export::{FailedRecord, RenamedRecord};
@@ -59,6 +62,7 @@ pub struct ExtractionSummary {
     cancelled: Vec<String>,
     archive_changed: bool,
     records: Option<RecordCounts>,
+    record_written_origin: Option<Result<Box<RecordExportProvenance>, RecordExportProvenanceError>>,
     record_failures: Vec<FailedRecord>,
     records_renamed: Vec<RenamedRecord>,
     excluded_parts: usize,
@@ -106,6 +110,10 @@ impl ExtractionSummary {
             cancelled: report.cancelled().to_vec(),
             archive_changed: report.archive_changed(),
             records: report.records().map(RecordCounts::new),
+            record_written_origin: report
+                .records()
+                .and_then(RecordExportReport::written_provenance)
+                .map(|origin| origin.map(|proof| Box::new(proof.clone()))),
             record_failures: report.records().map_or_default(|records| {
                 records.failures().iter().map(FailedRecord::of).collect()
             }),
@@ -179,6 +187,16 @@ impl ExtractionSummary {
     #[must_use]
     pub const fn records(&self) -> Option<RecordCounts> {
         self.records
+    }
+
+    /// Returns the original definition evidence for the converted Record count.
+    #[must_use]
+    pub fn record_written_origin(
+        &self,
+    ) -> Option<Result<&RecordExportProvenance, RecordExportProvenanceError>> {
+        self.record_written_origin
+            .as_ref()
+            .map(|origin| origin.as_deref().map_err(|error| *error))
     }
 
     /// Returns the Records of the DataForge Entry that were not written, with the reason.

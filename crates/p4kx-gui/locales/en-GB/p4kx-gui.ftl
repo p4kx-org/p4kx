@@ -149,6 +149,7 @@ extraction-summary-excluded-parts =
        *[other] { $number } part Entries left out of textures that stayed were still read to convert the textures.
     }
 extraction-summary-records = Records written { $written }, skipped { $skipped }, failed { $failed }, cancelled { $cancelled }; { $errors } error values in { $erroneous } Records
+extraction-summary-record-count-origin-failed = Record count origin unavailable ({ $reason })
 extraction-summary-target = Target: { $path }
 extraction-summary-failed = Failed ({ $number })
 extraction-summary-skipped = Skipped ({ $number })

@@ -116,6 +116,15 @@ The GUI Extraction and folder conversion summaries list the committed Record
 companions alongside the other file receipts and show companion publication
 failures alongside the Record totals.
 
+The converted Record count has separate provenance. JSON reports place
+`fieldOrigins["/exported"]` and its `provenance` inventory in `records`. The
+GUI result exposes the same definition ranges and displays the encryption
+marker on the Record totals. Only committed Records contribute, including
+Records whose individual companion failed after their XML was committed.
+Kept, failed and uncommitted cancelled writes never contribute. A loose
+DataForge input has unknown original Archive encryption. A count-evidence
+failure is reported separately without removing any committed files.
+
 ## Record files
 
 `p4kx dcb export --format json` writes a sibling `.p4kx-origin.jsonl` file.

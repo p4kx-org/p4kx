@@ -12,6 +12,8 @@ use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 
+use crate::dcb_export_count_origins::{assert_count, remove_count_origin};
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const README_RECEIPT: &str = "Data/readme.txt.p4kx-origin.jsonl";
@@ -193,17 +195,67 @@ fn convert_reports_the_records_as_json() -> TestResult {
 
     let stdout = extract(&archive, &dir.path().join("out"), &["--convert", "--json"])?;
 
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
     assert_eq!(
         value.pointer("/records/origin_receipts"),
         Some(&serde_json::json!(RECORD_RECEIPTS)),
         "the summary enumerates the committed Record companions"
     );
+    let records = value.get_mut("records").ok_or("Record report")?;
+    assert_count(records, 3, Some(true), &[[0, 3]])?;
+    remove_count_origin(records)?;
     insta::assert_snapshot!(
         "convert_dataforge_json",
         serde_json::to_string_pretty(&value)?
     );
     Ok(())
+}
+
+#[test]
+fn converted_record_counts_keep_only_newly_committed_definitions() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = write_archive(dir.path())?;
+    let out = dir.path().join("sparse");
+    let kept = out.join("Data/libs/foundry/records/items/boxes/Item.Crate.xml");
+    fs::create_dir_all(kept.parent().ok_or("kept Record folder")?)?;
+    fs::write(&kept, "previous XML")?;
+
+    let arguments = ["--convert", "--json", "--conflict", "skip"];
+    let result: serde_json::Value = serde_json::from_str(&extract(&archive, &out, &arguments)?)?;
+    let records = result.get("records").ok_or("partial Record report")?;
+    assert_count(records, 2, Some(true), &[[0, 1], [2, 3]])?;
+    assert_eq!(fs::read_to_string(&kept)?, "previous XML", "kept XML");
+
+    let result: serde_json::Value = serde_json::from_str(&extract(&archive, &out, &arguments)?)?;
+    assert_count(
+        result.get("records").ok_or("kept Record report")?,
+        0,
+        Some(false),
+        &[],
+    )
+}
+
+#[test]
+fn loose_dataforge_conversion_reports_unknown_original_archive_encryption() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let input = dir.path().join("input");
+    fs::create_dir(&input)?;
+    fs::write(input.join("Game2.dcb"), database())?;
+    let output = p4kx_testkit::p4kx()?
+        .arg("convert")
+        .arg(&input)
+        .arg("--out")
+        .arg(dir.path().join("out"))
+        .arg("--json")
+        .output()?;
+    assert!(output.status.success(), "loose conversion: {output:?}");
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_count(
+        result.get("records").ok_or("loose Record report")?,
+        3,
+        None,
+        &[[0, 3]],
+    )
 }
 
 #[test]

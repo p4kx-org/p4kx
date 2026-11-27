@@ -161,7 +161,7 @@ fn a_standalone_definition_has_unknown_archive_encryption() -> TestResult {
     assert_count(&summary, 3, None, &[[0, 1], [2, 4]])
 }
 
-fn assert_count(
+pub(super) fn assert_count(
     report: &Value,
     exported: usize,
     encrypted: Option<bool>,

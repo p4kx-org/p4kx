@@ -32,7 +32,7 @@ mod publication;
 mod report;
 #[path = "dcb_export_tags.rs"]
 mod tags;
-use count_origins::CountOrigin;
+pub(crate) use count_origins::CountOrigin;
 pub(crate) use report::print_report;
 use report::{Outcome, reason};
 use tags::RecordExportTags;

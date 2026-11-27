@@ -199,17 +199,7 @@ fn finished(ui: &mut Ui, texts: &Texts, summary: &ExtractionSummary, comparison_
         let note = texts.format(T::SummaryExcludedParts, &args);
         ui.colored_label(palette::GRAY_2_TEXT, note);
     }
-    if let Some(records) = summary.records() {
-        let counts = [
-            ("written", number(texts, records.written)),
-            ("skipped", number(texts, records.skipped)),
-            ("failed", number(texts, records.failed)),
-            ("cancelled", number(texts, records.cancelled)),
-            ("errors", number(texts, records.error_values)),
-            ("erroneous", number(texts, records.records_with_errors)),
-        ];
-        ui.label(texts.format(T::SummaryRecords, &counts));
-    }
+    super::extraction_record_lists::counts(ui, texts, summary);
     let target = summary.target().display().to_string();
     ui.label(texts.format(T::SummaryTarget, &[("path", target.into())]));
     lists(ui, texts, summary);

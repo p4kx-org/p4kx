@@ -3183,7 +3183,12 @@ Record's file does not follow its name or record path, `renamed` as there
 the Record files relative to the folder of the DataForge Entry. Otherwise that field is absent.
 `records.origin_receipts` lists newly published XML companions relative to the
 output target, and `records.origin_failures` reports companion publication
-failures. Each field appears when it has entries.
+failures. Each field appears when it has entries. Within `records`, the
+`fieldOrigins` entry for `/exported` links to the original definition ranges of
+committed Record XML files in `provenance`. Kept, failed and uncommitted
+cancelled Records contribute no positions. `records.provenanceError` reports a
+count-evidence failure, which produces a partial result and leaves committed
+XML files available.
 `texture_artifacts` contains the images published by this run when texture image conversion
 is enabled. Each texture groups its `images` with a shared `provenance` inventory. The group contains its declared `source_transfer`, encoded `output_transfer` and
 any `png_transform`, with their precise `field_origins`. Every image

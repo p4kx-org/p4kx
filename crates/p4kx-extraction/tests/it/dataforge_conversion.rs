@@ -357,13 +357,26 @@ fn cancelling_while_records_are_written_stops_the_run() -> TestResult {
         "not every Record is written: {records:?}"
     );
     assert!(!report.is_complete(), "a cancelled run is not complete");
+    let mut on_disk = std::collections::BTreeSet::new();
     for file in files(&fixture.target)? {
         let artifact = file.strip_suffix(".p4kx-origin.jsonl").unwrap_or(&file);
+        let ordinal = artifact
+            .rsplit('/')
+            .next()
+            .and_then(|name| name.strip_prefix('n'))
+            .and_then(|name| name.strip_suffix(".xml"))
+            .ok_or("written Record ordinal")?;
+        on_disk.insert(ordinal.parse()?);
         assert!(
             Path::new(artifact).extension() == Some(OsStr::new("xml"))
                 && fixture.target.join(artifact).is_file(),
             "only committed Record files and companions remain: {file}"
         );
     }
+    assert_eq!(
+        origins::committed_positions(records, Some(false))?,
+        on_disk,
+        "cancellation keeps exactly the original committed indices"
+    );
     Ok(())
 }

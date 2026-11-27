@@ -40,7 +40,7 @@ pub use self::entity_material_effects::{
 pub use self::mode::ProvenanceMode;
 pub use self::observed_tag_tree::{ObservedTagTree, TagPathOrigins};
 pub use self::origin_applicability::OriginApplicability;
-pub use self::record_export_provenance::RecordExportProvenance;
+pub use self::record_export_provenance::{RecordExportProvenance, RecordExportProvenanceError};
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use self::xml_render_origins::{XmlRenderOrigin, XmlRenderOrigins};

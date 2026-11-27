@@ -6,6 +6,21 @@ use crate::{
     SourceLocation, SourceUse, SourceUseRole, SourceUses,
 };
 
+/// The written Record count could not be bound to its original definitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum RecordExportProvenanceError {
+    /// The export did not retain the committed definition positions.
+    #[error("the Record export did not retain committed definitions")]
+    MissingDefinitions,
+    /// The recorded definition positions do not account for the whole written count.
+    #[error("the committed definition list does not match the exported Record count")]
+    CountMismatch,
+    /// The original source and use inventory could not be built.
+    #[error(transparent)]
+    Evidence(#[from] SourceEvidenceError),
+}
+
 /// Original inputs for the written Record count of one export.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -26,6 +41,23 @@ impl RecordExportProvenance {
     #[must_use]
     pub fn into_parts(self) -> (FieldOrigin, SourceInventory) {
         (self.written, self.inventory)
+    }
+
+    /// Verifies the committed definition count and binds its original positions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if accounting is missing, inconsistent, or cannot be bound.
+    pub fn capture_count(
+        source: Option<&DataForgeOrigin>,
+        indices: Option<Vec<u32>>,
+        written: usize,
+    ) -> Result<Self, RecordExportProvenanceError> {
+        let indices = indices.ok_or(RecordExportProvenanceError::MissingDefinitions)?;
+        if indices.len() != written {
+            return Err(RecordExportProvenanceError::CountMismatch);
+        }
+        Self::capture(source, indices).map_err(Into::into)
     }
 
     /// Binds the observed source to the committed definition indices from a Record export.

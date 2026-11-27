@@ -62,6 +62,8 @@ struct RecordsJson<'a> {
     origin_receipts: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     origin_failures: Vec<String>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    count_origin: Option<dcb_export::CountOrigin>,
 }
 
 pub(crate) fn report_json<'a>(
@@ -112,6 +114,7 @@ pub(crate) fn report_json<'a>(
                 .iter()
                 .map(ToString::to_string)
                 .collect(),
+            count_origin: dcb_export::CountOrigin::converted(records),
         }),
     }
 }
@@ -204,6 +207,9 @@ fn write_errors(err: &mut impl Write, report: &ExtractionReport) -> io::Result<(
     }
     if let Some(records) = report.records() {
         write_renamed(err, records.renamed())?;
+        if let Some(Err(error)) = records.written_provenance() {
+            writeln!(err, "Record count origin: {error}")?;
+        }
     }
     for unconverted in report.unconverted() {
         writeln!(

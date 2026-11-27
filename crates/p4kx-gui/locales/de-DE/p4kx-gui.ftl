@@ -149,6 +149,7 @@ extraction-summary-excluded-parts =
        *[other] { $number } ausgelassene Teil-Einträge von Texturen, die blieben, wurden zum Umwandeln der Texturen trotzdem gelesen.
     }
 extraction-summary-records = Records geschrieben { $written }, übersprungen { $skipped }, fehlgeschlagen { $failed }, abgebrochen { $cancelled }; { $errors } Fehlerwerte in { $erroneous } Records
+extraction-summary-record-count-origin-failed = Herkunft der Record-Anzahl nicht verfügbar ({ $reason })
 extraction-summary-target = Ziel: { $path }
 extraction-summary-failed = Fehlgeschlagen ({ $number })
 extraction-summary-skipped = Übersprungen ({ $number })

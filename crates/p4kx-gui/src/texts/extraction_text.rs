@@ -116,6 +116,8 @@ pub enum ExtractionText {
     /// The counts of the Records written for the DataForge Entry; takes `written`, `skipped`,
     /// `failed`, `cancelled`, `errors` and `erroneous`.
     SummaryRecords,
+    /// The written Record count could not be bound; takes `reason`.
+    SummaryRecordCountOriginFailed,
     /// The target folder; takes `path`.
     SummaryTarget,
     /// The heading of the failed Entries; takes `number`.
@@ -146,7 +148,7 @@ pub enum ExtractionText {
 
 impl ExtractionText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 67] = [
+    pub const ALL: [Self; 68] = [
         Self::ActionSelected,
         Self::ActionShown,
         Self::ActionAll,
@@ -201,6 +203,7 @@ impl ExtractionText {
         Self::SummaryCountsConverted,
         Self::SummaryExcludedParts,
         Self::SummaryRecords,
+        Self::SummaryRecordCountOriginFailed,
         Self::SummaryTarget,
         Self::SummaryFailed,
         Self::SummarySkipped,
@@ -275,6 +278,7 @@ impl ExtractionText {
             Self::SummaryCountsConverted => "extraction-summary-counts-converted",
             Self::SummaryExcludedParts => "extraction-summary-excluded-parts",
             Self::SummaryRecords => "extraction-summary-records",
+            Self::SummaryRecordCountOriginFailed => "extraction-summary-record-count-origin-failed",
             Self::SummaryTarget => "extraction-summary-target",
             Self::SummaryFailed => "extraction-summary-failed",
             Self::SummarySkipped => "extraction-summary-skipped",
