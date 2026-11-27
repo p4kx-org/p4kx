@@ -9,7 +9,8 @@ key, cache and application data.
 
 ## Flatpak startup and export protection
 
-The Flatpak window requires host Documents-portal API 5 with authenticated host-path lookup.
+The Flatpak window requires host Documents-portal API 5 or later with authenticated
+host-path lookup.
 When that prerequisite is missing, a notice explains it before the normal window or profile
 opens. See [Linux packages](linux-packages.md) for the separate host requirement and grants.
 

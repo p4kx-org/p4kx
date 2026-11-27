@@ -188,8 +188,8 @@ and glibc, with runner image fields when available. The two runs also require de
 upgrades from separately installed workflow fixtures, launch of the candidate version,
 removal and profile preservation. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
 host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.
-Flatpak additionally requires host Documents API 5 with `GetHostPaths`; an older Documents
-service is a startup failure rather than a successful or skipped runtime check.
+Flatpak additionally requires host Documents API 5 or later with `GetHostPaths`.
+An older Documents service fails the startup prerequisite and must be recorded as a runtime failure.
 Packaging checks, signatures, scans, provenance, the complete export audit and Windows AMD64 desktop checks remain required
 parts of the final release gate. Tag publication requires a completed VirusTotal report for the
 exact SHA-256 of each of the thirteen native packages. The assembly job compares the scan receipt
