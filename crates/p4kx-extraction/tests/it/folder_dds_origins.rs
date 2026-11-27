@@ -8,6 +8,7 @@ use std::path::Path;
 
 use p4kx_extraction::{OriginDigestWriter, RecordExportReport};
 use p4kx_testkit::check_dds_origin_pair;
+use serde_json::{Value, json};
 
 use super::{Fixture, TestResult, tree};
 
@@ -102,8 +103,6 @@ fn check_cryxml_origin_pair(
     archive: &mut BTreeMap<String, Vec<u8>>,
     loose: &mut BTreeMap<String, Vec<u8>>,
 ) -> TestResult {
-    use serde_json::{Value, json};
-
     const XML: &str = "Data/Ships/gladius.xml";
     const ORIGIN: &str = "Data/Ships/gladius.xml.p4kx-origin.jsonl";
     let xml = std::str::from_utf8(loose.get(XML).ok_or("converted loose XML")?)?;
@@ -148,68 +147,87 @@ fn check_record_origin_pair(
     archive: &mut BTreeMap<String, Vec<u8>>,
     loose: &mut BTreeMap<String, Vec<u8>>,
 ) -> TestResult {
-    use serde_json::{Value, json};
-
     const XML: &str = "Data/libs/items/one.xml";
     const RECEIPT: &str = "Data/libs/items/one.xml.p4kx-origin.jsonl";
     for (files, kind, marker) in [
         (archive, "archiveEntry", json!(false)),
         (loose, "file", Value::Null),
     ] {
-        let bytes = files.get(XML).ok_or("written Record XML")?;
-        let mut measure = OriginDigestWriter::new(io::sink());
-        measure.write_all(bytes)?;
-        let digest = measure.finish()?;
         let receipt = files.remove(RECEIPT).ok_or("Record XML companion")?;
+        let bytes = files.get(XML).ok_or("written Record XML")?;
         let rows: Vec<Value> = std::str::from_utf8(&receipt)?
             .lines()
             .map(serde_json::from_str)
             .collect::<Result<_, _>>()?;
-        let header = rows.first().ok_or("Record XML companion header")?;
-        assert_eq!(header["type"], "header");
-        assert_eq!(header["binding"]["sha256"], digest.sha256());
-        assert_eq!(
-            header["binding"]["byteLength"],
-            digest.byte_length().to_string()
-        );
+        check_record_xml_binding(bytes, &rows)?;
         let source = rows
             .iter()
-            .find(|row| row["type"] == "source")
+            .find(|row| row.get("type").and_then(Value::as_str) == Some("source"))
             .ok_or("physical Record source")?;
-        assert_eq!(source["source"]["kind"], kind);
-        assert!(rows.iter().any(|row| {
-            row.pointer("/address/type").and_then(Value::as_str) == Some("xmlBytes")
-                && row["sourceSetComplete"] == true
-                && row.get("containsEncryptedSource") == Some(&marker)
-                && row["sourceUsesRefs"]
-                    .as_array()
-                    .is_some_and(|refs| !refs.is_empty())
-        }));
         assert_eq!(
-            rows.last().ok_or("Record XML companion end")?["type"],
-            "end"
+            source.pointer("/source/kind").and_then(Value::as_str),
+            Some(kind),
+            "the original Record resides in the corresponding physical input"
+        );
+        assert!(
+            rows.iter().any(|row| {
+                row.pointer("/address/type").and_then(Value::as_str) == Some("xmlBytes")
+                    && row.get("sourceSetComplete").and_then(Value::as_bool) == Some(true)
+                    && row.get("containsEncryptedSource") == Some(&marker)
+                    && row
+                        .get("sourceUsesRefs")
+                        .and_then(Value::as_array)
+                        .is_some_and(|refs| !refs.is_empty())
+            }),
+            "a written XML range carries its complete source set and encryption marker"
+        );
+        assert_eq!(
+            rows.last()
+                .and_then(|row| row.get("type"))
+                .and_then(Value::as_str),
+            Some("end"),
+            "the companion contains a terminal row"
         );
     }
     Ok(())
 }
 
+fn check_record_xml_binding(bytes: &[u8], rows: &[Value]) -> TestResult {
+    let mut measure = OriginDigestWriter::new(io::sink());
+    measure.write_all(bytes)?;
+    let digest = measure.finish()?;
+    let header = rows.first().ok_or("Record XML companion header")?;
+    assert_eq!(
+        header.get("type").and_then(Value::as_str),
+        Some("header"),
+        "the first row declares the artifact binding"
+    );
+    assert_eq!(
+        header.pointer("/binding/sha256").and_then(Value::as_str),
+        Some(digest.sha256()),
+        "the companion identifies the exact committed XML bytes"
+    );
+    let size = digest.byte_length().to_string();
+    assert_eq!(
+        header
+            .pointer("/binding/byteLength")
+            .and_then(Value::as_str),
+        Some(size.as_str()),
+        "the binding uses the emitted length"
+    );
+    Ok(())
+}
+
 fn opaque_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {
     for line in std::str::from_utf8(bytes)?.lines() {
-        let row: serde_json::Value = serde_json::from_str(line)?;
-        if row
-            .pointer("/address/type")
-            .and_then(serde_json::Value::as_str)
-            == Some("opaquePayload")
-        {
+        let row: Value = serde_json::from_str(line)?;
+        if row.pointer("/address/type").and_then(Value::as_str) == Some("opaquePayload") {
             assert_eq!(
-                row.get("sourceSetComplete")
-                    .and_then(serde_json::Value::as_bool),
+                row.get("sourceSetComplete").and_then(Value::as_bool),
                 Some(true),
                 "the original payload is fully observed"
             );
-            return Ok(row
-                .get("containsEncryptedSource")
-                .and_then(serde_json::Value::as_bool));
+            return Ok(row.get("containsEncryptedSource").and_then(Value::as_bool));
         }
     }
     Err("opaque payload origin is missing".into())
@@ -217,21 +235,16 @@ fn opaque_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::E
 
 fn pcm_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {
     for line in std::str::from_utf8(bytes)?.lines() {
-        let row: serde_json::Value = serde_json::from_str(line)?;
-        if row
-            .pointer("/address/field")
-            .and_then(serde_json::Value::as_str)
-            == Some("pcmSamples")
-        {
+        let row: Value = serde_json::from_str(line)?;
+        if row.pointer("/address/field").and_then(Value::as_str) == Some("pcmSamples") {
             assert_eq!(
-                row.get("sourceSetComplete")
-                    .and_then(serde_json::Value::as_bool),
+                row.get("sourceSetComplete").and_then(Value::as_bool),
                 Some(true),
                 "original observed WEM"
             );
             assert!(
                 row.get("sourceUsesRefs")
-                    .and_then(serde_json::Value::as_array)
+                    .and_then(Value::as_array)
                     .is_some_and(|refs| !refs.is_empty()),
                 "the WEM supplies original samples"
             );
