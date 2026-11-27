@@ -2,15 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    DataForge, DataForgeOrigin, EntryOrigin, Field, FieldOrigin, InputScope, ObservedTagTree,
-    PositionedFields, PositionedRecord, PositionedSources, PositionedValue, RecordJsonLocation,
-    RecordJsonUse, SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, SourceUses, TagPathOrigins, Value,
+    DataForge, DataForgeOrigin, Field, FieldOrigin, IndexedRecordLocalization, InputScope,
+    ObservedTagTree, PositionedFields, PositionedRecord, PositionedSources, PositionedValue,
+    RecordJsonLocation, RecordJsonUse, SourceEvidenceError, SourceInput, SourceInventory,
+    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, TagPathOrigins, Value,
 };
 
 use super::FieldLine;
 use super::xml_provenance::{PendingXml, RecordXmlFieldProvenance, RowPositions};
-use crate::{TextLanguage, XmlPreviewOriginError};
+use crate::XmlPreviewOriginError;
 
 #[path = "line_provenance.rs"]
 mod line_provenance;
@@ -75,7 +75,7 @@ impl RecordPreviewProvenance {
         forge: &DataForge<'_>,
         record: &PositionedRecord<'_>,
         input: Option<&DataForgeOrigin>,
-        locale: Option<(TextLanguage, Option<&EntryOrigin>)>,
+        locale: Option<&IndexedRecordLocalization>,
         tags: Option<&ObservedTagTree>,
         shown: &[FieldLine],
         xml: Option<(PendingXml, u64)>,
@@ -83,7 +83,6 @@ impl RecordPreviewProvenance {
         let binding = Binding::new(input)?;
         let header = binding.header(forge, record)?;
         let route = binding.root_route(record.tree().record_index())?;
-        let locale = locale.map(|locale| binding.language(locale)).transpose()?;
         let tags = tags
             .map(|tags| tags.bind_paths(forge, &binding.uses))
             .transpose()?;
@@ -237,20 +236,6 @@ impl Binding {
         self.scope.at(location, role)
     }
 
-    fn language(
-        &self,
-        (language, original): (TextLanguage, Option<&EntryOrigin>),
-    ) -> Result<LanguageBinding, SourceEvidenceError> {
-        Ok(LanguageBinding {
-            language,
-            scope: self.uses.observe(
-                original.map_or(SourceInput::Unknown, SourceInput::Archive),
-                InputScope::Payload,
-            )?,
-            complete: original.is_some_and(|entry| entry.ancestors().all(|step| step.is_some())),
-        })
-    }
-
     fn positioned(
         &self,
         route: &mut Route,
@@ -293,12 +278,6 @@ impl Binding {
     }
 }
 
-struct LanguageBinding {
-    language: TextLanguage,
-    scope: SourceScope,
-    complete: bool,
-}
-
 #[derive(Clone)]
 struct Route {
     inputs: Vec<SourceUse>,
@@ -317,7 +296,7 @@ impl Route {
 
 struct Capture<'a> {
     binding: Binding,
-    locale: Option<LanguageBinding>,
+    locale: Option<&'a IndexedRecordLocalization>,
     tags: Option<TagPathOrigins<'a>>,
     lines: Vec<RecordFieldProvenance>,
     shown: std::slice::Iter<'a, FieldLine>,

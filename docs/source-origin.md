@@ -74,8 +74,11 @@ header, property, array, owned-instance and Reference inputs, including the
 actual target members displayed by the tab.
 
 A displayed localisation key retains its DataForge source. A translation or
-missing-text decision also retains the selected language Entry and original
-lookup. Tag paths use the names and selected original root and child
+missing-text decision also retains the lookup in the selected language Entry.
+A displayed translation identifies the original decoded byte range. An absent
+key has incomplete evidence if decoding was lossy or an INI line was skipped.
+The GUI caches the decoded Entry and its offset index together.
+Tag paths use the names and selected original root and child
 occurrences observed during the cached Tag tree build. A standalone DataForge
 can retain exact field coordinates with unknown original P4K encryption.
 

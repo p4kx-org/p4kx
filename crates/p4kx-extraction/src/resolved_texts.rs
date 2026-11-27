@@ -5,9 +5,12 @@ use p4kx_dataforge::{ObservedResolution, Resolution, TextResolver};
 use p4kx_localization::{Language, OwnedTextSet, TextSet};
 use p4kx_localization::{decode_line_breaks, is_placeholder_key};
 
+#[path = "indexed_record_localization.rs"]
+mod indexed_record_localization;
 #[path = "record_localization.rs"]
 mod record_localization;
 
+pub use indexed_record_localization::IndexedRecordLocalization;
 pub(crate) use record_localization::LocalizationLookupEvidence;
 pub use record_localization::RecordLocalization;
 

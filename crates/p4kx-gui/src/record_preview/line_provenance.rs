@@ -4,7 +4,7 @@
 use p4kx_extraction::{
     FieldOrigin, PositionedReferenceSources, PositionedSources, PositionedValue, RecordJsonBytes,
     RecordJsonLocation, RecordJsonReferenceMember as Member, RecordJsonSource, SourceEvidenceError,
-    SourceLocation, SourceUseRef, SourceUseRole,
+    SourceUse, SourceUseRole, Value,
 };
 
 use super::{Capture, Route};
@@ -106,7 +106,11 @@ impl Capture<'_> {
         let value = route.origin(&self.binding.uses);
         let annotation = match shown {
             LineValue::Key { text, .. } if !matches!(text, KeyText::None) => {
-                self.translation(parent, coordinates.as_ref(), text)?
+                let key = at.and_then(|slot| match slot.value() {
+                    Value::Locale(key) => Some(*key),
+                    _ => None,
+                });
+                self.translation(parent, coordinates.as_ref(), key)?
             }
             _ => None,
         };
@@ -197,24 +201,18 @@ impl Capture<'_> {
         &self,
         parent: &Route,
         coordinates: Option<&PositionedSources>,
-        text: &KeyText,
+        authored_key: Option<&str>,
     ) -> Result<Option<FieldOrigin>, SourceEvidenceError> {
         let (mut key, selector) = self.localization_key(parent, coordinates)?;
-        if let (Some(locale), Some(selector)) = (&self.locale, selector) {
-            let role = if matches!(text, KeyText::Text { .. }) {
-                SourceUseRole::Conversion
-            } else {
-                SourceUseRole::Selector
-            };
-            let translated = locale.scope.at(
-                SourceLocation::LocalizationLookup {
-                    language: locale.language,
-                    selector,
-                },
-                role,
+        if let (Some(locale), Some(selector), Some(authored_key)) =
+            (self.locale, selector, authored_key)
+        {
+            key.complete &= locale.append_lookup_uses(
+                authored_key,
+                &self.binding.uses,
+                &selector,
+                &mut key.inputs,
             )?;
-            key.push(translated);
-            key.complete &= locale.complete;
         } else {
             key.complete = false;
         }
@@ -225,7 +223,7 @@ impl Capture<'_> {
         &self,
         parent: &Route,
         coordinates: Option<&PositionedSources>,
-    ) -> Result<(Route, Option<SourceUseRef>), SourceEvidenceError> {
+    ) -> Result<(Route, Option<SourceUse>), SourceEvidenceError> {
         let mut key = parent.clone();
         let mut selector = None;
         let Some(coordinates) = coordinates else {
@@ -243,7 +241,7 @@ impl Capture<'_> {
                         ..
                     }
                 ) {
-                    selector = Some(bound.reference().clone());
+                    selector = Some(bound.clone());
                 }
                 key.push(bound);
             } else {

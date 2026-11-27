@@ -13,7 +13,7 @@ use crate::entry_path::same_entry_path;
 #[path = "localization_value_source.rs"]
 mod value_source;
 
-pub(crate) use value_source::LocalizationValueEvidence;
+pub(crate) use value_source::{LocalizationValueEvidence, offset_of};
 
 const INITIAL_RESERVE: u64 = 16 << 20;
 
@@ -212,6 +212,12 @@ pub enum LocalizationLoadError {
         /// The failed indexing.
         #[source]
         source: LocalizationError,
+    },
+    /// An indexed key or value does not borrow from the original decoded Entry.
+    #[error("the index of {path} contains text outside its decoded input")]
+    IndexOutsideInput {
+        /// The Entry path.
+        path: String,
     },
     /// The Entry cannot be opened in the Archive.
     #[error(transparent)]

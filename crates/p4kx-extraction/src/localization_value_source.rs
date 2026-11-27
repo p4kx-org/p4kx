@@ -78,7 +78,7 @@ impl LocalizationValueEvidence<'_> {
     }
 }
 
-fn offset_of(text: &str, value: &str) -> Option<u64> {
+pub(crate) fn offset_of(text: &str, value: &str) -> Option<u64> {
     let offset = (value.as_ptr() as usize).checked_sub(text.as_ptr() as usize)?;
     let end = offset.checked_add(value.len())?;
     text.get(offset..end).filter(|&inner| inner == value)?;

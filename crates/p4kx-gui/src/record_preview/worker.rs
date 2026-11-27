@@ -6,9 +6,7 @@ use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, OnceLock};
 use std::thread;
 
-use p4kx_extraction::{
-    DataForge, Guid, LanguageTexts, ObservedTagTree, TagResolver, TextResolver, TreeBuilder,
-};
+use p4kx_extraction::{DataForge, Guid, ObservedTagTree, TagResolver, TextResolver, TreeBuilder};
 
 use super::{RecordPreviewProvenance, RecordView, lines};
 use crate::forge_cache::{ForgeSource, ReadFailure};
@@ -187,22 +185,17 @@ fn read(
                 let reason = match error {
                     TextFailure::ArchiveChanged => return Err(Unread::ArchiveChanged),
                     TextFailure::Unreadable(reason) => reason,
-                    TextFailure::Reserve(error) => describe(&error),
                 };
                 failure = Some((language, reason.into_boxed_str()));
                 None
             }
         },
     };
-    let resolver = loaded
-        .as_ref()
-        .map(|(language, texts)| LanguageTexts::owned(&texts.texts, *language));
+    let resolver = loaded.as_ref().map(|(_, texts)| texts.as_ref());
     let (mut view, xml) = lines::view(
         forge,
         record.tree(),
-        resolver
-            .as_ref()
-            .map(|resolver| resolver as &dyn TextResolver),
+        resolver.map(|resolver| resolver as &dyn TextResolver),
         tags,
     );
     view.language = loaded.as_ref().map(|(language, _)| *language);
@@ -212,9 +205,7 @@ fn read(
             forge,
             &record,
             tags.source.entry.origin_of(forge),
-            loaded
-                .as_ref()
-                .map(|(language, texts)| (*language, texts.original.as_ref())),
+            resolver.and_then(|texts| texts.indexed.as_ref()),
             tags.tree.get().map(Arc::as_ref),
             &view.lines,
             xml.map(|pending| (pending, view.xml().bytes().len() as u64)),

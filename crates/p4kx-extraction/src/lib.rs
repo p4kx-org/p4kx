@@ -368,7 +368,7 @@ pub use record_report::{
     RenameCause,
 };
 pub use report::{EntryFailure, ExtractionError, ExtractionReport, MergedTextureArtifact};
-pub use resolved_texts::{LanguageTexts, RecordLocalization};
+pub use resolved_texts::{IndexedRecordLocalization, LanguageTexts, RecordLocalization};
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{ConvertedSoundArtifact, MAX_SOUND_LEN, OggFileReceipt, Sound};
 pub use source_provenance::*;

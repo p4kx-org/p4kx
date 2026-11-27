@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::TryReserveError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use p4kx_extraction::{EntryOrigin, LocalizationSet, OwnedTextSet};
+use p4kx_extraction::{
+    IndexedRecordLocalization, LocalizationEntry, LocalizationLoadError, Resolution, TextResolver,
+    is_placeholder_key,
+};
 
 use crate::model::describe;
 use crate::{EntryIndex, TextLanguage};
@@ -17,22 +19,29 @@ pub(crate) enum TextFailure {
     ArchiveChanged,
     /// The `global.ini` cannot be read or indexed, for the reason given.
     Unreadable(String),
-    /// Owned localisation storage could not be reserved.
-    Reserve(TryReserveError),
 }
 
 #[derive(Debug)]
 pub(crate) struct CachedLanguage {
-    pub(crate) texts: OwnedTextSet,
-    pub(crate) original: Option<EntryOrigin>,
+    pub(crate) indexed: Option<IndexedRecordLocalization>,
+}
+
+impl TextResolver for CachedLanguage {
+    fn resolve<'resolver>(&'resolver self, key: &str) -> Resolution<'resolver> {
+        match &self.indexed {
+            Some(locale) => locale.resolve(key),
+            None if is_placeholder_key(key) => Resolution::Keep,
+            None => Resolution::Missing,
+        }
+    }
 }
 
 type Loaded = Result<Arc<CachedLanguage>, TextFailure>;
 
 /// The localisation texts of an open Archive, one language at a time.
 ///
-/// A language is read, indexed and copied once, by the first consumer that asks for it; the
-/// others wait for that load. A failed load is kept as well, so a broken `global.ini` is not
+/// The first consumer loads the language Entry and builds its positional index.
+/// Other consumers wait for that load. A failed load is kept as well, so a broken `global.ini` is not
 /// read again for every Record. [`clear`](Self::clear) forgets everything once the Archive
 /// changed on disk.
 #[derive(Debug, Default)]
@@ -84,22 +93,14 @@ impl TextCache {
         let archive = index
             .entries_archive()
             .map_err(|error| unreadable(&error))?;
-        let files =
-            LocalizationSet::read(archive, &[language]).map_err(|error| unreadable(&error))?;
-        let set = files
-            .index()
-            .map_err(|error| unreadable(&error))?
-            .try_to_owned_set()
-            .map_err(TextFailure::Reserve)?;
+        let indexed = match LocalizationEntry::read(archive, language) {
+            Ok(entry) => Some(
+                IndexedRecordLocalization::try_new(entry).map_err(|error| unreadable(&error))?,
+            ),
+            Err(LocalizationLoadError::Missing { .. }) => None,
+            Err(error) => return Err(unreadable(&error)),
+        };
         index.watch().check().map_err(changed)?;
-        let original = files
-            .entries()
-            .first()
-            .and_then(|entry| entry.origin())
-            .cloned();
-        Ok(Arc::new(CachedLanguage {
-            texts: set,
-            original,
-        }))
+        Ok(Arc::new(CachedLanguage { indexed }))
     }
 }

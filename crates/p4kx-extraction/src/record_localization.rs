@@ -42,24 +42,11 @@ impl<'entry> RecordLocalization<'entry> {
         let LocalizationInput::Lookup(original) = observation.input() else {
             return None;
         };
-        let (value, complete) = original.map_or_else(
-            || {
-                (
-                    None,
-                    !self.entry.text().is_lossy() && self.ini.skipped() == 0,
-                )
-            },
-            |value| {
-                let physical = self.entry.value_evidence(value);
-                let complete = physical.is_some();
-                (physical, complete)
-            },
-        );
-        Some(LocalizationLookupEvidence {
-            entry: self.entry,
-            value,
-            complete,
-        })
+        Some(LocalizationLookupEvidence::new(
+            self.entry,
+            original,
+            !self.entry.text().is_lossy() && self.ini.skipped() == 0,
+        ))
     }
 }
 
@@ -69,7 +56,21 @@ pub(crate) struct LocalizationLookupEvidence<'entry> {
     complete: bool,
 }
 
-impl LocalizationLookupEvidence<'_> {
+impl<'entry> LocalizationLookupEvidence<'entry> {
+    pub(super) fn new(
+        entry: &'entry LocalizationEntry,
+        original: Option<&str>,
+        complete_absence: bool,
+    ) -> Self {
+        let value = original.and_then(|value| entry.value_evidence(value));
+        let complete = original.map_or(complete_absence, |_| value.is_some());
+        Self {
+            entry,
+            value,
+            complete,
+        }
+    }
+
     pub(crate) fn append_uses(
         &self,
         registry: &SourceUses,
