@@ -48,7 +48,7 @@ non-empty selections for CLI Archive listing, extraction and conversion; MCP ini
 tool listing and a read-only request; and GUI frames followed by exit. Windows and Linux check a
 software adapter. Linux uses native lavapipe for both the X11 window under Xvfb and the Wayland
 window under isolated Weston. The Wayland check disables X11 for that process and requires the
-viewport to report native 2� scaling. The packaged Linux smoke uses Xvfb. macOS checks native
+viewport to report native 2× scaling. The packaged Linux smoke uses Xvfb. macOS checks native
 Metal. Actual step outcomes populate the native runtime artifact only after successful execution.
 
 GUI and package smoke processes set an absolute `P4KX_FOLDERS_ROOT` to isolate settings, keys,
@@ -63,6 +63,18 @@ checks retain explicit `not_checked`, `success` or `unavailable` states. The own
 AMD64 desktop is the only required physical-device verification. The other four targets use the
 required hosted native checks for acceptance. Record their unobserved device capabilities in
 the release audit.
+
+On PR head `8a58c8d2f`, all five native test suites, lint jobs and doctest jobs
+passed. The Linux AMD64 focused job stopped in setup when an unrelated APT
+source returned HTTP 403. The focused jobs for the other four targets passed.
+The Blender add-on exchange job requires every focused job and did not run.
+[CI run](https://github.com/p4kx-org/p4kx/actions/runs/45993359457) ·
+[Linux AMD64 setup](https://github.com/p4kx-org/p4kx/actions/runs/45993359457/job/140486861647)
+
+Linux Rust setup installs the ALSA headers from the runner's Ubuntu sources
+and preserves the cached indexes for its other repositories. A local Ubuntu
+24.04 AMD64 check verified that an unrelated fixture source was excluded and
+the simulated ALSA install could select the native package.
 
 ## Package identity and update links
 
@@ -124,18 +136,15 @@ outcome on both architectures. A checkpoint records the phase observed in the or
 journal and carries an unproven lifecycle verdict. The original files remain in the local
 checkpoint and snapshot directories for diagnostic upload.
 
-A separate Finish supervisor observes the original lifecycle. Each Windows job uploads its
-original launch binding, then starts a detached monitor and its read-only waiter in a short
-workflow step. The waiter validates the original request and supervisor, then writes a readiness
-receipt containing their digests, the original cutoff and both process identities. The job uploads
-that receipt before entering the longer WaitFinish step. Readiness records progress and leaves
-native completion unproven.
+A separate Finish supervisor observes the original lifecycle. The Windows job uploads the
+original launch binding, takes a read-only checkpoint and uploads its bounded journal and
+currently available receipts. Each checkpoint step has a one-minute limit. The checkpoint
+records progress with native completion unproven.
 
-The monitor owns the waiter for the complete receipt observation and keeps its output in private
-logs. It records the waiter's exit code and binds a successful exit to the observed receipt
-digest. WaitFinish checks that evidence against the same cutoff. At the deadline the monitor
-allows 750 ms for the waiter to record failure and up to 1,000 ms to reap the owned process.
-The deadline failure stands even if the waiter exits successfully during that allowance.
+The hosted Wait step polls for the original supervisor result within the recorded collection
+cutoff. It binds the observed result digest to the original request, launch digest and
+supervisor process identity in `wait-result.json`. The step fails if it cannot bind a result
+before the cutoff.
 
 CollectFinish requires the bound receipts, the original successful result, the closed journal
 and final cleanup. The terminal evidence upload must succeed before the executed release payload
