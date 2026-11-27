@@ -100,6 +100,26 @@ at the best common focal length. The best held-out anatomical-group RMS residual
 focal sweep were 9.73 and 9.40 pixels. The capture identifies the authored take. Its projected
 face and CAF-to-video clock do not yet distinguish the rotations.
 
+The same PTU capture shows Walton Foxwell in two other MFD windows. The
+populated animation database has 143 face fragments and two idle fragments.
+Each face fragment joined through the authored audio events and the installed
+Wwise bank to one distinct English voice payload. The second mission-comms
+database has an empty fragment list. Three retained Patrol-accept voices share
+the current event and payload identifiers. Their greatest absolute waveform
+correlation was 0.073 across the two capture windows. The matched dialogue
+from the preceding example reached 0.543 with the same sequential OBS decode,
+and 0.030 after reversing the voice waveform. Walton's exact payload and face
+clip clock remain undetermined.
+
+The physical MFD camera can be registered independently in these windows.
+Across four held-out comparisons the casing's 90th-percentile error was
+0.553 to 0.893 pixels, and two display markers moved at most one rectified
+pixel. Tracking fixed groups on the head gave 2.59 to 4.20 pixels of
+90th-percentile held-out error in the better usable comparison. The panel
+registration does not calibrate the virtual head camera. Rotation selection
+requires an exact voice and CAF binding and independently calibrated head
+projection and timing.
+
 The 495 activations are also the weights of the morph targets: the targets of the head are the
 blendshapes that move a vertex, in the order of their numbers, and the build keeps the number of
 each, so target `k` takes the activation of blendshape `numbers[k]`.
