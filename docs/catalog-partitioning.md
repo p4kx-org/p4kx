@@ -1049,3 +1049,65 @@ The replay's native lifetime peaks were 8,714,493,952 B private commit and
 39,446,003,712 B physical and 56,382,038,016 B commit headroom, above the
 respective 12 GiB and 16 GiB reserves. The two earlier host-reserve stops
 retain their separate measurements. [Producer and replay measurements](catalog-resource-optimization.md#what-the-measurements-establish)
+
+### Local Windows AMD64 production from signed `84e0a9ca9`
+
+The release-profile executable from signed revision
+`84e0a9ca95ca03da3cae281e24240be9377c7ea5` completed Normal Full exports
+with the entire catalog scope and default languages on installed LIVE and PTU.
+Each used one worker and Zstandard level 3, with 12 GiB of physical availability
+and 16 GiB of commit headroom reserved for the host.
+
+| Build | Producer time | Private commit peak | Working-set peak | Compressed file | Producer decoded count |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 2,182.683 s | 35,245,895,680 B | 32,805,855,232 B | 1,576,271,368 B | 95,109,379,589 B |
+| PTU `13284307` | 2,445.397 s | 36,299,784,192 B | 33,525,100,544 B | 1,625,070,001 B | 98,173,166,243 B |
+
+Both processes exited successfully. Windows supplied the lifetime peaks through
+`K32GetProcessMemoryInfo`. All four peaks were below the 40,000,000,000 B
+producer limit. The writer temporary peak was 2,358,013,506 B on LIVE and
+2,466,879,589 B on PTU. Row spools accounted for 781,742,138 B and
+841,809,588 B respectively.
+
+The host ran Windows 11 Pro 26H2 build 26300.9974 on a Ryzen 9 9950X3D with
+32 logical processors and 100,573,523,968 B of RAM. The samples cover the
+producer lifetime. The 64 GiB headroom estimate subtracts the larger process
+peak from 64 GiB before accounting for the OS and other applications.
+
+| Build | Available before launch | Minimum available RAM | Minimum commit headroom | Estimated 64 GiB headroom | Page read delta | Page write delta | Process writes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 57,574,219,776 B | 23,526,182,912 B | 39,062,331,392 B | 33,473,581,056 B | 1,186,848 | 50 | 2,358,023,306 B |
+| PTU `13284307` | 57,781,686,272 B | 20,213,252,096 B | 37,800,472,576 B | 32,419,692,544 B | 347,415 | 51 | 2,466,889,700 B |
+
+The page counters are host totals. The measurement did not instrument
+desktop responsiveness.
+
+The before/after executable and Archive stamps agreed. The executable SHA-256
+was `d08628363068e0ef672f39430dd8a9c23d09de98ba233ab75853eeb398f30bb8`.
+The sealed LIVE frame SHA-256 was
+`59d7bb9ce387693b737089efca0e84137b6b4c86f3b85c46512357534546ce5b`.
+The sealed PTU frame SHA-256 was
+`a9056680c56fd94017b3b512a554a601977dafdf4be194e0b4f8eb7c2db88ac4`.
+#### Offline LIVE replay
+
+The optimized verifier from the same signed revision replayed the sealed LIVE
+frame in 6,619.026 s with one worker. Both passes decoded 95,109,379,589 B with
+SHA-256 `dbd96c2d9fbe7c328367c143f5db89056eab9c13c9be707235718222f0e9a223`.
+The verifier confirmed the compressed frame hash after the replay and left the
+installed Archive closed. Its binary SHA-256 was
+`a7d90528bd267b98823076568bf82f1a08d9f06a3b342fd2dbd358b147fd33f9`.
+
+| Verified LIVE inventory | Count |
+| --- | ---: |
+| Physical sources | 95,261 |
+| Source uses | 127,623,482 |
+| Variant source-use sets | 989 |
+| Sourced cells | 93,497,114 |
+| Items and item definitions | 23,685 each |
+| Blueprint definitions | 1,634 |
+| Container instances | 196,706 |
+
+The verifier reached 8,552,742,912 B private commit and 8,464,003,072 B working
+set. Minimum host availability was 28,468,948,992 B of physical memory and
+48,151,416,832 B of commit headroom. The same-revision PTU frame has its own
+offline replay gate.
