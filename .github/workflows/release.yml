@@ -25,11 +25,6 @@ on:
         type: boolean
         default: false
         required: false
-      windows-native-progress-only:
-        description: Diagnose the retained AMD64 native MSI execution without release acceptance
-        type: boolean
-        default: false
-        required: false
       linux-only:
         description: Validate native Linux packages without Windows, external scans or publication
         type: boolean
@@ -52,22 +47,13 @@ env:
 
 jobs:
   windows-observation-control:
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.windows-observation-control-only && !inputs.windows-native-progress-only)
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.windows-observation-control-only)
     permissions:
       contents: read
     uses: ./.github/workflows/windows-msi-detached-control.yml
 
-  windows-native-progress:
-    if: github.event_name == 'workflow_dispatch' && inputs.windows-native-progress-only
-    permissions:
-      actions: read
-      contents: read
-    uses: ./.github/workflows/windows-msi-native-progress.yml
-    with:
-      exclusive: ${{ !inputs.windows-observation-control-only && !inputs.linux-only && !inputs.windows-only }}
-
   prepare:
-    if: github.event_name != 'workflow_dispatch' || (!inputs.windows-observation-control-only && !inputs.windows-native-progress-only)
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows-observation-control-only
     name: Release identity and package plan
     runs-on: ubuntu-24.04
     timeout-minutes: 15
