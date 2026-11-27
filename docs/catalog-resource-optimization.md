@@ -215,7 +215,26 @@ positions where completeness or the encryption marker changes. This preserves
 evidence for out-of-order port requests without repeatedly scanning or
 materializing each prefix. Full preserves the ordered selector uses. The
 synthetic SDK comparison checks both profiles across separate physical calls
-that share a base XML file. Installed LIVE throughput remains a separate test.
+that share a base XML file.
+
+An ordinary, non-instrumented release-profile witness on signed revision
+`71275bd43` repeated the one-worker MarkersOnly Loadout test, with no locales
+and an empty visitor, on LIVE `13220821`. It visited 10,955 owners and emitted
+10,812 rows with complete dependency coverage. Initial preparation took
+0.808 seconds and the first owner arrived after 2.636 seconds. The visit took
+90.823 seconds and the process took 92.051 seconds. Native lifetime peaks were
+1,091,780,608 B private commit and 1,039,314,944 B working set. The observer
+reported 56,316,432,384 B minimum available physical memory and
+71,955,636,224 B minimum commit headroom. The release executable SHA-256 was
+`7b82e7aadd8fa41a71babb0c3b64ab9013dfe0acdd0a2505747cae66109d90ce`.
+
+The earlier ordinary `4aa8bcfa2` witness for this workload took 245.090 seconds
+for the visit and 245.973 seconds for the process. The visit is 62.9% shorter
+between those revisions. The private peak differs by 16,384 B and both are
+below the 2,000,000,000-byte SDK ceiling. The signed-revision comparison
+includes intervening changes and measures only the isolated Loadout visitor.
+It leaves the integrated VerseKit refresh and other SDK routes to their own
+acceptance runs.
 
 A matched Ship-only measurement used the same ignored timing test, LIVE Archive,
 English language and single worker on both signed release-profile Builds.
