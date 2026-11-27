@@ -1109,5 +1109,28 @@ installed Archive closed. Its binary SHA-256 was
 
 The verifier reached 8,552,742,912 B private commit and 8,464,003,072 B working
 set. Minimum host availability was 28,468,948,992 B of physical memory and
-48,151,416,832 B of commit headroom. The same-revision PTU frame has its own
-offline replay gate.
+48,151,416,832 B of commit headroom.
+
+#### Offline PTU replay
+
+The same optimized verifier replayed the sealed PTU frame in 6,723.383 s
+with one worker and left the installed Archive closed. Both passes decoded
+98,173,166,243 B with SHA-256
+`da0338196446000d40eb33b57158c119bbbd176c2c5d31e1ebe6ad03e09036dd`.
+The compressed frame hash matched the producer seal after the replay.
+
+| Verified PTU inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,254,383 |
+| Variant source-use sets | 513 |
+| Sourced cells | 98,388,081 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+
+The verifier reached 8,727,654,400 B private commit and 8,664,952,832 B working
+set. Minimum host availability was 25,365,000,192 B of physical memory and
+45,997,916,160 B of commit headroom. These local producer and replay
+measurements bind to the signed source revision above. The packaged release
+candidate requires its own producer and replay measurements.
