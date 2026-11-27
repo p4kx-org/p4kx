@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
 use std::io;
+use std::ops::Range;
 
-use p4kx_model::ModelFile;
+use p4kx_model::{ChunkUsage, ModelFile};
 
 use crate::model_geometry_scope::ModelGeometryScope;
 use crate::source_provenance::ChunkHeaderField;
 use crate::{
-    FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceUse, SourceUseRole, SourceUses,
+    CancelToken, FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceUse, SourceUseRole,
+    SourceUses,
 };
 
 /// Reports the original chunk counts of the model and its admitted companion files.
@@ -43,6 +46,76 @@ pub fn model_chunk_count_origin(
         );
     }
     Ok(uses.origin(&contributors, false))
+}
+
+/// Partial classification inputs for the three retained chunk usage counts.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ModelChunkUsageOrigins {
+    /// Original words of chunks the model read.
+    pub read: FieldOrigin,
+    /// Original words of known chunks the model skipped.
+    pub skipped: FieldOrigin,
+    /// Original words of unknown chunks the model skipped.
+    pub unknown: FieldOrigin,
+}
+
+impl ModelChunkUsageOrigins {
+    /// Captures one positive classification witness per usage and admitted file.
+    ///
+    /// # Errors
+    /// Returns an interruption or source evidence error.
+    pub fn capture(
+        source: &ModelSource,
+        uses: &SourceUses,
+        cancel: &CancelToken,
+    ) -> io::Result<Self> {
+        let mut words = usage_words(source, cancel)?;
+        let mut classified = [Vec::new(), Vec::new(), Vec::new()];
+        for read in source.archive_sources() {
+            if cancel.is_cancelled() {
+                return Err(io::ErrorKind::Interrupted.into());
+            }
+            let Some(scope) = ModelGeometryScope::from_model_read(uses, read)? else {
+                continue;
+            };
+            let usages = [ChunkUsage::Read, ChunkUsage::Skipped, ChunkUsage::Unknown];
+            for (usage, inputs) in usages.into_iter().zip(&mut classified) {
+                if let Some(word) = words.remove(&(read.file(), usage)) {
+                    let signature = ChunkHeaderField::Signature
+                        .observe(scope.scope(), SourceUseRole::Selector)
+                        .map_err(io::Error::other)?;
+                    inputs.extend([
+                        signature,
+                        scope.word(word, "typeId", SourceUseRole::Selector)?,
+                    ]);
+                }
+            }
+        }
+        // The witnesses omit other classified rows and decoder selection inputs.
+        let [read, skipped, unknown] = classified.map(|inputs| uses.origin(&inputs, false));
+        Ok(Self {
+            read,
+            skipped,
+            unknown,
+        })
+    }
+}
+
+fn usage_words(
+    source: &ModelSource,
+    cancel: &CancelToken,
+) -> io::Result<HashMap<(ModelFile, ChunkUsage), Range<u64>>> {
+    let mut words = HashMap::new();
+    for chunk in &source.model().chunks {
+        if cancel.is_cancelled() {
+            return Err(io::ErrorKind::Interrupted.into());
+        }
+        if let Some(word) = chunk.type_id_range() {
+            words.entry((chunk.file, chunk.usage)).or_insert(word);
+        }
+    }
+    Ok(words)
 }
 
 /// Immediate origins of one emitted chunk summary.

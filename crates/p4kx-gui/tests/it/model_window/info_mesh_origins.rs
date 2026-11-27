@@ -4,15 +4,18 @@
 use std::error::Error;
 
 use egui_kittest::kittest::Queryable;
-use p4kx_extraction::chunks::ChunkFile;
+use p4kx_extraction::chunks::{ChunkFile, ivo};
 use p4kx_extraction::{
     FieldOrigin, InputScope, SourceInventory, SourceLocation, SourceUseDescription, SourceUseRole,
 };
-use p4kx_gui::{Language, ModelInfoProvenance, ModelPreview, Unavailable, ViewerSupport};
-use p4kx_testkit::{TestCrchModel, TestEntry, TestModel, TestSubmesh};
+use p4kx_gui::{
+    Language, ModelInfo, ModelInfoProvenance, ModelPreview, Unavailable, ViewerSupport,
+};
+use p4kx_testkit::{TestChunkFile, TestCrchModel, TestEntry, TestModel, TestSubmesh};
 use serde_json::Value;
 
 use super::info_chunk_origins::{assert_marker, reveal_info_row};
+use super::info_topology_origins::assert_companion_topology;
 use crate::viewing::{Site, TestResult, model_preview, opened_at, select};
 
 const MAIN: &str = "Data/Objects/mesh.cgf";
@@ -27,9 +30,13 @@ fn visible_lod_rows_and_material_ids_follow_only_their_physical_words() -> TestR
         .with_lod(cube_with_materials(&[25; 7])?);
     let base = model.cgfm();
     let level = model.lod_cgfm(2).ok_or("LOD 2 fixture geometry")?;
+    let skipped = TestChunkFile::ivo()
+        .chunk(ivo::VIS_AREAS.id(), 0x900, [0; 16])
+        .bytes();
     let entries = vec![
         TestEntry::zstd(MAIN, model.cgf()),
         TestEntry::zstd(BASE, base.clone()),
+        TestEntry::zstd("Data/Objects/mesh_lod1.cgfm", skipped).encrypted(),
         TestEntry::zstd(
             "Data/Objects/mesh_lod2.cgf",
             model.lod_cgf(2).ok_or("LOD 2 fixture model")?,
@@ -45,22 +52,10 @@ fn visible_lod_rows_and_material_ids_follow_only_their_physical_words() -> TestR
     select(&mut harness, "mesh.cgf")?;
     let preview = model_preview(harness.state()).ok_or("model preview")?;
     let info = preview.info().ok_or("model facts")?;
-    let displayed: Vec<_> = info
-        .lods
-        .iter()
-        .map(|lod| (lod.level, lod.triangles))
-        .collect();
-    assert_eq!(
-        displayed,
-        [(0, 24), (2, 7)],
-        "the omitted level did not create a row"
-    );
-    assert_eq!(
-        info.material_ids.len(),
-        25,
-        "one material is omitted by the display"
-    );
-    assert_ivo_origins(provenance(preview)?, &base, &level, &shown)?;
+    assert_displayed_lods(info);
+    let proof = provenance(preview)?;
+    assert_ivo_origins(proof, &base, &level, &shown)?;
+    assert_companion_topology(proof, MAIN, BASE, &[LEVEL], None)?;
 
     harness.get_by_label("Info").click();
     harness.run_steps(4);
@@ -73,6 +68,31 @@ fn visible_lod_rows_and_material_ids_follow_only_their_physical_words() -> TestR
     );
     reveal_info_row(&mut harness, "7")?;
     assert_marker(&mut harness, "7", "Includes encrypted source data")
+}
+
+fn assert_displayed_lods(info: &ModelInfo) {
+    let displayed: Vec<_> = info
+        .lods
+        .iter()
+        .map(|lod| (lod.level, lod.triangles))
+        .collect();
+    assert_eq!(
+        displayed,
+        [(0, 24), (2, 7)],
+        "the omitted level did not create a row"
+    );
+    assert!(
+        info.unread
+            .iter()
+            .any(|chunk| chunk.file == p4kx_gui::ChunkFile::LodGeometry(1)),
+        "the opened visibility companion has no emitted LOD"
+    );
+    assert_eq!(info.meshes(), 1, "the top count belongs to the first LOD");
+    assert_eq!(
+        info.material_ids.len(),
+        25,
+        "one material is omitted by the display"
+    );
 }
 
 fn assert_ivo_origins(
@@ -298,7 +318,7 @@ fn uses_from<'a>(
         .collect()
 }
 
-fn provenance(preview: &ModelPreview) -> Result<&ModelInfoProvenance, Box<dyn Error>> {
+pub(super) fn provenance(preview: &ModelPreview) -> Result<&ModelInfoProvenance, Box<dyn Error>> {
     preview
         .info_provenance()
         .ok_or("model info provenance")?
@@ -325,7 +345,7 @@ fn cube_with_materials(ids: &[u16]) -> Result<TestModel, Box<dyn Error>> {
         .with_submeshes(submeshes))
 }
 
-const fn synthetic_site(entries: Vec<TestEntry>) -> Site {
+pub(super) const fn synthetic_site(entries: Vec<TestEntry>) -> Site {
     Site {
         entries,
         installation: false,

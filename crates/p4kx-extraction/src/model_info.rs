@@ -38,15 +38,15 @@ mod submesh_origins;
 
 pub use bone_origins::{ModelBoneOrigins, primary_skeleton_selection_uses};
 pub use chunk_origins::{
-    ModelChunkOrigins, capture_chunk_origins, model_chunk_count_origin, write_chunk_origins,
-    write_chunk_type_origin,
+    ModelChunkOrigins, ModelChunkUsageOrigins, capture_chunk_origins, model_chunk_count_origin,
+    write_chunk_origins, write_chunk_type_origin,
 };
 use field_origins::ModelFieldOrigins;
 pub use glb_animation_origins::{ArchiveClipFieldOrigins, write_glb_animation_origins};
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
 pub use overview_mesh_origins::{
-    ModelLodCountOrigins, ModelMeshSummaryOrigins, ModelOverviewMeshOrigins,
+    ModelLodCountOrigins, ModelMeshSummaryOrigins, ModelOverviewMeshOrigins, ModelTopologyOrigins,
 };
 pub use submesh_origins::{write_mesh_origins, write_submesh_origins};
 

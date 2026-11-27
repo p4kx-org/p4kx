@@ -11,7 +11,9 @@ use p4kx_render::{Camera, Scene, SceneError, Skeleton};
 
 use super::model_info_provenance::ModelInfoProvenance;
 use super::playback::Playback;
-use super::preview_animations::{Animated, can_animate, read as read_animations};
+use super::preview_animations::{
+    Animated, AnimationCountProvenance, can_animate, read as read_animations,
+};
 use crate::{AnimationCount, EntryIndex, ModelInfo};
 
 mod archive_read;
@@ -85,6 +87,7 @@ pub struct ModelPreview {
     state: State,
     info: Option<Arc<ModelInfo>>,
     info_provenance: Option<io::Result<ModelInfoProvenance>>,
+    animation_count_provenance: Option<io::Result<Box<AnimationCountProvenance>>>,
     camera: Option<Camera>,
     playback: Option<Playback>,
 }
@@ -121,6 +124,7 @@ impl ModelPreview {
             state,
             info: None,
             info_provenance: None,
+            animation_count_provenance: None,
             camera: None,
             playback: None,
         }
@@ -136,6 +140,16 @@ impl ModelPreview {
     #[must_use]
     pub fn info_provenance(&self) -> Option<Result<&ModelInfoProvenance, &io::Error>> {
         self.info_provenance.as_ref().map(Result::as_ref)
+    }
+
+    /// Returns count evidence from the bounded animation read when one completed.
+    #[must_use]
+    pub fn animation_count_provenance(
+        &self,
+    ) -> Option<Result<&AnimationCountProvenance, &io::Error>> {
+        self.animation_count_provenance
+            .as_ref()
+            .map(Result::as_deref)
     }
 
     /// Returns where the preview stands.
@@ -229,6 +243,7 @@ impl ModelPreview {
                 } = *read;
                 self.info = Some(Arc::new(info));
                 self.info_provenance = Some(info_provenance);
+                self.animation_count_provenance = None;
                 self.state = match scene {
                     Ok(scene) => {
                         self.camera = Some(Camera::framing(scene.bounds()));
@@ -242,6 +257,7 @@ impl ModelPreview {
             }
             Event::Animations(animated) => {
                 self.set_count(animated.count);
+                self.animation_count_provenance = animated.provenance;
                 if let Some(playback) = &mut self.playback {
                     playback.set_animations(animated.movers);
                 }
@@ -254,6 +270,7 @@ impl ModelPreview {
         self.events = None;
         self.info = None;
         self.info_provenance = None;
+        self.animation_count_provenance = None;
         self.camera = None;
         self.playback = None;
     }

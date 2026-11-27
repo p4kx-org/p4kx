@@ -3,12 +3,18 @@
 
 //! Animations in the Info tab and in Export as GLB over a synthetic Archive with a door model.
 
+use std::collections::BTreeSet;
+
+use super::info_chunk_origins::{assert_marker, reveal_info_row};
 use crate::glb_exporting::{finished, start};
 use crate::viewing::{Site, TestResult, model_preview, opened_at, select};
 use egui_kittest::kittest::Queryable;
+use p4kx_extraction::{
+    PhysicalSourceKind, SourceCoordinateOmission, SourceLocation, SourceUseRole,
+};
 use p4kx_gui::{
-    AnimationCount, Language, Model, ModelExport, ModelExportStatus, ModelExportSummary,
-    ModelPreview,
+    AnimationCount, AnimationCountProvenance, Language, Model, ModelExport, ModelExportStatus,
+    ModelExportSummary, ModelPreview, Unavailable, ViewerSupport,
 };
 use p4kx_testkit::{
     TestAnimation, TestDba, TestEntry, TestModel, TestSkeleton, TestTrack, check_glb,
@@ -73,6 +79,107 @@ fn the_info_counts_the_animations_next_to_the_model() -> TestResult {
         info.animations,
         AnimationCount::Counted(3),
         "two files and one of the database"
+    );
+    let proof = model_preview(harness.state())
+        .and_then(ModelPreview::animation_count_provenance)
+        .ok_or("no count provenance")?
+        .map_err(|error| format!("count provenance: {error}"))?;
+    assert_eq!(
+        proof.origin().contains_encrypted_source(),
+        None,
+        "plain inputs with incomplete selectors stay unknown"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_info_count_uses_only_the_original_entries_of_selected_clips() -> TestResult {
+    let encrypted = TestDba::new()
+        .animation(rotating("animations/objects/pull.caf", 20))
+        .animation(rotating("animations/objects/push.caf", 25));
+    let mut beside = site();
+    beside.key = true;
+    beside.entries.extend([
+        TestEntry::zstd("Data\\Objects\\more.dba", encrypted.bytes()).encrypted(),
+        TestEntry::zstd("Data\\Objects\\unread.caf", b"not a chunk file".to_vec()).encrypted(),
+    ]);
+    let (_folder, mut harness) = opened_at(
+        Language::BritishEnglish,
+        ViewerSupport::Unavailable(Unavailable::NoDevice),
+        beside,
+        |builder| builder,
+    )?;
+
+    select(&mut harness, "door.cga")?;
+    let preview = model_preview(harness.state()).ok_or("no model preview")?;
+    assert_eq!(
+        preview.info().map(|info| info.animations),
+        Some(AnimationCount::Counted(5)),
+        "both eligible clips count and failed or additive clips do not"
+    );
+    let proof = preview
+        .animation_count_provenance()
+        .ok_or("missing count provenance")?
+        .map_err(|error| format!("count provenance: {error}"))?;
+    assert_count_inputs(proof)?;
+
+    harness.get_by_label("Info").click();
+    harness.run_steps(4);
+    reveal_info_row(&mut harness, "5")?;
+    assert_marker(&mut harness, "5", "Includes encrypted source data")
+}
+
+fn assert_count_inputs(proof: &AnimationCountProvenance) -> TestResult {
+    let origin = proof.origin();
+    assert!(
+        !origin.source_set_complete(),
+        "selection inputs are incomplete"
+    );
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(true),
+        "the accepted encrypted database contributes"
+    );
+    assert_eq!(
+        origin.source_uses_refs().len(),
+        4,
+        "one payload use per contributing file"
+    );
+    let inventory = proof.inventory();
+    let mut paths = BTreeSet::new();
+    for reference in origin.source_uses_refs() {
+        let used = inventory
+            .iter_uses()
+            .find(|used| used.id() == reference)
+            .ok_or("count source use")?;
+        assert_eq!(used.role(), SourceUseRole::Conversion, "count input");
+        assert!(
+            matches!(
+                used.location(),
+                SourceLocation::Opaque {
+                    reason: SourceCoordinateOmission::Unavailable
+                }
+            ),
+            "original input without fabricated clip coordinates"
+        );
+        let source = inventory
+            .iter_sources()
+            .find(|source| source.id() == used.source())
+            .ok_or("count physical source")?;
+        let PhysicalSourceKind::ArchiveEntry(entry) = source.kind() else {
+            return Err("count requires an original Archive Entry".into());
+        };
+        paths.insert(entry.path().value().ok_or("original Entry path")?.as_str());
+    }
+    assert_eq!(
+        paths,
+        BTreeSet::from([
+            "Data\\Objects\\more.dba",
+            "Data\\Objects\\nod.caf",
+            "Data\\Objects\\pack.dba",
+            "Data\\Objects\\wave.caf",
+        ]),
+        "only the inputs of the counted clips"
     );
     Ok(())
 }

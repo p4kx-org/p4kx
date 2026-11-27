@@ -4,8 +4,8 @@
 use std::io;
 
 use p4kx_extraction::model_info::{
-    self, ModelBoneOrigins, ModelChunkOrigins, ModelMeshSummaryOrigins, ModelNodeOrigins,
-    ModelOverviewMeshOrigins,
+    self, ModelBoneOrigins, ModelChunkOrigins, ModelChunkUsageOrigins, ModelMeshSummaryOrigins,
+    ModelNodeOrigins, ModelOverviewMeshOrigins,
 };
 use p4kx_extraction::{
     CancelToken, FieldOrigin, MaterialSummaryOrigins, ModelSource, SourceInventory, SourceUses,
@@ -22,6 +22,7 @@ pub struct ModelInfoProvenance {
     material_library: MaterialSummaryOrigins,
     mesh_summary: ModelMeshSummaryOrigins,
     chunk_total: FieldOrigin,
+    chunk_usage: ModelChunkUsageOrigins,
     unread: Vec<ModelChunkOrigins>,
     inventory: SourceInventory,
 }
@@ -41,6 +42,7 @@ impl ModelInfoProvenance {
         let mesh_summary = ModelOverviewMeshOrigins::new(source, &uses)
             .capture_summary(info.listed_material_ids(), cancel)?;
         let chunk_total = model_info::model_chunk_count_origin(source, &uses)?;
+        let chunk_usage = ModelChunkUsageOrigins::capture(source, &uses, cancel)?;
         let unread = listed_chunks(source.model())
             .map(|(ordinal, _)| model_info::capture_chunk_origins(source, ordinal, &uses))
             .collect::<io::Result<_>>()?;
@@ -50,6 +52,7 @@ impl ModelInfoProvenance {
             material_library,
             mesh_summary,
             chunk_total,
+            chunk_usage,
             unread,
             inventory: uses.freeze().map_err(io::Error::other)?,
         })
@@ -83,6 +86,12 @@ impl ModelInfoProvenance {
     #[must_use]
     pub const fn chunk_total(&self) -> &FieldOrigin {
         &self.chunk_total
+    }
+
+    /// Returns partial classification origins for each displayed chunk usage count.
+    #[must_use]
+    pub const fn chunk_usage(&self) -> &ModelChunkUsageOrigins {
+        &self.chunk_usage
     }
 
     /// Returns origins in the same order as the visible unread chunk notes.

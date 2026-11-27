@@ -223,6 +223,16 @@ impl AnimationSet {
         bounds: AnimationBounds,
         cancel: &CancelToken,
     ) -> Result<Option<Self>, ConversionError> {
+        Self::gather_archive_bounded(index, model_entry, bounds, cancel)
+            .map(|read| read.map(Self::from))
+    }
+
+    pub(crate) fn gather_archive_bounded(
+        index: &PathIndex<'_>,
+        model_entry: &str,
+        bounds: AnimationBounds,
+        cancel: &CancelToken,
+    ) -> Result<Option<Gathered<Animation>>, ConversionError> {
         let entries = folder_entries(index, model_entry);
         if !within(
             &bounds,
@@ -231,7 +241,7 @@ impl AnimationSet {
             return Ok(None);
         }
         let sources = entries.into_iter().map(source_of).collect();
-        Self::from_sources(index, sources, &AnimationChoice::All, &[], Some(cancel)).map(Some)
+        Self::gather_sources(index, sources, &AnimationChoice::All, &[], Some(cancel)).map(Some)
     }
 
     /// Reads the animations `choice` selects from the `.caf` and `.dba` Entries anywhere below

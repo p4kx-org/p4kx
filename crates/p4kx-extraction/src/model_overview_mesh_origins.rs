@@ -18,6 +18,11 @@ use crate::{
     SourceUseRole, SourceUses,
 };
 
+#[path = "model_topology_origins.rs"]
+mod topology;
+
+pub use topology::ModelTopologyOrigins;
+
 /// Geometry origins of the displayed model summary.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -26,6 +31,8 @@ pub struct ModelMeshSummaryOrigins {
     pub lod_counts: Vec<ModelLodCountOrigins>,
     /// The material IDs included in the supplied display list.
     pub material_ids: FieldOrigin,
+    /// Selection evidence for geometry and the displayed LOD and mesh counts.
+    pub topology: ModelTopologyOrigins,
 }
 
 /// Proven contributors to the counts derived from one decoded LOD.
@@ -67,6 +74,7 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
         Ok(ModelMeshSummaryOrigins {
             lod_counts: observed.lod_counts,
             material_ids: material_ids_origin(self.uses, observed.materials),
+            topology: ModelTopologyOrigins::capture(self.source, self.uses, cancel)?,
         })
     }
 

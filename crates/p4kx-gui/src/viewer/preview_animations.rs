@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::sync::Arc;
 
 use p4kx_extraction::model::{Animation, Model};
-use p4kx_extraction::{AnimationBounds, AnimationSet, CancelToken, ConversionError, PathIndex};
+use p4kx_extraction::{
+    AnimationBounds, ArchiveAnimationRead, CancelToken, ConversionError, FieldOrigin, PathIndex,
+    SourceInventory, SourceUses,
+};
 use p4kx_render::Skeleton;
 
 use crate::AnimationCount;
@@ -16,11 +20,42 @@ pub const PREVIEW_ANIMATION_BOUNDS: AnimationBounds = AnimationBounds {
     bytes: 64 << 20,
 };
 
+/// Original inputs of the model preview's selected animation count.
+#[derive(Debug)]
+pub struct AnimationCountProvenance {
+    origin: FieldOrigin,
+    inventory: SourceInventory,
+}
+
+impl AnimationCountProvenance {
+    fn capture(read: &ArchiveAnimationRead) -> io::Result<Self> {
+        let uses = SourceUses::new();
+        let origin = read
+            .selected_count_origin(&uses)
+            .map_err(io::Error::other)?;
+        let inventory = uses.freeze().map_err(io::Error::other)?;
+        Ok(Self { origin, inventory })
+    }
+
+    /// Returns the incomplete count origin bound to the selected clip inputs.
+    #[must_use]
+    pub const fn origin(&self) -> &FieldOrigin {
+        &self.origin
+    }
+
+    /// Returns the original Entries and uses of the observed count.
+    #[must_use]
+    pub const fn inventory(&self) -> &SourceInventory {
+        &self.inventory
+    }
+}
+
 /// What reading the animations of a model came to.
 #[derive(Debug)]
 pub(super) struct Animated {
     pub(super) count: AnimationCount,
     pub(super) movers: Vec<Animation>,
+    pub(super) provenance: Option<io::Result<Box<AnimationCountProvenance>>>,
 }
 
 /// Returns whether an export could write an animation for `model`: it has bones, and they are
@@ -49,20 +84,33 @@ pub(super) fn read(
     skeleton: Option<&Arc<Skeleton>>,
     stop: &CancelToken,
 ) -> Option<Animated> {
-    match AnimationSet::from_archive_bounded(paths, path, PREVIEW_ANIMATION_BOUNDS, stop) {
-        Ok(Some(set)) => Some(Animated {
-            count: AnimationCount::Counted(set.animations.len()),
-            movers: skeleton.map_or_else(Vec::new, |skeleton| movers(skeleton, set.animations)),
-        }),
-        Ok(None) => Some(Animated {
-            count: AnimationCount::TooMany,
-            movers: Vec::new(),
-        }),
-        Err(ConversionError::Cancelled) => None,
-        Err(_) => Some(Animated {
-            count: AnimationCount::Unread,
-            movers: Vec::new(),
-        }),
+    let result =
+        ArchiveAnimationRead::for_model_bounded(paths, path, PREVIEW_ANIMATION_BOUNDS, stop);
+    if stop.is_cancelled() {
+        return None;
+    }
+    let animated = match result {
+        Ok(Some(read)) => {
+            let provenance = AnimationCountProvenance::capture(&read).map(Box::new);
+            let set = read.into_set();
+            Animated {
+                count: AnimationCount::Counted(set.animations.len()),
+                movers: skeleton.map_or_else(Vec::new, |skeleton| movers(skeleton, set.animations)),
+                provenance: Some(provenance),
+            }
+        }
+        Ok(None) => unread(AnimationCount::TooMany),
+        Err(ConversionError::Cancelled) => return None,
+        Err(_) => unread(AnimationCount::Unread),
+    };
+    (!stop.is_cancelled()).then_some(animated)
+}
+
+const fn unread(count: AnimationCount) -> Animated {
+    Animated {
+        count,
+        movers: Vec::new(),
+        provenance: None,
     }
 }
 

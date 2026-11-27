@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use egui::{Galley, Id, Rect, ScrollArea, Sense, Ui, vec2};
 
-use p4kx_extraction::{MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
+use p4kx_extraction::{FieldOrigin, MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
 
 use super::model_info_rows::{Rows, facts, tables};
 use super::{model_preview, source_origin};
@@ -17,10 +17,19 @@ use crate::theme::palette;
 use crate::widgets::frames;
 use crate::widgets::text::hairline_below;
 use crate::widgets::tooltip;
-use crate::{Language, ModelInfo, ModelInfoProvenance, ModelInfoText as T, ModelPreview, Texts};
+use crate::{
+    AnimationCountProvenance, Language, ModelInfo, ModelInfoProvenance, ModelInfoText as T,
+    ModelPreview, Texts,
+};
 
 #[path = "model_info_grid.rs"]
 mod grid;
+
+#[derive(Clone, Copy)]
+struct Origins<'a> {
+    model: Option<&'a ModelInfoProvenance>,
+    animation_count: Option<&'a FieldOrigin>,
+}
 
 pub(super) type Labelled = (String, Arc<Galley>);
 pub(super) struct Fact {
@@ -67,7 +76,13 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, path: &str, preview: &ModelPrevie
         model_preview::unread(ui, texts, path, preview.status());
         return;
     };
-    let origins = preview.info_provenance().and_then(Result::ok);
+    let origins = Origins {
+        model: preview.info_provenance().and_then(Result::ok),
+        animation_count: preview
+            .animation_count_provenance()
+            .and_then(Result::ok)
+            .map(AnimationCountProvenance::origin),
+    };
     frames::preview_body().show(ui, |ui| {
         ScrollArea::vertical()
             .id_salt("model-info")
@@ -106,7 +121,7 @@ impl Laid {
         laid
     }
 
-    fn show(&self, ui: &mut Ui, texts: &Texts, origins: Option<&ModelInfoProvenance>) {
+    fn show(&self, ui: &mut Ui, texts: &Texts, origins: Origins<'_>) {
         ui.spacing_mut().item_spacing.y = 0.0;
         let key_width = self.key_width;
         for (index, data) in self.facts.iter().enumerate() {
@@ -131,7 +146,7 @@ impl Laid {
             );
             hairline_below(ui, rect);
             ui.add_space(PANEL_TITLE_MARGIN_BOTTOM);
-            grid::show(ui, index, table, texts, origins);
+            grid::show(ui, index, table, texts, origins.model);
         }
     }
 }
@@ -142,22 +157,13 @@ fn fact(
     Fact { name, key, value }: &Fact,
     key_width: f32,
     texts: &Texts,
-    origins: Option<&ModelInfoProvenance>,
+    Origins {
+        model: origins,
+        animation_count,
+    }: Origins<'_>,
 ) {
-    let proof = match name {
-        T::Nodes => Some((T::Nodes, origins.map(ModelInfoProvenance::node_count))),
-        T::Bones => Some((T::Bones, origins.map(ModelInfoProvenance::bone_count))),
-        T::MaterialIds => Some((
-            T::ListedMaterialIds,
-            origins.map(|proof| &proof.mesh_summary().material_ids),
-        )),
-        T::Chunks => Some((
-            T::ChunksTotal,
-            origins.map(ModelInfoProvenance::chunk_total),
-        )),
-        _ => None,
-    };
-    let is_material_library = *name == T::Materials;
+    let proof = fact_origin(*name, origins);
+
     let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
     let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
@@ -179,7 +185,9 @@ fn fact(
         value,
         (on_baseline(value_rect, &value.1), palette::DATA_FG),
     );
-    if value.1.elided || proof.is_some() || is_material_library {
+    let proof =
+        proof.or_else(|| (*name == T::Animations).then_some((T::Animations, animation_count)));
+    if value.1.elided || proof.is_some() || matches!(name, T::Materials | T::Chunks) {
         tooltip::hover(shown, |ui| {
             if value.1.elided {
                 tooltip::line(ui, value.0.as_str());
@@ -187,17 +195,56 @@ fn fact(
             if let Some((field, origin)) = proof {
                 source_origin::row(ui, texts, field, origin);
             }
-            if is_material_library {
-                material_origins(
+            match name {
+                T::Materials => material_origins(
                     ui,
                     texts,
                     origins.map(ModelInfoProvenance::material_library),
-                );
+                ),
+                T::Chunks => chunk_count_origins(ui, texts, origins),
+                _ => {}
             }
         });
     }
     hairline_below(ui, key_rect);
     hairline_below(ui, value_rect);
+}
+
+fn fact_origin(
+    name: T,
+    origins: Option<&ModelInfoProvenance>,
+) -> Option<(T, Option<&FieldOrigin>)> {
+    let summary = origins.map(ModelInfoProvenance::mesh_summary);
+    let topology = summary.map(|summary| &summary.topology);
+    let (label, origin) = match name {
+        T::Nodes => (name, origins.map(ModelInfoProvenance::node_count)),
+        T::Meshes => (name, topology.and_then(|proof| proof.meshes_by_lod.first())),
+        T::Lods => (name, topology.map(|proof| &proof.lod_count)),
+        T::Geometry => (name, topology.map(|proof| &proof.geometry)),
+        T::Bones => (name, origins.map(ModelInfoProvenance::bone_count)),
+        T::MaterialIds => (
+            T::ListedMaterialIds,
+            summary.map(|proof| &proof.material_ids),
+        ),
+
+        _ => return None,
+    };
+    Some((label, origin))
+}
+
+fn chunk_count_origins(ui: &mut Ui, texts: &Texts, origins: Option<&ModelInfoProvenance>) {
+    let usage = origins.map(ModelInfoProvenance::chunk_usage);
+    for (label, origin) in [
+        (
+            T::ChunksTotal,
+            origins.map(ModelInfoProvenance::chunk_total),
+        ),
+        (T::ChunksRead, usage.map(|origin| &origin.read)),
+        (T::ChunksSkipped, usage.map(|origin| &origin.skipped)),
+        (T::ChunksUnknown, usage.map(|origin| &origin.unknown)),
+    ] {
+        source_origin::row(ui, texts, label, origin);
+    }
 }
 
 fn material_origins(ui: &mut Ui, texts: &Texts, origins: Option<&MaterialSummaryOrigins>) {

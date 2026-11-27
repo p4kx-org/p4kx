@@ -69,12 +69,14 @@ fn row_origins(
 ) -> [CellOrigin<'_>; 4] {
     match kind {
         TableKind::Lods => {
-            let row = origins.and_then(|origins| origins.mesh_summary().lod_counts.get(index));
+            let summary = origins.map(ModelInfoProvenance::mesh_summary);
+            let row = summary.and_then(|summary| summary.lod_counts.get(index));
+            let meshes = summary.and_then(|summary| summary.topology.meshes_by_lod.get(index));
             [
                 CellOrigin::Hidden,
                 CellOrigin::Shown(row.map(|row| &row.vertices)),
                 CellOrigin::Shown(row.map(|row| &row.triangles)),
-                CellOrigin::Hidden,
+                CellOrigin::Shown(meshes),
             ]
         }
         TableKind::UnreadChunks => {

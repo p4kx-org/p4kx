@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use p4kx_archive::EntryOrigin;
 use p4kx_model::{Animation, AnimationClipCoordinates, PositionedAnimation};
 
@@ -9,7 +11,11 @@ use super::{open_entry, with_extras};
 use crate::animation_load::load_with_positions;
 use crate::animation_select::{self, Gathered, ReadEvidence};
 use crate::animation_set::{folder_entries, source_of};
-use crate::{AnimationChoice, AnimationSet, ConversionError, PathIndex, PositionedUnreadAnimation};
+use crate::{
+    AnimationBounds, AnimationChoice, AnimationSet, CancelToken, ConversionError, FieldOrigin,
+    InputScope, PathIndex, PositionedUnreadAnimation, SourceCoordinateOmission,
+    SourceEvidenceError, SourceInput, SourceUseRole, SourceUses,
+};
 
 /// The selected animations and their bound Archive reads.
 #[derive(Debug, Clone, Default)]
@@ -46,6 +52,42 @@ impl ArchiveAnimationRead {
             |_, _| {},
         )
         .map(Self::from)
+    }
+
+    /// Reads the bounded preview selection and retains each selected clip's Archive Entry.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`AnimationSet::from_archive_bounded`].
+    pub fn for_model_bounded(
+        index: &PathIndex<'_>,
+        model_entry: &str,
+        bounds: AnimationBounds,
+        cancel: &CancelToken,
+    ) -> Result<Option<Self>, ConversionError> {
+        AnimationSet::gather_archive_bounded(index, model_entry, bounds, cancel)
+            .map(|read| read.map(Self::from))
+    }
+
+    /// Captures incomplete count evidence from the original Entries of selected clips.
+    ///
+    /// # Errors
+    /// Returns an error when a contributing Entry use cannot be registered.
+    pub fn selected_count_origin(
+        &self,
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        let mut seen = HashSet::new();
+        let mut inputs = Vec::new();
+        for entry in self.archive_sources.iter().flatten() {
+            if seen.insert(entry.binding()) {
+                let payload = uses.observe(SourceInput::Archive(entry), InputScope::Payload)?;
+                inputs.push(payload.at_opaque(
+                    SourceUseRole::Conversion,
+                    SourceCoordinateOmission::Unavailable,
+                )?);
+            }
+        }
+        Ok(uses.origin(&inputs, false))
     }
 
     pub(crate) fn unread_evidence(&self, index: usize) -> Option<&UnreadClipEvidence> {

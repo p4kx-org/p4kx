@@ -147,6 +147,15 @@ pub(super) fn assert_marker(
     label: &str,
     marker: &str,
 ) -> TestResult {
+    hover_info_value(harness, label)?;
+    assert!(
+        harness.query_by_label(marker).is_some(),
+        "field {label}: {marker}"
+    );
+    Ok(())
+}
+
+pub(super) fn hover_info_value(harness: &mut Harness<'_, Model>, label: &str) -> TestResult {
     harness.ctx.style_mut_of(harness.ctx.theme(), |style| {
         style.interaction.tooltip_delay = 0.0;
         style.interaction.show_tooltips_only_when_still = false;
@@ -156,10 +165,6 @@ pub(super) fn assert_marker(
     let point = visible_point(harness, label)?;
     harness.event(Event::PointerMoved(point));
     harness.run_steps(5);
-    assert!(
-        harness.query_by_label(marker).is_some(),
-        "field {label}: {marker}"
-    );
     Ok(())
 }
 

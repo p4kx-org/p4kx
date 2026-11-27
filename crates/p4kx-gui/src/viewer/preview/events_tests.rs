@@ -19,6 +19,7 @@ fn read_while_counting() -> (ModelPreview, Sender<Event>) {
         state: State::Loading,
         info: None,
         info_provenance: None,
+        animation_count_provenance: None,
         camera: None,
         playback: None,
     };
@@ -39,6 +40,14 @@ fn read_while_counting() -> (ModelPreview, Sender<Event>) {
     (preview, sender)
 }
 
+fn animation_result() -> Animated {
+    Animated {
+        count: AnimationCount::Counted(1),
+        movers: vec![swing("swing", 30)],
+        provenance: Some(Err(std::io::Error::other("unbound synthetic animation"))),
+    }
+}
+
 #[test]
 fn the_model_is_ready_while_the_animations_are_still_counted() {
     let (preview, _sender) = read_while_counting();
@@ -46,16 +55,19 @@ fn the_model_is_ready_while_the_animations_are_still_counted() {
     assert!(!preview.is_loading(), "the model is there");
     assert!(preview.is_reading_animations(), "the count is not");
     assert!(preview.scene().is_some(), "drawable");
+    assert!(
+        preview.animation_count_provenance().is_none(),
+        "the pending count has no proof"
+    );
 }
 
 #[test]
 fn the_second_event_fills_the_count_and_the_playback() {
     let (mut preview, sender) = read_while_counting();
-    let animated = Animated {
-        count: AnimationCount::Counted(1),
-        movers: vec![swing("swing", 30)],
-    };
-    assert!(sender.send(Event::Animations(animated)).is_ok(), "sent");
+    assert!(
+        sender.send(Event::Animations(animation_result())).is_ok(),
+        "sent"
+    );
 
     assert!(preview.poll(), "the count arrived");
 
@@ -63,6 +75,10 @@ fn the_second_event_fills_the_count_and_the_playback() {
     assert!(
         matches!(preview.info_provenance(), Some(Err(_))),
         "the original model provenance state is preserved"
+    );
+    assert!(
+        matches!(preview.animation_count_provenance(), Some(Err(_))),
+        "capture failure is retained independently of the count"
     );
     assert_eq!(
         preview.info().map(|info| info.animations),
@@ -90,14 +106,27 @@ fn a_reader_that_ends_while_counting_leaves_the_count_unread() {
         Some(AnimationCount::Unread),
         "not read"
     );
+    assert!(
+        preview.animation_count_provenance().is_none(),
+        "no provenance was read before the worker ended"
+    );
 }
 
 #[test]
 fn an_archive_change_discards_model_info_and_its_provenance() {
     let (mut preview, sender) = read_while_counting();
     assert!(
+        sender.send(Event::Animations(animation_result())).is_ok(),
+        "animation event sent"
+    );
+    assert!(preview.poll(), "count noticed");
+    assert!(
         preview.info_provenance().is_some(),
         "the source state arrived"
+    );
+    assert!(
+        preview.animation_count_provenance().is_some(),
+        "the count source state arrived"
     );
     assert!(sender.send(Event::ArchiveChanged).is_ok(), "sent");
 
@@ -106,6 +135,10 @@ fn an_archive_change_discards_model_info_and_its_provenance() {
     assert!(
         preview.info_provenance().is_none(),
         "the associated sources were discarded"
+    );
+    assert!(
+        preview.animation_count_provenance().is_none(),
+        "the stale count provenance was discarded"
     );
 }
 

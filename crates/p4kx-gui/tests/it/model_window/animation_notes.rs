@@ -134,6 +134,10 @@ fn more_animation_files_than_the_preview_reads_show_not_read_and_stay_exportable
     let info = preview.info().ok_or("no info")?;
     assert_eq!(info.animations, AnimationCount::TooMany, "not counted");
     assert!(
+        preview.animation_count_provenance().is_none(),
+        "a refused read has no contributing inputs"
+    );
+    assert!(
         preview
             .playback()
             .is_some_and(|playback| playback.animations().is_empty()),
@@ -185,6 +189,10 @@ fn a_model_with_nothing_to_animate_reads_no_animations() -> TestResult {
 
     let preview = model_preview(harness.state()).ok_or("no preview")?;
     assert!(!preview.is_reading_animations(), "nothing is read");
+    assert!(
+        preview.animation_count_provenance().is_none(),
+        "a static model has no animation count inputs"
+    );
     assert_eq!(
         preview.info().map(|info| info.animations),
         Some(AnimationCount::Counted(0)),
