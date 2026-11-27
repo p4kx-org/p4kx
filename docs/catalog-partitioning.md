@@ -1170,4 +1170,30 @@ and background workload. Paging is measured across the host.
 | LIVE 13220821 | `447f8805ca5fdeafa5ef0b6f9af74bf4c7d21db60874fe50880c9cf5c88e0041` | `b6dbec62b1f72447d55e7a5b5feae9c81d4c31633b45f31663af036ca451a340` |
 | PTU 13284307 | `25e43ed28c3e603606cbe58f68933fb5bb1c1a28dd5a0e8132fb1c2f5689623c` | `5fa5adc674e9cff54f8f485fc6e0cae9f40a1c76cb630cf5ef2ac263b08ae827` |
 
-The independent frame replay has its own acceptance receipts.
+### Packaged LIVE Full readback
+
+The separate signed verifier from `84e0a9ca95ca03da3cae281e24240be9377c7ea5`
+replayed the packaged LIVE 13220821 frame with one worker and kept the
+installed Archive closed. The sealed replay binding matches 29 verifier,
+source-accounting and wire-contract files across the two revisions.
+Both passes decoded 95,109,379,589 B with SHA-256
+`a432f1fa95399837d0cec40d1dbb205aaaa6a7244afe98d13e1ca38934e5c998`.
+The final compressed frame hash matches the producer seal.
+
+| Verified LIVE inventory | Count |
+| --- | ---: |
+| Physical sources | 95,261 |
+| Source uses | 127,623,482 |
+| Variant source-use sets | 989 |
+| Sourced cells | 93,497,114 |
+| Items and item definitions | 23,685 each |
+| Blueprint definitions | 1,634 |
+| Container instances | 196,706 |
+| Counted document sections | 254 |
+
+The verifier exited 0 in 6,078.746 s, with 8,551,821,312 B peak private commit,
+8,463,880,192 B peak working set and 23,964 B of process write transfers.
+Minimum host availability was 41,197,506,560 B physical memory and
+61,723,824,128 B commit headroom. A guarded one-job synthetic compilation
+shared the host during the readback. The terminal receipt SHA-256 is
+`eb72449baf43783075f6676cb86f304f12187b6d39690657d1108350c49cd90b`.
