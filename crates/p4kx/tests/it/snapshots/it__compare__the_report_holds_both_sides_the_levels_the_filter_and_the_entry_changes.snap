@@ -142,21 +142,21 @@ expression: report
       "/entries/changes/1/old/crc32c": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u21"
+          "u28"
         ],
         "sourceSetComplete": true
       },
       "/entries/changes/1/old/size": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u20"
+          "u27"
         ],
         "sourceSetComplete": true
       },
       "/entries/changes/1/path": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u22"
+          "u20"
         ],
         "sourceSetComplete": true
       },
@@ -187,21 +187,21 @@ expression: report
       "/entries/changes/2/old/crc32c": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u45"
+          "u52"
         ],
         "sourceSetComplete": true
       },
       "/entries/changes/2/old/size": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u44"
+          "u51"
         ],
         "sourceSetComplete": true
       },
       "/entries/changes/2/path": {
         "containsEncryptedSource": false,
         "sourceUsesRefs": [
-          "u46"
+          "u44"
         ],
         "sourceSetComplete": true
       },
@@ -321,7 +321,7 @@ expression: report
             "value": "DATA\\LIBS\\CRC.xml",
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u22"
+              "u20"
             ],
             "sourceSetComplete": true
           },
@@ -335,7 +335,7 @@ expression: report
             "value": null,
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u23"
+              "u21"
             ],
             "sourceSetComplete": true
           },
@@ -352,7 +352,7 @@ expression: report
                     "value": null,
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u24"
+                      "u22"
                     ],
                     "sourceSetComplete": true
                   },
@@ -361,7 +361,7 @@ expression: report
                     "value": 0,
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u25"
+                      "u23"
                     ],
                     "sourceSetComplete": true
                   },
@@ -373,21 +373,21 @@ expression: report
                     ],
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u26"
+                      "u24"
                     ],
                     "sourceSetComplete": true
                   }
                 },
                 "containsEncryptedSource": false,
                 "sourceUsesRefs": [
-                  "u27"
+                  "u25"
                 ],
                 "sourceSetComplete": true
               }
             ],
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u28"
+              "u26"
             ],
             "sourceSetComplete": true
           }
@@ -403,7 +403,7 @@ expression: report
             "value": "Data\\Libs\\size.xml",
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u46"
+              "u44"
             ],
             "sourceSetComplete": true
           },
@@ -417,7 +417,7 @@ expression: report
             "value": null,
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u47"
+              "u45"
             ],
             "sourceSetComplete": true
           },
@@ -434,7 +434,7 @@ expression: report
                     "value": null,
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u48"
+                      "u46"
                     ],
                     "sourceSetComplete": true
                   },
@@ -443,7 +443,7 @@ expression: report
                     "value": 0,
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u49"
+                      "u47"
                     ],
                     "sourceSetComplete": true
                   },
@@ -455,21 +455,21 @@ expression: report
                     ],
                     "containsEncryptedSource": false,
                     "sourceUsesRefs": [
-                      "u50"
+                      "u48"
                     ],
                     "sourceSetComplete": true
                   }
                 },
                 "containsEncryptedSource": false,
                 "sourceUsesRefs": [
-                  "u51"
+                  "u49"
                 ],
                 "sourceSetComplete": true
               }
             ],
             "containsEncryptedSource": false,
             "sourceUsesRefs": [
-              "u52"
+              "u50"
             ],
             "sourceSetComplete": true
           }
@@ -965,28 +965,6 @@ expression: report
         },
         {
           "id": "u20",
-          "source": "a1.4",
-          "scope": "archiveDirectoryMetadata",
-          "role": "payload",
-          "location": {
-            "type": "metadata",
-            "field": "uncompressed_size"
-          },
-          "effectiveEncryption": "unencrypted"
-        },
-        {
-          "id": "u21",
-          "source": "a1.4",
-          "scope": "archiveDirectoryMetadata",
-          "role": "payload",
-          "location": {
-            "type": "metadata",
-            "field": "checksum"
-          },
-          "effectiveEncryption": "unencrypted"
-        },
-        {
-          "id": "u22",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -997,7 +975,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u23",
+          "id": "u21",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1008,7 +986,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u24",
+          "id": "u22",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1019,7 +997,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u25",
+          "id": "u23",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1030,7 +1008,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u26",
+          "id": "u24",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1041,7 +1019,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u27",
+          "id": "u25",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1052,13 +1030,35 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u28",
+          "id": "u26",
           "source": "a0.2",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
           "location": {
             "type": "metadata",
             "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u27",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "uncompressed_size"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u28",
+          "source": "a1.4",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "checksum"
           },
           "effectiveEncryption": "unencrypted"
         },
@@ -1251,28 +1251,6 @@ expression: report
         },
         {
           "id": "u44",
-          "source": "a1.3",
-          "scope": "archiveDirectoryMetadata",
-          "role": "payload",
-          "location": {
-            "type": "metadata",
-            "field": "uncompressed_size"
-          },
-          "effectiveEncryption": "unencrypted"
-        },
-        {
-          "id": "u45",
-          "source": "a1.3",
-          "scope": "archiveDirectoryMetadata",
-          "role": "payload",
-          "location": {
-            "type": "metadata",
-            "field": "checksum"
-          },
-          "effectiveEncryption": "unencrypted"
-        },
-        {
-          "id": "u46",
           "source": "a0.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1283,7 +1261,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u47",
+          "id": "u45",
           "source": "a0.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1294,7 +1272,7 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u48",
+          "id": "u46",
           "source": "a0.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
@@ -1305,13 +1283,35 @@ expression: report
           "effectiveEncryption": "unencrypted"
         },
         {
-          "id": "u49",
+          "id": "u47",
           "source": "a0.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
           "location": {
             "type": "metadata",
             "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u48",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u49",
+          "source": "a0.3",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
           },
           "effectiveEncryption": "unencrypted"
         },
@@ -1333,29 +1333,29 @@ expression: report
           "role": "payload",
           "location": {
             "type": "metadata",
-            "field": "encryptionDeclarations[0].rawBytes"
+            "field": "encryptionDeclarations"
           },
           "effectiveEncryption": "unencrypted"
         },
         {
           "id": "u51",
-          "source": "a0.3",
+          "source": "a1.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
           "location": {
             "type": "metadata",
-            "field": "encryptionDeclarations[0]"
+            "field": "uncompressed_size"
           },
           "effectiveEncryption": "unencrypted"
         },
         {
           "id": "u52",
-          "source": "a0.3",
+          "source": "a1.3",
           "scope": "archiveDirectoryMetadata",
           "role": "payload",
           "location": {
             "type": "metadata",
-            "field": "encryptionDeclarations"
+            "field": "checksum"
           },
           "effectiveEncryption": "unencrypted"
         },
