@@ -765,3 +765,34 @@ remain unobserved.
 [ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/job/140202197290) ·
 [ARM64 before-Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/artifacts/15158350863) ·
 [ARM64 launch evidence](https://github.com/p4kx-org/p4kx/actions/runs/45900458773/artifacts/15158053307)
+
+### Native Windows execution on 2d26aa221
+
+Windows-only run 45917796679, attempt 1, passed on both architectures at
+revision 2d26aa221ef3b57d323b2ea4ebf72eab4fdf4206. Both jobs passed the
+pre-installation mock checks, then completed the genuine installer lifecycle,
+published its terminal evidence and recorded the executed packages. The
+direct Wait step returned against the original launch binding, and
+CollectFinish verified the bound receipt and original cleanup journal.
+[Windows-only validation run](https://github.com/p4kx-org/p4kx/actions/runs/45917796679)
+
+AMD64 completed in 4 minutes 54 seconds. Wait took 89 seconds and CollectFinish
+took 1 second. The terminal evidence archive SHA-256 is
+`563b5275b352d141ecab260ec553b689cc28aab29d6f0ba6b5917a6f7409448b`.
+The executed package archive SHA-256 is
+`1a7c86dd8e911fdc217fee7bfb26ef052c0b4aaa631256fe6cc022f60ddfec23`.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/job/140252990919) ·
+[AMD64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/artifacts/15164454873) ·
+[AMD64 executed packages](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/artifacts/15163714881)
+
+ARM64 completed in 5 minutes 20 seconds. Wait took 85 seconds and CollectFinish
+took 1 second. The terminal evidence archive SHA-256 is
+`06659f451aa72e03879d256f2adbd43e988c6a91f610caf73e5382692a240d26`.
+The executed package archive SHA-256 is
+`e49acf0a79f4c022b9db2f42eba0f7e6b2de8fed6885629a609cb3ef12636df7`.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/job/140252990942) ·
+[ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/artifacts/15165045583) ·
+[ARM64 executed packages](https://github.com/p4kx-org/p4kx/actions/runs/45917796679/artifacts/15165405065)
+
+Physical audio, clipboard, file dialogs and hardware GPU require separate
+desktop device evidence.
