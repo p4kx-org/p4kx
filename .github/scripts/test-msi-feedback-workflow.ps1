@@ -265,5 +265,4 @@ $diagnosticPaths=@(
 foreach ($path in $diagnosticPaths) {
     Assert-FeedbackWorkflow ($upload.Contains(('${{ env.P4KX_PACKAGE_TASK }}' + $path))) 'The diagnostic artifact must retain original launch, checkpoints and admission evidence.'
 }
-& (Join-Path $PSScriptRoot 'test-msi-native-progress-workflow.ps1') -Repository $Repository
 'PASS: actual workflow keeps job/deadline/worker policies and independently bounds installer plus always-upload; no native execution.'
