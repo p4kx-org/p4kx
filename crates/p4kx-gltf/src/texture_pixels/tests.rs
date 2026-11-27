@@ -62,6 +62,16 @@ fn the_alpha_of_a_decal_is_its_strongest_mask_and_the_later_mask_covers_the_earl
 }
 
 #[test]
+fn red_precedes_blue_where_the_green_mask_is_clear() {
+    assert_eq!(painted([OPAQUE, 0, OPAQUE]), [OPAQUE, 0, 0, OPAQUE]);
+    let [red, green, blue, alpha] = painted([128, 0, OPAQUE]);
+    assert_eq!(green, 0);
+    assert_eq!(alpha, OPAQUE);
+    assert!(red.abs_diff(188) <= 1 && blue.abs_diff(187) <= 1);
+    assert_eq!(painted([OPAQUE, 1, OPAQUE]), [0, 0, OPAQUE, OPAQUE]);
+}
+
+#[test]
 fn a_dark_specular_colour_darkens_a_light_specular_map() {
     let [red, ..] = base([0.061; 3]);
     assert!(red < 80, "the map is multiplied by the dark colour: {red}");

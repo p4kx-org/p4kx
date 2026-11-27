@@ -211,9 +211,7 @@ pub(crate) fn base_colour(
 /// Returns the base colour image of the opacity map `opacity`: white, with the red channel of the
 /// map as the alpha channel, so that the material's diffuse colour is the colour of the surface.
 ///
-/// With `decal`, the colours of the red, green and blue masks, the image is painted instead: the
-/// red colour, with the green and the blue colour blended over it by their masks, and the
-/// strongest mask as the alpha channel.
+/// With `decal`, blends the three decal colours by their masks and uses the strongest mask as alpha.
 pub(crate) fn opacity_colour(
     opacity: &RgbaImage,
     decal: Option<[[f32; 3]; 3]>,
@@ -228,19 +226,18 @@ pub(crate) fn opacity_colour(
     })
 }
 
-/// Returns the texel of a stencil decal with the masks `masks` painted in the linear `colours`.
-///
-/// The masks are layers whose alpha is the mask, red below green below blue. A colour counts by
-/// its mask and by what the masks above it leave of it, and the texel is the weighted mean of the
-/// colours, so a texel that one mask covers only partly takes none of the colours of the masks that
-/// are 0 there. The alpha is the strongest mask.
+/// Blends the decal colours using red above blue for a clear green mask (ADR-0310).
 fn decal_texel(colours: [[f32; 3]; 3], masks: [u8; 3]) -> [u8; RGBA] {
     let [red, green, blue] = masks.map(|mask| f32::from(mask) / f32::from(OPAQUE));
-    let weights = [
-        red * (1.0 - green) * (1.0 - blue),
-        green * (1.0 - blue),
-        blue,
-    ];
+    let weights = if green == 0.0 {
+        [red, 0.0, blue * (1.0 - red)]
+    } else {
+        [
+            red * (1.0 - green) * (1.0 - blue),
+            green * (1.0 - blue),
+            blue,
+        ]
+    };
     let [r, g, b] = mix(weights, colours).map(encode);
     let [mask_red, mask_green, mask_blue] = masks;
     [r, g, b, mask_red.max(mask_green).max(mask_blue)]

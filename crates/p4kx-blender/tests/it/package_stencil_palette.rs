@@ -124,7 +124,7 @@ fn verify_glb(bytes: &[u8], painted: bool) -> TestResult {
         [0, 255, 0, 255],
         [0, 0, 255, 255],
         [0, 0, 255, 255],
-        [187, 0, 188, 255],
+        [255, 0, 0, 255],
         [0, 255, 0, 64],
         [0, 0, 0, 0],
         [255, 0, 0, 128],
@@ -136,15 +136,7 @@ fn verify_glb(bytes: &[u8], painted: bool) -> TestResult {
         let pixel = image
             .pixel(x, 0)
             .ok_or("a texel for each authored mask case")?;
-        let tolerance = u8::from(painted && mask == [255, 0, 128]);
-        assert!(
-            pixel
-                .into_iter()
-                .zip(want)
-                .zip([tolerance, tolerance, tolerance, 0])
-                .all(|((actual, target), limit)| actual.abs_diff(target) <= limit),
-            "stencil cell {cell}: actual {pixel:?}, expected {want:?}, painted={painted}"
-        );
+        assert_eq!(pixel, want, "stencil cell {cell}, painted={painted}");
     }
     Ok(())
 }

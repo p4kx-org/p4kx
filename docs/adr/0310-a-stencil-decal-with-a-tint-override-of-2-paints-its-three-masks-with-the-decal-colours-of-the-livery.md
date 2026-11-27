@@ -29,8 +29,7 @@ the shape of each finding, not the counts.
 
 ## Observations in game
 
-Seen by eye in screenshots of the owner, in a hangar. The evidence for the decision rests on one
-livery of one ship.
+Screenshots and registered texture measurements cover one livery of one vehicle.
 
 - **RSI Ursa Medivac, Respite livery** (palette `rsi_ursa_medivac_black_white_grey_vip`): the
   entries are greys (60, 106 and 22 of 255); `decalColorR` is a dark red (100, 15, 25),
@@ -39,13 +38,13 @@ livery of one ship.
   the cross and the large lettering are light grey, the small "RSI URSA" on the roof is near black,
   and the small "+MEDIVAC" box at the rear has a dark red edge. Red appears in no palette entry and
   not in the stencil colour; it can only be `decalColorR`.
-- **Order of overlapping masks.** On the same ship, the long "+MEDIVAC" band on the side of the
-  hull is plain light grey with no red tint, though the red mask of the stencil map lies under the
-  grey band. That observation supports provisional blue over red. PTU 13284307 provides a near-normal view of the full side marking and separately confirms
-  the equipped Respite livery. The side shows a cool light-grey cross and band with dark lettering.
-  Red illumination falls farther aft near the rear lamps. The smaller rear marking shows red.
-  Determining the overlap order requires registering the side image to the stencil masks and UVs
-  of that build.
+- **Order of overlapping masks.** On PTU 13284307, the side marking maps to a region of the
+  stencil where blue supplies the coverage. The rear marking uses the same source texture.
+  Registering the screenshot to the rear UVs using only the blue "URSA" glyphs matched 99.16% of
+  2,634 held-out samples there. In the separate rear "+MEDIVAC" band, 215 samples with strong
+  red and blue masks and negligible green showed the red palette colour. The blue-only control
+  showed the grey palette colour. This establishes red above blue there and leaves mixed green
+  coverage unresolved.
 - **MISC Freelancer, standard livery** (consistent with `misc_freelancer_dur_default`): the emblem
   on the blue-grey panel of the rear outer wing flap is darker than the panel and neither rust nor
   white, where `decalColorR` is (10, 10, 10) and green and blue are white. This is the livery
@@ -57,10 +56,9 @@ livery of one ship.
 A stencil decal drawn by its stencil map with a `StencilTintOverride` that rounds to 2 paints its
 masks with the livery's decal colours: the red mask with `decalColorR`, the green mask with
 `decalColorG` and the blue mask with `decalColorB`. `StencilDiffuseColor` does not colour such a
-decal. The masks are layers with the mask as their alpha, red below green below blue (provisional,
-see Open 2): a colour counts by its mask and by what the masks above leave of it, the colour of a
-texel is the weighted mean of the three, and the opacity is the strongest mask. A texel that only
-one mask covers partly therefore takes none of the other colours.
+decal. For a clear green mask, red layers above blue. With green coverage the blend still uses
+blue above green above red as an approximation. The output is the weighted mean of the contributing
+colours, and opacity takes the strongest mask. This approximates the coverage of the game shader.
 
 - **Model.** `StencilTint` tells where the colour comes from; `PaletteSlot::Decal` is what the
   material takes (`Material::palette`); `TintPalette::decal` holds the colours, and
@@ -83,9 +81,8 @@ Each point is settled by one observation in the game.
 1. **What an override of 1 takes.** Candidates: the primary palette entry (the stand-in), or a
    decal colour. Observe the two materials `ident_a_primary_tint` (1) and `ident_a_secondary_stencil`
    (2), which share one stencil map, on a livery whose primary entry and `decalColorR` differ.
-2. **The order of overlapping masks (provisional: blue on top).** The Freelancer emblem, whose
-   three masks coincide, shows the red colour, and layered materials put red over green over blue
-   (ADR-0097), so red on top is as likely. Observe a decal whose masks overlap in a wide area.
+2. **The order with green coverage.** The rear Ursa marking establishes red above blue without
+   meaningful green coverage. Establish where green belongs with a separate registered overlap.
 3. **A second ship.** The decision rests on one livery of one ship. A cheap confirmation is a
    second ship with a decal of an override of 2 in a livery whose three decal colours differ from
    each other and from its paint entries; the census finds them.
@@ -99,3 +96,8 @@ Each point is settled by one observation in the game.
 
 The census tests (`stencil_params.rs`, `real_palette_decals.rs`, `real_ursa_decals.rs`) are the
 measurements and rerun on any Archive. The Blender package format is 1.7.
+
+
+The synthetic overlap and fallback cases are checked in the GLB exporter and in isolated Blender
+renders of the source-built package. Blender 5.2.5 LTS (5f2fd03c4701) matched the expected linear
+colour and coverage at all eight stations in each case.

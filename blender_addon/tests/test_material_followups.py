@@ -268,6 +268,7 @@ def evaluate(graph: GraphSpec, ref: Ref, masks: tuple[float, float, float]) -> f
             "SUBTRACT": lambda x, y: x - y,
             "MULTIPLY": lambda x, y: x * y,
             "MAXIMUM": max,
+            "GREATER_THAN": lambda x, y: float(x > y),
         }
         return operations[node.props["operation"]](a, b)
     assert node.kind == "ShaderNodeMix", node.kind
@@ -310,6 +311,15 @@ def test_a_texel_that_one_mask_covers_partly_takes_only_the_colour_of_that_mask(
     assert evaluate(graph, base, (0.0, 0.0, 0.0)) == pytest.approx((0.0, 0.0, 0.0))
     lower = evaluate(graph, base, (1.0, 1.0, 0.5))
     assert lower[0] == 0.0 and lower[1] > 0.0 and lower[2] > 0.0, "green and blue cover red"
+
+
+def test_red_precedes_blue_where_the_green_mask_is_clear() -> None:
+    graph = decal_graph()
+    base = graph.linked("bsdf", "Base Color")
+    assert base is not None
+    assert evaluate(graph, base, (1.0, 0.0, 1.0)) == pytest.approx((0.4, 0.0, 0.0))
+    assert evaluate(graph, base, (0.5, 0.0, 1.0)) == pytest.approx((0.2, 0.0, 0.3))
+    assert evaluate(graph, base, (1.0, 1.0 / 255.0, 1.0)) == pytest.approx((0.0, 0.0, 0.6))
 
 
 def test_the_alpha_of_a_decal_with_decal_colours_is_the_strongest_of_its_masks() -> None:

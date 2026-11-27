@@ -614,13 +614,11 @@ the package leaves the decision to the importer.
 `decal` (1.7) holds the three decal colours of the livery (`decalColorR`, `decalColorG`,
 `decalColorB`), each a linear colour, absent when the palette states none and in 1.6 and older. A
 material whose `palette` is `decal` is a stencil decal whose stencil map holds up to three masks:
-the red, green and blue channel. An importer treats the masks as layers with the mask as alpha, red
-below green below blue (provisional order): each colour counts by its mask and by what the masks
-above it leave of it, the colour of a texel is the weighted mean of the three colours, and the
-opacity is the strongest of the three masks (before `stencil.opacity` and the material's
-`opacity`). Without a `decal` in the palette the decal keeps its `stencil.colour` and the red
-channel as its opacity. Which colour a decal with `StencilTintOverride` 1 takes, and the order of
-overlapping masks, are not settled by the game data, see ADR-0310.
+the red, green and blue channels. Where green is clear, red layers above blue. Where green has
+coverage, the importer approximates the order as blue above green above red. The texel colour is
+the weighted mean of the visible masks, and opacity is the strongest mask before `stencil.opacity`
+and the material's `opacity`. Without a `decal` in the palette the decal uses `stencil.colour` and
+the red channel as its opacity. ADR-0310 records the evidence and the open questions.
 
 `decal_texture` (1.23) is the original `TintPaletteTree.root.decalTexture` resource
 string. An empty string records an explicitly empty value. The field is absent when the

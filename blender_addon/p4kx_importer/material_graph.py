@@ -132,12 +132,7 @@ class _Maker(LayerBlending, GlassSurface):
         return palette.decal
 
     def _decal_paint(self, colours: tuple[Colour, Colour, Colour]) -> Ref:
-        """Returns the colour of a stencil map painted with ``colours``.
-
-        The masks are layers, red below green below blue: each colour counts by its mask and by
-        what the masks above leave of it, and the result is the weighted mean, so a texel that
-        one mask covers partly takes none of the colours of the masks that are 0 there.
-        """
+        """Blend decal colours with red above blue where green is clear (ADR-0310)."""
         slot = self.desc.slot("stencil")
         assert slot is not None
         b = self.builder
@@ -146,10 +141,15 @@ class _Maker(LayerBlending, GlassSurface):
         mask_red, mask_green, mask_blue = (Ref(split, name) for name in ("Red", "Green", "Blue"))
         below_green = b.math("SUBTRACT", 1.0, mask_green)
         below_blue = b.math("SUBTRACT", 1.0, mask_blue)
+        has_green = b.math("GREATER_THAN", mask_green, 0.0)
+        clear_green = b.math("SUBTRACT", 1.0, has_green)
+        red_over_blue = b.math("MULTIPLY", b.math("MULTIPLY", mask_red, mask_blue), clear_green)
         weight_red = b.math("MULTIPLY", b.math("MULTIPLY", mask_red, below_green), below_blue)
+        weight_red = b.math("ADD", weight_red, red_over_blue)
         weight_green = b.math("MULTIPLY", mask_green, below_blue)
-        weights = (weight_red, weight_green, mask_blue)
-        total = b.math("ADD", b.math("ADD", weight_red, weight_green), mask_blue)
+        weight_blue = b.math("SUBTRACT", mask_blue, red_over_blue)
+        weights = (weight_red, weight_green, weight_blue)
+        total = b.math("ADD", b.math("ADD", weight_red, weight_green), weight_blue)
         floor = b.math("MAXIMUM", total, DECAL_WEIGHT_FLOOR)
         weighted = [
             b.mix(colour, weight, 1.0, blend="MULTIPLY")

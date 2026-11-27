@@ -353,7 +353,7 @@ fn a_stencil_decal_that_takes_the_decal_colours_is_painted_with_those_of_each_li
     let second = palette("second", [[0.0, 0.0, 1.0]; 3]);
     let stub = Stub::default().with(
         "objects/test/logo_stencil.dds",
-        &texture([255, 0, 0, 255], false)?,
+        &texture([255, 0, 255, 255], false)?,
     );
 
     let (glb, summary) = write(
@@ -374,7 +374,7 @@ fn a_stencil_decal_that_takes_the_decal_colours_is_painted_with_those_of_each_li
         .collect::<Result<_, _>>()?;
     assert!(
         near(pixels[0], [255, 0, 0, 255]),
-        "the red mask is red: {pixels:?}"
+        "the red mask covers the blue mask in the first livery: {pixels:?}"
     );
     assert!(near(pixels[1], [0, 0, 255, 255]), "{pixels:?}");
     for logo in &logos {
