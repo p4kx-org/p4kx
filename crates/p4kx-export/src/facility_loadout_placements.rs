@@ -46,11 +46,11 @@ mod installed;
 #[path = "loadout_walk_state.rs"]
 mod loadout_walk_state;
 use installed::InstalledFlightLookup;
+pub(crate) use installed::{FlightComponentReaders, ScopedFlightLinks, scoped_table};
 pub use installed::{
     FlightConfigurationKind, FlightConfigurationLink, InstalledConfiguration,
     InstalledConfigurationDependency,
 };
-pub(crate) use installed::{ScopedFlightLinks, read_owner_links, scoped_table};
 use loadout_walk_state::Path;
 #[path = "facility_interior_placements.rs"]
 mod interior;

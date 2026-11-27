@@ -12,7 +12,7 @@ use crate::catalog_queries::{
     ParsedCatalogQueries,
 };
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_v3::facility_loadout_placements::scoped_table;
+use crate::catalog_v3::facility_loadout_placements::{FlightComponentReaders, scoped_table};
 use crate::loadout::Wanted;
 use crate::texts::Texts;
 
@@ -113,6 +113,7 @@ fn visit_all<E: From<CatalogError>>(
     mut visit: impl FnMut(&InstalledConfigurationSnapshot) -> Result<(), E>,
 ) -> Result<InstalledConfigurationVisitSummary, E> {
     let declared = scoped_table(query.forge, Vec::new()).availability;
+    let flight = FlightComponentReaders::new(query.forge);
     let mut summary = InstalledConfigurationVisitSummary {
         build: query.archive.build().cloned(),
         availability: declared,
@@ -122,7 +123,7 @@ fn visit_all<E: From<CatalogError>>(
         ship_coverage: CatalogRecordCoverage::default(),
     };
     summary.ship_coverage = loadout_visit::visit_ship_roots(query, |inputs, texts, want| {
-        let snapshot = read_owner(query, inputs, texts, want, declared)?;
+        let snapshot = read_owner(query, inputs, texts, want, declared, &flight)?;
         checkpoint(query.cancel)?;
         visit(&snapshot)?;
         summary.owner_count += 1;
@@ -136,12 +137,13 @@ fn visit_all<E: From<CatalogError>>(
     Ok(summary)
 }
 
-fn read_owner(
-    query: &Query<'_>,
+fn read_owner<'source>(
+    query: &Query<'source>,
     inputs: &ResolverInputs<'_>,
     texts: &Texts<'_>,
     want: Wanted,
     declared: DatasetAvailability,
+    flight: &FlightComponentReaders<'source>,
 ) -> Result<InstalledConfigurationSnapshot, CatalogError> {
     let mut loadout_coverage = CatalogRecordCoverage::default();
     let ((loadout_state, loadout_dependencies, configurations), source_inventory) =
@@ -155,7 +157,7 @@ fn read_owner(
                 let (state, configurations) = match owner.row.as_ref() {
                     Some(row) => (
                         SourceValueState::Present,
-                        read_placements(query, input, row)?,
+                        read_placements(flight, input, row, query.cancel)?,
                     ),
                     None => (
                         SourceValueState::Unreadable,

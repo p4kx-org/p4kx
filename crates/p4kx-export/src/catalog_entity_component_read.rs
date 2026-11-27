@@ -14,7 +14,6 @@ use super::item_component_owner::ComponentOwner;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::ConfigurationInspection;
@@ -26,6 +25,10 @@ use crate::source_fields::FieldError;
 use crate::source_projection_notes;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, CatalogReadFailure, ExportAccountingError};
+
+#[path = "catalog_prepared_component_read.rs"]
+mod prepared;
+pub(super) use prepared::PreparedComponent;
 
 const ENTITY: &str = "EntityClassDefinition";
 const COMPONENTS: &str = "Components";
@@ -89,7 +92,7 @@ pub(super) fn read<'source, Row>(
     kind: &ComponentKind,
     project: Projection<'source, Row>,
 ) -> Result<ComponentRead<'source, Row>, CatalogError> {
-    read_in(forge, input, selection, cancel, kind, project, None)
+    PreparedComponent::new(forge, *kind).read(input, selection, cancel, project, None)
 }
 
 pub(super) fn read_selected<'source, Row>(
@@ -100,45 +103,13 @@ pub(super) fn read_selected<'source, Row>(
     kind: &ComponentKind,
     project: Projection<'source, Row>,
 ) -> Result<(Vec<Row>, CatalogRecordCoverage), CatalogError> {
-    checkpoint(cancel)?;
-    let selection = ComponentSelection {
-        physical: owners,
-        ..ComponentSelection::discovery()
-    };
-    let mut coverage = CatalogRecordCoverage::default();
-    let read = read_in(
-        forge,
-        input,
-        &selection,
-        cancel,
-        kind,
-        project,
-        Some(&mut coverage),
-    )?;
-    Ok((read.rows, coverage))
+    PreparedComponent::new(forge, *kind).read_selected(input, owners, cancel, project)
 }
 
-/// Reads one physical owner with strict coverage and retains canonical partial rows.
-pub(super) fn read_selected_with_partials<'source, Row>(
-    forge: &'source DataForge<'source>,
-    input: &OriginalCatalogInput<'_, 'source>,
-    record_index: u32,
-    cancel: Option<&CancelToken>,
-    kind: &ComponentKind,
-    project: Projection<'source, Row>,
-) -> Result<(Vec<Row>, CatalogRecordCoverage), CatalogError> {
-    let physical = CatalogRecordSelection::RecordIndex(record_index);
-    let (rows, coverage) = read_selected(forge, input, physical, cancel, kind, project)?;
-    if !rows.is_empty() || coverage.unreadable_bodies.is_empty() {
-        return Ok((rows, coverage));
-    }
-    checkpoint(cancel)?;
-    let selection = ComponentSelection {
-        physical,
-        ..ComponentSelection::export(None, None)
-    };
-    let canonical = read(forge, input, &selection, cancel, kind, project)?;
-    Ok((canonical.rows, coverage))
+#[derive(Clone, Copy)]
+struct ComponentPlan<'probe, 'source> {
+    kind: &'probe ComponentKind,
+    probe: Option<&'probe PointerProbe<'source>>,
 }
 
 fn read_in<'source, Row>(
@@ -146,28 +117,23 @@ fn read_in<'source, Row>(
     input: &OriginalCatalogInput<'_, 'source>,
     selection: &ComponentSelection<'_>,
     cancel: Option<&CancelToken>,
-    kind: &ComponentKind,
+    plan: ComponentPlan<'_, 'source>,
     project: Projection<'source, Row>,
     mut coverage: Option<&mut CatalogRecordCoverage>,
 ) -> Result<ComponentRead<'source, Row>, CatalogError> {
-    input.check_forge(forge)?;
+    let ComponentPlan { kind, probe } = plan;
     let mut read = ComponentRead {
         rows: Vec::new(),
         numbers: Vec::new(),
         ledger: ExportLedger::default(),
         failures: Vec::new(),
     };
-    let probe = if selection.unclassified_role.is_some() {
-        forge.strict_pointer_probe(COMPONENTS, kind.source_type)
-    } else {
-        forge.pointer_probe(COMPONENTS, kind.source_type)
-    };
     let Some(probe) = probe else {
         return Ok(read);
     };
     let mut trees = TreeBuilder::new();
     selection.physical.for_each(forge, cancel, |record| {
-        match candidate(&mut trees, &probe, record, selection) {
+        match candidate(&mut trees, probe, record, selection) {
             Ok(false) => return Ok(()),
             Err(failure) => {
                 if let Some(role) = failure.role {

@@ -3584,6 +3584,21 @@ system. The cold results establish the census and process footprint.
 The retained Full comparison independently verifies canonical occurrence
 parity and contributor coverage.
 
+A verifier built from `a518fa0628038efc361148c29878f910ac0464a6` reused the
+DataForge component probes across owners. It ran once per Build with one
+Rayon worker and a stable Archive. The executable SHA-256 was
+`698f46d4b32c965c1aea04accf17bd089379be79e8781936a064ca8b453f2f46`.
+
+| Build | Elapsed (s) | Peak private commit (bytes) | Marker receipt SHA-256 |
+| --- | ---: | ---: | --- |
+| LIVE `13220821` | 280.140 | 1,091,465,216 | `968ef32394fb180e3d19cdb927304b93893aa532f922c29b09b054c567f979b5` |
+| PTU `13284307` | 315.902 | 1,114,738,688 | `2a2c194522cc0d7f1e26f492802c1bc59567daf40acf20a9701eb1acff5dfcb4` |
+
+Each Marker receipt was byte-identical to its baseline. The independent LIVE
+processes showed 45.8% lower elapsed time. The earlier PTU measurement shares
+the host with other builds, so its elapsed time is contextual. The separate
+Full retained comparison covers occurrence and contributor parity.
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for

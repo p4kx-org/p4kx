@@ -18,7 +18,7 @@ use crate::catalog_queries::{
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::facility_loadout_placements::{
-    ScopedFlightLinks, project_installed_configurations, read_owner_links, scoped_table,
+    FlightComponentReaders, ScopedFlightLinks, project_installed_configurations, scoped_table,
 };
 use crate::contract_loadout::Loadout;
 use crate::{CatalogError, ExportAccountingError};
@@ -168,9 +168,10 @@ fn selected(
         [loadout] => (
             SourceValueState::Present,
             read_placements(
-                query,
+                &FlightComponentReaders::new(query.forge),
                 &OriginalCatalogInput::new(query.forge, &origins),
                 loadout,
+                query.cancel,
             )?,
         ),
         [] if admitted || !loadout_coverage.unreadable_headers.is_empty() => (
@@ -203,22 +204,20 @@ struct ProjectedConfigurations {
     dependencies: Vec<InstalledConfigurationDependency>,
 }
 
-fn read_placements(
-    query: &Query<'_>,
-    input: &OriginalCatalogInput<'_, '_>,
+fn read_placements<'source>(
+    flight: &FlightComponentReaders<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
     loadout: &Loadout,
+    cancel: Option<&CancelToken>,
 ) -> Result<ProjectedConfigurations, CatalogError> {
     let mut configurations: BTreeMap<u32, ScopedFlightLinks> = BTreeMap::new();
-    let rows =
-        project_installed_configurations(loadout, input.origins(), query.cancel, &mut |index| {
-            let entry = match configurations.entry(index) {
-                Entry::Occupied(entry) => entry.into_mut(),
-                Entry::Vacant(entry) => {
-                    entry.insert(read_owner_links(query.forge, input, index, query.cancel)?)
-                }
-            };
-            Ok(entry.links.clone())
-        })?;
+    let rows = project_installed_configurations(loadout, input.origins(), cancel, &mut |index| {
+        let entry = match configurations.entry(index) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(flight.read_owner_links(input, index, cancel)?),
+        };
+        Ok(entry.links.clone())
+    })?;
     Ok(ProjectedConfigurations {
         rows,
         dependencies: configurations

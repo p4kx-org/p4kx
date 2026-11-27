@@ -322,14 +322,14 @@ pub(super) struct OwnerLoadout {
     pub(super) dependencies: LoadoutDependencyCoverage,
 }
 
-pub(super) fn with_resolved_owner<T>(
-    query: &Query<'_>,
+pub(super) fn with_resolved_owner<'source, T>(
+    query: &Query<'source>,
     inputs: &ResolverInputs<'_>,
     texts: &Texts<'_>,
     want: Wanted,
     coverage: &mut CatalogRecordCoverage,
     project: impl FnOnce(
-        &OriginalCatalogInput<'_, '_>,
+        &OriginalCatalogInput<'_, 'source>,
         &mut DirectAlignment<'_>,
         OwnerLoadout,
     ) -> Result<T, CatalogError>,

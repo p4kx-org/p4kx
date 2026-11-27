@@ -7,7 +7,7 @@ use p4kx_extraction::{CancelToken, DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::super::catalog_entity_component_read;
+use super::super::catalog_entity_component_read::PreparedComponent;
 use super::super::catalog_independent_configurations::flight_configuration_tables::{
     FLIGHT_CONTROLLERS, FlightConfigurationTables, FlightOwner, IFCS, THRUSTERS,
 };
@@ -230,64 +230,67 @@ pub(crate) struct ScopedFlightLinks {
     pub(crate) coverage: InstalledConfigurationDependency,
 }
 
-pub(crate) fn read_owner_links<'source>(
-    forge: &'source DataForge<'source>,
-    input: &OriginalCatalogInput<'_, 'source>,
-    record_index: u32,
-    cancel: Option<&CancelToken>,
-) -> Result<ScopedFlightLinks, CatalogError> {
-    let (controllers, flight_controllers) =
-        catalog_entity_component_read::read_selected_with_partials(
-            forge,
+pub(crate) struct FlightComponentReaders<'source> {
+    controllers: PreparedComponent<'source>,
+    ifcs: PreparedComponent<'source>,
+    thrusters: PreparedComponent<'source>,
+}
+
+impl<'source> FlightComponentReaders<'source> {
+    pub(crate) const fn new(forge: &'source DataForge<'source>) -> Self {
+        Self {
+            controllers: PreparedComponent::new(forge, FLIGHT_CONTROLLERS),
+            ifcs: PreparedComponent::new(forge, IFCS),
+            thrusters: PreparedComponent::new(forge, THRUSTERS),
+        }
+    }
+
+    pub(crate) fn read_owner_links(
+        &self,
+        input: &OriginalCatalogInput<'_, 'source>,
+        record_index: u32,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedFlightLinks, CatalogError> {
+        let (controllers, flight_controllers) = self.controllers.read_with_partials(
             input,
             record_index,
             cancel,
-            &FLIGHT_CONTROLLERS,
             FlightController::read,
         )?;
-    let (systems, ifcs) = catalog_entity_component_read::read_selected_with_partials(
-        forge,
-        input,
-        record_index,
-        cancel,
-        &IFCS,
-        Ifcs::read,
-    )?;
-    let (engines, thrusters) = catalog_entity_component_read::read_selected_with_partials(
-        forge,
-        input,
-        record_index,
-        cancel,
-        &THRUSTERS,
-        Thruster::read,
-    )?;
-    let owners = controllers
-        .iter()
-        .map(|row| FlightOwner {
-            kind: FlightConfigurationKind::FlightController,
-            owner: row.owner(),
+        let (systems, ifcs) =
+            self.ifcs
+                .read_with_partials(input, record_index, cancel, Ifcs::read)?;
+        let (engines, thrusters) =
+            self.thrusters
+                .read_with_partials(input, record_index, cancel, Thruster::read)?;
+        let owners = controllers
+            .iter()
+            .map(|row| FlightOwner {
+                kind: FlightConfigurationKind::FlightController,
+                owner: row.owner(),
+            })
+            .chain(systems.iter().map(|row| FlightOwner {
+                kind: FlightConfigurationKind::Ifcs,
+                owner: row.owner(),
+            }))
+            .chain(engines.iter().map(|row| FlightOwner {
+                kind: FlightConfigurationKind::Thruster,
+                owner: row.owner(),
+            }));
+        let mut links = owners
+            .map(|owner| FlightConfigurationLink::new(&owner))
+            .collect::<Vec<_>>();
+        FlightConfigurationLink::sort_for_owner(&mut links, record_index)?;
+        Ok(ScopedFlightLinks {
+            links,
+            coverage: InstalledConfigurationDependency {
+                record_index,
+                flight_controllers,
+                ifcs,
+                thrusters,
+            },
         })
-        .chain(systems.iter().map(|row| FlightOwner {
-            kind: FlightConfigurationKind::Ifcs,
-            owner: row.owner(),
-        }))
-        .chain(engines.iter().map(|row| FlightOwner {
-            kind: FlightConfigurationKind::Thruster,
-            owner: row.owner(),
-        }));
-    let mut links = owners
-        .map(|owner| FlightConfigurationLink::new(&owner))
-        .collect::<Vec<_>>();
-    FlightConfigurationLink::sort_for_owner(&mut links, record_index)?;
-    Ok(ScopedFlightLinks {
-        links,
-        coverage: InstalledConfigurationDependency {
-            record_index,
-            flight_controllers,
-            ifcs,
-            thrusters,
-        },
-    })
+    }
 }
 
 pub(crate) fn scoped_table(
