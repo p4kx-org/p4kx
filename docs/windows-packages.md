@@ -997,3 +997,9 @@ request, merge, target and attempt. The final artifact SHA-256 is
 `c1b7815e68b176bb0b9d4d05d5757eac43c8a9a79b3abf261b66d3d7eff3e9bd`.
 [AMD64 final evidence](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15229624010) ·
 [AMD64 executed payload](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15229574273)
+
+The ARM64 retry reached Wait at 20:34:24 UTC. GitHub cancelled the job at
+21:25:55 UTC, 55 minutes after its start, with the 45-minute job-limit
+annotation. Its raw log endpoint returned HTTP 404. The original final
+lifecycle evidence remains unverified for this attempt. A debug rerun
+selects only the ARM64 execution job on the same merge.
