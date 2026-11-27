@@ -18,8 +18,6 @@ pub(super) fn entities(archive: &Archive) -> TestResult<Route> {
 }
 
 pub(super) fn declarations(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str =
-        "synthetic source and Catalog parity available; installed producer parity open";
     tags::with_tag_declarations(
         archive,
         tags::TagDeclarationFamily::All,
@@ -29,8 +27,8 @@ pub(super) fn declarations(archive: &Archive) -> TestResult<[Route; 2]> {
             let definitions = snapshot.definitions.ok_or("Tag definitions")?;
             let roots = snapshot.roots.ok_or("TagDatabase root arrays")?;
             Ok([
-                Route::queried_rows(TAG_DEFINITIONS, &definitions.rows, REMAINING)?,
-                Route::queried_rows(TAG_ROOTS, &roots.rows, REMAINING)?,
+                Route::queried_rows(TAG_DEFINITIONS, &definitions.rows, None)?,
+                Route::queried_rows(TAG_ROOTS, &roots.rows, None)?,
             ])
         },
     )?
@@ -38,10 +36,6 @@ pub(super) fn declarations(archive: &Archive) -> TestResult<[Route; 2]> {
 
 pub(super) fn paths(archive: &Archive) -> TestResult<Route> {
     tags::with_tag_paths(archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            TAG_PATHS,
-            &snapshot.rows,
-            "synthetic source and Catalog parity available; installed producer parity open",
-        )
+        Route::queried_rows(TAG_PATHS, &snapshot.rows, None)
     })?
 }

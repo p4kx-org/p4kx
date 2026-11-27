@@ -1031,6 +1031,27 @@ was 36,210,360,320 B and minimum commit headroom was 59,859,345,408 B.
 The elapsed time includes streaming the retained Catalog.
 [Same-revision producer and offline replay](catalog-partitioning.md#offline-ptu-replay)
 
+### Packaged LIVE and PTU Tag parity
+
+The one-worker native verifier at `84e0a9ca95ca03da3cae281e24240be9377c7ea5`
+compared the three complete SDK tables and their ordered original
+contributors with the retained Full frames from packaged producer
+`8e2ab5df97cf7c08bd6378606ed232930875586e`. The evidence binding identifies
+53 unchanged Tag reader, source-accounting and verification files.
+Both installed Archive stamps and frame digests were stable.
+
+| Build | Definitions | Roots | Paths | Distinct contributing source uses | Physical sources | Elapsed (s) | Peak private commit (B) | Peak working set (B) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 18,961 | 1 | 18,961 | 284,425 | 1 | 2,021.067 | 1,091,358,720 | 1,022,861,312 |
+| PTU 13284307 | 19,688 | 1 | 19,688 | 295,330 | 1 | 2,081.154 | 1,115,222,016 | 1,047,097,344 |
+
+The elapsed time includes the retained-frame scan. The separate cold
+measurements above cover the SDK queries alone. Minimum available host
+RAM was 49,283,362,816 B on LIVE and 48,857,452,544 B on PTU.
+The terminal pair receipt SHA-256 is
+`4f04ae33f4dcd0b22a7698586307252f5593599fbb7ac25862f139655a5ebab1`.
+[Packaged producer frames](catalog-partitioning.md#packaged-normal-full-measurement-on-9499f7d58)
+
 ## Original Entity tag declarations
 
 Use `catalog_queries::tags::with_entity_tags` or a parsed session's
