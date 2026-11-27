@@ -988,3 +988,12 @@ and reusable Windows workflow. Its AMD64 and ARM64 execution jobs retain
 separate completion receipts.
 [AMD64 retry](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140725255982) ·
 [ARM64 retry](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140725255992)
+
+The AMD64 retry verified terminal success on the tested merge. Its original
+worker closed sequence 200 after 114.650 seconds. The final artifact contains
+the local sequence-04 checkpoint alongside sequence 09, the Wait receipt
+and the successful observer result. The result binds the same original
+request, merge, target and attempt. The final artifact SHA-256 is
+`c1b7815e68b176bb0b9d4d05d5757eac43c8a9a79b3abf261b66d3d7eff3e9bd`.
+[AMD64 final evidence](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15229624010) ·
+[AMD64 executed payload](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15229574273)
