@@ -41,8 +41,11 @@ livery of one ship.
   not in the stencil colour; it can only be `decalColorR`.
 - **Order of overlapping masks.** On the same ship, the long "+MEDIVAC" band on the side of the
   hull is plain light grey with no red tint, though the red mask of the stencil map lies under the
-  grey band: where the masks overlap, blue shows and red does not. This is a weak observation (one
-  band, seen at hangar light); look at the edge of the band on the side of the Ursa Medivac.
+  grey band. That observation supports provisional blue over red. PTU 13284307 provides a near-normal view of the full side marking and separately confirms
+  the equipped Respite livery. The side shows a cool light-grey cross and band with dark lettering.
+  Red illumination falls farther aft near the rear lamps. The smaller rear marking shows red.
+  Determining the overlap order requires registering the side image to the stencil masks and UVs
+  of that build.
 - **MISC Freelancer, standard livery** (consistent with `misc_freelancer_dur_default`): the emblem
   on the blue-grey panel of the rear outer wing flap is darker than the panel and neither rust nor
   white, where `decalColorR` is (10, 10, 10) and green and blue are white. This is the livery
