@@ -77,6 +77,14 @@ indexes for the other repositories. A local Ubuntu 24.04 AMD64 check excluded
 an unrelated fixture source and resolved all four package lists with APT
 simulation. A failed refresh prevents the helper from starting the install.
 
+A local Windows AMD64 Blender 5.2.5 LTS process ran the repository add-on
+smoke test and independently verified all four native fixture artifacts
+published by the CI run above. Each artifact matched its published digest,
+its producer receipt and merge `127366f76ca889b4d90b380a613d37a90c872cd5`.
+The verifier compared manifests across the four sources and imported all
+12 assembly, character and livery scenes. The Linux AMD64 producer and
+the hosted exchange for all five targets remain separate acceptance checks.
+
 ## Package identity and update links
 
 Each package carries `p4kx-distribution.json` to identify its target and format.
