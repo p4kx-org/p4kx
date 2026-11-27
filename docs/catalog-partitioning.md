@@ -785,6 +785,8 @@ Facility instances are staged in one sequential spool. Resolved Loadout occurren
 original room occurrences in their existing order. The producer releases each instance after
 serialization. Room coverage, installed configuration rows and typed resource joins retain
 their existing access paths. The spool contributes to the staged bytes reported by the writer.
+The room-helper read validates the selected model, then releases its mesh levels of detail.
+The retained node hierarchy and original source ranges supply the room transform.
 
 
 Inventory item bounds are staged during the same scan in physical Record and Component order.
@@ -796,6 +798,8 @@ One observed loadout resolver visits roots in stable GUID order and stages each 
 one sequential compressed spool. It retains only the typed Ship port and owner data needed for
 crafter, facility and resource topology joins. The joins use the original attachment and name
 evidence. The producer releases each tree immediately after joining its resource topology.
+Resource-network link bindings occupy a second checksummed frame in the Loadout spool file, and
+each table replays only its own byte range.
 Each Record-defined port shares the selection evidence for its six attribute fields within
 that specific occurrence. Each field retains its own original inputs and completeness. Stage and SDK tests compare the serialized
 fields against their flat evidence sets in both provenance modes. Record process writes during

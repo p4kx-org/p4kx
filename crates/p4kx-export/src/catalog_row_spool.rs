@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
 use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Read, Seek as _, Write};
+use std::io::{self, BufReader, BufWriter, Read, Seek as _, SeekFrom, Write};
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::CancelToken;
-use serde::ser::SerializeSeq as _;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use serde_json::value::RawValue;
 use thiserror::Error;
 use zstd::stream::{read, write};
@@ -19,8 +17,13 @@ use crate::CatalogError;
 
 #[path = "catalog_indexed_row_spool.rs"]
 mod indexed;
+#[path = "catalog_row_spool_serialization.rs"]
+mod serialization;
+#[path = "catalog_row_spool_suffix.rs"]
+mod suffix;
 
 pub(crate) use self::indexed::IndexedRowSpoolWriter;
+pub(crate) use self::suffix::RowSpoolSuffixWriter;
 
 const BUFFER_BYTES: usize = 64 * 1024;
 const SPOOL_ZSTD_LEVEL: i32 = 1;
@@ -29,6 +32,12 @@ const SPOOL_ZSTD_LEVEL: i32 = 1;
 pub(crate) enum RowSpoolError {
     #[error("catalog row spool I/O failed")]
     Io(#[from] io::Error),
+    #[error("catalog row spool suffix could not be rolled back: {rollback}")]
+    SuffixRollback {
+        #[source]
+        primary: Box<CatalogError>,
+        rollback: io::Error,
+    },
     #[error("catalog row could not be encoded")]
     Encode(#[source] serde_json::Error),
     #[error("catalog row spool contained invalid JSON")]
@@ -55,16 +64,27 @@ impl From<RowSpoolError> for CatalogError {
 }
 
 /// Streams ordered JSON rows into one private compressed file and indexes their decoded lengths.
-pub(crate) struct RowSpoolWriter {
-    encoder: Option<BufWriter<write::Encoder<'static, BufWriter<File>>>>,
+pub(crate) struct RowSpoolWriter<W: Write = File> {
+    encoder: Option<BufWriter<write::Encoder<'static, BufWriter<W>>>>,
     lengths: Vec<NonZeroUsize>,
 }
 
 impl RowSpoolWriter {
     pub(crate) fn new(scratch: &Path) -> Result<Self, RowSpoolError> {
-        let file = tempfile::tempfile_in(scratch)?;
+        Self::with_output(tempfile::tempfile_in(scratch)?)
+    }
+
+    pub(crate) fn finish(self, cancel: Option<&CancelToken>) -> Result<RowSpool, RowSpoolError> {
+        let (file, lengths) = self.finish_output(cancel)?;
+        let bytes = file.metadata()?.len();
+        Ok(RowSpool::new(file, bytes, RowIndex::Sequential(lengths)))
+    }
+}
+
+impl<W: Write> RowSpoolWriter<W> {
+    fn with_output(output: W) -> Result<Self, RowSpoolError> {
         let mut encoder = write::Encoder::new(
-            BufWriter::with_capacity(BUFFER_BYTES, file),
+            BufWriter::with_capacity(BUFFER_BYTES, output),
             SPOOL_ZSTD_LEVEL,
         )?;
         encoder.include_checksum(true)?;
@@ -90,10 +110,10 @@ impl RowSpoolWriter {
     }
 
     /// Completes the compressed frame and releases the append buffer.
-    pub(crate) fn finish(
+    fn finish_output(
         mut self,
         cancel: Option<&CancelToken>,
-    ) -> Result<RowSpool, RowSpoolError> {
+    ) -> Result<(W, Vec<NonZeroUsize>), RowSpoolError> {
         checkpoint(cancel)?;
         let buffered = self.encoder.take().ok_or(RowSpoolError::Closed)?;
         let encoder = buffered
@@ -106,24 +126,26 @@ impl RowSpoolWriter {
         let flushed = buffered.flush();
         checkpoint(cancel)?;
         flushed?;
-        let file = buffered
+        let output = buffered
             .into_inner()
             .map_err(io::IntoInnerError::into_error)?;
-        let bytes = file.metadata()?.len();
-        Ok(RowSpool {
-            file: Mutex::new(file),
-            bytes,
-            index: RowIndex::Sequential(self.lengths),
-        })
+        Ok((output, self.lengths))
     }
 }
 
 /// An immutable ordered row source replayed with a fresh decoder.
 #[derive(Debug)]
 pub(crate) struct RowSpool {
-    file: Mutex<File>,
+    backing: Arc<SpoolBacking>,
+    offset: u64,
     bytes: u64,
     index: RowIndex,
+}
+
+#[derive(Debug)]
+struct SpoolBacking {
+    file: Mutex<File>,
+    bytes: u64,
 }
 
 #[derive(Debug)]
@@ -133,6 +155,18 @@ enum RowIndex {
 }
 
 impl RowSpool {
+    fn new(file: File, bytes: u64, index: RowIndex) -> Self {
+        Self {
+            backing: Arc::new(SpoolBacking {
+                file: Mutex::new(file),
+                bytes,
+            }),
+            offset: 0,
+            bytes,
+            index,
+        }
+    }
+
     pub(crate) const fn rows(&self) -> usize {
         match &self.index {
             RowIndex::Sequential(lengths) => lengths.len(),
@@ -144,35 +178,28 @@ impl RowSpool {
         self.bytes
     }
 
-    pub(crate) const fn serialize_rows<'a>(
-        &'a self,
-        cancel: Option<&'a CancelToken>,
-    ) -> SpoolRows<'a> {
-        SpoolRows {
-            spool: self,
-            cancel,
-            failure: RefCell::new(None),
-        }
-    }
-
     fn replay<E>(
         &self,
         cancel: Option<&CancelToken>,
         mut visit: impl FnMut(&RawValue) -> Result<(), E>,
     ) -> Result<(), ReplayError<E>> {
         checkpoint(cancel)?;
-        let mut file = self.file.lock().map_err(|_| {
-            RowSpoolError::Io(io::Error::other("catalog row spool lock is poisoned"))
-        })?;
-        if file.metadata().map_err(RowSpoolError::Io)?.len() != self.bytes {
-            return Err(RowSpoolError::Corrupt("compressed length changed").into());
+        let mut file = self.backing.file.lock().map_err(|_| poisoned_lock())?;
+        check_backing_length(&file, self.backing.bytes)?;
+        if self
+            .offset
+            .checked_add(self.bytes)
+            .is_none_or(|end| end > self.backing.bytes)
+        {
+            return Err(RowSpoolError::Corrupt("compressed range exceeds backing").into());
         }
         let lengths = match &self.index {
             RowIndex::Sequential(lengths) => lengths,
             RowIndex::Indexed(frames) => return indexed::replay(&mut file, frames, cancel, visit),
         };
-        file.rewind().map_err(RowSpoolError::Io)?;
-        let input = CheckedIo::new(&mut *file, cancel);
+        file.seek(SeekFrom::Start(self.offset))
+            .map_err(RowSpoolError::Io)?;
+        let input = CheckedIo::new((&mut *file).take(self.bytes), cancel);
         let decoder = read::Decoder::with_buffer(BufReader::with_capacity(BUFFER_BYTES, input))
             .map_err(RowSpoolError::Io)?
             .single_frame();
@@ -200,6 +227,17 @@ impl RowSpool {
     }
 }
 
+fn poisoned_lock() -> RowSpoolError {
+    RowSpoolError::Io(io::Error::other("catalog row spool lock is poisoned"))
+}
+
+fn check_backing_length(file: &File, expected: u64) -> Result<(), RowSpoolError> {
+    if file.metadata()?.len() != expected {
+        return Err(RowSpoolError::Corrupt("compressed length changed"));
+    }
+    Ok(())
+}
+
 enum ReplayError<E> {
     Spool(RowSpoolError),
     Output(E),
@@ -208,47 +246,6 @@ enum ReplayError<E> {
 impl<E> From<RowSpoolError> for ReplayError<E> {
     fn from(error: RowSpoolError) -> Self {
         Self::Spool(error)
-    }
-}
-
-/// Serializes the same ordered row sequence on each invocation.
-#[derive(Debug)]
-pub(crate) struct SpoolRows<'a> {
-    spool: &'a RowSpool,
-    cancel: Option<&'a CancelToken>,
-    failure: RefCell<Option<RowSpoolError>>,
-}
-
-impl SpoolRows<'_> {
-    /// Recovers the typed input error after a failed serialization.
-    pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
-        self.failure.take()
-    }
-
-    /// Streams verified rows into an existing JSON sequence.
-    pub(crate) fn visit<E: serde::ser::Error>(
-        &self,
-        visit: impl FnMut(&RawValue) -> Result<(), E>,
-    ) -> Result<(), E> {
-        *self.failure.borrow_mut() = None;
-        match self.spool.replay(self.cancel, visit) {
-            Ok(()) => Ok(()),
-            Err(ReplayError::Output(error)) => Err(error),
-            Err(ReplayError::Spool(error)) => {
-                let reported = E::custom(&error);
-                *self.failure.borrow_mut() = Some(error);
-                Err(reported)
-            }
-        }
-    }
-}
-
-impl Serialize for SpoolRows<'_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        *self.failure.borrow_mut() = None;
-        let mut sequence = serializer.serialize_seq(Some(self.spool.rows()))?;
-        self.visit(|row| sequence.serialize_element(row))?;
-        sequence.end()
     }
 }
 

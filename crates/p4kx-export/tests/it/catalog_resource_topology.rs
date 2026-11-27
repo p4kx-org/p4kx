@@ -15,6 +15,9 @@ mod physical_loadout;
 mod placements_sdk;
 #[path = "catalog_resource_topology_port_attributes.rs"]
 mod port_attributes;
+#[path = "catalog_resource_topology_staged.rs"]
+mod staged;
+
 #[path = "catalog_topology_declarations_sdk.rs"]
 mod sdk;
 #[path = "catalog_vehicle_port_selector_origins.rs"]

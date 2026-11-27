@@ -71,9 +71,13 @@ fn indexed_frames_reject_same_length_corruption() -> TestResult {
     let directory = tempfile::tempdir()?;
     let mut writer = IndexedRowSpoolWriter::new(directory.path())?;
     writer.append(0, &["row contents"], None)?;
-    let mut spool = writer.finish(None)?;
+    let spool = writer.finish(None)?;
     {
-        let file = spool.file.get_mut().map_err(|_| "poisoned fixture spool")?;
+        let mut file = spool
+            .backing
+            .file
+            .lock()
+            .map_err(|_| "poisoned fixture spool")?;
         let mut byte = [0];
         file.seek(SeekFrom::End(-1))?;
         file.read_exact(&mut byte)?;

@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::io::{self, Read as _, Seek as _, SeekFrom, Write as _};
+use std::io;
+use std::sync::Arc;
 
 use p4kx_extraction::CancelToken;
 use serde::ser::SerializeSeq as _;
@@ -10,7 +11,11 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 use serde_json::value::RawValue;
 
-use super::{IndexedRowSpoolWriter, RowSpoolError, RowSpoolWriter};
+use super::{IndexedRowSpoolWriter, RowSpool, RowSpoolError, RowSpoolWriter};
+use crate::CatalogError;
+
+#[path = "catalog_row_spool_frame_tests.rs"]
+mod frames;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -27,7 +32,7 @@ fn rows_replay_in_original_order_as_the_same_compact_json() -> TestResult {
     for row in &values {
         writer.append(row, None)?;
     }
-    let spool = writer.finish(None)?;
+    let mut spool = writer.finish(None)?;
     assert_eq!(
         spool.rows(),
         values.len(),
@@ -37,6 +42,7 @@ fn rows_replay_in_original_order_as_the_same_compact_json() -> TestResult {
     assert_eq!(
         spool.stored_bytes(),
         spool
+            .backing
             .file
             .lock()
             .map_err(|_| "private spool lock")?
@@ -48,15 +54,88 @@ fn rows_replay_in_original_order_as_the_same_compact_json() -> TestResult {
         spool.stored_bytes() < u64::try_from(expected.len())?,
         "the scratch file retains only the compressed row stream"
     );
-    let view = spool.serialize_rows(None);
-    assert_eq!(serde_json::to_vec(&view)?, expected, "the measure replay");
-    assert_eq!(serde_json::to_vec(&view)?, expected, "the output replay");
+    {
+        let view = spool.serialize_rows(None);
+        assert_eq!(serde_json::to_vec(&view)?, expected, "the measure replay");
+        assert_eq!(serde_json::to_vec(&view)?, expected, "the output replay");
+    }
+    check_suffix_views(&mut spool, &expected)?;
     drop(spool);
     assert_eq!(
         scratch.path().read_dir()?.count(),
         0,
         "scratch is released on drop"
     );
+    Ok(())
+}
+
+fn check_suffix_views(loadouts: &mut RowSpool, expected: &[u8]) -> TestResult {
+    let original_bytes = loadouts.stored_bytes();
+    let ((), empty) = loadouts.append_suffix(None, |_| Ok(()))?;
+    assert!(empty.is_none(), "an empty suffix does not create a frame");
+    assert_eq!(
+        loadouts.backing.bytes, original_bytes,
+        "an empty suffix preserves the sealed file length"
+    );
+
+    let ((), links) = loadouts.append_suffix(None, |writer| {
+        writer.append(&json!({"port":5}), None)?;
+        writer.append(&json!({"port":1}), None)?;
+        Ok(())
+    })?;
+    let links = links.ok_or("missing appended frame")?;
+    assert!(
+        Arc::ptr_eq(&links.backing, &loadouts.backing),
+        "both frames use the same existing open file"
+    );
+    assert_eq!(
+        links.offset, original_bytes,
+        "the link frame begins at the sealed Loadout boundary"
+    );
+    assert_eq!(
+        loadouts.stored_bytes(),
+        original_bytes,
+        "link staging keeps the Loadout frame size"
+    );
+    assert_eq!(
+        links.backing.bytes,
+        original_bytes + links.stored_bytes(),
+        "each view accounts for its own compressed bytes"
+    );
+    for _ in 0..2 {
+        assert_eq!(
+            serde_json::to_vec(&loadouts.serialize_rows(None))?,
+            expected,
+            "Loadout replay stays within the original frame"
+        );
+        assert_eq!(
+            serde_json::to_string(&links.serialize_rows(None))?,
+            r#"[{"port":5},{"port":1}]"#,
+            "link replay preserves only the appended rows in projection order"
+        );
+    }
+
+    check_truncated_backing(loadouts, &links)
+}
+
+fn check_truncated_backing(loadouts: &RowSpool, links: &RowSpool) -> TestResult {
+    links
+        .backing
+        .file
+        .lock()
+        .map_err(|_| "private spool lock")?
+        .set_len(links.backing.bytes - 1)?;
+    for spool in [loadouts, links] {
+        let view = spool.serialize_rows(None);
+        assert!(
+            serde_json::to_vec(&view).is_err(),
+            "both views refuse a truncated shared file"
+        );
+        assert!(
+            matches!(view.take_failure(), Some(RowSpoolError::Corrupt(_))),
+            "replay retains the typed backing-length failure"
+        );
+    }
     Ok(())
 }
 
@@ -165,32 +244,6 @@ fn replay_cancellation_and_output_errors_are_distinct() -> TestResult {
         serde_json::to_string(&output)?,
         "[true]",
         "a failed output did not consume the immutable row source"
-    );
-    Ok(())
-}
-
-#[test]
-fn an_in_place_checksum_corruption_stops_replay() -> TestResult {
-    let scratch = tempfile::tempdir()?;
-    let mut writer = RowSpoolWriter::new(scratch.path())?;
-    writer.append(&json!({"value": 42}), None)?;
-    let spool = writer.finish(None)?;
-    {
-        let mut file = spool.file.lock().map_err(|_| "private spool lock")?;
-        file.seek(SeekFrom::End(-1))?;
-        let mut byte = [0];
-        file.read_exact(&mut byte)?;
-        file.seek(SeekFrom::End(-1))?;
-        file.write_all(&byte.map(|last| last ^ 0xff))?;
-    }
-    let view = spool.serialize_rows(None);
-    assert!(
-        serde_json::to_vec(&view).is_err(),
-        "frame checksum rejects changed bytes"
-    );
-    assert!(
-        view.take_failure().is_some(),
-        "spool replay error remains available"
     );
     Ok(())
 }

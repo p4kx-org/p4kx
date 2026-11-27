@@ -10,7 +10,9 @@ use super::facility_instance::FacilityInstance;
 use super::facility_loadout_placements::{
     self, InstalledConfiguration, InteriorRoomCoverage, LoadoutPlacements,
 };
-use super::resource_network_placements::ResourceNetworkPlacementTables;
+use super::resource_network_placements::{
+    ResourceNetworkPlacementTables, StagedResourceNetworkPlacementTables,
+};
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
 use crate::CatalogError;
@@ -33,7 +35,8 @@ use crate::starmap_containers::unresolved::UnresolvedContainerLink;
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogPlacements {
     #[serde(flatten)]
-    resource_network: ResourceNetworkPlacementTables,
+    #[schemars(with = "ResourceNetworkPlacementTables")]
+    resource_network: StagedResourceNetworkPlacementTables,
     starmap_placements: CatalogTable<StarmapPlacement>,
     #[schemars(with = "CatalogTable<FacilityInstance>")]
     facility_instances: StagedCatalogTable,
@@ -52,7 +55,8 @@ pub(crate) struct CatalogPlacements {
 
 impl CatalogPlacements {
     pub(crate) fn staged_row_bytes(&self) -> u128 {
-        u128::from(self.container_instances.stored_bytes())
+        u128::from(self.resource_network.stored_bytes())
+            + u128::from(self.container_instances.stored_bytes())
             + u128::from(self.location_instances.stored_bytes())
             + u128::from(self.unresolved_container_links.stored_bytes())
             + u128::from(self.location_physics_grids.stored_bytes())
@@ -60,8 +64,9 @@ impl CatalogPlacements {
     }
 
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
-        self.container_instances
+        self.resource_network
             .take_failure()
+            .or_else(|| self.container_instances.take_failure())
             .or_else(|| self.location_instances.take_failure())
             .or_else(|| self.unresolved_container_links.take_failure())
             .or_else(|| self.location_physics_grids.take_failure())

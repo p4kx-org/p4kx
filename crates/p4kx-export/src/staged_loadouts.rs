@@ -9,8 +9,11 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 
 use super::join::ShipLoadoutJoin;
-use crate::catalog_rows::spool::{RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
+use crate::catalog_rows::spool::{
+    RowSpool, RowSpoolError, RowSpoolSuffixWriter, RowSpoolWriter, checkpoint,
+};
 use crate::contract_loadout::{EntityKind, Loadout};
+use crate::{CatalogError, ExportAccountingError};
 
 /// Canonical Loadout rows and the typed inputs for Ship placement joins.
 #[derive(Debug, Default)]
@@ -94,6 +97,18 @@ impl StagedLoadouts {
 
     pub(crate) fn take_ship_joins(&mut self) -> Vec<ShipLoadoutJoin> {
         std::mem::take(&mut self.ships)
+    }
+
+    pub(crate) fn append_topology_links<T>(
+        &mut self,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(&mut RowSpoolSuffixWriter<'_>) -> Result<T, CatalogError>,
+    ) -> Result<(T, Option<RowSpool>), CatalogError> {
+        let rows = self
+            .rows
+            .as_mut()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        rows.append_suffix(cancel, project)
     }
 
     pub(crate) fn stored_bytes(&self) -> u64 {

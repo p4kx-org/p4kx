@@ -4,7 +4,6 @@
 use std::fs::File;
 use std::io::{self, BufWriter, Seek as _, SeekFrom, Write as _};
 use std::path::Path;
-use std::sync::Mutex;
 
 use p4kx_extraction::CancelToken;
 use serde::Serialize;
@@ -101,11 +100,11 @@ impl<Key: Ord> IndexedRowSpoolWriter<Key> {
             checkpoint(cancel)?;
             frames.push(frame);
         }
-        Ok(RowSpool {
-            file: Mutex::new(file),
-            bytes: self.bytes,
-            index: super::RowIndex::Indexed(frames),
-        })
+        Ok(RowSpool::new(
+            file,
+            self.bytes,
+            super::RowIndex::Indexed(frames),
+        ))
     }
 }
 

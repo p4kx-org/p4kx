@@ -173,12 +173,15 @@ fn read_model(
 ) -> Result<ProvidedModel, RoomTransformUnavailable> {
     use p4kx_assembly::ModelProvider as _;
 
-    provider
+    let mut model = provider
         .model(path, AssemblyOptions::default().lod)
         .map_err(|error| match error {
             ModelFailure::Missing => RoomTransformUnavailable::Unsupported,
             _ => RoomTransformUnavailable::Unreadable,
-        })
+        })?;
+    // Room helpers use the admitted node hierarchy and its original source ranges.
+    model.model.lods = Vec::new();
+    Ok(model)
 }
 
 fn observe_helper(

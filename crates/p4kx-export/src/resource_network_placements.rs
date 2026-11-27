@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, SourcedValue};
+use p4kx_extraction::{CancelToken, DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 pub use super::catalog_item_alignment::PhysicalPort;
 pub use super::loadout_position::LoadoutPosition;
 pub use super::network_endpoint::{EndpointCandidate, NetworkEndpoint};
-use crate::catalog_table::CatalogTable;
+use crate::catalog_rows::spool::{RowSpool, RowSpoolError};
+use crate::catalog_rows::staged::StagedCatalogTable;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::loadout::alignment::AttachmentIdentity;
 use crate::schema_fields::every_field_required;
@@ -17,36 +19,83 @@ use crate::schema_fields::every_field_required;
 mod api;
 pub use api::PlacementTable;
 
+const LINK_TYPES: &[&str] = &["SInternalHardpointLink", "SInternalResourceLink"];
+
 #[derive(Default)]
 pub(crate) struct ResourceNetworkPlacements {
     pub(super) nodes: Vec<ResourceNetworkNode>,
-    pub(super) links: Vec<ResourceNetworkLinkBinding>,
     pub(super) rooms: Vec<RoomAssociationBinding>,
 }
 
 impl ResourceNetworkPlacements {
-    pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> ResourceNetworkPlacementTables {
+    pub(super) fn into_tables(
+        self,
+        forge: &DataForge<'_>,
+        links: Vec<ResourceNetworkLinkBinding>,
+    ) -> ResourceNetworkPlacementTables {
+        let (resource_network_nodes, room_association_bindings) = self.tables(forge);
         ResourceNetworkPlacementTables {
-            resource_network_nodes: CatalogTable::new(
-                forge,
-                &[
-                    "ItemResourceComponentParams",
-                    "SInternalHardpointLink",
-                    "SInternalResourceLink",
-                ],
-                self.nodes,
-            ),
-            resource_network_link_bindings: CatalogTable::new(
-                forge,
-                &["SInternalHardpointLink", "SInternalResourceLink"],
-                self.links,
-            ),
-            room_association_bindings: CatalogTable::new(
-                forge,
-                &["SVehicleObjectContainerParams"],
-                self.rooms,
-            ),
+            resource_network_nodes,
+            resource_network_link_bindings: CatalogTable::new(forge, LINK_TYPES, links),
+            room_association_bindings,
         }
+    }
+
+    pub(super) fn into_staged_tables(
+        self,
+        forge: &DataForge<'_>,
+        links: Option<RowSpool>,
+        cancel: Option<&CancelToken>,
+    ) -> StagedResourceNetworkPlacementTables {
+        let availability = if links.is_some() {
+            DatasetAvailability::Available
+        } else {
+            DatasetAvailability::from_source_declarations(forge, |name| LINK_TYPES.contains(&name))
+        };
+        let (resource_network_nodes, room_association_bindings) = self.tables(forge);
+        StagedResourceNetworkPlacementTables {
+            resource_network_nodes,
+            resource_network_link_bindings: StagedCatalogTable::new(availability, links, cancel),
+            room_association_bindings,
+        }
+    }
+
+    fn tables(
+        self,
+        forge: &DataForge<'_>,
+    ) -> (
+        CatalogTable<ResourceNetworkNode>,
+        CatalogTable<RoomAssociationBinding>,
+    ) {
+        let nodes = CatalogTable::new(
+            forge,
+            &[
+                "ItemResourceComponentParams",
+                "SInternalHardpointLink",
+                "SInternalResourceLink",
+            ],
+            self.nodes,
+        );
+        let rooms = CatalogTable::new(forge, &["SVehicleObjectContainerParams"], self.rooms);
+        (nodes, rooms)
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StagedResourceNetworkPlacementTables {
+    resource_network_nodes: CatalogTable<ResourceNetworkNode>,
+    resource_network_link_bindings: StagedCatalogTable,
+    room_association_bindings: CatalogTable<RoomAssociationBinding>,
+}
+
+impl StagedResourceNetworkPlacementTables {
+    pub(crate) const fn stored_bytes(&self) -> u64 {
+        self.resource_network_link_bindings.stored_bytes()
+    }
+
+    pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
+        self.resource_network_link_bindings.take_failure()
     }
 }
 

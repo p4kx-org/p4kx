@@ -12,7 +12,7 @@ use super::network_endpoint::{LocalPorts, NetworkEndpoint};
 use super::resource_network_placements::{
     FuseEvidence, InstalledResourceComponent, LinkFamily, ResourceNetworkLinkBinding,
     ResourceNetworkNode, ResourceNetworkPlacementTables, ResourceNetworkPlacements,
-    RoomAssociationBinding,
+    RoomAssociationBinding, StagedResourceNetworkPlacementTables,
 };
 use super::resource_topology_declarations::ResourceTopologyDeclarations;
 use super::resource_topology_index::{TopologyIndex, TopologySource};
@@ -40,7 +40,7 @@ impl<Port> Context<'_, Port> {
 
 pub(crate) struct CatalogResourceTopology<'source> {
     pub(crate) declarations: super::resource_topology_declarations::ResourceTopologyTables<'source>,
-    pub(crate) placements: ResourceNetworkPlacementTables,
+    pub(crate) placements: StagedResourceNetworkPlacementTables,
 }
 
 impl<'source> Collected<'source> {
@@ -51,12 +51,12 @@ impl<'source> Collected<'source> {
         cancel: Option<&CancelToken>,
     ) -> Result<CatalogResourceTopology<'source>, CatalogError> {
         let placements = project(
+            forge,
             &mut self.loadouts,
             &self.entity_configurations,
             sources,
             cancel,
-        )?
-        .into_tables(forge);
+        )?;
         let declarations =
             std::mem::take(&mut self.entity_configurations.topology).into_tables(forge);
         Ok(CatalogResourceTopology {
@@ -67,17 +67,28 @@ impl<'source> Collected<'source> {
 }
 
 fn project(
+    forge: &DataForge<'_>,
     loadouts: &mut StagedLoadouts,
     selected: &EntityConfigurationRows<'_>,
     sources: &SourceUses,
     cancel: Option<&CancelToken>,
-) -> Result<ResourceNetworkPlacements, CatalogError> {
+) -> Result<StagedResourceNetworkPlacementTables, CatalogError> {
     let index = TopologyIndex::new(selected)?;
-    let mut graph = ResourceNetworkPlacements::default();
-    for ship in loadouts.take_ship_joins() {
-        graph.add_loadout(&ship.view(), &index, sources, cancel)?;
+    let ships = loadouts.take_ship_joins();
+    if ships.is_empty() {
+        return Ok(ResourceNetworkPlacements::default().into_staged_tables(forge, None, cancel));
     }
-    Ok(graph)
+    let (placements, links) = loadouts.append_topology_links(cancel, |rows| {
+        let mut projection = Projection {
+            placements: ResourceNetworkPlacements::default(),
+            emit_link: |row| rows.append(&row, cancel).map_err(CatalogError::from),
+        };
+        for ship in ships {
+            projection.add_loadout(&ship.view(), &index, sources, cancel)?;
+        }
+        Ok(projection.placements)
+    })?;
+    Ok(placements.into_staged_tables(forge, links, cancel))
 }
 
 pub(crate) fn project_scoped(
@@ -89,16 +100,31 @@ pub(crate) fn project_scoped(
     sources: &SourceUses,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceNetworkPlacementTables, CatalogError> {
-    let mut graph = ResourceNetworkPlacements::default();
+    let mut links = Vec::new();
+    let mut projection = Projection {
+        placements: ResourceNetworkPlacements::default(),
+        emit_link: |row| {
+            links.push(row);
+            Ok(())
+        },
+    };
     if let Some(loadout) = loadout {
         let index =
             TopologyIndex::with_facts(declarations, resources, &alignment.topology_facts())?;
-        graph.add_loadout(&LoadoutJoin::from(loadout), &index, sources, cancel)?;
+        projection.add_loadout(&LoadoutJoin::from(loadout), &index, sources, cancel)?;
     }
-    Ok(graph.into_tables(forge))
+    Ok(projection.placements.into_tables(forge, links))
 }
 
-impl ResourceNetworkPlacements {
+struct Projection<Emit> {
+    placements: ResourceNetworkPlacements,
+    emit_link: Emit,
+}
+
+impl<Emit> Projection<Emit>
+where
+    Emit: FnMut(ResourceNetworkLinkBinding) -> Result<(), CatalogError>,
+{
     fn add_loadout(
         &mut self,
         loadout: &LoadoutJoin<'_, impl JoinPort>,
@@ -111,7 +137,7 @@ impl ResourceNetworkPlacements {
         let position = LoadoutPosition::root(record);
         let root_resources = components(index, Some(record));
         if !root_resources.is_empty() {
-            self.nodes.push(ResourceNetworkNode {
+            self.placements.nodes.push(ResourceNetworkNode {
                 position: position.clone(),
                 original_port: None,
                 attached_item: None,
@@ -175,7 +201,7 @@ impl ResourceNetworkPlacements {
             let attachment = port.alignment().attachment();
             let resource_components = components(index, target_record(attachment));
             if referenced.contains(&ordinal) || !resource_components.is_empty() {
-                self.nodes.push(ResourceNetworkNode {
+                self.placements.nodes.push(ResourceNetworkNode {
                     position: context.child(ordinal),
                     original_port: port.alignment().physical_port()?,
                     attached_item: attachment.cloned(),
@@ -203,28 +229,28 @@ impl ResourceNetworkPlacements {
                 let port1 = local.name(&link.port1, link.port1_use.as_ref())?;
                 let port2 = local.name(&link.port2, link.port2_use.as_ref())?;
                 referenced.extend(port_ordinals(&port1).chain(port_ordinals(&port2)));
-                self.links.push(ResourceNetworkLinkBinding {
+                (self.emit_link)(ResourceNetworkLinkBinding {
                     context: context.position.clone(),
                     family: LinkFamily::Hardpoint,
                     owner: declaration.owner().clone(),
                     link_ordinal: link.link_ordinal.clone(),
                     port1,
                     port2,
-                });
+                })?;
             }
             for link in declaration.resources() {
                 check_cancel(cancel)?;
                 let port1 = local.weak(record, &link.port1, link.port1_use.as_ref())?;
                 let port2 = local.weak(record, &link.port2, link.port2_use.as_ref())?;
                 referenced.extend(port_ordinals(&port1).chain(port_ordinals(&port2)));
-                self.links.push(ResourceNetworkLinkBinding {
+                (self.emit_link)(ResourceNetworkLinkBinding {
                     context: context.position.clone(),
                     family: LinkFamily::Resource,
                     owner: declaration.owner().clone(),
                     link_ordinal: link.link_ordinal.clone(),
                     port1,
                     port2,
-                });
+                })?;
             }
         }
         for declaration in &source.rooms {
@@ -233,7 +259,7 @@ impl ResourceNetworkPlacements {
                 let port =
                     local.name(&room.resource_network_itemport_name, room.port_use.as_ref())?;
                 referenced.extend(port_ordinals(&port));
-                self.rooms.push(RoomAssociationBinding {
+                self.placements.rooms.push(RoomAssociationBinding {
                     context: context.position.clone(),
                     owner: declaration.owner().clone(),
                     container_ordinal: room.container_ordinal.clone(),
