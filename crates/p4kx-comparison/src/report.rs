@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 #[path = "report_entry_origins.rs"]
-mod entry_origins;
+pub(crate) mod entry_origins;
 
 use crate::record_report::{RecordLevel, record_level};
 use crate::report_origins::{ReportOriginFields, ReportOrigins};

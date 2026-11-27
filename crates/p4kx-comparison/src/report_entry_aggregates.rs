@@ -13,14 +13,16 @@ use crate::{ChangeKind, DirectoryCounts, EntryChange};
 pub(crate) struct AggregateOrigins<'a> {
     directories: &'a [DirectoryCounts<'a>],
     totals: CountOrigins,
+    selects_paths: bool,
     groups: Vec<GroupOrigins>,
 }
 
 impl<'a> AggregateOrigins<'a> {
-    pub(crate) fn new(directories: &'a [DirectoryCounts<'a>]) -> Self {
+    pub(crate) fn new(directories: &'a [DirectoryCounts<'a>], selects_paths: bool) -> Self {
         Self {
             directories,
             totals: CountOrigins::default(),
+            selects_paths,
             groups: directories
                 .iter()
                 .map(|_| GroupOrigins::default())
@@ -55,7 +57,11 @@ impl<'a> AggregateOrigins<'a> {
             });
         }
         let kind = change.kind();
-        self.totals.for_kind(kind).push(decision.clone());
+        let total = self.totals.for_kind(kind);
+        total.push(decision.clone());
+        if self.selects_paths {
+            total.push(membership.clone());
+        }
         group
             .counts
             .for_kind(kind)

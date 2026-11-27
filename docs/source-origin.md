@@ -445,6 +445,17 @@ suffix. Kept files retain their existing proof. The report uses null
 foreign content occupies its companion path. A replacement requires the guarded
 lock, retires a previous owned companion and preserves foreign content.
 
+## GUI Entry comparison summary
+
+`ComparisonView::entry_summary_provenance` captures the original inputs of the
+currently displayed counts and directory labels. It runs on request and follows
+the applied Filter, including incomparable pairs. Each directory label retains
+the spelling of its first selected Entry. Counts and directories use the same
+field paths as the Comparison report, and `/entries/incomparableCount` addresses
+the number of selected incomparable pairs. An empty count without observed
+population evidence has unknown origin. Resolve the references in the returned
+source inventory.
+
 ## CryXml in extraction and folder conversion
 
 The batch commands publish the converted XML beside the same field-addressed

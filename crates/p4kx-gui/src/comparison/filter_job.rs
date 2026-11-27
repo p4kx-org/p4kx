@@ -15,6 +15,7 @@ use super::summary::Summary;
 #[derive(Debug)]
 pub(crate) struct Matched {
     pub(crate) mask: Arc<[bool]>,
+    pub(crate) filter: Option<Filter>,
     pub(crate) summary: Summary,
 }
 
@@ -60,6 +61,7 @@ pub(crate) fn none(comparison: &OwnedComparison) -> Matched {
     let mask = vec![false; comparison.len()];
     Matched {
         summary: Summary::of(&comparison.comparison_of(&mask)),
+        filter: None,
         mask: mask.into(),
     }
 }
@@ -90,6 +92,7 @@ pub(crate) fn start(
         Err(_ignored) => Started::Finished(
             matching(comparison, filter, &AtomicBool::new(false)).unwrap_or_else(|| Matched {
                 mask: Arc::from([]),
+                filter: None,
                 summary: Summary::default(),
             }),
         ),
@@ -124,6 +127,7 @@ fn matching(
     };
     (!cancelled.load(Ordering::Relaxed)).then(|| Matched {
         mask: mask.into(),
+        filter: Some(filter.clone()),
         summary,
     })
 }

@@ -187,6 +187,26 @@ impl OwnedComparison {
         }
     }
 
+    /// Returns the selected Entry changes and the incomparable pairs admitted by `filter`.
+    ///
+    /// A missing Filter selects no incomparable pairs.
+    #[must_use]
+    pub fn comparison_of_filter(
+        &self,
+        selected: &[bool],
+        filter: Option<&Filter>,
+    ) -> Comparison<'_> {
+        let mut comparison = self.comparison_of(selected);
+        if let Some(filter) = filter {
+            comparison.filter = Some(filter.as_str().to_owned());
+            comparison.incomparables = self
+                .incomparable_entries()
+                .filter(|entry| filter.matches(entry.path()))
+                .collect();
+        }
+        comparison
+    }
+
     /// Compares both Archives again on the levels of this Comparison, narrowed to `filter`, and
     /// hands the whole Comparison, the Record level included, to `use_it`; it is what
     /// [`compare_with_dataforge_entries`] gives with these settings.
