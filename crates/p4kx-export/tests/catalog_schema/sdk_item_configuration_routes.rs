@@ -30,6 +30,8 @@ use super::{Route, TestResult, fixtures};
 mod alignment;
 #[path = "../it/equipment_bounds_fixture.rs"]
 mod bounds;
+#[path = "sdk_item_port_localization.rs"]
+mod port_localization;
 
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 const LANGUAGES: CatalogLanguageSelection = CatalogLanguageSelection::Selected(&[]);

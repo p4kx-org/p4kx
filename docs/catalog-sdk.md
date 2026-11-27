@@ -899,8 +899,9 @@ consumer-owned values from the callback and publish them after the query succeed
 
 The snapshot carries Record, component and port positions, original value states,
 scope coverage, public labels in the selected languages, and the field origin inventory.
-`with_item_ports` reads the requested localization before owner selection. An unreadable
-requested locale can therefore fail even when selection would return no owners.
+`with_item_ports` loads requested locale payloads when it reaches the first readable selected
+owner. A selection without a readable owner reports the requested languages and an empty
+available-language list. An unreadable requested locale fails a query with a readable owner.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
 Use `visit_item_ports` or `visit_item_ports_from` to process one readable physical Record

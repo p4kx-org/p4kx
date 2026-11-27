@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::ENTITY_TYPE;
+use std::cell::OnceCell;
+
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Language, LocalizationNote,
-    PointerProbe, Record, SourceInventory, TreeBuilder,
+    SourceInventory,
 };
 
 use super::{
     CatalogLanguageSelection, CatalogPublicName, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability, ItemPortContainer,
 };
+use crate::CatalogError;
+use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_query_session::{
     CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
@@ -19,11 +23,8 @@ use crate::catalog_query_session::{
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_entity_configurations;
 use crate::catalog_v3::catalog_item_alignment::{AlignmentOptions, CONTAINER};
-use crate::entity_selection::{self, Selected};
 use crate::record_observation::RecordObservation;
-use crate::scan::{CRAFTER_FIELD, CRAFTER_STRUCT};
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, Kind};
 
 /// The selected original port declarations and their source inventory.
 #[derive(Debug)]
@@ -145,109 +146,125 @@ fn with_parsed<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(ItemPortSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
+    let sources = OnceCell::new();
+    let projection = OnceCell::new();
+    let mut rows = Vec::new();
+    let coverage =
+        Plan::visit_entities::<CatalogError>(forge, selection, None, cancel, |owner, coverage| {
+            let inputs = if let Some(inputs) = projection.get() {
+                inputs
+            } else {
+                let loaded = TextSources::read_languages(archive, requested_languages)?;
+                let sources = sources.get_or_init(|| loaded);
+                let inputs = PortProjection::read(archive, entry, forge, sources, cancel)?;
+                projection.get_or_init(|| inputs)
+            };
+            inputs.project(forge, &owner, &mut rows, coverage, cancel)
+        })?;
+    let table = CatalogTable::new(forge, &[CONTAINER], rows);
+    let (public_names, localization_notes, source_inventory) = match projection.get() {
+        Some(inputs) => inputs.finish(forge, cancel)?,
+        None => (
+            Vec::new(),
+            Vec::new(),
+            entry.registry().finish_with(|| checkpoint(cancel))?,
+        ),
+    };
     checkpoint(cancel)?;
-    let sources = TextSources::read_languages(archive, requested_languages)?;
-    checkpoint(cancel)?;
-    let origins = entry.with_texts(archive, &sources)?;
-    let input = OriginalCatalogInput::new(forge, &origins);
-    let texts = Texts::parse(&sources)?;
-    let registry = CatalogTextRegistry::default();
-    let projection = CatalogProjection::new(&texts, &input, &registry);
-    let options = AlignmentOptions::read(forge, cancel)?;
-    let crafter = forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT);
-    let mut trees = TreeBuilder::new();
-    let mut state = SelectedPorts::default();
-    selection.for_each(forge, cancel, |record| {
-        state.read(
-            record,
-            &projection,
-            &options,
-            crafter.as_ref(),
-            &mut trees,
-            cancel,
-        )
-    })?;
-    let table = CatalogTable::new(forge, &[CONTAINER], state.rows);
-    let public_names = projection
-        .finish_public_names()?
-        .into_iter()
-        .map(CatalogPublicName::from)
-        .collect();
-    let available_languages = requested_languages
-        .iter()
-        .copied()
-        .filter(|language| sources.entry(*language).is_some())
-        .collect();
-    let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
     Ok(inspect(ItemPortSnapshot {
         build: archive.build().cloned(),
         availability: table.availability,
         rows: table.rows,
-        public_names,
         requested_languages: requested_languages.to_vec(),
-        available_languages,
-        localization_notes: texts.notes().to_vec(),
+        available_languages: requested_languages
+            .iter()
+            .copied()
+            .filter(|language| {
+                sources
+                    .get()
+                    .is_some_and(|sources| sources.entry(*language).is_some())
+            })
+            .collect(),
+        localization_notes,
+        public_names,
         source_inventory,
-        coverage: state.coverage,
+        coverage,
     }))
 }
 
-#[derive(Default)]
-struct SelectedPorts<'source> {
-    rows: Vec<ItemPortContainer<'source>>,
-    coverage: CatalogRecordCoverage,
+struct PortProjection<'source> {
+    origins: CatalogOrigins,
+    texts: Texts<'source>,
+    registry: CatalogTextRegistry<'source>,
+    options: AlignmentOptions<'source>,
 }
 
-impl<'source> SelectedPorts<'source> {
+impl<'source> PortProjection<'source> {
     fn read(
-        &mut self,
-        record: &Record<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        options: &AlignmentOptions<'_>,
-        crafter: Option<&PointerProbe<'source>>,
-        trees: &mut TreeBuilder<'source>,
+        archive: &Archive,
+        entry: CatalogQuerySource<'_>,
+        forge: &'source DataForge<'_>,
+        sources: &'source TextSources,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, CatalogError> {
+        checkpoint(cancel)?;
+        Ok(Self {
+            origins: entry.with_texts(archive, sources)?,
+            texts: Texts::parse(sources)?,
+            registry: CatalogTextRegistry::default(),
+            options: AlignmentOptions::read(forge, cancel)?,
+        })
+    }
+
+    fn project(
+        &self,
+        forge: &DataForge<'source>,
+        owner: &Owner<'source>,
+        rows: &mut Vec<ItemPortContainer<'source>>,
+        coverage: &mut CatalogRecordCoverage,
         cancel: Option<&CancelToken>,
     ) -> Result<(), CatalogError> {
-        let selection = record.type_name().and_then(|source_type| {
-            if source_type == ENTITY_TYPE {
-                entity_selection::select(record, None)
-            } else {
-                Ok(None)
-            }
-        });
-        match selection {
-            Err(_) => self.coverage.unreadable_headers.push(record.index()),
-            Ok(Some(Selected::Leftover(_))) => self.coverage.skipped_leftovers += 1,
-            Ok(Some(Selected::Entity(kind))) => {
-                checkpoint(cancel)?;
-                if kind == Kind::Crafters {
-                    match crafter.map_or(Ok(false), |probe| trees.holds(probe, record)) {
-                        Ok(true) => {}
-                        Ok(false) => return Ok(()),
-                        Err(_) => {
-                            self.coverage.unreadable_headers.push(record.index());
-                            return Ok(());
-                        }
-                    }
-                }
-                let Ok(tree) = trees.build(record) else {
-                    self.coverage.unreadable_bodies.push(record.index());
-                    return Ok(());
-                };
-                let admission = RecordObservation::capture(projection.original(), record)?;
-                let (rows, notes) = catalog_entity_configurations::read_item_ports(
-                    &tree, projection, &admission, options, cancel,
-                )?;
-                if notes
-                    .iter()
-                    .any(|note| note.description().issue.blocks_projection())
-                {
-                    self.coverage.incomplete_fields.push(record.index());
-                }
-                self.rows.extend(rows);
-            }
-            Ok(None) => {}
+        checkpoint(cancel)?;
+        let input = OriginalCatalogInput::new(forge, &self.origins);
+        let projection = CatalogProjection::new(&self.texts, &input, &self.registry);
+        let admission = RecordObservation::capture(&input, &owner.record)?;
+        let (selected, notes) = catalog_entity_configurations::read_item_ports(
+            &owner.tree,
+            &projection,
+            &admission,
+            &self.options,
+            cancel,
+        )?;
+        if notes
+            .iter()
+            .any(|note| note.description().issue.blocks_projection())
+        {
+            coverage.incomplete_fields.push(owner.record.index());
         }
+        rows.extend(selected);
         Ok(())
+    }
+
+    fn finish(
+        &self,
+        forge: &DataForge<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<
+        (
+            Vec<CatalogPublicName>,
+            Vec<LocalizationNote>,
+            SourceInventory,
+        ),
+        CatalogError,
+    > {
+        let input = OriginalCatalogInput::new(forge, &self.origins);
+        let projection = CatalogProjection::new(&self.texts, &input, &self.registry);
+        let names = projection
+            .finish_public_names()?
+            .into_iter()
+            .map(CatalogPublicName::from)
+            .collect();
+        let inventory = self.origins.uses.finish_with(|| checkpoint(cancel))?;
+        Ok((names, self.texts.notes().to_vec(), inventory))
     }
 }
