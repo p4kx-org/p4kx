@@ -458,6 +458,12 @@ original Scene or Library slot, field, source when present and reason. Hover ove
 read it in full. `p4kx ui` draws the same pictures on the command line, and `p4kx ui hologram` draws
 the hologram of a vehicle, which the window does not offer.
 
+A PNG or SVG export also writes a `.p4kx-origin.jsonl` companion next to the
+picture. Hover over the completed export status to see the file path and the
+encryption marker for the game's source inputs.
+[Movie render receipts](source-origin.md#movie-rendering)
+[Screen render receipts](source-origin.md#screen-rendering)
+
 ## The window
 
 - The tab bar has **Browse**, **Comparison**, **Query**, **Localisation**, **Tags**, **Search**,
