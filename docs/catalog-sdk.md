@@ -3532,6 +3532,27 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equip
 cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_vehicle_armor_and_resource_links_match_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
 ```
 
+### Complete Flight fleet verification
+
+Run both fleet tests in separate processes for each installed Build. For both,
+set `P4KX_DATA_P4K`, `P4KX_NEW_SDK_BUILD` and
+`P4KX_FLIGHT_CATALOG_PRODUCER_REVISION`. Set
+`P4KX_FLIGHT_FLEET_MARKER_RECEIPT` to a new JSON path in the private temporary
+directory. The Marker test writes this receipt. Keep the same receipt and
+set `P4KX_CATALOG_MEASUREMENT_DIR` to the matching completed Normal
+Catalog measurement before running the Full test.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::fleet_witness::installed_flight_fleet_cold_marker_visit -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::fleet_witness::installed_flight_fleet_matches_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
+```
+
+The Full test compares the physical Ship census, ordered values and immediate
+markers with the Marker receipt, then checks the original contributors against
+the retained Catalog. The terminal census reports incomplete owners separately
+from parity. Measure memory in the cold process independently of the retained
+comparison.
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for
