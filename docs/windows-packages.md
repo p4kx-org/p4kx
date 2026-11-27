@@ -1001,5 +1001,27 @@ request, merge, target and attempt. The final artifact SHA-256 is
 The ARM64 retry reached Wait at 20:34:24 UTC. GitHub cancelled the job at
 21:25:55 UTC, 55 minutes after its start, with the 45-minute job-limit
 annotation. Its raw log endpoint returned HTTP 404. The original final
-lifecycle evidence remains unverified for this attempt. A debug rerun
-selects only the ARM64 execution job on the same merge.
+lifecycle evidence remains unverified for this attempt. The attempt 2 log
+archive contains the successful AMD64 job and its runner diagnostics. It
+contains no ARM64 job or runner diagnostic log.
+
+The isolated ARM64 debug rerun on the same merge started at 21:27:35 UTC.
+The live observation completed at 21:30:58 UTC. The launch receipt binds the
+original request to a collection cutoff at 21:43:42.579 UTC. GitHub
+cancelled the job at 22:22:35 UTC with the 45-minute job-limit annotation.
+Wait stayed in progress in the job record and CollectFinish stayed pending.
+The per-job log endpoint returned HTTP 404. The attempt 3 log ZIP is empty,
+and the attempt retained only the pre-Finish observations and launch
+receipt for ARM64. The installer outcome and the state of the runner
+remain unverified.
+[ARM64 attempt 3](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/job/140745809614) ·
+[Launch binding](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15232502628) ·
+[Pre-Finish observation](https://github.com/p4kx-org/p4kx/actions/runs/46052213476/artifacts/15232622584)
+
+The bounded subprocess implementation in `946838c8c` also reached this
+reporting boundary. Both native jobs finished supervisor launch and
+preserved the launch binding. GitHub kept Wait active through job
+cancellation and supplied no job logs or final receipts. The recurrence
+across both wait implementations leaves the blocking operation unresolved.
+[Bounded AMD64 wait](https://github.com/p4kx-org/p4kx/actions/runs/45857680191/job/140065082705) ·
+[Bounded ARM64 wait](https://github.com/p4kx-org/p4kx/actions/runs/45857680191/job/140065082751)
