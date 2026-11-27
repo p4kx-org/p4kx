@@ -91,6 +91,12 @@ impl LocalizationSet {
         wanted: &[Language],
         limits: LocalizationLimits,
     ) -> Result<Self, LocalizationLoadError> {
+        if wanted.is_empty() {
+            return Ok(Self {
+                entries: Vec::new(),
+            });
+        }
+
         let located: Vec<(Language, &Entry)> = archive
             .entries()
             .par_iter()
