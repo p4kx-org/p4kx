@@ -251,10 +251,31 @@ fn item_port_visitor_loads_locales_with_the_first_readable_owner() -> TestResult
         None,
         |_, _| -> Result<(), CatalogError> { panic!("locale failure precedes the callback") },
     );
-    assert!(matches!(selected, Err(CatalogError::LoadTexts(_))));
-    let aggregate =
-        catalog_queries::with_item_ports(&archive, empty_selection, languages, None, |_| ());
-    assert!(matches!(aggregate, Err(CatalogError::LoadTexts(_))));
+    assert!(
+        matches!(selected, Err(CatalogError::LoadTexts(_))),
+        "the readable owner needs the requested locale"
+    );
+    catalog_queries::with_item_ports(&archive, empty_selection, languages, None, |snapshot| {
+        assert!(
+            snapshot.rows.is_empty(),
+            "the aggregate selection is also empty"
+        );
+        assert!(
+            snapshot.available_languages.is_empty(),
+            "the empty aggregate selection needs no language payload"
+        );
+    })?;
+    let aggregate = catalog_queries::with_item_ports(
+        &archive,
+        CatalogRecordSelection::RecordIndex(0),
+        languages,
+        None,
+        |_| (),
+    );
+    assert!(
+        matches!(aggregate, Err(CatalogError::LoadTexts(_))),
+        "both SDK routes report unreadable localization for the readable owner"
+    );
     Ok(())
 }
 
