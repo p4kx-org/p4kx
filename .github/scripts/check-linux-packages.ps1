@@ -30,8 +30,7 @@ $tarName = Get-P4kxAssetName -Target $Target -Version $Version -Package tar-gz
 & (Join-Path $PSScriptRoot 'check-native-platform.ps1') -Target $Target -ArchivePath (Join-Path $assets $tarName) -MetadataPath $BuildMetadata -ValidateArchive
 $adapter = Get-Content -LiteralPath $AdapterEvidence -Raw | ConvertFrom-Json
 if ($adapter.target -cne $Target -or $adapter.revision -cne $env:GITHUB_SHA -or $adapter.outcome -cne 'success') { throw 'Native software adapter evidence source/CPU/outcome differs.' }
-$libc = (Invoke-P4kxLinuxTool getconf @('GNU_LIBC_VERSION') | Out-String).Trim()
-if ($libc -cne "glibc $((Get-P4kxLinuxPackaging).maximum_glibc_requirement)") { throw 'Native verification does not use the declared minimum glibc baseline.' }
+$hostEvidence = Get-P4kxLinuxRuntimeHostEvidence $platform
 $services = Get-Content -LiteralPath $ServiceBuildMetadata -Raw | ConvertFrom-Json
 Assert-P4kxDocumentsServiceBuild $services $Target $env:GITHUB_SHA
 $context = @{target=$Target; version=$Version; assets=$assets; fixture=$fixture; lifecycle_fixtures=$lifecycleFixtures; output=$output;
@@ -46,7 +45,7 @@ $lifecycle = @(Get-Content -LiteralPath (Join-Path $phases.stock 'linux-lifecycl
 $base | Add-Member -NotePropertyName linux_lifecycle -NotePropertyValue $lifecycle
 $base | Add-Member -NotePropertyName package_smokes -NotePropertyValue $smokes
 $base | Add-Member -NotePropertyName minimum_distribution -NotePropertyValue (Get-P4kxLinuxPackaging).minimum_distribution
-$base | Add-Member -NotePropertyName observed_glibc -NotePropertyValue $libc
+$base | Add-Member -NotePropertyMembers $hostEvidence
 $metadata = Join-Path $output 'executed-packages.json'
 $base | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $metadata -Encoding utf8NoBOM
 foreach ($variable in @('CLI_LIST_OUTCOME', 'CLI_EXTRACT_OUTCOME', 'CLI_CONVERT_OUTCOME', 'MCP_TOOLS_OUTCOME', 'MCP_READ_OUTCOME', 'GUI_FRAMES_OUTCOME')) {

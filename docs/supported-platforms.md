@@ -183,7 +183,8 @@ runtime evidence fails preflight. [Windows packages](windows-packages.md) descri
 rollback and CPU replacement verification.
 Linux runtime evidence covers all four actual package launchers and retains post-transformation
 ELF hashes with unchanged source `.text` hashes, plus Flatpak runtime/app OSTree identity and
-Documents-portal grants. The two native Linux runs also require deb and Flatpak in-place
+Documents-portal grants. Both native Linux records include the observed distribution, kernel
+and glibc, with runner image fields when available. The two runs also require deb and Flatpak in-place
 upgrades from separately installed workflow fixtures, launch of the candidate version,
 removal and profile preservation. [Linux packages](linux-packages.md) defines the Ubuntu 24.04 / glibc 2.39
 host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.

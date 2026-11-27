@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'flatpak-metadata.ps1')
 . (Join-Path $PSScriptRoot 'linux-profile-preservation.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-installation.ps1')
+. (Join-Path $PSScriptRoot 'linux-runtime-host-evidence.ps1')
 New-Item -ItemType Directory -Force -Path $Directory | Out-Null
 $appImage = Join-Path $Directory 'P4KX package.AppImage'
 $mounted = Get-P4kxAppImageLaunchers $appImage Mounted
@@ -21,6 +22,23 @@ foreach ($name in $dispatch.Keys) {
     }
 }
 $settings = Get-P4kxLinuxPackaging
+$release = @('NAME="Ubuntu"', 'VERSION="24.04.5 LTS (Noble Numbat)"', 'ID=ubuntu', 'VERSION_ID="24.04"') -join [char]10
+$identity = ConvertFrom-P4kxLinuxOsRelease $release
+if ($identity.distribution_id -cne 'ubuntu' -or $identity.os_version_id -cne '24.04' -or
+    $identity.os_version -cne '24.04.5 LTS (Noble Numbat)') {
+    throw 'The native distribution evidence lost its observed value.'
+}
+foreach ($invalidRelease in @(
+    $release.Replace('VERSION_ID="24.04"', ''),
+    $release.Replace('ID=ubuntu', "ID=ubuntu$([char]10)ID=ubuntu"),
+    $release.Replace('ID=ubuntu', 'ID=debian'),
+    $release.Replace('VERSION_ID="24.04"', 'VERSION_ID="24.04'),
+    $release.Replace('VERSION="24.04.5 LTS (Noble Numbat)"', 'VERSION="26.04 LTS"')
+)) {
+    $rejected = $false
+    try { ConvertFrom-P4kxLinuxOsRelease $invalidRelease | Out-Null } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Missing, foreign, malformed or duplicate Linux os-release identity was accepted.' }
+}
 foreach ($mutation in @(
     { param($value) $value.flatpak.finish_args += '--filesystem=host' },
     { param($value) $value.flatpak.finish_args += '--filesystem=home:rw' },

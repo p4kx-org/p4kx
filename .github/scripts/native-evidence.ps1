@@ -65,13 +65,21 @@ function Assert-P4kxRuntimeEvidence {
         [Parameter(Mandatory)]$Metadata,
         [Parameter(Mandatory)]$Platform,
         [Parameter(Mandatory)][string]$Version,
-        [Parameter(Mandatory)][string]$Revision
+        [Parameter(Mandatory)][string]$Revision,
+        [string]$ExpectedRunId
     )
     if ($Metadata.version -cne $Version -or $Metadata.scope -cne 'native-synthetic') {
         throw 'Native runtime evidence has a different version or scope.'
     }
-    if ($Metadata.workflow_run -cnotmatch '^https://github\.com/p4kx-org/p4kx/actions/runs/[0-9]+$') {
-        throw 'Native runtime evidence has no owning repository CI run.'
+    $runPrefix = 'https://github.com/p4kx-org/p4kx/actions/runs/'
+    if ($Metadata.workflow_run -isnot [string] -or
+        -not $Metadata.workflow_run.StartsWith($runPrefix, [StringComparison]::Ordinal) -or
+        $Metadata.workflow_run.Substring($runPrefix.Length) -cnotmatch '\A[1-9][0-9]*\z' -or
+        $Metadata.workflow_attempt -isnot [string] -or $Metadata.workflow_attempt -cnotmatch '\A[1-9][0-9]*\z') {
+        throw 'Native runtime evidence has no valid owning repository CI run and attempt.'
+    }
+    if ($ExpectedRunId -and $Metadata.workflow_run -cne "$runPrefix$ExpectedRunId") {
+        throw 'Native runtime evidence belongs to another workflow run.'
     }
     foreach ($name in (Get-P4kxRuntimeChecks -Platform $Platform)) {
         if ($Metadata.runtime.$name -cne 'success') { throw "Required native runtime check '$name' did not succeed." }

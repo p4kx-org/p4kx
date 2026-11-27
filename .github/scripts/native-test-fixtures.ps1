@@ -28,6 +28,7 @@ function New-P4kxTestEvidence {
         })
         scope = 'native-synthetic'
         workflow_run = 'https://github.com/p4kx-org/p4kx/actions/runs/1'
+        workflow_attempt = '1'
         runtime = [pscustomobject]@{
             cli_list = 'success'; cli_extract = 'success'; cli_convert = 'success'
             mcp_tools = 'success'; mcp_read = 'success'; gui_frames = 'success'; software_adapter = 'success'

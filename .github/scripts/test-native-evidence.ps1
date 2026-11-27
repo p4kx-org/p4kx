@@ -41,7 +41,19 @@ foreach ($row in $contract.targets) {
 
     $baseline = New-P4kxTestEvidence -Platform $row -Version '0.5.0' -Revision $revision -Compiler $compiler -Nextest $nextest
     Assert-P4kxArchiveEvidence -Metadata $baseline -Platform $row -Revision $revision -Compiler $compiler -Nextest $nextest -ArchiveHash ('b' * 64)
-    Assert-P4kxRuntimeEvidence -Metadata $baseline -Platform $row -Version '0.5.0' -Revision $revision
+    Assert-P4kxRuntimeEvidence -Metadata $baseline -Platform $row -Version '0.5.0' -Revision $revision -ExpectedRunId '1'
+    foreach ($mutation in @(
+        { param($m) $m.PSObject.Properties.Remove('workflow_attempt') },
+        { param($m) $m.workflow_attempt = 1 },
+        { param($m) $m.workflow_attempt = '0' },
+        { param($m) $m.workflow_attempt = 'not-an-attempt' }
+    )) {
+        $changed = $baseline | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        & $mutation $changed
+        $rejected = $false
+        try { Assert-P4kxRuntimeEvidence -Metadata $changed -Platform $row -Version '0.5.0' -Revision $revision } catch { $rejected = $true }
+        if (-not $rejected) { throw 'Missing or invalid native workflow attempt was accepted.' }
+    }
     foreach ($mutation in @(
         { param($m) $m.target = 'wrong-architecture' },
         { param($m) $m.os = if ($m.os -ceq 'windows') { 'linux' } else { 'windows' } },

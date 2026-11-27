@@ -12,10 +12,13 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'package-release-evidence.ps1')
 $contract = Get-P4kxPlatformContract
+if ($ReleaseRunId -and $ReleaseRunId -cnotmatch '\A[1-9][0-9]*\z') {
+    throw 'The expected release run ID must be a positive decimal string.'
+}
 $desktopReceipts = $null
-if ($WindowsDesktopEvidencePath -or $ReleaseRunId) {
-    if (-not $WindowsDesktopEvidencePath -or $ReleaseRunId -cnotmatch '\A[1-9][0-9]*\z') {
-        throw 'Windows AMD64 desktop validation requires its receipt file and the original release run ID.'
+if ($WindowsDesktopEvidencePath) {
+    if (-not $ReleaseRunId) {
+        throw 'Windows AMD64 desktop validation requires the original release run ID.'
     }
     . (Join-Path $PSScriptRoot 'windows-desktop-device-evidence.ps1')
     $desktopReceipts = Get-Content -LiteralPath $WindowsDesktopEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
@@ -48,7 +51,14 @@ foreach ($row in $contract.targets) {
     $name = "P4KX-$Version-$($row.target)-runtime.json"
     $runtime = Get-Content -LiteralPath (Join-Path $AssetDirectory $name) -Raw | ConvertFrom-Json
     Assert-P4kxArchiveEvidence -Metadata $runtime -Platform $row -Revision $Revision -Compiler $compiler -Nextest $nextest
-    Assert-P4kxRuntimeEvidence -Metadata $runtime -Platform $row -Version $Version -Revision $Revision
+    Assert-P4kxRuntimeEvidence -Metadata $runtime -Platform $row -Version $Version -Revision $Revision -ExpectedRunId $ReleaseRunId
+    if ($row.os -ceq 'windows') {
+        $installer = $runtime.installer.path_contract
+        if ($installer.run -isnot [string] -or $installer.attempt -isnot [string] -or
+            $installer.run -cne $runtime.workflow_run.Split('/')[-1] -or $installer.attempt -cne $runtime.workflow_attempt) {
+            throw 'MSI PATH evidence belongs to a different workflow run or attempt than its package runtime.'
+        }
+    }
     Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version
     if ($RequireStableMacosRelease -and $row.os -ceq 'macos') {
         $current = @($runtime.package_smokes)[0].current_hosted_smoke

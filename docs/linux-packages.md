@@ -309,7 +309,11 @@ themselves establish real FUSE or package acceptance.
 
 [`release-linux.yml`](../.github/workflows/release-linux.yml) builds on the matching Ubuntu 24.04
 native CPU and verifies packages on a fresh matching runner. The consumer validates the source
-SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:
+SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. Its runtime
+record retains `ID`, `VERSION_ID` and `VERSION` from `/etc/os-release`, the native kernel release
+and the glibc version. It includes the runner image OS and version when provided. Release
+preflight requires the Ubuntu 24.04 and glibc 2.39 observations and a native kernel release.
+The consumer exercises each format on the host.
 
 - Real tar executables, the AppImage runtime and AppRun dispatch, installed deb commands and
   installed `flatpak run` commands for all three applications. The AppImage checks require

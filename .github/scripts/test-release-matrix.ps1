@@ -35,9 +35,6 @@ foreach ($row in $contract.targets) {
         $sbom | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
     }
     $proof = New-P4kxTestEvidence -Platform $row -Version $version -Revision $revision -Compiler $compiler -Nextest $nextest
-    if (Test-P4kxWindowsDesktopTarget $row) {
-        $proof | Add-Member -NotePropertyName workflow_attempt -NotePropertyValue '1'
-    }
     if ($row.os -cin @('windows', 'linux', 'macos')) {
         $smokes = @(foreach ($package in $row.packages) {
             $asset = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
@@ -85,7 +82,7 @@ foreach ($row in $contract.targets) {
         }
         $proof.archive_sha256 = ($smokes | Where-Object package -CEQ $sourcePackage).archive_sha256
         if ($row.os -ceq 'macos') {
-            $proof | Add-Member -NotePropertyMembers @{ signing_sha256=$smokes[0].signing_sha256; workflow_attempt='1' }
+            $proof | Add-Member -NotePropertyName signing_sha256 -NotePropertyValue $smokes[0].signing_sha256
             $current = $proof | ConvertTo-Json -Depth 16 | ConvertFrom-Json
             $current.workflow_attempt = '2'
             $current.runtime_host = @{ os_version=(Get-P4kxMacosReleaseRunnerVersion); os_build='26A434'; architecture='arm64' }
@@ -115,12 +112,22 @@ foreach ($row in $contract.targets) {
                 candidate_launch='success'; uninstalled='success'; profile_preserved='success'
             }
         })
-        $proof | Add-Member -NotePropertyName linux_lifecycle -NotePropertyValue $lifecycle
+        $linuxHost = @{
+            distribution_id = 'ubuntu'; os_version_id = '24.04'
+            os_version = '24.04.5 LTS (Noble Numbat)'; kernel_release = '6.17.0-1015-azure'
+        }
+        if ($row.arch -ceq 'amd64') {
+            $linuxHost.image_os = 'ubuntu24'
+            $linuxHost.image_version = '20261116.315.1'
+        }
+        $proof | Add-Member -NotePropertyMembers @{
+            linux_lifecycle = $lifecycle; runtime_host = $linuxHost; observed_glibc = 'glibc 2.39'
+        }
     }
     if ($row.os -ceq 'windows') {
         $msi = Get-P4kxAssetName -Target $row.target -Version $version -Package msi
         $msiHash = (Get-FileHash -LiteralPath (Join-Path $Directory $msi) -Algorithm SHA256).Hash.ToLowerInvariant()
-        $reports = @(& (Join-Path $PSScriptRoot 'test-msi-path-verification.ps1') -FixtureTarget $row.target -FixtureRevision $revision -FixtureMsiSha256 $msiHash)
+        $reports = @(& (Join-Path $PSScriptRoot 'test-msi-path-verification.ps1') -FixtureTarget $row.target -FixtureRevision $revision -FixtureMsiSha256 $msiHash -FixtureRunId '1' -FixtureAttempt $proof.workflow_attempt)
         if ($reports.Count -ne 1 -or $reports[0] -isnot [Collections.IDictionary] -or $reports[0].scope -cne 'native-synthetic') {
             throw 'The pure MSI fixture must return exactly one synthetic report in its own script scope.'
         }
@@ -132,7 +139,7 @@ foreach ($row in $contract.targets) {
     $proof | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
 }
 
-& $validator -AssetDirectory $Directory -Version $version -Revision $revision
+& $validator -AssetDirectory $Directory -Version $version -Revision $revision -ReleaseRunId '1'
 $notesFixture = Join-Path $Directory 'release-notes-fixture'
 $notesAssets = Join-Path $notesFixture 'assets'
 New-Item -ItemType Directory -Path $notesAssets | Out-Null
@@ -226,6 +233,19 @@ foreach ($row in $contract.targets) {
     catch { $rejected = $true }
     finally { Set-Content -LiteralPath $proofPath -Value $original -Encoding utf8NoBOM }
     if (-not $rejected) { throw "Release accepted the $otherPackage digest as the source archive for $($row.target)." }
+
+    $foreign = $original | ConvertFrom-Json
+    $foreign.workflow_run = 'https://github.com/p4kx-org/p4kx/actions/runs/2'
+    $foreign | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
+    try {
+        $failure = try { & $validator -AssetDirectory $Directory -Version $version -Revision $revision -ReleaseRunId '1' | Out-Null }
+        catch { $_.Exception.Message }
+        if ($failure -cne 'Native runtime evidence belongs to another workflow run.') {
+            throw "Release accepted or misclassified a foreign workflow run for $($row.target)."
+        }
+    } finally {
+        Set-Content -LiteralPath $proofPath -Value $original -Encoding utf8NoBOM
+    }
 }
 $windows = @($contract.targets | Where-Object os -EQ windows)[0]
 $windowsProofPath = Join-Path $Directory "P4KX-$version-$($windows.target)-runtime.json"
@@ -233,6 +253,8 @@ $originalProof = Get-Content -LiteralPath $windowsProofPath -Raw
 foreach ($mutation in @(
     { param($proof) $proof.PSObject.Properties.Remove('installer') },
     { param($proof) $proof.installer.repair = 'skipped' },
+    { param($proof) $proof.installer.path_contract.run = '2' },
+    { param($proof) $proof.workflow_attempt = '2' },
     { param($proof) $proof.installer.path_contract.raw_cases = @($proof.installer.path_contract.raw_cases | Select-Object -Skip 1) },
     { param($proof) $proof.package_smokes = @($proof.package_smokes | Select-Object -First 1) },
     { param($proof) $proof.package_smokes[0].archive_sha256 = 'f' * 64 },
@@ -265,6 +287,18 @@ foreach ($mutation in @(
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').appimage_fuse_launch = 'skipped' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.game_alias_refusal = 'skipped' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.revision = 'f' * 40 },
+    { param($proof) $proof.PSObject.Properties.Remove('runtime_host') },
+    { param($proof) $proof.runtime_host.distribution_id = 'debian' },
+    { param($proof) $proof.runtime_host.distribution_id = @('ubuntu') },
+    { param($proof) $proof.runtime_host.os_version_id = '26.04' },
+    { param($proof) $proof.runtime_host.os_version_id = 24.04 },
+    { param($proof) $proof.runtime_host.os_version = '24.040 LTS' },
+    { param($proof) $proof.runtime_host.PSObject.Properties.Remove('kernel_release') },
+    { param($proof) $proof.runtime_host.kernel_release = 'unknown' },
+    { param($proof) $proof.runtime_host.image_os = @('ubuntu24') },
+    { param($proof) $proof.runtime_host.image_version = '' },
+    { param($proof) $proof.PSObject.Properties.Remove('observed_glibc') },
+    { param($proof) $proof.observed_glibc = 'glibc 2.40' },
     { param($proof) $proof.PSObject.Properties.Remove('linux_lifecycle') },
     { param($proof) $proof.linux_lifecycle = @($proof.linux_lifecycle[0], $proof.linux_lifecycle[0]) },
     { param($proof) $proof.linux_lifecycle[0].baseline.installed = $proof.linux_lifecycle[0].candidate.installed },

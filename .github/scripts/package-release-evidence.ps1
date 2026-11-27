@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-evidence.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-lifecycle-evidence.ps1')
+. (Join-Path $PSScriptRoot 'linux-runtime-host-evidence.ps1')
 . (Join-Path $PSScriptRoot 'documents-portal-evidence.ps1')
 . (Join-Path $PSScriptRoot 'msi-path-verification.ps1')
 . (Join-Path $PSScriptRoot 'macos-release-evidence.ps1')
@@ -72,6 +73,7 @@ function Assert-P4kxPackageRuntime {
 
     }
     if ($Platform.os -ceq 'linux') {
+        Assert-P4kxLinuxRuntimeHostEvidence $Runtime
         Assert-P4kxLinuxLifecycleEvidence $Runtime.linux_lifecycle $packages $Platform $Version $Runtime.revision
     }
 }

@@ -2,12 +2,10 @@ param([switch]$Build)
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-package-installation.ps1')
+. (Join-Path $PSScriptRoot 'linux-runtime-host-evidence.ps1')
 $platform = Get-P4kxCurrentPlatform
 Assert-P4kxDisposableLinuxRunner $platform
-$distribution = Get-Content -LiteralPath '/etc/os-release' -Raw
-if ($distribution -notmatch '(?m)^ID=ubuntu$' -or $distribution -notmatch '(?m)^VERSION_ID="24\.04"$') {
-    throw 'Linux release packaging requires the declared Ubuntu 24.04 baseline.'
-}
+$null = ConvertFrom-P4kxLinuxOsRelease (Get-Content -LiteralPath '/etc/os-release' -Raw)
 $packages = @(
     'binutils', 'dbus-x11', 'flatpak', 'fuse3', 'libasound2t64', 'libegl1', 'libgl1',
     'libvulkan1', 'libx11-6', 'libxcursor1', 'libxi6', 'libxrandr2', 'libxkbcommon0',

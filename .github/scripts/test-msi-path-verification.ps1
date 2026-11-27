@@ -5,7 +5,11 @@ param(
     [Parameter(Mandatory,ParameterSetName='Fixture')]
     [ValidatePattern('\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z')][string]$FixtureRevision,
     [Parameter(Mandatory,ParameterSetName='Fixture')]
-    [ValidatePattern('\A[0-9a-f]{64}\z')][string]$FixtureMsiSha256
+    [ValidatePattern('\A[0-9a-f]{64}\z')][string]$FixtureMsiSha256,
+    [Parameter(ParameterSetName='Fixture')]
+    [ValidatePattern('\A[1-9][0-9]*\z')][string]$FixtureRunId = '12',
+    [Parameter(ParameterSetName='Fixture')]
+    [ValidatePattern('\A[1-9][0-9]*\z')][string]$FixtureAttempt = '3'
 )
 $revision=if($PSCmdlet.ParameterSetName -ceq 'Fixture'){$FixtureRevision}else{'1'*40}
 $msiHash=if($PSCmdlet.ParameterSetName -ceq 'Fixture'){$FixtureMsiSha256}else{'a'*64}
@@ -15,7 +19,7 @@ $checks=0
 function Assert-Test([bool]$Value,[string]$Message){if(-not $Value){throw $Message};$script:checks++}
 function Copy-TestValue($Value){return $Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json -AsHashtable}
 function New-TestImage($Path){
-    return @{schema=1;role='disposable-ci-registry-fixture';revision=$revision;run='12';attempt='3';process_arch='x86_64';root='C:\runner\raw';
+    return @{schema=1;role='disposable-ci-registry-fixture';revision=$revision;run=$FixtureRunId;attempt=$FixtureAttempt;process_arch='x86_64';root='C:\runner\raw';
         image=@{path=$Path;state=$null;sequence=$null;binding=$null;keys=@{environment=$true;installer=$false;ownership=$false;invocation=$false}};
         core=@{status='valid';sequence='4';phase='committed';owner=$null;reserved_binding=$null;reservation_phase=$null;cancelled_binding=$null;journal_binding=$null}}
 }
@@ -90,7 +94,7 @@ function Invoke-P4kxMsiPathHelper($Context,$Arguments){
 }
 $adapter=Invoke-P4kxMsiForeignEditProbe $context $fixture $original
 Assert-Test ($adapter.outcome -ceq 'success') 'The narrow external-edit/rollback mock failed.'
-$report=@{schema=1;scope='native-synthetic';target='x86_64-pc-windows-msvc';revision=$revision;run='12';attempt='3';raw_root='C:\runner\raw';
+$report=@{schema=1;scope='native-synthetic';target='x86_64-pc-windows-msvc';revision=$revision;run=$FixtureRunId;attempt=$FixtureAttempt;raw_root='C:\runner\raw';
     msi_sha256=$msiHash;helper_sha256=('b'*64);fixture_sha256=('c'*64);folder=$context.folder;msi_identity=$metadata;raw_cases=$results;adapter=$adapter;legacy=@{calibration='success';upgrade='success'}}
 $report.lifecycle_steps=@(foreach($pair in @{install=0;'feature-noop'=0;'rollback-disabled'=1603;repair=0;rollback=1603;upgrade=0;'downgrade-blocked'=1603;uninstall=0;'wrong-cpu-rejected'=1633}.GetEnumerator()){
     @{name=$pair.Key;exit_code=$pair.Value;before=$original;after=$original}
