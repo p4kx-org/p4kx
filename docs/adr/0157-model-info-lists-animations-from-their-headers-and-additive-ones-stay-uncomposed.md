@@ -32,15 +32,11 @@ additive animations can be composed onto a base.
 - **Checker.** The testkit's GLB checker compares the `min` and `max` of the key times with the
   first and last time (the claim of ADR-0046), not only that they exist.
 - **Additive animations stay uncomposed.** ADR-0046 still holds: they are written only when
-  named, with the note that the pose needs a base. Composing them needs two facts the data does
-  not give. Which pose the offsets apply to (the bind pose, or the matching frame of a base
-  animation) and the order of the multiplication (offset times base, or base times offset) are
-  engine behaviour; the keys of the 1,475 additive `.caf` files and 1,905 database animations
-  lie near the identity (docs/model-animations.md) whichever convention is right, so no
-  measurement on the Archive tells the conventions apart, and no field of the records read so far
-  names a base. Writing a guess would pose a skeleton wrongly without any sign of it. This is
-  reopened if a base is named by a source (an animation graph or `.chrparams` entry) and a
-  convention is confirmed against the game.
+  named, with the note that the pose needs a base. Rotation composition requires an observed
+  base pose, the time and weight of the additive frame and the order of the product.
+  The installed MotionIdle option below binds a base clip and an additive clip to one
+  authored plan. The sampled source keys distinguish two possible products. A runtime
+  reference must determine which product the game applies to this plan.
 
 ## Scoped installed source check
 
@@ -86,6 +82,27 @@ exact alias stems in the adjoining Rig CHRPARAMS folders for the authored
 `.aim`, `.bspace` and `.comb` families. It found no matching Entries. That
 pass used the original names and verified the Archive and manifest stamps
 before and after the read.
+
+## LIVE MotionIdle comparison
+
+On LIVE 13220821 the original animation database
+`Data/Animations/Mannequin/ADB/Players/playerMotionAnims.adb` matched the
+retained candidate byte for byte after physical Entry and CRC verification.
+The selected `MotionIdle` option names
+`stocked_alerted_stand_idle_turn360_raised` in the lower layer and
+`nw_neutral_stand_foot_shuffle_03_add` in the upper layer. The original
+clip headers in the two verified LIVE DBA files identify the lower clip
+as ordinary and the upper clip as additive. The upper declaration has
+zero speed and weight. The manual animation controller takes the upper
+layer's playback time and weight from `ShuffleTime` and `ShuffleWeight`
+on scope layer 1.
+
+The two named clips share 29 rotation controllers. Across 307 pairs
+of jointly stored rotation keys at the same source frame, the largest
+angle between the two quaternion products at unit weight was 4.88°
+at source frame 23 on controller `B328DB12`. This comparison nominates
+a discriminating source frame. A runtime reference still needs the bound
+actor rig, actual base time, `ShuffleTime` and a nonzero `ShuffleWeight`.
 
 ## Consequences
 

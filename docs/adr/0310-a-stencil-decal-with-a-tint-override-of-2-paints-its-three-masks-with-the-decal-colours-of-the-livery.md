@@ -43,8 +43,10 @@ Screenshots and registered texture measurements cover one livery of one vehicle.
   Registering the screenshot to the rear UVs using only the blue "URSA" glyphs matched 99.16% of
   2,634 held-out samples there. In the separate rear "+MEDIVAC" band, 215 samples with strong
   red and blue masks and zero green showed the red palette colour. The blue-only control
-  showed the grey palette colour. This establishes red above blue there and leaves mixed green
-  coverage unresolved.
+  showed the grey palette colour. This establishes red above blue there. Across the entire
+  512 × 512 source atlas, 13,432 texels have nonzero green coverage. Zero of these texels
+  overlap red or blue. Both resolved Ursa stencil materials use this atlas with override 2.
+  The order with mixed green coverage requires a different decal.
 - **MISC Freelancer, standard livery** (consistent with `misc_freelancer_dur_default`): the emblem
   on the blue-grey panel of the rear outer wing flap is darker than the panel and neither rust nor
   white, where `decalColorR` is (10, 10, 10) and green and blue are white. This is the livery
