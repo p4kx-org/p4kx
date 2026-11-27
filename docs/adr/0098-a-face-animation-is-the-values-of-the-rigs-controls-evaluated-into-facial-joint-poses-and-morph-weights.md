@@ -99,8 +99,15 @@ and 11 source frames, the differences between the four actions reached 0.47 to 1
 frontal model projection for the six candidate pairs. Fits of the same archived head to two
 near-neutral video frames projected the tested expression differences to at most 2.37 pixels
 at the best common focal length. The best held-out anatomical-group RMS residuals across the
-focal sweep were 9.73 and 9.40 pixels. The capture identifies the authored take. Its projected
-face and CAF-to-video clock do not yet distinguish the rotations.
+focal sweep were 9.73 and 9.40 pixels.
+
+An independent mouth-aperture timing check gated the clock fit on stable head
+registration across two windows. In [554, 560) and [573, 580) seconds, the
+focused head registration admitted 44 of 180 and 33 of 210 frames. A wider head
+mask admitted 28 of 180 and 6 of 210. The best coverage was 24.4%, below the
+predeclared 70% required to fit and validate the clock. The source supplies
+identical central-lip translation curves for all four candidates. The video
+registration leaves their CAF-to-video clock and rotation selection unresolved.
 
 The same PTU capture shows Walton Foxwell in two other MFD windows. The
 populated animation database has 143 face fragments and two idle fragments.
