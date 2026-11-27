@@ -96,8 +96,8 @@ fn package_keeps_typed_decal_references_and_their_payload_origins() -> TestResul
 fn verify_decal_reference(manifest: &Value, expected: &str) -> TestResult {
     assert_eq!(
         field(manifest, "/version")?,
-        "1.23",
-        "the added palette field selects its format"
+        "1.25",
+        "the decal reference and triangle evidence share the scene format"
     );
     let provenance = field(manifest, "/palette_provenance")?;
     let root = binding(manifest, "")?;
@@ -232,8 +232,8 @@ pub(super) fn field<'a>(
 fn verify_payload(manifest: &Value, provenance: &Value, binding: &Value) -> TestResult {
     assert_eq!(
         field(manifest, "/version")?,
-        "1.21",
-        "a package without the new source field retains its format"
+        "1.25",
+        "the version reflects the mesh triangle evidence"
     );
     let payload = row(provenance, "payloads", field(binding, "/payload")?)?;
     let palette = row(manifest, "palettes", field(payload, "/palette")?)?;

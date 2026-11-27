@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use p4kx_blender::{
-    AlphaMeaning, Basis, BuildInfo, ColourSpace, FORMAT_VERSION, Format, IssueOrigin, Manifest,
-    PackageInfo, TextureFormat, Unit, manifest_schema, write_package,
+    AlphaMeaning, Basis, BuildInfo, ColourSpace, Format, IssueOrigin, Manifest, PackageInfo,
+    TextureFormat, Unit, manifest_schema, write_package,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::{TestEntry, check_glb, livery_entries};
@@ -164,7 +164,7 @@ fn the_manifest_states_version_source_and_axes() -> TestResult {
     let manifest = &written.manifest;
 
     assert_eq!(manifest.format, Format::P4kxBlenderPackage);
-    assert_eq!(manifest.version, FORMAT_VERSION);
+    assert_eq!(manifest.version, "1.25");
     assert_eq!(manifest.generator.name, "p4kx");
     assert_eq!(manifest.source.channel.as_deref(), Some("LIVE"));
     assert_eq!(

@@ -2235,6 +2235,43 @@
       },
       "type": "object"
     },
+    "FieldSummary": {
+      "properties": {
+        "complete": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "encrypted": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fields": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unencrypted": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknown": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fields",
+        "encrypted",
+        "unencrypted",
+        "unknown",
+        "complete"
+      ],
+      "type": "object"
+    },
     "FileSource": {
       "description": "Observed standalone-file facts without a claim of original P4K lineage.",
       "properties": {
@@ -4805,6 +4842,25 @@
         }
       ]
     },
+    "SceneProvenance": {
+      "properties": {
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        "summary": {
+          "$ref": "#/$defs/FieldSummary"
+        }
+      },
+      "required": [
+        "fieldOrigins",
+        "sourceInventory",
+        "summary"
+      ],
+      "type": "object"
+    },
     "Selection": {
       "oneOf": [
         {
@@ -7223,6 +7279,17 @@
         "$ref": "#/$defs/Palette"
       },
       "type": "array"
+    },
+    "scene_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SceneProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Observed scene fields and their shared source inventory."
     },
     "source": {
       "$ref": "#/$defs/Source",

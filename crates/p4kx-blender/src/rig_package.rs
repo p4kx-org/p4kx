@@ -23,6 +23,7 @@ use crate::manifest_rig::Rig;
 use crate::mesh_vertex_map::Writer;
 
 use crate::package_receipt::{self, PackageFile, PackageTotals};
+use crate::package_scene_provenance::{self, SceneFields};
 use crate::plan::mesh_id;
 use crate::rig_mount_provenance;
 use crate::stage::Staging;
@@ -97,6 +98,7 @@ pub(crate) fn rig_manifest(
         default_material: None,
         entity_provenance: None,
         light_placements: None,
+        scene_provenance: None,
         entity_glow: None,
         issues,
     }
@@ -112,6 +114,7 @@ pub(crate) struct WrittenRig {
     pub(crate) summary: GlbSummary,
     pub(crate) worn_origins: Option<WornMountOrigins>,
     pub(crate) body_zones: Option<BodyZoneData>,
+    pub(crate) scene_fields: Option<SceneFields>,
 }
 
 impl WrittenRig {
@@ -120,6 +123,7 @@ impl WrittenRig {
             summary,
             worn_origins: None,
             body_zones: None,
+            scene_fields: None,
         }
     }
 }
@@ -185,6 +189,7 @@ fn write_rig_files(
         summary: written,
         worn_origins,
         body_zones,
+        scene_fields,
     } = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     let digest = writer
@@ -214,6 +219,9 @@ fn write_rig_files(
     rig_mount_provenance::bind(&mut manifest, &relative, &digest, worn_origins)
         .map_err(|source| PackageError::write(&path, source))?;
     sanitise(&mut manifest);
+    if let Some(evidence) = scene_fields {
+        package_scene_provenance::attach(&mut manifest, &evidence.fields, &evidence.sources)?;
+    }
     let files = std::iter::once(PackageFile::new(relative, &digest))
         .chain(sidecar)
         .collect();

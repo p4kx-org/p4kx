@@ -181,6 +181,8 @@ fn write_mesh(
         .transpose()
         .map_err(|error| GltfError::Write(io::Error::other(error)))?;
     Ok(WrittenRig {
+        scene_fields: crate::character_clip_origins::capture(animations, &summary)
+            .map_err(GltfError::Write)?,
         summary,
         worn_origins,
         body_zones: zones

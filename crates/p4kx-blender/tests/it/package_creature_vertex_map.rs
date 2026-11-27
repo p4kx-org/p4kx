@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -9,6 +10,7 @@ use p4kx_assembly::{ArchiveModels, Assembly};
 use p4kx_blender::{Manifest, PackageInfo, PackageWriteContext, write_package_with_context};
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_extraction::{Archive, ArchiveWriteProtection, OpenOptions};
+use p4kx_gltf::MaterialMode;
 use p4kx_testkit::gltf::Semantic;
 use p4kx_testkit::{
     CREATURE_HORNED, TestEntry, TestModel, check_glb, creature_entries, mesh_streams, test_key,
@@ -17,7 +19,12 @@ use serde_json::{Value, json};
 
 use super::package_primitive_map::{ExpectedSubmesh, assert_draws, assert_submesh, primitive_row};
 use super::package_vertex_map::{assert_receipt, rows};
-use super::support::{TestResult, assemble, fixture, glb_options};
+use super::support::{Fixture, TestResult, assemble, fixture, glb_options};
+
+#[path = "package_creature_triangles.rs"]
+mod triangles;
+
+use triangles::assert_scene_triangles;
 
 const SKIN: &str = r"Data\Objects\Characters\Creatures\Test\creature.skinm";
 const HORN: &str = r"Data\Objects\Test\horn.cgfm";
@@ -26,22 +33,20 @@ const HORN: &str = r"Data\Objects\Test\horn.cgfm";
 fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement() -> TestResult {
     let skin = TestModel::two_bone_skin();
     let horn = TestModel::cube().scaled(0.25);
-    let mut entries = creature_entries();
-    let slot = entries
-        .iter_mut()
-        .find(|entry| entry.path() == SKIN)
-        .ok_or("actual skin companion")?;
-    *slot = TestEntry::zstd(SKIN, skin.cgfm()).encrypted();
-    let fixture = fixture(entries)?;
+    let fixture = encrypted_skin_fixture(&skin)?;
     let archive = Archive::open_with(&fixture.path, OpenOptions::new().key(Some(test_key())))?;
     let assembly = assemble(&archive, CREATURE_HORNED)?;
     let out = tempfile::tempdir()?;
     let package = out.path().join("creature");
-    write(&archive, &assembly, &package, false)?;
-    let original = fs::read(package.join("meshes/m0001.glb"))?;
+    let ordinary = write_ordinary_package(&archive, &assembly, &package, [&skin, &horn])?;
     write(&archive, &assembly, &package, true)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.21", "same additive package contract");
+    assert_eq!(manifest.version, "1.25", "additive scene evidence version");
+    assert_eq!(
+        manifest.scene_provenance.as_ref(),
+        ordinary.scene.get("scene_provenance"),
+        "optional vertex mapping preserves the scene field evidence"
+    );
     let combined = manifest.meshes.first().ok_or("creature GLB")?;
     let map = combined
         .vertex_map
@@ -49,10 +54,11 @@ fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement(
         .ok_or("creature map reference")?;
     let glb = fs::read(package.join(&combined.file))?;
     assert_eq!(
-        glb, original,
+        glb, ordinary.glb,
         "observation leaves the rigged render output unchanged"
     );
-    let proof = rows(&package.join(map))?;
+    let map_path = package.join(map);
+    let proof = rows(&map_path)?;
     let expected = [
         (SKIN, true, first_index(&skin)?),
         (HORN, false, first_index(&horn)?),
@@ -60,23 +66,65 @@ fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement(
     assert_meshes(&proof, &glb, expected)?;
     assert_creature_primitives(&proof, &glb, [&skin, &horn])?;
     assert_receipt(&package, map)?;
+    assert_receipt(&package, "scene.json")?;
     write(&archive, &assembly, &package, true)?;
     assert_eq!(
-        rows(&package.join(map))?,
+        rows(&map_path)?,
         proof,
         "repeat publishes a complete replacement"
     );
     write(&archive, &assembly, &package, false)?;
     assert!(
-        !package.join(map).exists(),
+        !map_path.exists(),
         "ordinary replacement removes the optional sidecar"
     );
     assert_eq!(
         fs::read(package.join(&combined.file))?,
-        original,
+        ordinary.glb,
         "same rig after replacement"
     );
     Ok(())
+}
+
+fn encrypted_skin_fixture(skin: &TestModel) -> Result<Fixture, Box<dyn Error>> {
+    let mut entries = creature_entries();
+    let slot = entries
+        .iter_mut()
+        .find(|entry| entry.path() == SKIN)
+        .ok_or("actual skin companion")?;
+    *slot = TestEntry::zstd(SKIN, skin.cgfm()).encrypted();
+    fixture(entries)
+}
+
+struct OrdinaryPackage {
+    glb: Vec<u8>,
+    scene: Value,
+}
+
+fn write_ordinary_package(
+    archive: &Archive,
+    assembly: &Assembly,
+    package: &Path,
+    models: [&TestModel; 2],
+) -> Result<OrdinaryPackage, Box<dyn Error>> {
+    write(archive, assembly, package, false)?;
+    let glb = fs::read(package.join("meshes/m0001.glb"))?;
+    let scene = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
+    let mut unobserved = Vec::new();
+    let options = glb_options(0)
+        .with_materials(MaterialMode::Textures)
+        .with_layer_vertex_colours();
+    assembly.write_glb_with(
+        &options,
+        &ArchiveModels::new(archive).textures(),
+        &mut unobserved,
+    )?;
+    assert_eq!(
+        glb, unobserved,
+        "package observation preserves ordinary GLB bytes"
+    );
+    assert_scene_triangles(&scene, &glb, models)?;
+    Ok(OrdinaryPackage { glb, scene })
 }
 
 fn write(archive: &Archive, assembly: &Assembly, output: &Path, observe: bool) -> TestResult {
@@ -209,11 +257,7 @@ fn assert_index(
     Ok(())
 }
 
-fn at<'a>(
-    proof: &'a [Value],
-    kind: &str,
-    mesh: usize,
-) -> Result<&'a Value, Box<dyn std::error::Error>> {
+fn at<'a>(proof: &'a [Value], kind: &str, mesh: usize) -> Result<&'a Value, Box<dyn Error>> {
     proof
         .iter()
         .find(|row| row.get("type") == Some(&json!(kind)) && row.get("mesh") == Some(&json!(mesh)))
@@ -253,7 +297,7 @@ fn assert_creature_primitives(proof: &[Value], glb: &[u8], models: [&TestModel; 
     Ok(())
 }
 
-fn first_index(model: &TestModel) -> Result<u64, Box<dyn std::error::Error>> {
+fn first_index(model: &TestModel) -> Result<u64, Box<dyn Error>> {
     let original = model.skin_chunk();
     let streams = mesh_streams(&original).ok_or("physical stream offsets")?;
     let stream = streams

@@ -33,14 +33,9 @@ fn package_collision_helpers_are_optional_and_keep_original_attachment_rig() -> 
         "render hierarchy and topology"
     );
     assert_eq!(default.meshes, optional.meshes, "render mesh references");
+    assert_eq!(default.version, "1.25", "default format version");
     assert_eq!(
-        default.version,
-        p4kx_blender::FORMAT_VERSION,
-        "default format version"
-    );
-    assert_eq!(
-        optional.version,
-        p4kx_blender::FORMAT_VERSION,
+        optional.version, "1.25",
         "helpers use the current package version"
     );
     for mesh in &default.meshes {

@@ -144,6 +144,9 @@ pub enum PackageError {
     /// Original light placement evidence could not be recorded.
     #[error("cannot record package light placement")]
     LightEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// The scene origin map or its source inventory could not be represented.
+    #[error("could not capture scene source evidence")]
+    SceneEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// Original collision source or placement evidence could not be recorded.
     #[error("cannot record package collision helper evidence")]
     CollisionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),

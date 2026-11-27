@@ -230,9 +230,9 @@ impl Fixture {
                 (2, 11, 0, 3),
                 (0, 12, 3, 0),
                 (4, 21, 3, 3),
-                (4, 22, 6, 3),
-                (10, 23, 9, 3),
-                (14, 24, 12, 3),
+                (4, 22, 6, 6),
+                (10, 23, 12, 9),
+                (14, 24, 21, 3),
             ]
             .into_iter()
             .map(
@@ -302,12 +302,12 @@ impl Fixture {
             .next()
             .ok_or("actual mesh chunk")?;
         let expected = [
-            (2, 4, 21, 0, PrimitiveMaterialSource::Library(4)),
-            (3, 4, 22, 0, PrimitiveMaterialSource::Library(4)),
-            (4, 10, 23, 1, fallback),
-            (5, 14, 24, 1, fallback),
+            (2, 4, 21, 0, 3, PrimitiveMaterialSource::Library(4)),
+            (3, 4, 22, 0, 6, PrimitiveMaterialSource::Library(4)),
+            (4, 10, 23, 1, 9, fallback),
+            (5, 14, 24, 1, 3, fallback),
         ];
-        for ((primitive, row), (ordinal, id, zone, dense, source)) in
+        for ((primitive, row), (ordinal, id, zone, dense, indices, source)) in
             mesh.primitives().zip(rows).zip(expected)
         {
             assert_eq!(
@@ -317,9 +317,17 @@ impl Fixture {
             );
             let accessor = primitive.indices().ok_or("emitted index accessor")?;
             assert_eq!(
-                row.index_accessor,
-                Some(accessor.index()),
-                "actual GLB index accessor"
+                (row.index_accessor, row.index_count),
+                (
+                    Some(accessor.index()),
+                    Some(u64::try_from(accessor.count())?)
+                ),
+                "actual GLB index accessor and element count"
+            );
+            assert_eq!(
+                row.index_count,
+                Some(indices),
+                "fixture indices per primitive"
             );
             assert_eq!(
                 row.material_index,

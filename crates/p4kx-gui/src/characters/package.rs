@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{
-    AnimationFolders, ArchiveModels, CharacterAnimations, LoadoutChanges, character_animations,
+    AnimationFolders, ArchiveModels, CharacterAnimations, LoadoutChanges,
+    character_animations_with_clip_evidence,
 };
 use p4kx_blender::{CharacterScene, PackageWriteContext, write_character_package_with_context};
 use p4kx_extraction::{
-    AnimationSet, ArchiveWriteProtection, CancelToken, ConversionError, GlbSummary,
+    ArchiveAnimationRead, ArchiveWriteProtection, CancelToken, ConversionError, GlbSummary,
 };
 
 use super::export::{CharacterExportSummary, Ended, Request};
@@ -15,7 +16,10 @@ use crate::{EntryIndex, ModelExportFailure, NoEntries};
 
 /// Reads the animations of the animation folders of the Character: the folder of the story
 /// character of its Loadout first, then those of its body.
-fn clips(models: &ArchiveModels<'_>, request: &Request) -> Result<AnimationSet, ConversionError> {
+fn clips(
+    models: &ArchiveModels<'_>,
+    request: &Request,
+) -> Result<ArchiveAnimationRead, ConversionError> {
     let variant = request.armour.variant();
     let folders = request
         .origin
@@ -24,8 +28,13 @@ fn clips(models: &ArchiveModels<'_>, request: &Request) -> Result<AnimationSet, 
         .map_or_else(AnimationFolders::default, |folder| {
             AnimationFolders::of_npc(models, variant, folder)
         });
-    match character_animations(models, variant, (&["all".to_owned()], &[]), &folders) {
-        Err(ConversionError::UnknownAnimations { .. }) => Ok(AnimationSet::default()),
+    match character_animations_with_clip_evidence(
+        models,
+        variant,
+        (&["all".to_owned()], &[]),
+        &folders,
+    ) {
+        Err(ConversionError::UnknownAnimations { .. }) => Ok(ArchiveAnimationRead::default()),
         found => found,
     }
 }
@@ -48,13 +57,13 @@ pub(super) fn write(index: &EntryIndex, request: &Request, cancel: &CancelToken)
             Err(error) => return Ended::Failed(failure_of(index, &error)),
         }
     } else {
-        AnimationSet::default()
+        ArchiveAnimationRead::default()
     };
     if cancel.is_cancelled() {
         return Ended::Cancelled;
     }
     let animations = if request.animations {
-        request.armour.animate(&found.animations, &models)
+        request.armour.animate_with_clip_evidence(&found, &models)
     } else {
         CharacterAnimations::default()
     };

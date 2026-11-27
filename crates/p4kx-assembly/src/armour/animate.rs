@@ -3,6 +3,7 @@
 
 #[path = "animate_origins.rs"]
 mod origins;
+pub use self::origins::{CharacterAnimationInput, CharacterAnimationRole};
 
 #[cfg(feature = "verification")]
 #[path = "face_rotation_verification.rs"]
@@ -14,6 +15,7 @@ use std::collections::HashSet;
 use std::io::Write;
 
 use p4kx_character::RigLogic;
+use p4kx_extraction::ArchiveAnimationRead;
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, SampledAnimation, SampledWeights, TextureLoader,
     write_rigged_glb_animated, write_rigged_glb_animated_with,
@@ -42,6 +44,7 @@ const MAX_SAMPLES: usize = 1 << 15;
 /// [`Armour::animate`].
 #[derive(Debug, Clone, Default)]
 pub struct CharacterAnimations<'a> {
+    archive_animation_read: Option<&'a ArchiveAnimationRead>,
     keys: Vec<(usize, &'a Animation, Vec<u32>)>,
     sampled: Vec<SampledAnimation>,
     sampled_indices: Vec<usize>,

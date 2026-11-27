@@ -194,12 +194,12 @@ exchange separately to a workflow revision and the exporter binary digest.
 
 All lengths are metres, all transforms are relative to the parent node. Writers add fields in
 minor versions, so a reader ignores fields it does not know. Absent optional fields are not
-written (there are no `null`s).
+written.
 
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format. Current exports use 1.21 for ordinary packages, 1.22 with fitted paint provenance, 1.23 with a palette decal-texture field, or 1.24 with Character body-zone addresses. |
+| `version` | `<major>.<minor>` of the package format. Current exports use 1.21 when no later versioned fields are present, 1.22 with fitted paint provenance, 1.23 with a palette decal-texture field, 1.24 with Character body-zone addresses, or 1.25 with addressed scene provenance. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -213,6 +213,7 @@ written (there are no `null`s).
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
 | `palette_provenance` | Optional source proof for palette fields and each node's selection. |
 | `paint_provenance` | Optional root hull paint identities and their exact observed origins (1.22). |
+| `scene_provenance` | Optional field-addressed scene evidence and its shared source inventory (1.25). |
 | `issues` | What could not be resolved or written. |
 
 `format`, `basis`, `unit`, `Texture.format`, `colour_space`, `alpha`, `Node.kind`,
@@ -861,6 +862,22 @@ and palette bindings.
 fitted paint provenance.
 
 **1.24** adds the optional Character body-zone and worn-part map, addressed in its rigged GLB.
+
+**1.25** adds `scene_provenance`. Its `fieldOrigins` keys are JSON Pointers rooted at
+`scene.json`. Resolve each field's `sourceUsesRefs` against the shared `sourceInventory`.
+The `summary` counts addressed fields and their encryption and completeness states.
+Those counts describe the addressed fields. An address can identify a finite renderer
+transform of a directly owned baked vehicle Interior light. A vector replaced during
+numeric sanitization can lack a source binding. The ordinary transform remains in `nodes`.
+The Character package addresses written animation slots under `/meshes/0/rig/animations`.
+A clip name identifies the original CAF or DBA entry. A key-track clip keeps the original
+additive and duration evidence. Sampled additive flags are generated. Sampled duration, key
+counts and channel counts retain known conversion inputs with incomplete field evidence.
+Creature, static Entity and standalone Interior packages address each written mesh's
+triangle count at /meshes/<slot>/triangles. They keep the original IVO index-count
+words where the emitted index accessor and the original submesh row agree. The field's
+evidence remains incomplete when original model, LOD or visibility selection is unavailable.
+The existing package receipt binds the complete `scene.json` with its SHA-256 digest.
 
 ### Authored Entity Glow
 

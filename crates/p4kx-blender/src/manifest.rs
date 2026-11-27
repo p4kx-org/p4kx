@@ -22,6 +22,7 @@ pub const FORMAT_VERSION: &str = "1.21";
 pub(crate) const PAINT_FORMAT_VERSION: &str = "1.22";
 pub(crate) const PALETTE_DECAL_FORMAT_VERSION: &str = "1.23";
 pub(crate) const CHARACTER_BODY_ZONES_FORMAT_VERSION: &str = "1.24";
+pub(crate) const SCENE_PROVENANCE_FORMAT_VERSION: &str = "1.25";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -135,6 +136,10 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<crate::package_light_placements::LightPlacements>")]
     pub light_placements: Option<serde_json::Value>,
+    /// Observed scene fields and their shared source inventory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_scene_provenance::SceneProvenance<'static>>")]
+    pub scene_provenance: Option<serde_json::Value>,
     /// Original Entity Glow declarations and their separate owner model associations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<crate::package_glow::PackageGlow>")]

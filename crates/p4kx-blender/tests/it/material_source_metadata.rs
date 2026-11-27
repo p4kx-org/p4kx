@@ -6,7 +6,7 @@ use std::io::{BufRead as _, BufReader};
 use std::path::Path;
 
 use flate2::bufread::GzDecoder;
-use p4kx_blender::{FORMAT_VERSION, Manifest, MaterialLibrarySourceDescription};
+use p4kx_blender::{Manifest, MaterialLibrarySourceDescription};
 use serde_json::Value;
 
 use crate::package_materials;
@@ -56,7 +56,7 @@ fn package_source_roots_are_shared_without_overriding_original_material_indices(
     let written = package_materials::write()?;
     let manifest = &written.manifest;
     assert_eq!(
-        manifest.version, FORMAT_VERSION,
+        manifest.version, "1.25",
         "producer format follows the current additive contract"
     );
     assert!(

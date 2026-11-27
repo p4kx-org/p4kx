@@ -121,7 +121,7 @@ fn the_package_has_the_documented_layout_and_validates_against_the_schema() -> T
         .collect();
     assert!(violations.is_empty(), "{violations:?}");
     assert_eq!(manifest["format"], "p4kx-blender-package");
-    assert_eq!(manifest["version"], p4kx_blender::FORMAT_VERSION);
+    assert_eq!(manifest["version"], "1.25");
     assert_eq!(manifest["source"]["entity"]["class_name"], "TEST_Livery");
     for part in manifest["meshes"].as_array().ok_or("parts")? {
         let file = part["file"].as_str().ok_or("file")?;

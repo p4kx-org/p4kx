@@ -7,8 +7,8 @@ use std::path::Path;
 
 use p4kx_assembly::{ArchiveModels, Assembly};
 use p4kx_blender::{
-    FORMAT_VERSION, IssueOrigin, Manifest, NodeKind, PackageInfo, PackageSummary, RigPartOrigin,
-    manifest_schema, write_package,
+    IssueOrigin, Manifest, NodeKind, PackageInfo, PackageSummary, RigPartOrigin, manifest_schema,
+    write_package,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
@@ -78,7 +78,10 @@ fn a_creature_with_its_skeleton_is_one_skinned_rig_mesh() -> TestResult {
     let written = write(CREATURE)?;
     let manifest = &written.manifest;
 
-    assert_eq!(manifest.version, FORMAT_VERSION);
+    assert_eq!(
+        manifest.version, "1.25",
+        "addressed Creature triangle evidence"
+    );
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert!(manifest.textures.is_empty() && manifest.materials.is_empty());
     let [node] = manifest.nodes.as_slice() else {

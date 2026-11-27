@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 
 use p4kx_extraction::model::MeshOrigin;
-use p4kx_extraction::{FrozenGlbMeshOrigins, GlbMeshOrigins};
+use p4kx_extraction::{ArchiveAnimationRead, FrozenGlbMeshOrigins, GlbMeshOrigins};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MeshVertexMap, RigAnimation, RiggedGlbEmission,
     TextureLoader, write_rigged_glb_animated_observed,
@@ -12,21 +12,90 @@ use p4kx_gltf::{
 };
 
 use super::{Armour, ArmourPart, CharacterAnimations, RigArchiveRead};
+use crate::ModelProvider;
+
+/// How a selected clip contributes to a prepared Character animation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CharacterAnimationRole {
+    /// Original key tracks selected for the body skeleton.
+    Keys,
+    /// Rig-evaluated poses and weights at sampled controller frames.
+    Sampled,
+}
+
+/// A prepared writer slot's source index and contribution role.
+#[derive(Debug, Clone, Copy)]
+pub struct CharacterAnimationInput<'rig> {
+    index: usize,
+    role: CharacterAnimationRole,
+    rig: Option<&'rig RigArchiveRead>,
+}
+
+impl<'rig> CharacterAnimationInput<'rig> {
+    /// Returns the index in the original animation slice supplied for fitting.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.index
+    }
+
+    /// Returns how the original clip was prepared for this slot.
+    #[must_use]
+    pub const fn role(self) -> CharacterAnimationRole {
+        self.role
+    }
+
+    /// Returns the actual rig read when this prepared input consumed one.
+    #[must_use]
+    pub const fn rig_read(self) -> Option<&'rig RigArchiveRead> {
+        self.rig
+    }
+}
 
 impl CharacterAnimations<'_> {
+    /// Returns the exact Archive read whose decoded clips were fitted, when supplied.
+    #[must_use]
+    pub const fn archive_animation_read(&self) -> Option<&ArchiveAnimationRead> {
+        self.archive_animation_read
+    }
+
+    /// Returns the source index and role at a prepared writer slot, including slots that emit no channels.
+    #[must_use]
+    pub fn input_for(&self, writer_index: usize) -> Option<CharacterAnimationInput<'_>> {
+        self.inputs().nth(writer_index)
+    }
+
     /// Returns the original input positions of animations passed to the GLB writer, in its order.
     pub fn input_indices(&self) -> impl Iterator<Item = usize> + '_ {
-        self.keys
-            .iter()
-            .map(|(index, _, _)| *index)
-            .chain(self.sampled_indices.iter().copied())
+        self.inputs().map(CharacterAnimationInput::index)
     }
 
     /// Returns the rig read used by a sampled animation in writer order.
     #[must_use]
     pub fn rig_read_for(&self, animation: usize) -> Option<&RigArchiveRead> {
-        let sampled = animation.checked_sub(self.keys.len())?;
-        self.sampled_rigs.get(sampled)?.as_ref()
+        self.input_for(animation)?.rig_read()
+    }
+
+    /// Iterates the original clip and rig bindings in writer-slot order.
+    pub fn inputs(&self) -> impl Iterator<Item = CharacterAnimationInput<'_>> + '_ {
+        let keys = self
+            .keys
+            .iter()
+            .map(|&(index, _, _)| CharacterAnimationInput {
+                index,
+                role: CharacterAnimationRole::Keys,
+                rig: None,
+            });
+        let sampled = self
+            .sampled_indices
+            .iter()
+            .enumerate()
+            .map(|(position, &index)| CharacterAnimationInput {
+                index,
+                role: CharacterAnimationRole::Sampled,
+                rig: self.sampled_rigs.get(position).and_then(Option::as_ref),
+            });
+        keys.chain(sampled)
     }
 
     pub(super) fn rig_animations(&self) -> Vec<RigAnimation<'_>> {
@@ -45,6 +114,18 @@ struct EmittedMesh {
 }
 
 impl Armour {
+    /// Fits the selected Archive clips and retains their original read evidence.
+    #[must_use]
+    pub fn animate_with_clip_evidence<'clips>(
+        &self,
+        found: &'clips ArchiveAnimationRead,
+        models: &dyn ModelProvider,
+    ) -> CharacterAnimations<'clips> {
+        let mut animated = self.animate(&found.set().animations, models);
+        animated.archive_animation_read = Some(found);
+        animated
+    }
+
     /// Writes the rigged GLB and retains observed geometry and worn mount field origins.
     ///
     /// # Errors

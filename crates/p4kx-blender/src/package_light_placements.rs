@@ -5,8 +5,12 @@ use p4kx_assembly::{
     Assembly, InteriorLightHelper, InteriorLightHelperError, InteriorLightHelperSource,
     InteriorLightPlacement, InteriorPart, ObjectContainerRef, SocTileLightAnchorError,
 };
-use p4kx_extraction::{SourceInventory, SourceUses, SourceValue, SourcedValue};
+use p4kx_extraction::{
+    FieldOrigin, FieldOrigins, FieldPath, SourceInventory, SourceUses, SourceValue, SourcedValue,
+};
+use p4kx_gltf::NodeTransform;
 use p4kx_model::SocLight;
+use p4kx_model::Transform;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -103,26 +107,83 @@ enum HelperSource {
     Unknown,
 }
 
+pub(crate) struct LightCapture {
+    pub(crate) placements: Option<serde_json::Value>,
+    pub(crate) node_fields: FieldOrigins,
+    pub(crate) sources: SourceUses,
+}
+
+/// Captures the baked light placements and the same observed origins of their renderer transforms.
 pub(crate) fn capture(
     assembly: &Assembly,
     items: &[Item<'_>],
     context: &PackageWriteContext<'_>,
-) -> PackageResult<Option<serde_json::Value>> {
+) -> PackageResult<LightCapture> {
     let sources = SourceUses::with_compact_use_refs();
     let mut rows = Vec::new();
+    let mut node_fields = FieldOrigins::new();
     for (node, item) in items.iter().enumerate() {
         if let Some(placed) = &item.light_placement {
             context.check()?;
-            rows.push(LightPlacement::read(node, placed, assembly, &sources)?);
+            let placement = LightPlacement::read(node, placed, assembly, &sources)?;
+            if item.light.is_some() && placed.part.parent().is_some() {
+                capture_node_transform(
+                    &mut node_fields,
+                    node,
+                    &item.transform,
+                    placed.part.local(),
+                    placement.effective_light.origin(),
+                )?;
+            }
+            rows.push(placement);
         }
     }
-    if rows.is_empty() {
-        return Ok(None);
+    let placements = if rows.is_empty() {
+        None
+    } else {
+        let inventory = sources.freeze().map_err(error)?;
+        Some(serde_json::to_value(LightPlacements { rows, inventory }).map_err(error)?)
+    };
+    Ok(LightCapture {
+        placements,
+        node_fields,
+        sources,
+    })
+}
+
+fn capture_node_transform(
+    fields: &mut FieldOrigins,
+    node: usize,
+    transform: &NodeTransform,
+    authored: &Transform,
+    origin: &FieldOrigin,
+) -> PackageResult<()> {
+    // Quaternion conversion can produce finite identity from a non-finite basis.
+    let valid_basis = authored
+        .rows
+        .iter()
+        .all(|[x, y, z, _]| x.is_finite() && y.is_finite() && z.is_finite());
+    let finite_fields = [
+        (
+            "translation",
+            transform.translation.into_iter().all(f32::is_finite),
+        ),
+        (
+            "rotation",
+            valid_basis && transform.rotation.into_iter().all(f32::is_finite),
+        ),
+        ("scale", transform.scale.into_iter().all(f32::is_finite)),
+    ];
+    let mut path = FieldPath::parse("/nodes").map_err(error)?;
+    path.push_index(node).map_err(error)?;
+    for (field, finite) in finite_fields {
+        if finite {
+            path.push_field(field).map_err(error)?;
+            fields.insert(path.clone(), origin.clone()).map_err(error)?;
+            path.pop();
+        }
     }
-    let inventory = sources.freeze().map_err(error)?;
-    serde_json::to_value(LightPlacements { rows, inventory })
-        .map(Some)
-        .map_err(error)
+    Ok(())
 }
 
 impl LightPlacement {
@@ -294,4 +355,46 @@ const fn helper_reason(reason: InteriorLightHelperError) -> &'static str {
 
 fn error(error: impl std::error::Error + Send + Sync + 'static) -> PackageError {
     PackageError::LightEvidence(Box::new(error))
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_extraction::{FieldOrigins, SourceUses};
+    use p4kx_gltf::light_node_transform;
+    use p4kx_model::Transform;
+
+    use crate::PackageResult;
+
+    use super::capture_node_transform;
+
+    #[test]
+    fn renderer_fields_require_finite_source_vectors() -> PackageResult<()> {
+        let sources = SourceUses::with_compact_use_refs();
+        let origin = sources.origin(&[], false);
+        let [_, y, z] = Transform::IDENTITY.rows;
+        let invalid_translation = Transform {
+            rows: [[1.0, 0.0, 0.0, f32::NAN], y, z],
+        };
+        let invalid_basis = Transform {
+            rows: [[f32::NAN, 0.0, 0.0, 0.0], y, z],
+        };
+        let mut fields = FieldOrigins::new();
+        for (index, authored) in [invalid_translation, invalid_basis].iter().enumerate() {
+            let transform = light_node_transform(authored);
+            assert!(
+                transform.rotation.into_iter().all(f32::is_finite),
+                "rotation is finite in both cases"
+            );
+            capture_node_transform(&mut fields, index, &transform, authored, &origin)?;
+        }
+        assert_eq!(
+            fields
+                .iter()
+                .map(|(path, _)| path.as_str())
+                .collect::<Vec<_>>(),
+            ["/nodes/0/rotation", "/nodes/0/scale"],
+            "omit sanitized translation and guessed rotation while retaining the original finite fields"
+        );
+        Ok(())
+    }
 }

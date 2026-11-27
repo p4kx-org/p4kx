@@ -3,7 +3,7 @@
 
 use std::io;
 
-use gltf_json::{Mesh as GltfMesh, Root};
+use gltf_json::{Accessor, Mesh as GltfMesh, Root};
 use p4kx_model::{Mesh, MeshSubmeshSource, ModelChunk};
 
 use crate::instance::Instance;
@@ -32,6 +32,8 @@ pub struct MeshPrimitiveMap {
     pub primitive: usize,
     /// The emitted index accessor.
     pub index_accessor: Option<usize>,
+    /// The number of elements in the emitted index accessor.
+    pub index_count: Option<u64>,
     /// The emitted dense GLB material array index.
     pub material_index: Option<usize>,
     /// The draw material selected before equal GLB materials were shared.
@@ -45,6 +47,7 @@ pub struct MeshPrimitiveMap {
 #[derive(Clone, Copy)]
 pub(crate) struct ObservedMesh<'a> {
     written: &'a GltfMesh,
+    accessors: &'a [Accessor],
     planned: &'a MeshLayout,
     materials: &'a MaterialPlan<'a>,
     chunk: Option<&'a ModelChunk>,
@@ -60,7 +63,7 @@ impl std::fmt::Debug for ObservedMesh<'_> {
 
 impl<'a> ObservedMesh<'a> {
     pub(crate) fn new(
-        document: &Root,
+        document: &'a Root,
         written: &'a GltfMesh,
         planned: &'a MeshLayout,
         instance: &'a Instance<'a>,
@@ -89,6 +92,7 @@ impl<'a> ObservedMesh<'a> {
         });
         Ok(Self {
             written,
+            accessors: &document.accessors,
             planned,
             materials: &instance.plan,
             chunk,
@@ -116,9 +120,14 @@ impl<'a> ObservedMesh<'a> {
                     Some(Slot::Default) => PrimitiveMaterialSource::BuiltInFallback,
                     None => PrimitiveMaterialSource::Unassigned,
                 };
+                let index_accessor = written.indices.map(|index| index.value());
+                let index_count = index_accessor
+                    .and_then(|index| self.accessors.get(index))
+                    .map(|accessor| accessor.count.0);
                 MeshPrimitiveMap {
                     primitive,
-                    index_accessor: written.indices.map(|index| index.value()),
+                    index_accessor,
+                    index_count,
                     material_index,
                     material_source,
                     model_submesh: planned.model_submesh,

@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use p4kx_assembly::{Assembly, Part};
-use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode, TextureLoader};
+use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MaterialMode, TextureLoader};
 
 use crate::build::assembly_issue;
 use crate::entity_classification::EntityClassifications;
@@ -15,6 +15,11 @@ use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
 use crate::rig_package::{RigScene, WrittenRig, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
+
+#[path = "creature_triangle_evidence.rs"]
+mod triangle_evidence;
+
+use triangle_evidence::TriangleEvidence;
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
 /// [`Assembly::write_glb_with`] writes it, its skeleton as bone nodes with the skins bound to it,
@@ -47,17 +52,26 @@ pub(crate) fn write_creature_package(
         &options,
         context,
         |options, writer, map| {
-            let summary = if let Some(map) = map {
-                assembly.write_glb_with_vertex_origins(
-                    options,
-                    textures,
-                    writer,
-                    &mut |row, model, sources| map.observe(&row, model, sources, context),
-                )
-            } else {
-                assembly.write_glb_with(options, textures, writer)
-            }?;
-            Ok(WrittenRig::geometry(summary))
+            let mut map = map;
+            let mut triangles = TriangleEvidence::new();
+            let summary = assembly.write_glb_with_vertex_origins(
+                options,
+                textures,
+                writer,
+                &mut |row, model, sources| {
+                    triangles.observe(&row, model, sources, context)?;
+                    if let Some(map) = map.as_deref_mut() {
+                        map.observe(&row, model, sources, context)?;
+                    }
+                    Ok(())
+                },
+            )?;
+            let scene_fields = triangles
+                .finish(summary.triangles)
+                .map_err(GltfError::Write)?;
+            let mut written = WrittenRig::geometry(summary);
+            written.scene_fields = Some(scene_fields);
+            Ok(written)
         },
         |written| {
             let mut manifest = manifest(assembly, interior_left_out, info, &options, written);

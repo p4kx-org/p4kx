@@ -13,6 +13,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "character_package_origins.rs"]
+mod clip_origins;
 mod default_chf_tests;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -141,7 +143,7 @@ fn a_character_with_animations_is_a_package_of_one_skinned_glb() -> TestResult {
     assert!(run.stdout.contains("2 animations"), "{}", run.stdout);
 
     let manifest = manifest(&out)?;
-    assert_eq!(manifest["version"], p4kx_blender::FORMAT_VERSION);
+    clip_origins::verify(&manifest)?;
     assert_eq!(manifest["nodes"][0]["kind"], "character");
     assert_eq!(manifest["nodes"][0]["name"], "hero");
     assert_eq!(manifest["nodes"][0]["mesh"], "m0001");

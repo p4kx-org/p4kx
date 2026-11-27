@@ -24,6 +24,7 @@ mod build;
 mod character;
 mod character_body_zone_origins;
 mod character_body_zones;
+mod character_clip_origins;
 mod collect;
 mod collision_helper_cdf;
 mod collision_helper_document;
@@ -61,6 +62,7 @@ mod package_palette_provenance;
 mod package_paths;
 mod package_receipt;
 mod package_replacement;
+mod package_scene_provenance;
 mod package_soc_scene;
 mod package_write_context;
 mod palette_fields;
@@ -124,6 +126,7 @@ mod texture_field_origins;
 mod texture_format;
 mod texture_source_metadata;
 mod textures;
+mod triangle_evidence;
 mod write;
 
 pub use character::{

@@ -86,6 +86,19 @@ def test_a_higher_major_version_is_refused_with_an_update_message() -> None:
         parse(manifest(version="2.0"))
 
 
+def test_scene_provenance_does_not_change_rendered_fields() -> None:
+    ordinary = parse(manifest(version="1.24"))
+    observed = parse(manifest(version="1.25", scene_provenance={
+        "fieldOrigins": {"/nodes/0/translation": {
+            "containsEncryptedSource": None, "sourceUsesRefs": [], "sourceSetComplete": False,
+        }},
+        "sourceInventory": {"sources": [], "uses": []},
+        "summary": {"fields": 1, "encrypted": 0, "unencrypted": 0, "unknown": 1, "complete": 0},
+    }))
+    assert observed.nodes == ordinary.nodes
+    assert not observed.warnings
+
+
 def test_a_higher_minor_version_reads_with_a_warning() -> None:
     newer = f"1.{package.SUPPORTED_MINOR + 1}"
     result = parse(manifest(version=newer))

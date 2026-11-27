@@ -8,7 +8,8 @@ use anyhow::{Context, Result};
 use p4kx_assembly::character::{CHF_SIZE, Chf};
 use p4kx_assembly::{
     AnimationFolders, ArchiveFiles, ArchiveModels, Armour, AssemblyOptions, BodyVariant,
-    Expressions, ForgeItems, ForgePalettes, Head, LoadoutResolver, Piece, character_animations,
+    Expressions, ForgeItems, ForgePalettes, Head, LoadoutResolver, Piece,
+    character_animations_with_clip_evidence,
 };
 use p4kx_blender::{
     CharacterScene, PackageInfo, PackageSummary, PackageWriteContext, check_output_with_context,
@@ -96,13 +97,13 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
         &options,
     )?;
     let folders = animation_folders(args, &selection, &models, variant);
-    let found = character_animations(
+    let found = character_animations_with_clip_evidence(
         &models,
         variant,
         (&args.animations, &args.animation_sources),
         &folders,
     )?;
-    let animated = armour.animate(&found.animations, &models);
+    let animated = armour.animate_with_clip_evidence(&found, &models);
 
     let name = name_of(args, variant);
     let chf_name =
@@ -120,7 +121,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
         variant,
         selection: &selection,
         armour: &armour,
-        found: &found,
+        found: found.set(),
     };
     report::print(&shown, &summary, as_json)?;
     failure(&armour, &args.out).map_or(Ok(()), Err)

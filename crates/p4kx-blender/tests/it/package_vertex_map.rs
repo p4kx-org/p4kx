@@ -17,6 +17,9 @@ use serde_json::{Value, json};
 use super::package_primitive_map::{ExpectedSubmesh, assert_draws, assert_submesh, primitive_row};
 use crate::support::{TestResult, assemble, fixture, glb_options};
 
+#[path = "package_static_triangles.rs"]
+pub(super) mod static_triangles;
+
 const GEOMETRY: &str = r"Data\Objects\Test\livery_ship.cgfm";
 
 #[test]
@@ -35,7 +38,10 @@ fn archive_geometry_vertex_sidecar_binds_actual_glb_and_original_encrypted_range
     let observed = out.path().join("observed");
     write_pair(&archive, &plain, &observed)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(observed.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.21", "opt-in enables the additive wire");
+    assert_eq!(
+        manifest.version, "1.25",
+        "triangle evidence advances the additive wire"
+    );
     let root = manifest.meshes.first().ok_or("root GLB")?;
     let map = root
         .vertex_map
@@ -61,13 +67,70 @@ fn archive_geometry_vertex_sidecar_binds_actual_glb_and_original_encrypted_range
     let base = chunk.offset();
     assert_first(&rows, base + indices.data.start as u64, base + 184)?;
     assert_static_primitives(&rows, &glb, base)?;
+    assert_static_scene(&manifest, &plain, &observed, base)?;
     assert_receipt(&observed, map)?;
-    let before = fs::read(observed.join(map))?;
-    write_pair(&archive, &plain, &observed)?;
+    assert_receipt(&observed, "scene.json")?;
+    assert_repeat(&archive, &plain, &observed, map, &manifest)
+}
+
+fn assert_static_scene(
+    manifest: &Manifest,
+    plain: &Path,
+    observed: &Path,
+    chunk: u64,
+) -> TestResult {
+    static_triangles::assert_mesh_counts(manifest, observed)?;
+    let baseline: Manifest = serde_json::from_slice(&fs::read(plain.join("scene.json"))?)?;
     assert_eq!(
-        fs::read(observed.join(map))?,
-        before,
+        baseline.scene_provenance, manifest.scene_provenance,
+        "default and vertex-map writes preserve the shared evidence and identifiers"
+    );
+    let scene = manifest.scene_provenance.as_ref().ok_or("scene evidence")?;
+    let field = static_triangles::triangle_origin(scene, 0)?;
+    assert_eq!(
+        field.get("containsEncryptedSource"),
+        Some(&json!(true)),
+        "encrypted geometry contributes"
+    );
+    let count_words = static_triangles::count_operands(scene, 0)?;
+    assert_eq!(
+        count_words.len(),
+        2,
+        "both root primitives have directly bound index count words"
+    );
+    let physical = static_triangles::source_entry(scene, GEOMETRY)?;
+    for offset in [chunk + 176, chunk + 224] {
+        let range = json!([offset.to_string(), (offset + 4).to_string()]);
+        assert!(
+            count_words.iter().any(|operand| {
+                operand.get("source") == physical.get("id")
+                    && operand.pointer("/location/indices") == Some(&range)
+            }),
+            "the root mesh has its exact decoded index word at {offset}"
+        );
+    }
+    Ok(())
+}
+
+fn assert_repeat(
+    archive: &Archive,
+    plain: &Path,
+    observed: &Path,
+    map: &str,
+    before: &Manifest,
+) -> TestResult {
+    let map_path = observed.join(map);
+    let original_map = fs::read(&map_path)?;
+    write_pair(archive, plain, observed)?;
+    assert_eq!(
+        fs::read(map_path)?,
+        original_map,
         "repeated package replaces its own map"
+    );
+    let repeated: Manifest = serde_json::from_slice(&fs::read(observed.join("scene.json"))?)?;
+    assert_eq!(
+        repeated.scene_provenance, before.scene_provenance,
+        "repeat preserves every field address and source reference"
     );
     Ok(())
 }

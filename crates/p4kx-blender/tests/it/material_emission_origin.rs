@@ -7,10 +7,11 @@ use p4kx_extraction::{Archive, FieldPath, OpenOptions, select_entries};
 use std::path::Path;
 
 use p4kx_testkit::{
-    SOC_IDENTITY, TestContainer, TestEntry, TestModel, TestObjectContainer, TestSoc, test_key,
+    ArchiveBuilder, SOC_IDENTITY, TestEntry, TestModel, TestObjectContainer, TestSoc, test_key,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use crate::package_vertex_map::static_triangles;
 use crate::support::{TestResult, fixture, glb_options, never};
 
 #[test]
@@ -22,11 +23,11 @@ fn a_plain_interior_material_keeps_its_encrypted_container_ancestor() -> TestRes
         .model("objects/test/fixture.cgf")
         .object(0, SOC_IDENTITY);
     let description = TestObjectContainer::new("fixture").stream("fixture.soc");
-    let container = TestContainer::new()
+    let container = ArchiveBuilder::v2()
         .entry(TestEntry::stored("fixture.xml", description.xml()))
         .entry(TestEntry::deflated("fixture.soc", scene.bytes()))
         .entry(TestEntry::stored(format!("{MODEL}.cgf"), model.cgf()))
-        .entry(TestEntry::stored(format!("{MODEL}.cgfm"), model.cgfm()))
+        .entry(TestEntry::stored(format!("{MODEL}.cgfm"), model.cgfm()).with_encryption_field(0))
         .entry(TestEntry::stored(
             format!("{MODEL}.mtl"),
             br#"<Material Shader="Illum" Glow="2"><Opaque Data="first&amp;last"><Nested/></Opaque></Material>"#,
@@ -59,7 +60,63 @@ fn a_plain_interior_material_keeps_its_encrypted_container_ancestor() -> TestRes
     )?;
     let manifest: Manifest = serde_json::from_slice(&std::fs::read(target.join("scene.json"))?)?;
     check_encrypted_material(&manifest)?;
-    check_authored_material(&manifest, &target)
+    check_authored_material(&manifest, &target)?;
+    check_interior_triangles(&manifest, &target, CONTAINER, &format!("{MODEL}.cgfm"))
+}
+
+fn check_interior_triangles(
+    manifest: &Manifest,
+    target: &Path,
+    container_path: &str,
+    geometry_path: &str,
+) -> TestResult {
+    assert_eq!(
+        manifest.version, "1.25",
+        "mesh evidence needs no Assembly classification"
+    );
+    assert!(
+        manifest.light_placements.is_none()
+            && manifest.nodes.iter().all(|node| node.light.is_none()),
+        "this Interior has no light provenance to initialize the inventory"
+    );
+    static_triangles::assert_mesh_counts(manifest, target)?;
+    let scene = manifest
+        .scene_provenance
+        .as_ref()
+        .ok_or("standalone Interior scene evidence")?;
+    let origin = static_triangles::triangle_origin(scene, 0)?;
+    assert_eq!(
+        origin.get("containsEncryptedSource"),
+        Some(&json!(true)),
+        "the plain contributing geometry inherits its encrypted container"
+    );
+    let geometry = static_triangles::source_entry(scene, geometry_path)?;
+    let container = static_triangles::source_entry(scene, container_path)?;
+    let container_id = container.get("id").ok_or("container source identity")?;
+    assert_eq!(
+        geometry.get("storedEncryption"),
+        Some(&json!("unencrypted")),
+        "the original geometry leaf is plain"
+    );
+    assert_eq!(
+        container.get("storedEncryption"),
+        Some(&json!("encrypted")),
+        "the stored container is encrypted"
+    );
+    assert_eq!(
+        geometry.get("ancestors"),
+        Some(&json!([container_id])),
+        "the leaf retains its physical parent"
+    );
+    let counts = static_triangles::count_operands(scene, 0)?;
+    assert!(
+        !counts.is_empty()
+            && counts
+                .iter()
+                .all(|count| count.get("source") == geometry.get("id")),
+        "every known count word is from the selected geometry leaf"
+    );
+    Ok(())
 }
 
 fn check_encrypted_material(manifest: &Manifest) -> TestResult {

@@ -5,9 +5,11 @@
 
 use std::error::Error;
 
+use p4kx_extraction::model_info;
 use p4kx_extraction::{
-    AnimationChoice, AnimationListing, AnimationSet, Archive, ArchivePositionedAnimation,
-    ConversionError, PathIndex,
+    AnimationChoice, AnimationListing, AnimationSet, Archive, ArchiveAnimationRead,
+    ArchivePositionedAnimation, ConversionError, FieldOrigin, FieldOrigins, PathIndex,
+    SourceInventory, SourceLocation, SourceUses,
 };
 use p4kx_testkit::{ArchiveBuilder, TestAnimation, TestDba, TestEntry, TestSkeleton, TestTrack};
 
@@ -267,6 +269,130 @@ fn assert_positioned(
         positioned.controller_ordinal(1),
         None,
         "no decoded second track"
+    );
+    Ok(())
+}
+
+#[test]
+fn selected_database_fields_retain_the_physical_clip_ordinal() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(&dir)?;
+    let index = PathIndex::new(&archive);
+    let choice = AnimationChoice::Named(vec!["close".to_owned()]);
+    let found = ArchiveAnimationRead::for_model(&index, MODEL, &choice, &[])?;
+    assert_eq!(
+        found.set().animations.len(),
+        1,
+        "only the second DBA clip is selected"
+    );
+
+    let full = SourceUses::new();
+    let fields = found
+        .clip_field_origins(0, &full)?
+        .ok_or("selected clip fields")?;
+    let inventory = full.freeze()?;
+    for (field, origin) in [
+        ("databasePath", &fields.name),
+        ("additive", &fields.additive),
+        ("frames_per_second", &fields.duration_seconds),
+        ("end_frame", &fields.duration_seconds),
+    ] {
+        let indices =
+            coordinates_of(&inventory, origin, field).ok_or("original field coordinates")?;
+        assert!(
+            matches!(indices, [1, _, start, end] if start < end),
+            "original DBA ordinal and half-open {field} range: {indices:?}"
+        );
+    }
+    let name_only = SourceUses::new();
+    let name = found
+        .clip_name_origin(0, &name_only)?
+        .ok_or("selected clip name")?;
+    let inventory = name_only.freeze()?;
+    assert!(
+        coordinates_of(&inventory, &name, "databasePath").is_some(),
+        "name-only proof retains the original name"
+    );
+    assert!(
+        inventory.iter_uses().all(|site| {
+            !matches!(
+                site.location(),
+                SourceLocation::Subresource { namespace, field, .. }
+                    if namespace == "cryEngineAnimation" && field != "databasePath"
+            )
+        }),
+        "name-only proof does not register authored timing or flags"
+    );
+    Ok(())
+}
+
+fn coordinates_of<'inventory>(
+    inventory: &'inventory SourceInventory,
+    origin: &FieldOrigin,
+    field: &str,
+) -> Option<&'inventory [u64]> {
+    inventory
+        .iter_uses()
+        .filter(|site| origin.source_uses_refs().contains(site.id()))
+        .find_map(|site| match site.location() {
+            SourceLocation::Subresource {
+                namespace,
+                indices,
+                field: actual,
+            } if namespace == "cryEngineAnimation" && actual == field => Some(indices.as_slice()),
+            _ => None,
+        })
+}
+
+#[test]
+fn absent_clip_coordinates_stay_incomplete_and_detached_bindings_are_rejected() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(&dir)?;
+    let index = PathIndex::new(&archive);
+    let plain = AnimationSet::from_folders_with_archive_sources(
+        &index,
+        &["Data/Objects"],
+        &AnimationChoice::Named(vec!["close".to_owned()]),
+        &[],
+    )?;
+    let uses = SourceUses::new();
+    let fields = plain
+        .clip_field_origins(0, &uses)?
+        .ok_or("valid selected clip")?;
+    let name = plain
+        .clip_name_origin(0, &uses)?
+        .ok_or("valid selected clip name")?;
+    for origin in [fields.name, fields.additive, fields.duration_seconds, name] {
+        assert!(
+            !origin.source_set_complete(),
+            "absent coordinates cannot prove the field"
+        );
+        assert!(
+            origin.source_uses_refs().is_empty(),
+            "no guessed original source positions"
+        );
+    }
+    assert!(
+        plain.clip_field_origins(1, &uses)?.is_none(),
+        "out-of-range full projection"
+    );
+    assert!(
+        plain.clip_name_origin(1, &uses)?.is_none(),
+        "out-of-range name projection"
+    );
+
+    let empty = ArchiveAnimationRead::default();
+    let detached = AnimationSet::default();
+    let foreign = model_info::write_glb_animation_origins(
+        Some(&empty),
+        &detached,
+        &[],
+        &uses,
+        &mut FieldOrigins::new(),
+    );
+    assert!(
+        matches!(foreign, Err(error) if error.kind() == std::io::ErrorKind::InvalidData),
+        "standalone export rejects an unrelated identically shaped selected set"
     );
     Ok(())
 }

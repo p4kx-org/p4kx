@@ -20,8 +20,8 @@ pub(super) fn check_export(fixture: &PaintFixture, out: &Path, package: &Path) -
     let manifest = manifest(package)?;
     assert_eq!(
         text(&manifest, "version"),
-        Some("1.22"),
-        "the package version identifies the added paint provenance"
+        Some("1.25"),
+        "paint and triangle evidence share the scene format"
     );
     let proof = manifest
         .get("paint_provenance")

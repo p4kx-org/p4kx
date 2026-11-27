@@ -14,8 +14,9 @@ use p4kx_testkit::{
     DataForgeBuilder, TestChunkFile, TestContainer, TestEntity, TestEntry, TestModel, TestNode,
     entity_schema, test_key,
 };
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
+use crate::package_vertex_map::static_triangles;
 use crate::support::{TestResult, fixture, glb_options, never};
 
 const CLASS: &str = "TEST_TileLightPlacement";
@@ -92,7 +93,9 @@ fn package_lights_join_exact_occurrences_and_field_origins() -> TestResult {
         raw.get("light_placements"),
         "the Rust reader retains placement evidence"
     );
-    verify(&raw)
+    verify(&raw)?;
+    static_triangles::assert_mesh_counts(&parsed, &out)?;
+    verify_scene_origins(&raw)
 }
 
 fn entries() -> Vec<TestEntry> {
@@ -212,6 +215,106 @@ fn verify_origins(package: &Value, first: &Value) -> TestResult {
             used.get("id") == Some(id) && used.pointer("/location/field") == Some(&json!("value"))
         })),
         "the effective helper points to the winning original Elem value attribute"
+    );
+    Ok(())
+}
+
+fn verify_scene_origins(package: &Value) -> TestResult {
+    assert_eq!(
+        package.get("version"),
+        Some(&json!("1.25")),
+        "addressed scene evidence advances the minor version"
+    );
+    let placement_rows = package
+        .pointer("/light_placements/rows")
+        .and_then(Value::as_array)
+        .ok_or("placement rows")?;
+    let scene = package.get("scene_provenance").ok_or("scene provenance")?;
+    let origins = scene
+        .get("fieldOrigins")
+        .and_then(Value::as_object)
+        .ok_or("scene origin addresses")?;
+    let evidence = scene
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("scene use inventory")?;
+    for placed in placement_rows {
+        verify_rendered_transform(package, origins, evidence, placed)?;
+    }
+    let meshes = package
+        .get("meshes")
+        .and_then(Value::as_array)
+        .ok_or("written meshes")?;
+    assert!(
+        !meshes.is_empty(),
+        "the fixture writes mesh and light fields together"
+    );
+    let light_fields = placement_rows.len() * 3;
+    assert_eq!(
+        origins.len(),
+        light_fields + meshes.len(),
+        "each rendered light contributes three vectors and each mesh a triangle count"
+    );
+    assert_eq!(
+        scene.pointer("/summary/fields"),
+        Some(&json!(origins.len())),
+        "the summary covers exactly the addressed fields"
+    );
+    assert_eq!(
+        scene.pointer("/summary/encrypted"),
+        Some(&json!(light_fields)),
+        "every addressed light transform uses encrypted data in this fixture"
+    );
+    assert_eq!(
+        scene.pointer("/summary/unknown"),
+        Some(&json!(meshes.len())),
+        "the plain mesh inputs have a partial source set"
+    );
+    Ok(())
+}
+
+fn verify_rendered_transform(
+    package: &Value,
+    origins: &Map<String, Value>,
+    evidence: &[Value],
+    placed: &Value,
+) -> TestResult {
+    let node = placed
+        .get("node")
+        .and_then(Value::as_u64)
+        .ok_or("placed node")?;
+    let source = &placed["effective_light"];
+    for field in ["translation", "rotation", "scale"] {
+        let address = format!("/nodes/{node}/{field}");
+        assert!(
+            package.pointer(&address).is_some(),
+            "authored address {address}"
+        );
+        let origin = origins.get(&address).ok_or("rendered transform origin")?;
+        for key in [
+            "containsEncryptedSource",
+            "sourceUsesRefs",
+            "sourceSetComplete",
+        ] {
+            assert_eq!(origin.get(key), source.get(key), "rendered {field} {key}");
+        }
+        let references = origin["sourceUsesRefs"]
+            .as_array()
+            .ok_or("source use references")?;
+        references
+            .first()
+            .ok_or("the light transform requires observed inputs")?;
+        for reference in references {
+            assert!(
+                evidence.iter().any(|row| row.get("id") == Some(reference)),
+                "the light transform reference resolves inside scene provenance"
+            );
+        }
+    }
+    assert_eq!(
+        package.pointer(&format!("/nodes/{node}/translation/0")),
+        source.pointer("/value/0/3"),
+        "the written X translation uses the effective light frame"
     );
     Ok(())
 }

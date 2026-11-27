@@ -57,19 +57,7 @@ impl Writer {
         sources: &[ModelArchiveSource],
         context: &PackageWriteContext<'_>,
     ) -> io::Result<()> {
-        let evidence = source_of(model, sources, map.origin);
-        let scope = evidence
-            .map(|(entry, chunk)| {
-                Ok::<_, io::Error>(Bound {
-                    scope: self
-                        .inventory
-                        .observe(SourceInput::Archive(entry), InputScope::Payload)
-                        .map_err(io::Error::other)?,
-                    chunk,
-                    complete: entry.ancestors().all(|step| step.is_some()),
-                })
-            })
-            .transpose()?;
+        let scope = BoundMesh::open(&self.inventory, model, sources, map.origin)?;
         let anchors = scope
             .as_ref()
             .map(|bound| {
@@ -119,7 +107,7 @@ impl Writer {
     fn observe_primitives(
         &mut self,
         map: &MeshVertexMap<'_>,
-        bound: Option<&Bound<'_>>,
+        bound: Option<&BoundMesh<'_>>,
         context: &PackageWriteContext<'_>,
     ) -> io::Result<()> {
         for primitive in map.primitives() {
@@ -149,7 +137,7 @@ impl Writer {
         &mut self,
         mesh: usize,
         vertex: p4kx_model::MeshVertexOrigin,
-        bound: Option<&Bound<'_>>,
+        bound: Option<&BoundMesh<'_>>,
     ) -> io::Result<()> {
         let own = bound.map(|bound| bound.vertex(vertex)).transpose()?;
         let uses = own.as_ref().map_or(&[][..], |uses| uses.as_slice());
@@ -234,7 +222,7 @@ fn renderer_material(source: PrimitiveMaterialSource) -> io::Result<RendererMate
 
 fn source_submesh(
     inventory: &SourceUses,
-    bound: Option<&Bound<'_>>,
+    bound: Option<&BoundMesh<'_>>,
     source: MeshSubmeshSource,
 ) -> io::Result<SourceSubmesh> {
     Ok(SourceSubmesh {
@@ -267,7 +255,7 @@ fn source_submesh(
 
 fn geometry_value<T>(
     inventory: &SourceUses,
-    bound: Option<&Bound<'_>>,
+    bound: Option<&BoundMesh<'_>>,
     value: T,
     span: Range<u64>,
     field: &str,
@@ -307,13 +295,36 @@ fn source_of<'a>(
     Some((entry, chunk))
 }
 
-struct Bound<'a> {
+pub(super) struct BoundMesh<'a> {
     scope: SourceScope,
     chunk: &'a ModelChunk,
     complete: bool,
 }
 
-impl Bound<'_> {
+impl<'a> BoundMesh<'a> {
+    pub(super) fn open(
+        inventory: &SourceUses,
+        model: &'a Model,
+        sources: &'a [ModelArchiveSource],
+        origin: Option<MeshOrigin>,
+    ) -> io::Result<Option<Self>> {
+        let Some((entry, chunk)) = source_of(model, sources, origin) else {
+            return Ok(None);
+        };
+        let scope = inventory
+            .observe(SourceInput::Archive(entry), InputScope::Payload)
+            .map_err(io::Error::other)?;
+        Ok(Some(Self {
+            scope,
+            chunk,
+            complete: entry.ancestors().all(|step| step.is_some()),
+        }))
+    }
+
+    pub(super) fn index_count(&self, word: Range<u64>) -> io::Result<SourceUse> {
+        self.use_range(word, "indexCount", SourceUseRole::Conversion)
+    }
+
     fn vertex(&self, vertex: p4kx_model::MeshVertexOrigin) -> io::Result<[SourceUse; 3]> {
         let base = self.chunk.layout.offset;
         let absolute = |span: Range<u64>| base + span.start..base + span.end;

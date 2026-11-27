@@ -4,6 +4,9 @@
 //! Animations of a Character: keys that move the bones of the body, and facial animations
 //! evaluated through the rig logic into morph weights.
 
+#[path = "head_animation_observed.rs"]
+mod observed;
+
 use std::error::Error;
 
 use p4kx_assembly::{
@@ -14,8 +17,8 @@ use p4kx_extraction::{Archive, SourceEncryption};
 use p4kx_gltf::GlbOptions;
 use p4kx_model::Animation;
 use p4kx_testkit::{
-    HEAD_VERTICES, MALE_RIG_HASH, TestAnimation, TestSkeleton, TestTrack, check_glb, head_entries,
-    head_rig, test_key,
+    HEAD_VERTICES, MALE_RIG_HASH, TestAnimation, TestEntry, TestSkeleton, TestTrack, check_glb,
+    head_entries, head_rig, test_key,
 };
 
 use crate::assembly_support::{Fixture, TestResult, fixture};
@@ -59,6 +62,13 @@ fn build() -> Result<(Armour, Archive, Fixture), Box<dyn Error>> {
 fn build_with_rig_encryption(
     encrypted: bool,
 ) -> Result<(Armour, Archive, Fixture), Box<dyn Error>> {
+    build_with_clips(encrypted, [])
+}
+
+fn build_with_clips(
+    encrypted: bool,
+    clips: impl IntoIterator<Item = TestEntry>,
+) -> Result<(Armour, Archive, Fixture), Box<dyn Error>> {
     let entries = head_entries(Some(head_rig(HEAD_VERTICES, MALE_RIG_HASH).build()))
         .into_iter()
         .map(|entry| {
@@ -68,6 +78,7 @@ fn build_with_rig_encryption(
                 entry
             }
         })
+        .chain(clips)
         .collect();
     let fixture = fixture(entries)?;
     let archive = Archive::open_with_key(&fixture.path, encrypted.then(test_key))?;

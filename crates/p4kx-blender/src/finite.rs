@@ -200,6 +200,7 @@ pub(super) mod tests {
             default_material: None,
             entity_provenance: None,
             light_placements: None,
+            scene_provenance: None,
             entity_glow: None,
             issues: Vec::new(),
         }

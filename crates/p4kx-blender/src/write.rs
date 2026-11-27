@@ -14,8 +14,11 @@ use crate::creature::write_creature_package;
 use crate::entity_classification::EntityClassifications;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
-use crate::manifest::{BuildInfo, EntityRef, Issue, MESHES_FOLDER, Replacement, TEXTURES_FOLDER};
+use crate::manifest::{
+    BuildInfo, EntityRef, Issue, MESHES_FOLDER, Manifest, Replacement, TEXTURES_FOLDER,
+};
 use crate::package_receipt::{self, PackageFile};
+use crate::package_scene_provenance::{self, SceneFields};
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
 use crate::textures;
@@ -283,7 +286,7 @@ fn write_scene_files(
     )?;
     context.check()?;
     let mut authored_files = collected.library_sources.write_authored(staging, context)?;
-    let mut manifest = manifest(&Inputs {
+    let inputs = Inputs {
         entity: scene.entity.clone(),
         assembly_issues: scene.issues,
         items,
@@ -293,14 +296,13 @@ fn write_scene_files(
         collected: &collected,
         outcomes: &outcomes,
         meshes: &written,
-    });
-    let authored_soc_file =
-        complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
-    manifest.palette_provenance =
-        crate::package_palette_provenance::capture(items, &plan, &collected, context)?;
-    record_paint_provenance(&mut manifest, scene.classification)?;
+    };
+    let CompletedManifest {
+        mut manifest,
+        authored_soc,
+    } = complete_manifest(&inputs, scene, fallback.as_deref(), staging, context)?;
     let summary = summarise(&manifest, &outcomes, &written);
-    let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
+    let mut files = package_receipt::scene_files(written, &outcomes, authored_soc);
     files.append(&mut authored_files);
     finish_scene(
         &mut manifest,
@@ -314,7 +316,7 @@ fn write_scene_files(
 }
 
 fn record_paint_provenance(
-    manifest: &mut crate::Manifest,
+    manifest: &mut Manifest,
     assembly: Option<&Assembly>,
 ) -> PackageResult<()> {
     if let Some(assembly) = assembly
@@ -334,7 +336,7 @@ fn record_paint_provenance(
 }
 
 fn finish_scene(
-    manifest: &mut crate::Manifest,
+    manifest: &mut Manifest,
     scene: &Scene<'_>,
     options: &GlbOptions,
     staging: &Path,
@@ -356,13 +358,19 @@ fn finish_scene(
     Ok(summary)
 }
 
+struct CompletedManifest {
+    manifest: Manifest,
+    authored_soc: Option<PackageFile>,
+}
+
 fn complete_manifest(
-    manifest: &mut crate::Manifest,
+    inputs: &Inputs<'_>,
     scene: &Scene<'_>,
     fallback: Option<&ArchiveDefaultMaterial>,
     staging: &Path,
     context: &PackageWriteContext<'_>,
-) -> PackageResult<Option<PackageFile>> {
+) -> PackageResult<CompletedManifest> {
+    let mut manifest = manifest(inputs);
     let authored_soc = scene
         .authored_soc
         .map(|authored| crate::package_soc_scene::write(staging, authored, context))
@@ -371,12 +379,38 @@ fn complete_manifest(
         manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
     }
     manifest.default_material = fallback.map(ArchiveDefaultMaterial::receipt);
-    if let Some(assembly) = scene.classification {
-        EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?.apply(manifest);
-        manifest.light_placements =
-            crate::package_light_placements::capture(assembly, &scene.items, context)?;
-        crate::package_glow::attach(manifest, assembly, context)?;
-    }
-    sanitise(manifest);
-    Ok(authored_soc)
+    let mut evidence = match scene.classification {
+        Some(assembly) => {
+            EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?
+                .apply(&mut manifest);
+            let light = crate::package_light_placements::capture(assembly, &scene.items, context)?;
+            manifest.light_placements = light.placements;
+            crate::package_glow::attach(&mut manifest, assembly, context)?;
+            SceneFields {
+                fields: light.node_fields,
+                sources: light.sources,
+            }
+        }
+        None => SceneFields::new(),
+    };
+    sanitise(&mut manifest);
+    meshes::record_triangle_fields(
+        inputs.items,
+        inputs.plan,
+        inputs.meshes,
+        &mut evidence,
+        context,
+    )?;
+    package_scene_provenance::attach(&mut manifest, &evidence.fields, &evidence.sources)?;
+    manifest.palette_provenance = crate::package_palette_provenance::capture(
+        inputs.items,
+        inputs.plan,
+        inputs.collected,
+        context,
+    )?;
+    record_paint_provenance(&mut manifest, scene.classification)?;
+    Ok(CompletedManifest {
+        manifest,
+        authored_soc,
+    })
 }

@@ -5,6 +5,7 @@ use std::io;
 
 use p4kx_archive::EntryOrigin;
 use p4kx_gltf::AnimationSummary;
+use p4kx_model::AnimationClipCoordinates;
 
 use super::animation_origin_sites::{self, AnimationChunkSites};
 use crate::{
@@ -43,7 +44,7 @@ pub fn write_glb_animation_origins(
         for (name, origin) in [
             ("name", clip.name),
             ("additive", clip.additive),
-            ("duration_seconds", clip.duration),
+            ("duration_seconds", clip.duration_seconds),
         ] {
             put(fields, &path, name, origin)?;
         }
@@ -77,10 +78,80 @@ struct Projection<'a> {
     uses: &'a SourceUses,
 }
 
-struct ClipFields {
-    name: FieldOrigin,
-    additive: FieldOrigin,
-    duration: FieldOrigin,
+/// The exact original sources of a clip's decoded fields.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct ArchiveClipFieldOrigins {
+    /// The CAF directory name or original DBA clip name.
+    pub name: FieldOrigin,
+    /// The original additive flag and its selectors.
+    pub additive: FieldOrigin,
+    /// The inputs to the decoded duration, including keys that extend its end frame.
+    pub duration_seconds: FieldOrigin,
+}
+
+impl ArchiveClipFieldOrigins {
+    fn unknown(uses: &SourceUses) -> Self {
+        let origin = uses.origin(&[], false);
+        Self {
+            name: origin.clone(),
+            additive: origin.clone(),
+            duration_seconds: origin,
+        }
+    }
+}
+
+impl ArchiveAnimationRead {
+    /// Returns the original field origins for a selected clip.
+    /// Missing source evidence yields incomplete fields, and a missing clip yields `None`.
+    ///
+    /// # Errors
+    /// Returns an error when an observed source position cannot be represented.
+    pub fn clip_field_origins(
+        &self,
+        index: usize,
+        uses: &SourceUses,
+    ) -> Result<Option<ArchiveClipFieldOrigins>, SourceEvidenceError> {
+        let Some(clip) = self.set().animations.get(index) else {
+            return Ok(None);
+        };
+        Projection {
+            source: Some(self),
+            uses,
+        }
+        .clip(index, clip.end_frame)
+        .map(Some)
+    }
+
+    /// Returns the original name origin for a selected clip without registering its timing or flags.
+    /// Missing source evidence yields an incomplete field, and a missing clip yields `None`.
+    ///
+    /// # Errors
+    /// Returns an error when an observed name or selector position cannot be represented.
+    pub fn clip_name_origin(
+        &self,
+        index: usize,
+        uses: &SourceUses,
+    ) -> Result<Option<FieldOrigin>, SourceEvidenceError> {
+        if self.set().animations.get(index).is_none() {
+            return Ok(None);
+        }
+        let projection = Projection {
+            source: Some(self),
+            uses,
+        };
+        let Some(clip) = projection.clip_input(index) else {
+            return Ok(Some(uses.origin(&[], false)));
+        };
+        let payload = projection.payload(clip.entry)?;
+        projection.name(&clip, &payload, None).map(Some)
+    }
+}
+
+struct ClipInput<'clip> {
+    entry: &'clip EntryOrigin,
+    ordinal: usize,
+    coordinates: &'clip AnimationClipCoordinates,
 }
 
 struct UnreadFields {
@@ -90,64 +161,85 @@ struct UnreadFields {
 }
 
 impl Projection<'_> {
-    fn clip(&self, index: usize, authored_end: u32) -> Result<ClipFields, SourceEvidenceError> {
-        let observed = self.source.and_then(|source| {
-            let entry = source.archive_source(index)?;
-            let evidence = source.clip_evidence(index)?;
-            Some(((evidence.ordinal, evidence.coordinates.as_ref()?), entry))
-        });
-        let Some(((ordinal, coords), entry)) = observed else {
-            let unknown = self.uses.origin(&[], false);
-            return Ok(ClipFields {
-                name: unknown.clone(),
-                additive: unknown.clone(),
-                duration: unknown,
-            });
+    fn clip_input(&self, index: usize) -> Option<ClipInput<'_>> {
+        let source = self.source?;
+        let entry = source.archive_source(index)?;
+        let evidence = source.clip_evidence(index)?;
+        Some(ClipInput {
+            entry,
+            ordinal: evidence.ordinal,
+            coordinates: evidence.coordinates.as_ref()?,
+        })
+    }
+
+    fn clip(
+        &self,
+        index: usize,
+        authored_end: u32,
+    ) -> Result<ArchiveClipFieldOrigins, SourceEvidenceError> {
+        let Some(clip) = self.clip_input(index) else {
+            return Ok(ArchiveClipFieldOrigins::unknown(self.uses));
         };
-        let payload = self.payload(entry)?;
-        let complete = entry.ancestors().all(|step| step.is_some());
+        let payload = self.payload(clip.entry)?;
+        let complete = clip.entry.ancestors().all(|step| step.is_some());
+        let coords = clip.coordinates;
         let metadata = AnimationChunkSites::of(&payload, coords.metadata_chunk())?;
         let data = AnimationChunkSites::of(&payload, coords.data_chunk())?;
-        let chunk = coords.metadata_chunk().ordinal();
-        let name = match coords.database_path() {
-            Some(bytes) => {
-                let mut name = metadata.selectors.clone();
-                name.push(animation_origin_sites::clip_site(
-                    &payload,
-                    ordinal,
-                    chunk,
-                    "databasePath",
-                    bytes,
-                    SourceUseRole::Conversion,
-                )?);
-                self.uses.origin(&name, metadata.complete && complete)
-            }
-            None => self.path(entry, &payload)?,
-        };
+        let name = self.name(&clip, &payload, Some(&metadata))?;
         let mut additive = metadata.selectors.clone();
         additive.push(animation_origin_sites::clip_site(
             &payload,
-            ordinal,
-            chunk,
+            clip.ordinal,
+            coords.metadata_chunk().ordinal(),
             "additive",
             coords.flags(),
             SourceUseRole::Conversion,
         )?);
         let duration = animation_origin_sites::duration_sites(
             &payload,
-            ordinal,
+            clip.ordinal,
             coords,
             authored_end,
             &metadata,
             &data,
         )?;
-        Ok(ClipFields {
+        Ok(ArchiveClipFieldOrigins {
             name,
             additive: self.uses.origin(&additive, metadata.complete && complete),
-            duration: self
+            duration_seconds: self
                 .uses
                 .origin(&duration.uses, duration.complete && complete),
         })
+    }
+
+    fn name(
+        &self,
+        clip: &ClipInput<'_>,
+        payload: &SourceScope,
+        metadata: Option<&AnimationChunkSites>,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        let Some(bytes) = clip.coordinates.database_path() else {
+            return self.path(clip.entry, payload);
+        };
+        let chunk = clip.coordinates.metadata_chunk();
+        let observed;
+        let metadata = if let Some(metadata) = metadata {
+            metadata
+        } else {
+            observed = AnimationChunkSites::of(payload, chunk)?;
+            &observed
+        };
+        let mut uses = metadata.selectors.clone();
+        uses.push(animation_origin_sites::clip_site(
+            payload,
+            clip.ordinal,
+            chunk.ordinal(),
+            "databasePath",
+            bytes,
+            SourceUseRole::Conversion,
+        )?);
+        let complete = clip.entry.ancestors().all(|step| step.is_some());
+        Ok(self.uses.origin(&uses, metadata.complete && complete))
     }
 
     fn unread(
