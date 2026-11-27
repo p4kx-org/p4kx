@@ -1,18 +1,35 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::path::Path;
 
-use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, write_scene_glb};
-use p4kx_model::Transform;
+use p4kx_extraction::{OriginDigestWriter, SourceUse, SourceUses};
+
+use p4kx_gltf::{
+    GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, write_scene_glb,
+    write_scene_glb_observed,
+};
+use p4kx_model::{Material, Transform};
 use rayon::prelude::*;
 
-use crate::items::Item;
+use crate::items::{Drawn, Item};
+use crate::manifest::MESHES_FOLDER;
 use crate::mesh_options::package_mesh_options;
+use crate::mesh_vertex_map::{self, BoundMesh};
+use crate::package_receipt::PackageFile;
+use crate::package_scene_provenance::{self, SceneFields};
 use crate::plan::{MeshPlan, mesh_id};
-use crate::{Cancelled, PackageError, PackageResult};
+use crate::stoppable::Stoppable;
+use crate::triangle_evidence::{self, IndexCountOperand, TriangleEvidence};
+use crate::{PackageError, PackageResult, PackageWriteContext};
+
+pub(crate) struct WrittenMesh {
+    pub(crate) summary: GlbSummary,
+    pub(crate) file: PackageFile,
+    pub(crate) vertex_map: Option<PackageFile>,
+    triangle_operands: Vec<IndexCountOperand>,
+}
 
 /// Writes the GLB file `<folder>/<id>.glb` of every distinct mesh of `plan`, in parallel.
 pub(crate) fn write_all(
@@ -20,13 +37,14 @@ pub(crate) fn write_all(
     plan: &MeshPlan,
     options: &GlbOptions,
     folder: &Path,
-    cancelled: &Cancelled<'_>,
-) -> PackageResult<Vec<GlbSummary>> {
+    cancelled: &PackageWriteContext<'_>,
+    fallback: Option<&Material>,
+) -> PackageResult<Vec<WrittenMesh>> {
     (0..plan.len())
         .into_par_iter()
         .map(|index| {
             cancelled.check()?;
-            write_one(items, plan, index, options, folder)
+            write_one(items, plan, index, options, folder, cancelled, fallback)
         })
         .collect()
 }
@@ -37,16 +55,17 @@ fn write_one(
     index: usize,
     options: &GlbOptions,
     folder: &Path,
-) -> PackageResult<GlbSummary> {
+    context: &PackageWriteContext<'_>,
+    fallback: Option<&Material>,
+) -> PackageResult<WrittenMesh> {
     let id = mesh_id(index);
-    let first = plan
-        .first(index)
-        .and_then(|position| items.get(position)?.drawn);
+    let first = first_drawn(items, plan, index);
     let mut scene = Scene::new();
     let mut name = String::new();
     if let Some(first) = first {
         first.label.clone_into(&mut name);
         let drawn = ScenePart::new(first.model, first.materials);
+        let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
         let drawn = first
             .palette
             .map_or(drawn, |palette| drawn.with_palette(palette));
@@ -55,25 +74,117 @@ fn write_one(
             .push(node)
             .map_err(|source| mesh_error(&id, &name, source))?;
     }
-    let path = folder.join(format!("{id}.glb"));
-    let mut glb = Vec::new();
-    let summary = write_scene_glb(
-        &scene,
-        &package_mesh_options(options).with_material_indices(),
-        &mut glb,
-    )
-    .map_err(|source| mesh_error(&id, &name, source))?;
-    let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
-    let mut writer = BufWriter::new(file);
-    writer
-        .write_all(&glb)
-        .and_then(|()| writer.flush())
+    write_files(&scene, first, options, folder, (&id, &name), context)
+}
+
+fn write_files(
+    scene: &Scene<'_>,
+    drawn: Option<Drawn<'_>>,
+    options: &GlbOptions,
+    folder: &Path,
+    (id, name): (&str, &str),
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<WrittenMesh> {
+    let filename = format!("{id}.glb");
+    let path = folder.join(&filename);
+    let map_name = format!("{id}.vertex-map.jsonl");
+    let map_path = folder.join(&map_name);
+    let mut vertex_map = drawn
+        .filter(|_| context.vertex_maps)
+        .map(|_| mesh_vertex_map::Writer::new(&map_path, context))
+        .transpose()?;
+    let (file, ownership) = context.create_file(&path)?.into_parts();
+    let mut sink = BufWriter::new(file);
+    let mut writer = Stoppable::new(OriginDigestWriter::new(&mut sink), context);
+    let options = package_mesh_options(options).with_material_indices();
+    let mut counts = TriangleEvidence::new();
+    let mut triangle_operands = Vec::new();
+    let summary = if let Some(drawn) = drawn {
+        write_scene_glb_observed(scene, &options, None, &mut writer, &mut |row| {
+            counts.observe(&row, context, |operand| {
+                triangle_operands.push(operand);
+                Ok(())
+            })?;
+            if let Some(map) = &mut vertex_map {
+                map.observe(&row, drawn.model, drawn.model_sources, context)?;
+            }
+            Ok(())
+        })
+    } else {
+        write_scene_glb(scene, &options, &mut writer)
+    };
+    context.check()?;
+    let summary = summary.map_err(|source| mesh_error(id, name, source))?;
+    counts
+        .verify(summary.triangles)
+        .map_err(package_scene_provenance::evidence_error)?;
+    let digest = writer
+        .into_inner()
+        .finish()
         .map_err(|source| PackageError::write(&path, source))?;
-    writer
-        .get_ref()
+    ownership.ensure_writable(&path, context.cancel_flag())?;
+    sink.get_ref()
         .sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
-    Ok(summary)
+    let glb_path = format!("{MESHES_FOLDER}/{filename}");
+    let vertex_map = vertex_map
+        .map(|map| map.finish(&map_path, &map_name, &glb_path, &digest, context))
+        .transpose()?;
+    Ok(WrittenMesh {
+        summary,
+        file: PackageFile::new(glb_path, &digest),
+        vertex_map,
+        triangle_operands,
+    })
+}
+
+fn first_drawn<'a>(items: &[Item<'a>], plan: &MeshPlan, slot: usize) -> Option<Drawn<'a>> {
+    plan.first(slot)
+        .and_then(|position| items.get(position)?.drawn)
+}
+
+pub(crate) fn record_triangle_fields(
+    items: &[Item<'_>],
+    plan: &MeshPlan,
+    written: &[WrittenMesh],
+    evidence: &mut SceneFields,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<()> {
+    for (slot, mesh) in written.iter().enumerate() {
+        context.check()?;
+        let contributions = match first_drawn(items, plan, slot) {
+            Some(drawn) => bind_operands(&mesh.triangle_operands, drawn, &evidence.sources)
+                .map_err(package_scene_provenance::evidence_error)?,
+            None => Vec::new(),
+        };
+        triangle_evidence::append_field(
+            slot,
+            &mut evidence.fields,
+            &evidence.sources,
+            &contributions,
+        )
+        .map_err(package_scene_provenance::evidence_error)?;
+    }
+    Ok(())
+}
+
+fn bind_operands(
+    operands: &[IndexCountOperand],
+    drawn: Drawn<'_>,
+    inventory: &SourceUses,
+) -> std::io::Result<Vec<SourceUse>> {
+    let mut contributions = Vec::new();
+    for operand in operands {
+        if let Some(bound) = BoundMesh::open(
+            inventory,
+            drawn.model,
+            drawn.model_sources,
+            Some(operand.mesh_origin),
+        )? {
+            contributions.push(bound.index_count(operand.word.clone())?);
+        }
+    }
+    Ok(contributions)
 }
 
 fn mesh_error(id: &str, name: &str, source: GltfError) -> PackageError {

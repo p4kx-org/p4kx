@@ -6,31 +6,44 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
 
 ## Decision
 
-- **Reading.** An `Attachment` of type `CA_BONE` with a `BoneName` and a `Binding` is a bone
-  attachment unless it is the drawn model. `RelPosition` (`x,y,z`, metres) and `RelRotation`
-  (a quaternion `w,x,y,z`, `1,0,0,0` being none) default to no offset; a value that does not read as
-  numbers, a rotation without length, a binding that is another definition and the 65th and further
-  attachments are listed as left out. The numbers are read with the tolerant parser of ADR-0145.
+- **Reading.** After selecting the part's model, retain each `CA_BONE` with nonempty `BoneName`
+  and `Binding` as a separate bone attachment. The attachment pass excludes the exact occurrence
+  selected as the part's model. When the declared model provides a rig without drawable geometry
+  and the first bound attachment is rigid, the Assembly uses the declared rig as the owner and
+  places that attachment with the other rigid attachments. `RelPosition` and `RelRotation`
+  independently take precedence over the model-space `Position` and `Rotation`. The translation
+  is in metres and quaternions are stored as WXYZ. Absent values default to zero translation and
+  identity orientation in the bone frame when neither model-space attribute is authored, or in the
+  model frame otherwise. A selected value that does not parse, a rotation without length or a
+  binding that is another definition is listed as left out. Attachment occurrences stay in source
+  order, with original undrawn occurrences in `left_out`. The numbers are read with the tolerant
+  parser of ADR-0145. Source Entry admission and per-definition vertex admission are independent.
+  See [ADR-0150](0150-assembly-lod-fallback-vehicle-only-ports-and-character-definitions.md).
 - **Providing.** `ProvidedModel::attachments` holds one `ProvidedAttachment` per bone attachment
   that was read: its name, bone, offset, rotation, entry and model. A file that is missing or
   cannot be read is listed in `left_out`, so `attachments_left_out` names only what is not drawn.
+  The provider keeps the first bound mesh as the selected drawable model for model-only callers.
 - **Placing.** A bone attachment is not an Entity, so it is no part. A `Part` carries
   `attachments()`, each an `AttachedModel` with its own model and material library (the attachment's
-  `Material` replaces the one the model names). Its transform to the part is the bind pose of the
-  bone in the part's model, `bone_transform` as for the backpack and the item ports of a character
-  definition, then the attachment's own offset. A bone the model lacks is `helper_not_found`, and
-  the model sits at the part's origin with its offset.
+  `Material` replaces the one the model names). For a rig without drawable geometry, the first
+  rigid attachment also takes the Entity material override when one is present. Its transform to
+  the part combines the resolved relative components with the bind pose of the bone and keeps
+  authored model-space components in that space. A missing bone emits `helper_not_found` and
+  substitutes the identity frame for relative components. Observed placement cites only the
+  selected transform attributes and the bind data used by the projected frame.
 - **Writing.** The GLB, the Blender package and the viewer scene write each attachment as a child
   of its part's node, after all parts and before the Interior, in the order of
   `Assembly::attached_models`; the indices of the parts are their own. A viewer piece has the path
   `<port path>/<name>`, so the tree lists it.
 - **Limits.** The numbers of an attachment must be finite as `f32`, else it is left out. The
-  models of one definition, skin and attachments together, are read up to
+  models of one definition, the part's model and its bone attachments, are read up to
   `ArchiveModels::with_max_attachment_vertices` (by default `MAX_ASSEMBLY_VERTICES`); an
   attachment that passes it and the ones after it are left out.
-- **Budget.** The vertices of the attachments count with those of the part's skin against the
+- **Budget.** The vertices of the attachments count with those of the part's model against the
   vertex budget, in the wave check and the part-by-part check, and against the bound of the model
   cache.
+
+- **Storage.** Within one character read at one LOD, successful repeated attachment models share immutable storage by the actually selected canonical Entry and the exact parsed material override. Each instance still selects its current Entry first and keeps its own name, bone, transform and vertex charge. Missing, unreadable and fatal outcomes keep their existing handling; the local cache is discarded when that character read ends.
 
 ## Consequences
 

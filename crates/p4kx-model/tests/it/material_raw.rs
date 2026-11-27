@@ -6,9 +6,7 @@
 
 use std::error::Error;
 
-use p4kx_model::{
-    MAX_LAYERS, MAX_RAW_DEPTH, MAX_RAW_ELEMENTS, MaterialError, MaterialLibrary, PaletteSlot,
-};
+use p4kx_model::{MAX_RAW_DEPTH, MAX_RAW_ELEMENTS, MaterialError, MaterialLibrary, PaletteSlot};
 
 use p4kx_testkit::{TestElement, TestMtl, TestMtlMaterial};
 
@@ -120,14 +118,18 @@ fn a_texture_slot_keeps_its_attributes_and_modifier() -> TestResult {
 }
 
 #[test]
-fn too_many_layers_or_raw_elements_are_cut_off_and_reported_not_refused() -> TestResult {
-    let layered = (0..=MAX_LAYERS).fold(TestMtlMaterial::new("many"), |material, _| {
+fn layers_are_complete_and_raw_element_limits_are_reported() -> TestResult {
+    const LAYERS: usize = 65;
+    let layered = (0..LAYERS).fold(TestMtlMaterial::new("many"), |material, _| {
         material.layer_with(&[("Name", "L")])
     });
     let library = parse(&TestMtl::single(&layered))?;
     let many = library.materials.first().ok_or("material")?;
-    assert_eq!(many.layers.len(), MAX_LAYERS);
-    assert_eq!(many.truncated, [format!("layers beyond {MAX_LAYERS}")]);
+    assert_eq!(many.layers.len(), LAYERS, "all original layer occurrences");
+    assert!(
+        many.truncated.is_empty(),
+        "typed layers do not exhaust raw fragment storage"
+    );
 
     let crowded = (0..=MAX_RAW_ELEMENTS).fold(TestMtlMaterial::new("crowd"), |material, _| {
         material.child(TestElement::new("E"))

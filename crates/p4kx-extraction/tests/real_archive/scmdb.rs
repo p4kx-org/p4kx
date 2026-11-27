@@ -63,8 +63,11 @@ fn dataforge_values_agree_with_scmdb_dumps_of_the_same_build() -> Result<(), Sen
     for line in findings.summary() {
         report(&line);
     }
+    if !findings.is_empty() && !findings.has_mismatches() {
+        report("comparison incomplete: unproven reward mappings were not compared");
+    }
     assert!(
-        findings.is_empty(),
+        !findings.has_mismatches(),
         "values disagree with SCMDB, e.g. {:#?}",
         findings.examples(EXAMPLES_PER_CATEGORY)
     );

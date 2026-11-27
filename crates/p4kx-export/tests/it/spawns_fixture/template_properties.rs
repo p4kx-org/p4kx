@@ -24,10 +24,13 @@ fn string_hash() -> TestInstance {
             TestInstance::new("MissionPropertyValueOption_StringHash")
                 .value("textId", locale("@place_name"))
                 .value("value", text("calm"))
-                .value("weighting", TestValue::Int32(3))
+                .value("weighting", TestValue::Single(3.0))
                 .value(
                     "dependentProperties",
-                    array(vec![TestValue::pointer("prop_home")]),
+                    array(vec![object(
+                        TestInstance::new("DependentMissionProperty")
+                            .value("property", TestValue::pointer("prop_home")),
+                    )]),
                 ),
         )]),
     )
@@ -37,11 +40,11 @@ fn integer() -> TestInstance {
     TestInstance::new("MissionPropertyValue_Integer").value(
         "options",
         array(vec![object(
-            TestInstance::new("MissionPropertyValueOption_Number")
+            TestInstance::new("MissionPropertyValueOption_Integer")
                 .value("textId", locale("@LOC_UNINITIALIZED"))
-                .value("value", TestValue::Single(5.0))
-                .value("variation", TestValue::Single(1.0))
-                .value("weighting", TestValue::Int32(2)),
+                .value("value", TestValue::Int32(5))
+                .value("variation", TestValue::Int32(1))
+                .value("weighting", TestValue::Single(2.0)),
         )]),
     )
 }

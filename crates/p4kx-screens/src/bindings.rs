@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use p4kx_dataforge::{Location, Step, StructValue, Value};
+use p4kx_dataforge::{Location, Reference, Step, StructValue, Value};
 
-use crate::reader::{as_struct, flag, float, items, reference, text};
+use crate::reader::{as_struct, exact, flag, float, items, reference, text};
 use crate::rest::{Rest, RestParams};
 
 const PARAMETER: &str = "BuildingBlocks_BindingsLocalizedComponentParameter";
@@ -33,11 +33,10 @@ pub(crate) fn index_at(location: Option<&Location<'_>>, field: &str) -> Option<u
     }
 }
 
-/// Reads which widget texts a canvas binds to component parameters; the widgets of the library
-/// follow the `scene_len` widgets of the scene.
+/// Reads which widget texts a canvas binds to component parameters.
 pub(crate) fn text_bindings(
     root: &StructValue<'_>,
-    scene_len: usize,
+    find_widget: &impl Fn(&Reference<'_>) -> Option<usize>,
 ) -> HashMap<usize, TextBinding> {
     let operations = items(root, "operations");
     let parameters: HashMap<usize, TextBinding> = operations
@@ -61,10 +60,7 @@ pub(crate) fn text_bindings(
             operation.type_name() == FIELD && text(operation, "field") == Some("Text")
         })
         .filter_map(|operation| {
-            let location = reference(operation, "widget")?.location();
-            let widget = index_at(location, "scene").or_else(|| {
-                index_at(location, "library").and_then(|index| index.checked_add(scene_len))
-            })?;
+            let widget = find_widget(reference(operation, "widget")?)?;
             let input = index_at(reference(operation, "input")?.location(), "operations")?;
             Some((widget, parameters.get(&input)?.clone()))
         })
@@ -85,8 +81,10 @@ pub(crate) fn typed_values(widget: &StructValue<'_>) -> RestParams {
                 "BuildingBlocks_ComponentParameterInputBoolean" => {
                     Rest::Bool(flag(input, "value")?)
                 }
-                "BuildingBlocks_ComponentParameterInputInteger"
-                | "BuildingBlocks_ComponentParameterInputNumber" => {
+                "BuildingBlocks_ComponentParameterInputInteger" => {
+                    Rest::Integer(exact(input.field("value")?).filter(|v| v.is_finite())?)
+                }
+                "BuildingBlocks_ComponentParameterInputNumber" => {
                     Rest::Num(f64::from(float(input, "value").filter(|v| v.is_finite())?))
                 }
                 "BuildingBlocks_ComponentParameterInputString" => {

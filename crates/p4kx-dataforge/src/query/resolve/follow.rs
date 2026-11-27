@@ -7,7 +7,7 @@ use crate::query::resolve::{At, Resolver};
 use crate::query::syntax::Name;
 use crate::query::{QueryError, QueryErrorKind, Span};
 
-impl Resolver<'_, '_> {
+impl Resolver<'_, '_, '_> {
     /// Follows a Reference or weak pointer with `->` to the field `next` of the struct its field
     /// declares.
     pub(super) fn follow(&mut self, arrow: Span, next: &Name) -> Result<(), QueryError> {

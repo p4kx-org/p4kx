@@ -2,54 +2,161 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
+use p4kx_extraction::SourceLocation;
 
 use crate::character_path::is_rigged_path_outside_human_rigs;
-use crate::read::{struct_field, struct_items, text};
+use crate::read::{struct_field, text};
 
-/// The deepest nesting of sub-geometry nodes that is read.
-const MAX_NESTED_SUB_GEOMETRY: usize = 4;
+#[path = "geometry_source.rs"]
+mod source;
 
-/// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
-/// Record and the child of its tree.
+pub use source::{GeometrySource, visit_geometry_sources};
+
+#[path = "geometry_origins.rs"]
+mod origins;
+
+use self::origins::MaterialPosition;
+pub(crate) use self::origins::{GeometryComponent, GeometrySelectors};
+use crate::MaterialVariantSelection;
+
+#[path = "geometry_variants.rs"]
+mod variants;
+
+pub(crate) use self::variants::AppearanceOnlyVariant;
+
+/// The authored tint palette selection, with geometry fallback when the material node names one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaletteRef {
+    preferred: PaletteCandidate,
+    fallback: Option<Box<PaletteCandidate>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PaletteCandidate {
     pub(crate) guid: Guid,
     pub(crate) child_path: String,
+    pub(crate) selector: PaletteReferenceSource,
 }
+
+#[derive(Debug, Clone)]
+pub(crate) enum PaletteReferenceSource {
+    Named(Option<SourceLocation>),
+    IncludedPath(Option<crate::PaletteRecordSelection>),
+    SocEntity,
+}
+
+impl PartialEq for PaletteCandidate {
+    fn eq(&self, other: &Self) -> bool {
+        self.guid == other.guid && self.child_path == other.child_path
+    }
+}
+
+impl Eq for PaletteCandidate {}
 
 impl PaletteRef {
     /// Returns the GUID of the `TintPaletteTree` Record.
     #[must_use]
     pub const fn guid(&self) -> Guid {
-        self.guid
+        self.preferred.guid
     }
 
-    /// Returns the path of the child palette below the Record's root, or an empty string for the
-    /// root.
+    /// Returns the preferred palette's child path, or an empty string for the root.
     #[must_use]
     pub fn child_path(&self) -> &str {
-        &self.child_path
+        &self.preferred.child_path
+    }
+
+    pub(crate) const fn new(
+        guid: Guid,
+        child_path: String,
+        selector: PaletteReferenceSource,
+    ) -> Self {
+        Self {
+            preferred: PaletteCandidate {
+                guid,
+                child_path,
+                selector,
+            },
+            fallback: None,
+        }
+    }
+
+    pub(crate) fn with_selector(mut self, selector: PaletteReferenceSource) -> Self {
+        self.preferred.selector = selector;
+        self
+    }
+
+    fn with_geometry_fallback(mut self, geometry: Option<Self>) -> Self {
+        self.fallback = geometry
+            .map(|palette| palette.preferred)
+            .filter(|candidate| *candidate != self.preferred)
+            .map(Box::new);
+        self
+    }
+
+    pub(crate) fn candidates(&self) -> impl Iterator<Item = &PaletteCandidate> {
+        std::iter::once(&self.preferred).chain(self.fallback.as_deref())
+    }
+
+    pub(crate) fn read(data: &StructValue<'_>) -> Option<Self> {
+        let reference = struct_field(data, "Palette")?;
+        let guid = match reference.field("RootRecord")? {
+            Value::Reference(link) => link.guid(),
+            Value::Error(ValueError::DanglingReference { guid }) => *guid,
+            _ => return None,
+        };
+        Some(Self::new(
+            guid,
+            text(reference, "ChildPath").trim().to_owned(),
+            PaletteReferenceSource::Named(None),
+        ))
     }
 }
 
 /// The geometry an Entity Record names (`SGeometryResourceParams`): the model file, the material
 /// library that replaces the library the model names itself and the tint palette.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Geometry {
     pub(crate) path: String,
     pub(crate) material: Option<String>,
     pub(crate) palette: Option<PaletteRef>,
+    origins: GeometrySelectors,
 }
+
+impl PartialEq for Geometry {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.material == other.material && self.palette == other.palette
+    }
+}
+
+impl Eq for Geometry {}
 
 /// A geometry an Entity Record names for the tags of a sub-node (`SubGeometry`), e.g. `Male` or
 /// `Female` for the body a piece of armour is worn on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GeometryVariant {
     pub(crate) tags: Vec<String>,
+    pub(crate) tag_locations: Box<[SourceLocation]>,
     pub(crate) geometry: Geometry,
 }
 
+impl PartialEq for GeometryVariant {
+    fn eq(&self, other: &Self) -> bool {
+        self.tags == other.tags && self.geometry == other.geometry && self.slots() == other.slots()
+    }
+}
+
+impl Eq for GeometryVariant {}
+
 impl GeometryVariant {
+    fn slots(&self) -> &[usize] {
+        self.geometry
+            .origins
+            .model
+            .as_ref()
+            .map_or(&[], |source| source.slots.as_ref())
+    }
+
     /// Returns the tags of the sub-node, split at white space.
     #[must_use]
     pub fn tags(&self) -> &[String] {
@@ -66,93 +173,6 @@ impl GeometryVariant {
     #[must_use]
     pub fn has_tag(&self, tag: &str) -> bool {
         self.tags.iter().any(|own| own.eq_ignore_ascii_case(tag))
-    }
-}
-
-/// The deepest nesting of material variant nodes that is read.
-const MAX_MATERIAL_DEPTH: usize = 6;
-
-/// The most material variant nodes one Entity Record contributes.
-const MAX_MATERIAL_NODES: usize = 4096;
-
-/// A material library an Entity Record chooses for the tags of a node of its material tree
-/// (`SMaterialNodeParams`), e.g. `hairVar_Brown` and below it `Male`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialVariant {
-    pub(crate) tags: Vec<String>,
-    pub(crate) material: Option<String>,
-    pub(crate) children: Vec<Self>,
-}
-
-impl MaterialVariant {
-    /// Returns the tags of the node, split at white space.
-    #[must_use]
-    pub fn tags(&self) -> &[String] {
-        &self.tags
-    }
-
-    /// Returns the material library of the node, a path below `Data`.
-    #[must_use]
-    pub fn material(&self) -> Option<&str> {
-        self.material.as_deref()
-    }
-
-    /// Returns the nodes nested in this one.
-    #[must_use]
-    pub fn children(&self) -> &[Self] {
-        &self.children
-    }
-
-    /// Returns the material library of the deepest chain of nodes whose tags are all in `active`,
-    /// ignoring ASCII case; a node without tags never matches.
-    #[must_use]
-    pub fn resolve<'v>(variants: &'v [Self], active: &[String]) -> Option<&'v str> {
-        variants.iter().find_map(|node| {
-            let matches = !node.tags.is_empty()
-                && node
-                    .tags
-                    .iter()
-                    .all(|tag| active.iter().any(|own| own.eq_ignore_ascii_case(tag)));
-            if !matches {
-                return None;
-            }
-            Self::resolve(&node.children, active).or(node.material.as_deref())
-        })
-    }
-
-    /// Reads the variants below the material node of a `SGeometryResourceParams` component.
-    pub(crate) fn read(component: &StructValue<'_>) -> Vec<Self> {
-        let Some(node) = struct_field(component, "Material") else {
-            return Vec::new();
-        };
-        let mut budget = MAX_MATERIAL_NODES;
-        Self::read_children(node, 0, &mut budget)
-    }
-
-    fn read_children(node: &StructValue<'_>, depth: usize, budget: &mut usize) -> Vec<Self> {
-        if depth >= MAX_MATERIAL_DEPTH {
-            return Vec::new();
-        }
-        let mut found = Vec::new();
-        for child in struct_items(node, "materialVariants") {
-            if *budget == 0 {
-                break;
-            }
-            *budget -= 1;
-            let material = struct_field(child, "Material")
-                .map(|resource| text(resource, "path"))
-                .filter(|path| !path.is_empty())
-                .map(str::to_owned);
-            found.push(Self {
-                tags: text(child, "Tags")
-                    .split_whitespace()
-                    .map(str::to_owned)
-                    .collect(),
-                material,
-                children: Self::read_children(child, depth + 1, budget),
-            });
-        }
-        found
     }
 }
 
@@ -177,6 +197,20 @@ impl Geometry {
         self.palette.as_ref()
     }
 
+    /// Returns the geometry's own palette or the one named by the same item's main geometry.
+    pub(crate) fn palette_with_main<'a>(
+        &'a self,
+        main: Option<&'a Self>,
+    ) -> Option<&'a PaletteRef> {
+        self.palette().or_else(|| main.and_then(Self::palette))
+    }
+
+    pub(crate) fn inherit_palette(&mut self, main: Option<&Self>) {
+        if self.palette.is_none() {
+            self.palette = self.palette_with_main(main).cloned();
+        }
+    }
+
     /// Returns whether the model file is a `.cdf`, `.chr` or `.skin` file outside
     /// `Objects/Characters/Human`, the folder of the human body rigs.
     #[must_use]
@@ -185,71 +219,122 @@ impl Geometry {
     }
 
     /// Reads the main geometry of a `SGeometryResourceParams` component.
-    pub(crate) fn read(component: &StructValue<'_>) -> Option<Self> {
-        Self::of_node(struct_field(component, "Geometry")?)
+    pub(crate) fn read(component: &StructValue<'_>, owner: GeometryComponent) -> Option<Self> {
+        let data = struct_field(struct_field(component, "Geometry")?, "Geometry")?;
+        let path = model_path(data)?;
+        let material_node = struct_field(component, "Material");
+        let component_material = material_node.and_then(material_path);
+        let mut geometry = Self::from_data(data, owner, &[], path, component_material);
+        if let Some(palette) = material_node.and_then(PaletteRef::read) {
+            let source =
+                PaletteReferenceSource::Named(Some(owner.at(".Material.Palette.RootRecord")));
+            geometry.palette = Some(
+                palette
+                    .with_selector(source)
+                    .with_geometry_fallback(geometry.palette.take()),
+            );
+        }
+        Some(geometry)
     }
 
-    /// Reads the geometry of the sub-nodes of the main node of a `SGeometryResourceParams`
-    /// component that name a model, with their tags: the children of the main node first, then
-    /// the sub-nodes nested in them, which carry the tags of the nodes they are nested in as well
-    /// as their own.
-    pub(crate) fn read_variants(component: &StructValue<'_>) -> Vec<GeometryVariant> {
-        let Some(node) = struct_field(component, "Geometry") else {
-            return Vec::new();
-        };
-        let mut variants = Vec::new();
-        let mut level = vec![(node, Vec::<String>::new())];
-        for _ in 0..MAX_NESTED_SUB_GEOMETRY {
-            let mut next = Vec::new();
-            for (parent, inherited) in &level {
-                for sub in struct_items(parent, "SubGeometry") {
-                    let mut tags = inherited.clone();
-                    tags.extend(text(sub, "Tags").split_whitespace().map(str::to_owned));
-                    if let Some(geometry) = Self::of_node(sub) {
-                        variants.push(GeometryVariant {
-                            tags: tags.clone(),
-                            geometry,
-                        });
-                    }
-                    next.push((sub, tags));
-                }
-            }
-            if next.is_empty() {
-                break;
-            }
-            level = next;
-        }
-        variants
+    /// Returns the physical Record field that names this geometry.
+    #[must_use]
+    pub fn model_field(&self) -> Option<SourceLocation> {
+        self.origins.model_field()
     }
 
-    fn of_node(node: &StructValue<'_>) -> Option<Self> {
-        let data = struct_field(node, "Geometry")?;
-        let path = struct_field(data, "Geometry").map(|resource| text(resource, "path"))?;
-        if path.is_empty() {
-            return None;
+    pub(crate) fn variant_position(&self) -> Option<SourceLocation> {
+        self.origins.model.as_ref().map(|position| position.at(""))
+    }
+
+    /// Returns the physical Record field that names this geometry's selected material.
+    #[must_use]
+    pub fn material_field(&self) -> Option<SourceLocation> {
+        self.origins.material_field()
+    }
+
+    pub(crate) fn selectors(&self, material_from_geometry: bool) -> GeometrySelectors {
+        GeometrySelectors {
+            model: self.origins.model.clone(),
+            material: material_from_geometry
+                .then(|| self.origins.material.clone())
+                .flatten(),
         }
-        let material = struct_field(data, "Material")
-            .map(|resource| text(resource, "path"))
-            .filter(|path| !path.is_empty());
-        Some(Self {
+    }
+
+    pub(crate) fn apply_material_variant(&mut self, variant: &MaterialVariantSelection<'_>) {
+        if let Some(material) = variant.material() {
+            self.material = Some(material.to_owned());
+            self.origins.material = variant
+                .material_location()
+                .map(|location| MaterialPosition::Authored(std::sync::Arc::new(location)));
+        }
+        if let Some(palette) = variant.palette() {
+            self.palette = Some(palette);
+        }
+    }
+
+    pub(crate) fn inherit_material(&mut self, other: &Self) {
+        self.material.clone_from(&other.material);
+        self.origins.material.clone_from(&other.origins.material);
+    }
+
+    pub(crate) fn override_model(&mut self, path: String) {
+        self.path = path;
+        self.origins.model = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fixture(path: &str) -> Self {
+        Self {
+            path: path.to_owned(),
+            material: None,
+            palette: None,
+            origins: GeometrySelectors::default(),
+        }
+    }
+
+    fn from_data(
+        data: &StructValue<'_>,
+        owner: GeometryComponent,
+        slots: &[usize],
+        path: &str,
+        component_material: Option<&str>,
+    ) -> Self {
+        let material = component_material.or_else(|| material_path(data));
+        let mut origins = GeometrySelectors::of(
+            owner,
+            slots,
+            material.is_some() && component_material.is_none(),
+        );
+        if component_material.is_some() {
+            origins.material = Some(MaterialPosition::Component(owner));
+        }
+        let palette = PaletteRef::read(data).map(|palette| {
+            let location = origins
+                .model
+                .as_ref()
+                .map(|position| position.at(".Geometry.Palette.RootRecord"));
+            palette.with_selector(PaletteReferenceSource::Named(location))
+        });
+        Self {
             path: path.to_owned(),
             material: material.map(str::to_owned),
-            palette: read_palette(data),
-        })
+            palette,
+            origins,
+        }
     }
 }
 
-fn read_palette(data: &StructValue<'_>) -> Option<PaletteRef> {
-    let reference = struct_field(data, "Palette")?;
-    let guid = match reference.field("RootRecord")? {
-        Value::Reference(link) => link.guid(),
-        Value::Error(ValueError::DanglingReference { guid }) => *guid,
-        _ => return None,
-    };
-    Some(PaletteRef {
-        guid,
-        child_path: text(reference, "ChildPath").trim().to_owned(),
-    })
+/// Returns the nonempty material path named by this original node or geometry.
+pub(crate) fn material_path<'source>(data: &StructValue<'source>) -> Option<&'source str> {
+    let path = text(struct_field(data, "Material")?, "path");
+    (!path.is_empty()).then_some(path)
+}
+
+fn model_path<'source>(data: &StructValue<'source>) -> Option<&'source str> {
+    let path = text(struct_field(data, "Geometry")?, "path");
+    (!path.is_empty()).then_some(path)
 }
 
 #[cfg(test)]
@@ -257,19 +342,11 @@ mod tests {
     use super::Geometry;
     use crate::BodyVariant;
 
-    fn geometry(path: &str) -> Geometry {
-        Geometry {
-            path: path.to_owned(),
-            material: None,
-            palette: None,
-        }
-    }
-
     #[test]
     fn the_human_skeleton_and_skin_are_no_rigged_files_outside_the_human_rigs() {
         for body in BodyVariant::ALL {
-            assert!(!geometry(body.skeleton()).is_rigged_file_outside_human_rigs());
-            assert!(!geometry(body.skin()).is_rigged_file_outside_human_rigs());
+            assert!(!Geometry::fixture(body.skeleton()).is_rigged_file_outside_human_rigs());
+            assert!(!Geometry::fixture(body.skin()).is_rigged_file_outside_human_rigs());
         }
     }
 
@@ -281,7 +358,10 @@ mod tests {
             "/Objects/Characters/Vanduul/drone/body.skin",
             "Objects/Spaceships/Thrusters/nozzle.cdf",
         ] {
-            assert!(geometry(path).is_rigged_file_outside_human_rigs(), "{path}");
+            assert!(
+                Geometry::fixture(path).is_rigged_file_outside_human_rigs(),
+                "{path}"
+            );
         }
         for path in [
             "Data/Objects/Characters/Human/male_v7/export/bhm_skeleton_v7.chr",
@@ -291,9 +371,17 @@ mod tests {
             "Objects/Characters/Creatures/x/skin",
         ] {
             assert!(
-                !geometry(path).is_rigged_file_outside_human_rigs(),
+                !Geometry::fixture(path).is_rigged_file_outside_human_rigs(),
                 "{path}"
             );
         }
     }
 }
+
+#[cfg(test)]
+#[path = "geometry_source_variants_tests.rs"]
+mod source_variants_tests;
+
+#[cfg(test)]
+#[path = "geometry_primary_material_tests.rs"]
+mod primary_material_tests;

@@ -2,29 +2,43 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Loot tables, archetypes, pool filters, the loot of a slot and the containers placed with a
-//! multi config, in the Basetool catalog.
+//! multi config, in the P4KX catalog.
 
+#[path = "loot_entity_container_publication.rs"]
+mod entity_container_publication;
+#[path = "legacy_loot_query_parity.rs"]
+mod legacy_query_parity;
+#[path = "loot_query_parity.rs"]
+mod query_parity;
+#[path = "loot_unreadable_root_publication.rs"]
+mod unreadable_root_publication;
+#[path = "loot_weighted_definitions.rs"]
+mod weighted_definitions;
+
+use crate::catalog_loot_filter_assertions;
 use crate::loot_fixture::{
     ARCHETYPE, AREA, CONFIG, ENTITY, FILTER, FILTER_LEAF, GHOST, LEGACY_TABLE, NESTED, PLANET,
     TABLE, TAG_COMMON, TAG_RARE, write_archive,
 };
-use crate::starmap_fixture::guid_text;
+use crate::loot_v3_graph::{self as graph, Graph};
+use crate::starmap_fixture;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Kind, build_catalog};
+use p4kx_export::{BuiltCatalog, CatalogOptions, CatalogPublicationMode, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(crate) fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let built = build_catalog(&archive, &options)?;
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -38,8 +52,11 @@ pub(crate) fn entry<'a>(
         .as_array()
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == guid_text(record).as_str())
-        .ok_or_else(|| format!("{kind} has no {}", guid_text(record)).into())
+        .find(|entry| {
+            let guid = entry.pointer("/guid/value").or_else(|| entry.get("guid"));
+            guid.and_then(Value::as_str) == Some(starmap_fixture::guid_text(record).as_str())
+        })
+        .ok_or_else(|| format!("{kind} has no {}", starmap_fixture::guid_text(record)).into())
 }
 
 #[test]
@@ -60,7 +77,10 @@ fn a_loot_table_keeps_its_weights_and_the_optional_data_of_each_entry() -> TestR
     assert_eq!(ammo["dupeLimit"], 3);
     assert_eq!(ammo["chanceToExist"], 0.75);
     let linked = &table["entries"][1];
-    assert_eq!(linked["archetypeGuid"], guid_text(ARCHETYPE).as_str());
+    assert_eq!(
+        linked["archetypeGuid"],
+        starmap_fixture::guid_text(ARCHETYPE).as_str()
+    );
     assert_eq!(linked["archetype"], Value::Null);
     assert_eq!(
         [
@@ -91,8 +111,8 @@ fn an_archetype_written_out_in_place_keeps_its_selector_stack_size_and_spawn_wit
         selector["selector"],
         json!({
             "selectorType": "LootArchetypeV3Selector_Tags",
-            "positiveTagGuids": [guid_text(TAG_COMMON), guid_text(TAG_RARE)],
-            "negativeTagGuids": [guid_text(TAG_RARE)],
+            "positiveTagGuids": [starmap_fixture::guid_text(TAG_COMMON), starmap_fixture::guid_text(TAG_RARE)],
+            "negativeTagGuids": [starmap_fixture::guid_text(TAG_RARE)],
             "entityClassGuids": []
         })
     );
@@ -106,7 +126,7 @@ fn an_archetype_written_out_in_place_keeps_its_selector_stack_size_and_spawn_wit
             "amount": {"min": 2.0, "max": 4.0},
             "selector": {
                 "selectorType": "SpawnWithV3Selector_Tags",
-                "positiveTagGuids": [guid_text(TAG_COMMON)],
+                "positiveTagGuids": [starmap_fixture::guid_text(TAG_COMMON)],
                 "negativeTagGuids": [],
                 "entityClassGuids": []
             }
@@ -120,20 +140,33 @@ fn an_archetype_selects_entity_classes_without_tags() -> TestResult {
     let (_, catalog) = build()?;
     let archetype = entry(&catalog, "lootArchetypes", ARCHETYPE)?;
     assert_eq!(archetype["className"], "V3LootArchetype_Cargo");
+    let [entry] = crate::health_origin_assertions::rows(archetype, "/entries")? else {
+        return Err("expected one archetype entry".into());
+    };
+    let mut view = entry.as_object().ok_or("archetype entry object")?.clone();
+    let weight_source = view
+        .remove("weightSource")
+        .ok_or("archetype weight origin")?;
     assert_eq!(
-        archetype["entries"],
-        json!([{
+        weight_source.get("state").and_then(Value::as_str),
+        Some("present"),
+        "canonical weight origin is available"
+    );
+    assert_eq!(
+        Value::Object(view),
+        json!({
             "name": "Unique",
             "weight": 1.0,
             "selector": {
                 "selectorType": "LootArchetypeV3Selector_EntityClasses",
                 "positiveTagGuids": [],
                 "negativeTagGuids": [],
-                "entityClassGuids": [guid_text(ENTITY)]
+                "entityClassGuids": [starmap_fixture::guid_text(ENTITY)]
             },
             "stackSize": null,
             "spawnWith": []
-        }])
+        }),
+        "the convenience archetype view retains its fields"
     );
     Ok(())
 }
@@ -141,47 +174,46 @@ fn an_archetype_selects_entity_classes_without_tags() -> TestResult {
 #[test]
 fn a_pool_filter_nests_a_link_and_tag_terms() -> TestResult {
     let (_, catalog) = build()?;
-    let leaf = entry(&catalog, "lootPoolFilters", FILTER_LEAF)?;
-    assert_eq!(leaf["filter"]["nodeType"], "PoolFilter_Tags");
+    let leaf = Graph::new(&catalog, &starmap_fixture::guid_text(FILTER_LEAF))?;
+    let fields = graph::structure(leaf.root("filter")?, "PoolFilter_Tags")?;
+    catalog_loot_filter_assertions::tags(
+        &leaf,
+        leaf.field(fields, "tagFilter")?,
+        &[TAG_COMMON],
+        &[],
+    )?;
+    let filter = Graph::new(&catalog, &starmap_fixture::guid_text(FILTER))?;
+    let fields = graph::structure(filter.root("filter")?, "PoolFilter_Sequence")?;
+    assert_eq!(fields.len(), 1, "the actual sequence declares only filters");
+    let slots = graph::elements(filter.field(fields, "filters")?)?;
     assert_eq!(
-        leaf["filter"]["positiveTagGuids"],
-        json!([guid_text(TAG_COMMON)])
+        slots.len(),
+        3,
+        "Base, Event and Empty retain original order"
     );
-    let filter = entry(&catalog, "lootPoolFilters", FILTER)?;
+    let base = catalog_loot_filter_assertions::step(&filter, slots, 0, "Base", "Cumulative")?;
+    let fields = graph::structure(base, "PoolFilter_RecordRef")?;
     assert_eq!(
-        filter["filter"],
-        json!({
-            "nodeType": "PoolFilter_Sequence",
-            "filterGuid": null,
-            "positiveTagGuids": [],
-            "negativeTagGuids": [],
-            "filters": [
-                {
-                    "name": "Base",
-                    "mode": "Cumulative",
-                    "filter": {
-                        "nodeType": "PoolFilter_RecordRef",
-                        "filterGuid": guid_text(FILTER_LEAF),
-                        "positiveTagGuids": [],
-                        "negativeTagGuids": [],
-                        "filters": []
-                    }
-                },
-                {
-                    "name": "Event",
-                    "mode": "Additive",
-                    "filter": {
-                        "nodeType": "PoolFilter_Tags",
-                        "filterGuid": null,
-                        "positiveTagGuids": [],
-                        "negativeTagGuids": [guid_text(TAG_RARE)],
-                        "filters": []
-                    }
-                },
-                {"name": "Empty", "mode": "Additive", "filter": null}
-            ]
-        })
+        fields.len(),
+        1,
+        "the link has no invented tag terms or owned children"
     );
+    assert_eq!(
+        graph::reference_guid(filter.field(fields, "filterRecord")?)?,
+        starmap_fixture::guid_text(FILTER_LEAF),
+        "Base links the original leaf"
+    );
+    let event = catalog_loot_filter_assertions::step(&filter, slots, 1, "Event", "Additive")?;
+    let fields = graph::structure(event, "PoolFilter_Tags")?;
+    catalog_loot_filter_assertions::tags(
+        &filter,
+        filter.field(fields, "tagFilter")?,
+        &[],
+        &[TAG_RARE],
+    )?;
+    graph::source_null(catalog_loot_filter_assertions::step(
+        &filter, slots, 2, "Empty", "Additive",
+    )?);
     Ok(())
 }
 
@@ -193,9 +225,9 @@ fn a_slot_names_the_tables_and_the_constraints_of_its_loot() -> TestResult {
     assert_eq!(
         slots[0]["lootConfig"],
         json!({
-            "lootTableGuid": guid_text(LEGACY_TABLE),
-            "lootTableV3Guid": guid_text(TABLE),
-            "poolFilterGuid": guid_text(FILTER),
+            "lootTableGuid": starmap_fixture::guid_text(LEGACY_TABLE),
+            "lootTableV3Guid": starmap_fixture::guid_text(TABLE),
+            "poolFilterGuid": starmap_fixture::guid_text(FILTER),
             "totalResultsLimit": 4,
             "chanceToGenerate": 1.0,
             "chanceToGenerateAdditionalInventories": 0.5,
@@ -206,12 +238,64 @@ fn a_slot_names_the_tables_and_the_constraints_of_its_loot() -> TestResult {
     Ok(())
 }
 
+fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
+    use crate::health_origin_assertions as proof;
+
+    proof::rows(catalog, "/lootContainers")?
+        .iter()
+        .map(|row| {
+            let mut facts = row.clone();
+            for field in ["multiConfigGuid", "container", "system"] {
+                let value = proof::at(proof::cell(row, field, "present")?, "/value")?;
+                facts
+                    .get_mut(field)
+                    .ok_or("canonical loot container cell")?
+                    .clone_from(value);
+            }
+            let parent = proof::at(row, "/starmapObjectGuid/value")?;
+            facts
+                .as_object_mut()
+                .ok_or("Loot placement row")?
+                .insert("starmapObjectGuid".to_owned(), parent.clone());
+            let value = proof::at(row, "/entityCount/value")?;
+            facts
+                .get_mut("entityCount")
+                .ok_or("canonical entity count cell")?
+                .clone_from(value);
+            let tag_facts = loot_tag_facts(row)?;
+            *facts
+                .get_mut("tagCounts")
+                .ok_or("canonical tag count cells")? = json!(tag_facts);
+            Ok(facts)
+        })
+        .collect()
+}
+
+fn loot_tag_facts(row: &Value) -> TestResult<Vec<Value>> {
+    use crate::health_origin_assertions as proof;
+
+    if proof::at(row, "/tagCounts/state")? == "absent" {
+        proof::cell(row, "tagCounts", "absent")?;
+        return Ok(Vec::new());
+    }
+    let carrier = proof::cell(row, "tagCounts", "present")?;
+    proof::rows(carrier, "/value")?
+        .iter()
+        .map(|tag| {
+            Ok(json!({
+                "tagGuid": proof::at(proof::cell(tag, "tagGuid", "present")?, "/value")?,
+                "entities": proof::at(proof::cell(tag, "entities", "present")?, "/value")?,
+            }))
+        })
+        .collect()
+}
+
 #[test]
 fn a_container_placed_with_a_config_is_listed_for_each_root_it_hangs_below() -> TestResult {
     let (built, catalog) = build()?;
     let area = |object: Value, entities: Value, tags: Value| {
         json!({
-            "multiConfigGuid": guid_text(CONFIG),
+            "multiConfigGuid": starmap_fixture::guid_text(CONFIG),
             "container": AREA,
             "system": "stanton",
             "starmapObjectGuid": object,
@@ -221,7 +305,7 @@ fn a_container_placed_with_a_config_is_listed_for_each_root_it_hangs_below() -> 
     };
     let nested = |object: Value| {
         json!({
-            "multiConfigGuid": guid_text(CONFIG),
+            "multiConfigGuid": starmap_fixture::guid_text(CONFIG),
             "container": NESTED,
             "system": "stanton",
             "starmapObjectGuid": object,
@@ -230,26 +314,28 @@ fn a_container_placed_with_a_config_is_listed_for_each_root_it_hangs_below() -> 
         })
     };
     let tags = json!([
-        {"tagGuid": guid_text(TAG_RARE), "entities": 2},
-        {"tagGuid": guid_text(TAG_COMMON), "entities": 3}
+        {"tagGuid": starmap_fixture::guid_text(TAG_RARE), "entities": 2},
+        {"tagGuid": starmap_fixture::guid_text(TAG_COMMON), "entities": 3}
     ]);
-    let planet = json!(guid_text(PLANET));
+    let planet = json!(starmap_fixture::guid_text(PLANET));
+    let actual = loot_container_facts(&catalog)?;
     assert_eq!(
-        catalog["lootContainers"],
-        json!([
+        actual,
+        vec![
             area(Value::Null, json!(5), tags.clone()),
             area(planet.clone(), json!(5), tags),
             nested(Value::Null),
             nested(planet.clone()),
-            {
-                "multiConfigGuid": guid_text(CONFIG),
+            json!({
+                "multiConfigGuid": starmap_fixture::guid_text(CONFIG),
                 "container": GHOST,
                 "system": "stanton",
                 "starmapObjectGuid": planet,
                 "entityCount": null,
                 "tagCounts": []
-            }
-        ])
+            })
+        ],
+        "the sourced carrier preserves the placement keys, order and counts"
     );
     assert_eq!(
         built

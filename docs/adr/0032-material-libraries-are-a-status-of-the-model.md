@@ -18,8 +18,11 @@ a `MaterialStatus`: `Unnamed`, `Missing`, `Unreadable` or `Loaded`.
 - A bare name is first looked for beside the model, as the engine does; the resolver for a model
   file on disk reads only `<last component>.mtl` of the path beside it.
 - Sub-materials are the first level of `SubMaterials` only. No file in LIVE nests them or refers
-  to another `.mtl`, so there is no cycle to detect; limits on the number of sub-materials (1,024)
-  and texture slots (64) bound what a corrupt file can allocate.
+  to another `.mtl`, so there is no cycle to detect. The chosen sub-material admission limit
+  remains 1,024. Texture slots and material layers retain every admitted original declaration
+  in order; there is no fixed 64-item source prefix. Input-byte admission belongs to each caller:
+  the MCP material tool uses 8 MiB, while direct `MaterialLibrary::parse` accepts the bytes its
+  caller supplies. Explicit `parse_with` limits bound retained authored syntax separately.
 - Submeshes whose material draws nothing are left out of the GLB, with a count in the summary:
   collision, shield and helper geometry would otherwise cover the model.
 - Two decisions can change without touching the model crate: the colour heuristics live in

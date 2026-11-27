@@ -2,19 +2,25 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
 use p4kx_archive::Checksum;
-use p4kx_texture::merge;
+use p4kx_texture::MergeSpan;
 
-use crate::ConflictPolicy;
-use crate::ExtractionError;
 use crate::buffers::Buffers;
+use crate::output_file::StagedOutput;
 use crate::texture_convert::{Source, Step};
 use crate::texture_siblings::Capturing;
+use crate::textures::{FileMergeInputs, FilePartReads};
 use crate::tracker::Tracker;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::write::{Destination, EntryWriter, Outcome, write_error};
+use crate::{ConflictPolicy, ExtractionError, OriginArtifactDigest, OriginDigestWriter};
+
+#[path = "texture_merge_publication.rs"]
+mod publication;
+
+pub(crate) use publication::MergedOutput;
 
 const WRITE_BUFFER_LEN: usize = 256 * 1024;
 
@@ -28,42 +34,50 @@ impl EntryWriter<'_> {
         capture: Option<u32>,
         counted: &mut Counted,
         buffers: &mut Buffers,
-    ) -> Result<Step, ExtractionError> {
+        output: &mut MergedOutput,
+    ) -> Result<(), ExtractionError> {
         if destination.existing.is_some() && self.policy == ConflictPolicy::Skip {
-            return Ok(Step::Kept);
+            output.step = Some(Step::Kept);
+            return Ok(());
         }
-        let (temporary, file) = create_temporary(&destination.folder)?;
+        let (temporary, file, ownership) = self.temporary(&destination.folder)?;
+        let staged = StagedOutput::new(
+            &temporary,
+            &destination.file,
+            &ownership,
+            self.protection,
+            self.cancel,
+        );
         let decided = self
             .merge_to(file, source, (capture, counted), buffers)
             .map_err(|error| write_error_at(error, destination))
-            .and_then(|(len, crc)| {
+            .and_then(|bytes| {
                 self.decide(
                     destination,
-                    || (len, Checksum::Crc32c(crc)),
+                    || (bytes.len, Checksum::Crc32c(bytes.crc)),
                     &mut buffers.chunk,
                 )
+                .map(|decision| (decision, bytes.evidence))
             });
-        let step = match decided {
-            Ok(None) => step_of(&self.put_in_place(
-                &temporary,
-                &destination.file,
-                Ok(Chunk::End),
-                Outcome::Converted,
-            )?),
-            Ok(Some(outcome)) => {
-                let _ignored = fs::remove_file(&temporary);
-                step_of(&outcome)
+        let pending = match decided {
+            Ok((None, evidence)) => {
+                let published = self.publish_merge(source, &staged, evidence, output);
+                if output.step == Some(Step::Written) {
+                    return published;
+                }
+                if published.is_err() && destination.existing.is_some() {
+                    output.step = Some(Step::Kept);
+                }
+                published
             }
-            Err(_) if self.tracker.should_stop() => {
-                let _ignored = fs::remove_file(&temporary);
-                Step::Cancelled
+            Ok((Some(outcome), _)) => {
+                output.step = Some(step_of(&outcome));
+                Ok(())
             }
-            Err(error) => {
-                let _ignored = fs::remove_file(&temporary);
-                return Err(error);
-            }
+            Err(error) => Err(error),
         };
-        Ok(step)
+        let resolved = self.resolve_uncommitted_merge(pending, output);
+        crate::output_cleanup::extraction(resolved, &ownership, &temporary, self.cancel)
     }
 
     /// Streams the merged DDS of `source` into `file` and returns its length and CRC-32C.
@@ -73,7 +87,7 @@ impl EntryWriter<'_> {
         source: &Source<'_>,
         (capture, counted): (Option<u32>, &mut Counted),
         buffers: &mut Buffers,
-    ) -> Result<(u64, u32), MergeError> {
+    ) -> Result<MergedBytes, MergeError> {
         let mut sink = MergeSink {
             writer: BufWriter::with_capacity(WRITE_BUFFER_LEN, file),
             tracker: self.tracker,
@@ -81,28 +95,67 @@ impl EntryWriter<'_> {
             len: 0,
             crc: 0,
         };
+        let file_reads = source
+            .header
+            .archive_path()
+            .is_none()
+            .then(|| RefCell::new(FilePartReads::default()));
         let siblings = Capturing {
             parts: source.texture.parts(),
             capture,
             data: RefCell::new(std::mem::take(&mut buffers.data)),
+            file_reads: file_reads.as_ref(),
         };
-        let merged = self.open_entry(source.header).and_then(|header| {
-            merge(
-                header,
-                source.header.uncompressed_size(),
-                &siblings,
-                &mut sink,
-            )
-            .map_err(|error| source.texture_error(error))
-        });
+        let merged = self
+            .open_entry(source.header)
+            .map_err(MergeError::Merge)
+            .and_then(|mut header| {
+                let mut digest = OriginDigestWriter::new(&mut sink);
+                let mut spans = Vec::new();
+                p4kx_texture::merge_with_spans(
+                    &mut header,
+                    source.header.uncompressed_size(),
+                    &siblings,
+                    &mut digest,
+                    |span| {
+                        spans.try_reserve(1).map_err(io::Error::other)?;
+                        spans.push(span);
+                        Ok(())
+                    },
+                )
+                .map_err(|error| MergeError::Merge(source.texture_error(error)))?;
+                let digest = digest.finish().map_err(MergeError::Close)?;
+                Ok((digest, spans, header.file_origin()))
+            });
         buffers.data = siblings.data.into_inner();
-        merged.map_err(MergeError::Merge)?;
+        let (digest, spans, header) = merged?;
+        let files = file_reads.map(|parts| FileMergeInputs {
+            header,
+            parts: parts.into_inner(),
+        });
+        let evidence = MergedEvidence {
+            digest,
+            spans,
+            files,
+        };
         let (len, crc) = (sink.len, sink.crc);
         sink.writer
             .into_inner()
             .map_err(|error| MergeError::Close(error.into_error()))?;
-        Ok((len, crc))
+        Ok(MergedBytes { len, crc, evidence })
     }
+}
+
+struct MergedBytes {
+    len: u64,
+    crc: u32,
+    evidence: MergedEvidence,
+}
+
+struct MergedEvidence {
+    digest: OriginArtifactDigest,
+    spans: Vec<MergeSpan>,
+    files: Option<FileMergeInputs>,
 }
 
 /// Why streaming a merged DDS into its temporary file failed.

@@ -5,6 +5,7 @@ mod draw;
 mod fit;
 mod fonts;
 mod layout;
+mod prepared;
 #[cfg(test)]
 pub(crate) mod probe;
 #[cfg(test)]
@@ -31,6 +32,7 @@ pub(crate) struct Texts<'t> {
     localise: Option<Localise<'t>>,
     pub(crate) styles: FontStyles,
     chars: usize,
+    pub(crate) observe_inputs: bool,
 }
 
 impl<'t> Texts<'t> {
@@ -40,6 +42,7 @@ impl<'t> Texts<'t> {
             localise,
             styles: FontStyles::default(),
             chars: 0,
+            observe_inputs: false,
         }
     }
 

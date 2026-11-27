@@ -4,10 +4,15 @@
 use std::borrow::Cow;
 use std::io::{self, Write};
 
-use p4kx_extraction::{CSV_BYTE_ORDER_MARK, Language, TextSet, decode_line_breaks, write_csv_cell};
+use p4kx_extraction::{
+    CSV_BYTE_ORDER_MARK, CsvCellMode, Language, TextSet, decode_line_breaks,
+    write_csv_cell_with_mode,
+};
 use serde::Serialize;
 
-use crate::action_map::{Action, ActionMap, ActionMaps, Binding, Device};
+use crate::action_map::{Action, ActionMaps, Binding, Device};
+use crate::action_map_origin::{ActionMapOrigins, CsvColumn, CsvRow, Recorder};
+use crate::action_map_profile::ActionMapProfile;
 
 /// The file format of an action map export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +25,8 @@ pub enum ActionMapFormat {
     Csv,
     /// As [`Csv`](Self::Csv) with the exact texts and no `'`; the byte order mark stays.
     CsvRaw,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
 }
 
 /// What an action map export wrote.
@@ -52,15 +59,86 @@ pub fn write_action_maps(
     format: ActionMapFormat,
     out: &mut impl Write,
 ) -> io::Result<ActionMapCounts> {
+    write(maps, texts, language, format, out, None)
+}
+
+/// An indexed language Entry and its actual action-label source.
+#[derive(Debug)]
+pub struct ActionMapLabels<'entry> {
+    entry: &'entry p4kx_extraction::LocalizationEntry,
+    texts: TextSet<'entry>,
+}
+
+impl<'entry> ActionMapLabels<'entry> {
+    /// Indexes the original language Entry.
+    ///
+    /// # Errors
+    /// Returns an error if the Entry cannot be indexed.
+    pub fn new(
+        entry: &'entry p4kx_extraction::LocalizationEntry,
+    ) -> Result<Self, p4kx_extraction::LocalizationError> {
+        Ok(Self {
+            entry,
+            texts: TextSet::new([(entry.language(), entry.parse()?)]),
+        })
+    }
+
+    pub(crate) const fn entry(&self) -> &'entry p4kx_extraction::LocalizationEntry {
+        self.entry
+    }
+
+    /// Returns the index for language diagnostics.
+    #[must_use]
+    pub const fn texts(&self) -> &TextSet<'entry> {
+        &self.texts
+    }
+}
+
+/// Writes the unchanged artifact and retains its exact per-field source evidence.
+///
+/// # Errors
+/// Returns an output or evidence error.
+pub fn write_action_maps_with_origins(
+    profile: &ActionMapProfile,
+    labels: &ActionMapLabels<'_>,
+    format: ActionMapFormat,
+    out: &mut dyn Write,
+) -> io::Result<(ActionMapCounts, ActionMapOrigins)> {
+    let mut origins = Recorder::new(profile, labels.entry, &labels.texts)?;
+    let counts = write(
+        profile.maps(),
+        &labels.texts,
+        labels.entry.language(),
+        format,
+        out,
+        Some(&mut origins),
+    )?;
+    Ok((counts, origins.finish()?))
+}
+
+fn write(
+    maps: &ActionMaps,
+    texts: &TextSet<'_>,
+    language: Language,
+    format: ActionMapFormat,
+    mut out: &mut dyn Write,
+    mut origins: Option<&mut Recorder<'_>>,
+) -> io::Result<ActionMapCounts> {
     let labels = Labels {
         texts,
         language,
         unresolved: std::cell::Cell::new(0),
     };
     match format {
-        ActionMapFormat::Json => write_json(maps, &labels, out)?,
-        ActionMapFormat::Csv => write_csv(maps, &labels, out, true)?,
-        ActionMapFormat::CsvRaw => write_csv(maps, &labels, out, false)?,
+        ActionMapFormat::Json => {
+            write_json(maps, &labels, &mut out)?;
+            if let Some(origins) = &mut origins {
+                origins.json()?;
+            }
+        }
+        ActionMapFormat::Csv => write_csv(maps, &labels, out, CsvCellMode::Spreadsheet, origins)?,
+        ActionMapFormat::CsvRaw => write_csv(maps, &labels, out, CsvCellMode::Raw, origins)?,
+        ActionMapFormat::CsvStrict => write_csv(maps, &labels, out, CsvCellMode::Strict, origins)?,
     }
     Ok(ActionMapCounts {
         action_maps: maps.maps.len(),
@@ -109,6 +187,8 @@ struct JsonAction<'a> {
     name: &'a str,
     label_key: Option<&'a str>,
     label: Option<Cow<'a, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ui_description: Option<&'a str>,
     activation_mode: Option<&'a str>,
     bindings: Vec<JsonBinding<'a>>,
 }
@@ -137,6 +217,7 @@ fn write_json(maps: &ActionMaps, labels: &Labels<'_, '_>, out: &mut impl Write) 
                         name: &action.name,
                         label_key: action.label_key.as_deref(),
                         label: labels.resolve(action.label_key.as_deref()),
+                        ui_description: action.ui_description.as_deref(),
                         activation_mode: action.activation_mode.as_deref(),
                         bindings: action
                             .bindings
@@ -159,71 +240,117 @@ fn write_json(maps: &ActionMaps, labels: &Labels<'_, '_>, out: &mut impl Write) 
 fn write_csv(
     maps: &ActionMaps,
     labels: &Labels<'_, '_>,
-    out: &mut impl Write,
-    neutralise: bool,
+    out: &mut dyn Write,
+    mode: CsvCellMode,
+    mut origins: Option<&mut Recorder<'_>>,
 ) -> io::Result<()> {
-    out.write_all(CSV_BYTE_ORDER_MARK)?;
-    out.write_all(b"action_map,action_map_label,action,label,activation_mode")?;
-    for device in Device::ALL {
-        out.write_all(b",")?;
-        out.write_all(device.name().as_bytes())?;
-    }
-    out.write_all(b"\r\n")?;
+    let mut out = Counted { out, position: 0 };
+    write_csv_header(&mut out, mode)?;
     let mut cell = String::new();
-    for map in &maps.maps {
+    let mut index = 0;
+    for (map_index, map) in maps.maps.iter().enumerate() {
         let map_label = labels.resolve(map.label_key.as_deref());
-        for action in &map.actions {
-            let row = Row {
-                map,
-                map_label: map_label.as_deref(),
-                action,
-                label: labels.resolve(action.label_key.as_deref()),
+        for (action_index, action) in map.actions.iter().enumerate() {
+            let row = CsvRow {
+                map: map_index,
+                action: action_index,
+                index,
             };
-            write_row(out, &row, &mut cell, neutralise)?;
+            let label = labels.resolve(action.label_key.as_deref());
+            let leading = [
+                (map.name.as_str(), CsvColumn::Map),
+                (
+                    map_label.as_deref().unwrap_or_default(),
+                    CsvColumn::MapLabel,
+                ),
+                (action.name.as_str(), CsvColumn::Action),
+                (label.as_deref().unwrap_or_default(), CsvColumn::ActionLabel),
+                (
+                    action.activation_mode.as_deref().unwrap_or_default(),
+                    CsvColumn::ActivationMode,
+                ),
+            ];
+            for (position, (text, column)) in leading.into_iter().enumerate() {
+                if position > 0 {
+                    out.write_all(b",")?;
+                }
+                write_cell(&mut out, text, mode, &mut origins, &row, column)?;
+            }
+            for device in Device::ALL {
+                out.write_all(b",")?;
+                cell.clear();
+                for binding in action
+                    .bindings
+                    .iter()
+                    .filter(|binding| binding.device == device)
+                {
+                    if !cell.is_empty() {
+                        cell.push_str(" | ");
+                    }
+                    push_binding(&mut cell, binding, action);
+                }
+                write_cell(
+                    &mut out,
+                    &cell,
+                    mode,
+                    &mut origins,
+                    &row,
+                    CsvColumn::Device(device),
+                )?;
+            }
+            out.write_all(b"\r\n")?;
+            index += 1;
         }
     }
     Ok(())
 }
 
-struct Row<'a> {
-    map: &'a ActionMap,
-    map_label: Option<&'a str>,
-    action: &'a Action,
-    label: Option<Cow<'a, str>>,
-}
-
-fn write_row(
-    out: &mut impl Write,
-    row: &Row<'_>,
-    cell: &mut String,
-    neutralise: bool,
-) -> io::Result<()> {
-    let action = row.action;
-    let leading = [
-        row.map.name.as_str(),
-        row.map_label.unwrap_or_default(),
-        action.name.as_str(),
-        row.label.as_deref().unwrap_or_default(),
-        action.activation_mode.as_deref().unwrap_or_default(),
-    ];
-    for (position, text) in leading.into_iter().enumerate() {
-        if position > 0 {
-            out.write_all(b",")?;
-        }
-        write_csv_cell(out, text, neutralise)?;
+fn write_csv_header(out: &mut impl Write, mode: CsvCellMode) -> io::Result<()> {
+    if mode != CsvCellMode::Strict {
+        out.write_all(CSV_BYTE_ORDER_MARK)?;
     }
+    out.write_all(b"action_map,action_map_label,action,label,activation_mode")?;
     for device in Device::ALL {
         out.write_all(b",")?;
-        cell.clear();
-        for binding in action.bindings.iter().filter(|b| b.device == device) {
-            if !cell.is_empty() {
-                cell.push_str(" | ");
-            }
-            push_binding(cell, binding, action);
-        }
-        write_csv_cell(out, cell, neutralise)?;
+        out.write_all(device.name().as_bytes())?;
     }
     out.write_all(b"\r\n")
+}
+
+fn write_cell(
+    out: &mut Counted<'_>,
+    text: &str,
+    mode: CsvCellMode,
+    origins: &mut Option<&mut Recorder<'_>>,
+    row: &CsvRow,
+    column: CsvColumn,
+) -> io::Result<()> {
+    let start = out.position;
+    write_csv_cell_with_mode(out, text, mode)?;
+    if let Some(origins) = origins {
+        origins.csv(row, column, start..out.position)?;
+    }
+    Ok(())
+}
+
+struct Counted<'output> {
+    out: &'output mut dyn Write,
+    position: u64,
+}
+
+impl Write for Counted<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let written = self.out.write(bytes)?;
+        self.position = self
+            .position
+            .checked_add(written as u64)
+            .ok_or_else(|| io::Error::other("action-map output offset exceeds u64"))?;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.out.flush()
+    }
 }
 
 fn push_binding(cell: &mut String, binding: &Binding, action: &Action) {

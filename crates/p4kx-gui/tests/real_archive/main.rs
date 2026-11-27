@@ -12,6 +12,7 @@ mod comparison_frames_real_archive;
 mod comparison_real_archive;
 mod comparison_records_real_archive;
 mod containers_real_archive;
+mod entry_preview_origins_real_archive;
 mod frame_steps;
 mod image_preview_real_archive;
 mod localization_real_archive;
@@ -19,6 +20,8 @@ mod model_export_real_archive;
 mod model_viewer_real_archive;
 #[path = "../support/node_text.rs"]
 mod node_text;
+#[path = "../support/preview_physical_entry.rs"]
+mod preview_physical_entry;
 mod query_completion_real_archive;
 mod real_archive;
 mod record_export_real_archive;
@@ -28,4 +31,5 @@ mod record_preview_real_archive;
 mod software_wgpu;
 mod soundbank_preview_real_archive;
 mod tags_real_archive;
+mod xml_preview_origin_real_archive;
 mod xml_preview_real_archive;

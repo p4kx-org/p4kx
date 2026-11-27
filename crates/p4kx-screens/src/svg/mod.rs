@@ -231,11 +231,7 @@ fn first_stop(walk: &Walk<'_, '_>, id: &str) -> Option<Colour> {
         if let Some(stop) = node.children().find(|c| c.tag_name().name() == "stop") {
             let mut found = stop.attribute("stop-color").and_then(colour);
             let mut opacity = stop.attribute("stop-opacity").map(str::to_owned);
-            for (name, value) in stop
-                .attribute("style")
-                .map(declarations)
-                .unwrap_or_default()
-            {
+            for (name, value) in stop.attribute("style").map_or_default(declarations) {
                 match name.as_str() {
                     "stop-color" => found = colour(&value),
                     "stop-opacity" => opacity = Some(value),

@@ -6,11 +6,31 @@ expression: json
   "archive_changed": false,
   "cancelled": [],
   "converted": 1,
+  "cryxml_artifacts": [
+    {
+      "digest": {
+        "byteLength": "70",
+        "sha256": "3f999f6635b797f8552ca700c268c990baf2417f20e4e5eb519d2eeb1306c760"
+      },
+      "origin_receipt": "Data/vehicle.xml.p4kx-origin.jsonl",
+      "path": "Data/vehicle.xml"
+    }
+  ],
   "extracted": 2,
   "failed": [
     {
       "error": "cannot convert the CryXml: truncated CryXml: the header declares 107 bytes, 20 are present",
       "path": "Data\\broken.xml"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "digest": {
+        "byteLength": "4",
+        "sha256": "29114363f749a0226b6988dda3ca2492a954117ab6b5f382706c20300dabc079"
+      },
+      "origin_receipt": "Data/text.xml.p4kx-origin.jsonl",
+      "path": "Data/text.xml"
     }
   ],
   "skipped": [],

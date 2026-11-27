@@ -10,8 +10,9 @@ The tests are `crates/p4kx-extraction/tests/real_archive/model_lods.rs` and
 Level 0 is the geometry companion `<name>m` (`foyer.cgfm`). Level `n` from 1 on is
 `<stem>_lod<n>.<extension>m` (`foyer_lod1.cgfm`); `foyer_lod1.cgf` beside it is a chunk file of
 one `MeshInfo` chunk (216 bytes in the example) and carries no nodes, which is why the nodes of
-every level come from the base `.cgf`. The `LodDistances` chunk of the base file, which `p4kx`
-does not read, holds the distances the engine switches at.
+every level come from the base `.cgf`. Model Media preserves the original positioned words
+of the base file's measured `LodDistances` layout. The relation between individual words
+and runtime switch thresholds or companion levels remains unverified.
 
 LIVE holds 80,537 geometry companions of levels 1 to 5 (`.cgfm` 68,205 of LOD1, `.cgam` 8,669,
 `.skinm` 3,663). Their levels are gapless but for `freelancer_pfx.cgfm`, which has only LOD4, so

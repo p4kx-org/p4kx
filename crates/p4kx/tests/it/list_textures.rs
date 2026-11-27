@@ -99,6 +99,14 @@ fn list_json_gives_the_parts_of_a_texture_and_its_total_sizes() -> TestResult {
     assert_eq!(wall["size"], 127, "total size");
     assert_eq!(wall["compressed_size"], 127, "total stored size");
     assert_eq!(
+        wall["metadata"]["owner_entry_index"], 3,
+        "physical base owner"
+    );
+    assert_eq!(
+        wall["metadata"]["original_directory_ordinal"], "3",
+        "base source ordinal"
+    );
+    assert_eq!(
         wall["parts"],
         serde_json::json!([
             "Data\\tex\\wall.dds.1",
@@ -112,6 +120,11 @@ fn list_json_gives_the_parts_of_a_texture_and_its_total_sizes() -> TestResult {
 
     let all: serde_json::Value = serde_json::from_str(&list(&archive, &["--json", "--parts"])?)?;
     assert_eq!(all["entries"].as_array().ok_or("entries")?.len(), 7);
+    assert_eq!(
+        all["entries"][4]["metadata"]["owner_entry_index"], 4,
+        "a part owns its metadata"
+    );
+    assert_eq!(all["entries"][4]["size"], 20, "part sizes stay physical");
     Ok(())
 }
 
@@ -124,6 +137,7 @@ fn list_json_snapshot() -> TestResult {
 
     let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
     value["archive"] = "[DIR]/Data.p4k".into();
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

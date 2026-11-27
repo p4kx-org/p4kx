@@ -7,9 +7,14 @@ use p4kx_assembly::{Armour, BodyVariant};
 use p4kx_settings::ModelMaterials;
 
 use super::{CharacterExport, CharactersTab, Chooser, HeadInfo, Pick, Sources, SourcesState};
+use crate::output_target::Witness;
 use crate::{Camera, PartIssue, Playback, Scene, ViewFailure, ViewProgress};
 
 impl CharactersTab {
+    pub(crate) fn export_subject(&self) -> Option<Witness> {
+        self.shown.as_ref().map(|shown| Witness::of(&shown.armour))
+    }
+
     /// Returns the body variant the Character is built on: the head's, else the chosen one.
     #[must_use]
     pub fn body(&self) -> BodyVariant {

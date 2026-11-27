@@ -4,21 +4,23 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_model::{MaterialStatus, Transform};
+use p4kx_model::Transform;
 
-use crate::build::{Libraries, issue, library_key_of, materials_for};
+use crate::attached::MaterialSelection;
+use crate::build::{Libraries, Library, SelectedLibrary, issue, library_key_of, materials_for};
+use crate::build_library_name::LibrarySource;
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
-use crate::placement::bone_transform;
-use crate::{AttachedModel, Issue, IssueKind, ProvidedAttachment};
+use crate::placement;
+use crate::{AttachedModel, Geometry, Issue, IssueKind};
 
 /// Places the bone attachments of the model `loaded` of a part: each at its bone in the bind
-/// pose of the part's skeleton, offset by the attachment. A bone the skeleton lacks is an issue,
-/// and the model then sits at the part's origin.
+/// pose of the part's skeleton, or at the attachment's authored model-space coordinates.
 pub(crate) fn attached(
     draft: &Draft<'_>,
     loaded: Option<&Loaded>,
-    libraries: (&Libraries, &Arc<MaterialStatus>),
+    primary: &SelectedLibrary,
+    libraries: (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
 ) -> Vec<AttachedModel> {
@@ -28,14 +30,38 @@ pub(crate) fn attached(
     loaded
         .attachments
         .iter()
-        .map(|attachment| {
-            let key = attachment
-                .model
-                .material_library
-                .as_deref()
-                .map(|name| library_key_of(name, &attachment.entry));
-            let materials = materials_for(draft, key, libraries, reported, issues);
-            let bone = bone_transform(&loaded.model, &attachment.bone);
+        .enumerate()
+        .map(|(index, attachment)| {
+            let (materials, material_selection) = if loaded.rig_only && index == 0 {
+                let selection = if primary
+                    .source
+                    .is_some_and(LibrarySource::uses_model_material)
+                {
+                    MaterialSelection::Attachment
+                } else {
+                    let authored = draft
+                        .geometry
+                        .filter(|_| draft.library.is_none())
+                        .and_then(Geometry::material_field);
+                    MaterialSelection::Entity(authored)
+                };
+                (Arc::clone(&primary.materials), selection)
+            } else {
+                let key = attachment
+                    .model
+                    .material_library
+                    .as_deref()
+                    .map(|name| library_key_of(name, &attachment.entry));
+                let materials = materials_for(draft, key, libraries, reported, issues);
+                (materials, MaterialSelection::Attachment)
+            };
+            let bone = placement::bone_placement(&loaded.model, &attachment.bone);
+            let bind = bone.map_or(Transform::IDENTITY, |bone| bone.transform);
+            let transform = attachment.pose_selection.in_model_space(
+                attachment.position,
+                attachment.rotation,
+                &bind,
+            );
             if bone.is_none() {
                 let helper = attachment.bone.clone();
                 issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
@@ -43,22 +69,18 @@ pub(crate) fn attached(
             AttachedModel {
                 name: attachment.name.clone(),
                 bone: attachment.bone.clone(),
-                local: bone
-                    .unwrap_or(Transform::IDENTITY)
-                    .then(&offset_of(attachment)),
+                local: transform.unwrap_or(bind),
                 found: bone.is_some(),
+                bone_selection: bone.map(|bone| bone.selection),
+                cdf_sources: attachment.cdf_sources.clone(),
+                placed_pose: transform.map(|_| attachment.pose_selection),
                 entry: attachment.entry.clone(),
                 model: Arc::clone(&attachment.model),
+                archive_sources: Arc::clone(&attachment.archive_sources),
+                definition_origin: loaded.definition_origin.clone(),
                 materials,
+                material_selection,
             }
         })
         .collect()
-}
-
-/// Returns the transform of the attachment's own position and rotation; the reader of the
-/// definition lets only finite values and a rotation with length through.
-fn offset_of(attachment: &ProvidedAttachment) -> Transform {
-    let [w, x, y, z] = attachment.rotation.map(f64::from);
-    Transform::from_quaternion([w, x, y, z], attachment.position.map(f64::from))
-        .unwrap_or(Transform::IDENTITY)
 }

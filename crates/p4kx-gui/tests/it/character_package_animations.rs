@@ -11,6 +11,7 @@ use egui_kittest::kittest::Queryable;
 use p4kx_gui::{AssemblyExportForm, CharacterExportStatus, Language};
 use p4kx_settings::AssemblyExportSettings;
 use p4kx_testkit::{TestAnimation, TestEntry, TestSkeleton, TestTrack};
+use serde_json::Value;
 
 use crate::character_export_window::compose;
 use crate::characters::{TestResult, Window, entries, opened_sized, wait_until};
@@ -58,20 +59,88 @@ fn start(window: &mut Window, folder: &Path, animations: bool) -> Result<bool, &
     Ok(model.submit_character_export(|| {}))
 }
 
-fn clip_names(folder: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(folder.join("scene.json"))?)?;
-    Ok(manifest
+fn read_manifest(folder: &Path) -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_slice(&std::fs::read(
+        folder.join("scene.json"),
+    )?)?)
+}
+
+fn clip_names(manifest: &Value) -> Vec<&str> {
+    manifest
         .pointer("/meshes/0/rig/animations")
-        .and_then(serde_json::Value::as_array)
-        .map(|clips| {
+        .and_then(Value::as_array)
+        .map_or_default(|clips| {
             clips
                 .iter()
-                .filter_map(|clip| clip.get("name").and_then(serde_json::Value::as_str))
-                .map(str::to_owned)
+                .filter_map(|clip| clip.get("name").and_then(Value::as_str))
                 .collect()
         })
-        .unwrap_or_default())
+}
+
+fn assert_nod_origin(manifest: &Value) -> TestResult {
+    assert_eq!(
+        manifest.get("version").and_then(Value::as_str),
+        Some("1.25"),
+        "an Archive clip contributes addressed scene evidence"
+    );
+    let scene = manifest
+        .get("scene_provenance")
+        .ok_or("GUI package scene evidence")?;
+    let origin = scene
+        .get("fieldOrigins")
+        .and_then(|fields| fields.get("/meshes/0/rig/animations/0/name"))
+        .ok_or("the GUI clip name has an addressed origin")?;
+    assert_eq!(
+        origin.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(true),
+        "the Archive clip name has a complete directory origin"
+    );
+    assert_eq!(
+        origin
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(false),
+        "the fixture's root directory is unencrypted"
+    );
+    let references = origin
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("clip name source references")?;
+    let [reference] = references.as_slice() else {
+        return Err("a root Archive clip name has one directory use".into());
+    };
+    assert_nod_directory_use(scene, reference)
+}
+
+fn assert_nod_directory_use(scene: &Value, reference: &Value) -> TestResult {
+    let name_use = scene
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .and_then(|rows| rows.iter().find(|row| row.get("id") == Some(reference)))
+        .ok_or("clip name use resolves in the same scene inventory")?;
+    assert_eq!(
+        name_use.get("scope").and_then(Value::as_str),
+        Some("archiveDirectoryMetadata"),
+        "the clip name consumes the observed directory entry"
+    );
+    assert_eq!(
+        name_use.pointer("/location/field").and_then(Value::as_str),
+        Some("path"),
+        "the name is derived from the original path"
+    );
+    let source_id = name_use.get("source").ok_or("clip directory source id")?;
+    let source = scene
+        .pointer("/sourceInventory/sources")
+        .and_then(Value::as_array)
+        .and_then(|rows| rows.iter().find(|row| row.get("id") == Some(source_id)))
+        .ok_or("clip source resolves in the same scene inventory")?;
+    let expected_path = format!("{CLIP_FOLDER}\\nod.caf");
+    assert_eq!(
+        source.pointer("/path/value").and_then(Value::as_str),
+        Some(expected_path.as_str()),
+        "the GUI package binds the selected nod clip's physical CAF"
+    );
+    Ok(())
 }
 
 #[test]
@@ -112,12 +181,13 @@ fn all_is_the_default_and_the_package_carries_the_clips_of_the_animation_folders
     };
     let package = summary.package().ok_or("no package")?;
     assert_eq!(package.animations(), 1, "{package:?}");
-    let names = clip_names(&folder)?;
+    let manifest = read_manifest(&folder)?;
+    let names = clip_names(&manifest);
     assert!(
         names.iter().any(|name| name.contains("nod")),
         "the clip is in the manifest: {names:?}"
     );
-    Ok(())
+    assert_nod_origin(&manifest)
 }
 
 #[test]
@@ -139,7 +209,8 @@ fn none_writes_a_package_without_clips() -> TestResult {
         return Err(format!("not finished: {export:?}").into());
     };
     assert_eq!(summary.package().ok_or("no package")?.animations(), 0);
-    assert_eq!(clip_names(&folder)?.len(), 0, "no clip in the manifest");
+    let manifest = read_manifest(&folder)?;
+    assert_eq!(clip_names(&manifest).len(), 0, "no clip in the manifest");
     Ok(())
 }
 

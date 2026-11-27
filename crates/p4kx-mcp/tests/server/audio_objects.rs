@@ -7,9 +7,10 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use crate::audio::serve;
-use crate::support::{Install, TestResult};
+use crate::support::{Install, Server, TestResult};
 
 const BANK: &str = "Data/Sounds/wwise/Music.bnk";
+const OBJECT_ORDER: [u64; 8] = [10, 11, 12, 14, 15, 19, 16, 17];
 
 fn install() -> TestResult<Install> {
     let bank = TestBank::new(0xD155_6D49)
@@ -31,7 +32,7 @@ fn install() -> TestResult<Install> {
         ))
         .object(TestHircObject::sound(15, 100, 2, 4096))
         .object(TestHircObject::event(19, &[20]))
-        .object(TestHircObject::raw(7, 16, [0; 8]))
+        .object(TestHircObject::raw(0xFE, 16, [0; 8]))
         .object(TestHircObject::raw(2, 17, [0; 3]))
         .bytes();
     let newer = TestBank::new(2)
@@ -55,18 +56,19 @@ fn objects_of_a_newer_bank_version_are_listed_as_unsupported() -> TestResult {
     )?;
     assert_eq!(
         result["layouts"],
-        json!({ "decoded": 0, "undecoded": 1, "unsupported": 1, "malformed": 0 }),
+        json!({ "decoded": 0, "undecoded": 0, "unsupported": 2, "malformed": 0 }),
         "counted"
     );
-    assert_eq!(result["objects"][0]["status"], "unsupported", "listed");
+    assert_eq!(result["objects"][0]["status"], "unsupported", "Event");
+    assert_eq!(result["objects"][1]["type"], "actor-mixer");
+    assert_eq!(result["objects"][1]["status"], "unsupported", "ActorMixer");
     Ok(())
 }
 
 fn ids(result: &Value) -> Vec<u64> {
     result["objects"]
         .as_array()
-        .map(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
-        .unwrap_or_default()
+        .map_or_default(|objects| object_ids(objects))
 }
 
 #[test]
@@ -88,25 +90,92 @@ fn a_soundbank_lists_all_its_objects_in_bank_order_with_the_layout_counts() -> T
         json!({ "decoded": 6, "undecoded": 1, "unsupported": 0, "malformed": 1 }),
         "undecoded and malformed objects are counted"
     );
-    assert_eq!(ids(&result), [10, 11, 12, 14, 15, 19, 16, 17], "bank order");
-    assert_eq!(result["next_cursor"], Value::Null, "one page");
-    let statuses: Vec<&str> = result["objects"]
-        .as_array()
-        .ok_or("objects")?
+    let objects = collect_pages(&mut server, result, json!({ "soundbank": BANK }))?;
+    assert_eq!(
+        object_ids(&objects),
+        OBJECT_ORDER,
+        "bank order across byte-bounded pages"
+    );
+    let statuses: Vec<_> = objects
         .iter()
         .filter_map(|object| object["status"].as_str())
         .collect();
-    assert_eq!(statuses.len(), 8, "every object, undecoded ones too");
     assert_eq!(
-        statuses[6..],
-        ["undecoded", "malformed"],
-        "listed, not skipped"
+        statuses.len(),
+        OBJECT_ORDER.len(),
+        "every original object has a status"
+    );
+    assert_eq!(
+        statuses.get(6..),
+        Some(["undecoded", "malformed"].as_slice()),
+        "undecoded and malformed objects remain in bank order",
     );
     assert!(
-        result["objects"][7]["error"].is_string(),
-        "why it is malformed"
+        objects
+            .last()
+            .and_then(|object| object["error"].as_str())
+            .is_some(),
+        "the final malformed object has its error",
     );
     Ok(())
+}
+
+fn object_ids(objects: &[Value]) -> Vec<u64> {
+    objects
+        .iter()
+        .filter_map(|object| object["id"].as_u64())
+        .collect()
+}
+
+fn collect_pages(
+    server: &mut Server,
+    mut page: Value,
+    mut arguments: Value,
+) -> TestResult<Vec<Value>> {
+    let header = |page: &Value| {
+        [
+            page["total"].clone(),
+            page["matched"].clone(),
+            page["layouts"].clone(),
+        ]
+    };
+    let expected = header(&page);
+    let matched = page
+        .get("matched")
+        .and_then(Value::as_u64)
+        .ok_or("matched count")?;
+    let matched = usize::try_from(matched)?;
+    let mut objects: Vec<Value> = Vec::new();
+    loop {
+        assert_eq!(
+            header(&page),
+            expected,
+            "continuation retains the bank and filter counters"
+        );
+        let batch = page
+            .get_mut("objects")
+            .and_then(Value::as_array_mut)
+            .ok_or("objects")?;
+        let progressed = !batch.is_empty();
+        objects.append(batch);
+        let cursor = match page.get("next_cursor") {
+            Some(Value::String(cursor)) => cursor,
+            None | Some(Value::Null) => {
+                assert_eq!(objects.len(), matched, "complete original selection");
+                return Ok(objects);
+            }
+            Some(_) => return Err("unexpected continuation cursor type".into()),
+        };
+        assert!(
+            progressed && objects.len() < matched,
+            "each continuation adds whole original objects"
+        );
+        arguments
+            .as_object_mut()
+            .ok_or("listing arguments")?
+            .insert("cursor".to_owned(), json!(cursor));
+        page = server.ok("list_soundbank_objects", &arguments)?;
+    }
 }
 
 #[test]
@@ -189,11 +258,14 @@ fn pages_continue_with_the_cursor_and_the_limit_is_bounded() -> TestResult {
     )?;
     assert_eq!(ids(&third), [16, 17], "the last page");
     assert_eq!(third["next_cursor"], Value::Null, "no further page");
-    let huge = server.ok(
-        "list_soundbank_objects",
-        &json!({ "soundbank": BANK, "limit": 4_000_000_000_u64 }),
-    )?;
-    assert_eq!(ids(&huge).len(), 8, "a huge limit is lowered, not refused");
+    let arguments = json!({ "soundbank": BANK, "limit": 4_000_000_000_u64 });
+    let huge = server.ok("list_soundbank_objects", &arguments)?;
+    let objects = collect_pages(&mut server, huge, arguments)?;
+    assert_eq!(
+        object_ids(&objects),
+        OBJECT_ORDER,
+        "a large requested limit still enumerates the full bank"
+    );
     let other = server.error(
         "list_soundbank_objects",
         &json!({ "soundbank": BANK, "type": "sound", "cursor": cursor }),

@@ -145,6 +145,7 @@ impl UiTab {
                     serial: self.serial,
                     source: key.source,
                     image: Arc::new(built.image),
+                    origins: built.origins,
                     report: built.report,
                     contents: built.contents,
                 });
@@ -154,6 +155,7 @@ impl UiTab {
                 self.rendering.shown = None;
                 self.rendering.failure = Some(match failure {
                     Fail::ArchiveChanged => UiRenderFailure::ArchiveChanged,
+                    Fail::Protected(error) => UiRenderFailure::Failed(Some(error.to_string())),
                     Fail::Stopped => UiRenderFailure::Failed(None),
                     Fail::Reason(reason) if reason.is_empty() => UiRenderFailure::Failed(None),
                     Fail::Reason(reason) => UiRenderFailure::Failed(Some(reason)),

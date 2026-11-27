@@ -29,7 +29,8 @@ pub(crate) enum BnkAction {
     /// summary. Prints the structure only; it does not resolve triggers or render playback.
     #[command(after_help = EXIT_CODES_HELP)]
     Objects(BnkObjectsArgs),
-    /// Writes every WEM a soundbank embeds into a folder as <ID>.wem, or converted as <ID>.wav or <ID>.ogg.
+    /// Writes every WEM a soundbank embeds into a folder as `<ID>.wem`, or converted as `<ID>.wav`
+    /// or `<ID>.ogg`.
     #[command(after_help = EXIT_CODES_HELP)]
     Extract {
         /// The soundbank.

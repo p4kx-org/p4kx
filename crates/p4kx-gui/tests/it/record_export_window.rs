@@ -6,17 +6,21 @@
 use crate::exporting;
 use crate::waiting::RunQuiet;
 
+use std::ffi::OsStr;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use exporting::{
-    TestResult, database, ended, files_below, many, opened, opened_with, select_node, wait_until,
+    TestResult, database, ended, files_below, many, opened, opened_with, opened_with_key,
+    select_node, wait_until,
 };
-use p4kx_gui::{Language, Model, RecordExport, RecordExportStatus, ui};
-use p4kx_testkit::{ArchiveBuilder, TestEntry};
+use p4kx_gui::{
+    Language, Model, RecordExport, RecordExportStatus, RecordExportSummary, TargetKind, ui,
+};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use tempfile::TempDir;
 
 fn harness(model: Model) -> Harness<'static, Model> {
@@ -115,6 +119,98 @@ fn the_tree_selection_is_exported_and_summarised() -> TestResult {
 }
 
 #[test]
+fn the_record_export_count_shows_only_committed_dataforge_origins() -> TestResult {
+    let dcb = database().build();
+    let archive = ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data\\Game.dcb", dcb.clone()))
+        .entry(TestEntry::deflated("Data\\Game2.dcb", dcb).encrypted());
+    let (dir, mut model, out) = opened_with_key(&archive, Some(test_key()))?;
+    select_node(&mut model, "libs/foundry/records/entities/spaceships")?;
+    let skipped = out.join("libs/foundry/records/entities/spaceships/aegs_avenger.json");
+    fs::create_dir_all(skipped.parent().ok_or("Record folder")?)?;
+    fs::write(&skipped, b"existing bytes")?;
+    let (_dir, _, mut harness) = window((dir, model, out));
+    harness.state_mut().begin_record_export();
+    harness
+        .state_mut()
+        .record_export_setup_mut()
+        .ok_or("Record export setup")?
+        .set_kind(TargetKind::ExistingFolder);
+    assert!(
+        harness.state_mut().submit_record_export(|| {}),
+        "Record export starts through the window model"
+    );
+    wait_for_the_end(&mut harness)?;
+    assert_single_committed_definition(harness.state())?;
+    assert_eq!(
+        fs::read(&skipped)?,
+        b"existing bytes",
+        "kept output untouched"
+    );
+
+    let counts = harness.get_by_label("Records written 1, skipped 1, failed 0, cancelled 0");
+    let point = counts.rect().center();
+    harness.ctx.style_mut_of(harness.ctx.theme(), |style| {
+        style.interaction.tooltip_delay = 0.0;
+        style.interaction.show_tooltips_only_when_still = false;
+    });
+    harness.event(egui::Event::PointerMoved(point));
+    harness.run_steps(4);
+    let _written = harness.get_by_label("Records written");
+    let _origin = harness.get_by_label("Includes encrypted source data");
+    Ok(())
+}
+
+fn assert_single_committed_definition(model: &Model) -> TestResult {
+    let Some(RecordExportStatus::Finished(summary)) =
+        model.record_export().map(RecordExport::status)
+    else {
+        return Err("finished summary".into());
+    };
+    let proof = summary
+        .provenance()
+        .ok_or("Record export provenance")?
+        .map_err(ToString::to_string)?;
+    assert_eq!(
+        proof.written.contains_encrypted_source(),
+        Some(true),
+        "selected Game2.dcb"
+    );
+    assert!(
+        proof.written.source_set_complete(),
+        "physical origin of the committed Record"
+    );
+    assert_eq!(proof.inventory().source_count(), 1, "the actual DataForge");
+    let mut contributors = proof
+        .inventory()
+        .iter_uses()
+        .filter(|site| proof.written.source_uses_refs().contains(site.id()));
+    let used = contributors.next().ok_or("committed definition range")?;
+    assert!(
+        contributors.next().is_none(),
+        "only one committed definition range contributes to the counter"
+    );
+    let p4kx_extraction::SourceLocation::Subresource {
+        namespace,
+        indices,
+        field,
+    } = used.location()
+    else {
+        return Err("DataForge occurrence".into());
+    };
+    assert_eq!(
+        namespace, "dataforgeRecordTable",
+        "original DataForge definition table"
+    );
+    assert_eq!(
+        field, "committedDefinitions",
+        "only committed definitions contributed"
+    );
+    assert_eq!(indices, &[1, 2], "only the other ship was written");
+    Ok(())
+}
+
+#[test]
 fn a_typed_filter_selects_the_records_by_record_path() -> TestResult {
     let (_dir, out, mut harness) = window(opened(&database())?);
 
@@ -137,7 +233,16 @@ fn a_typed_filter_selects_the_records_by_record_path() -> TestResult {
 
     assert!(!start_ready, "no Records before a filter is typed");
     harness.get_by_label("Records written 2, skipped 0, failed 0, cancelled 0");
-    assert_eq!(files_below(&out)?.len(), 2, "both weapons as JSON");
+    assert_eq!(
+        files_below(&out)?,
+        [
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json.p4kx-origin.jsonl",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json.p4kx-origin.jsonl",
+        ],
+        "the two selected weapons and their companions"
+    );
     Ok(())
 }
 
@@ -254,15 +359,39 @@ fn an_export_cancelled_while_writing_reports_what_it_wrote() -> TestResult {
     let RecordExportStatus::Finished(summary) = ended(harness.state_mut())? else {
         return Err("no summary".into());
     };
-    let (written, cancelled) = (summary.written(), summary.cancelled());
-    let was_cancelled = summary.was_cancelled();
+    assert!(summary.was_cancelled(), "cancelled");
+    assert!(summary.written() > 0, "some Records were written first");
+    assert!(
+        summary.failures().is_empty(),
+        "cancellation does not report failed Records: {:?}",
+        summary.failures()
+    );
+    assert_eq!(
+        summary.written() + summary.cancelled(),
+        20000,
+        "every Record is accounted for"
+    );
+    assert_cancelled_record_files(&out, summary)?;
     harness.run_quiet();
-
-    assert!(was_cancelled, "cancelled");
-    assert!(written > 0, "some Records were written first");
-    assert_eq!(written + cancelled, 20000, "every Record is accounted for");
-    assert_eq!(files_below(&out)?.len(), written, "the files written");
     harness.get_by_label("Record export cancelled");
     harness.get_by_label(&format!("Target: {}", out.display()));
+    Ok(())
+}
+
+fn assert_cancelled_record_files(out: &Path, summary: &RecordExportSummary) -> TestResult {
+    let files = files_below(out)?;
+    let payloads = files
+        .iter()
+        .filter(|path| Path::new(path).extension() == Some(OsStr::new("json")))
+        .count();
+    let companions = summary.origin_receipts();
+    let written = summary.written();
+    assert_eq!(payloads, written, "committed payload count");
+    let other_files = files.len() - payloads;
+    assert_eq!(other_files, companions.len(), "only companions remain");
+    let all_exist = companions.iter().all(|path| path.is_file());
+    assert!(all_exist, "every reported companion exists");
+    let reported = companions.len() + summary.origin_failures().len();
+    assert!(reported >= written, "missing companions are reported");
     Ok(())
 }

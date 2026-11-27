@@ -12,13 +12,13 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
-dirs.workspace = true
-p4kx-foundation.workspace = true
+p4kx-foundation = { workspace = true, features = ["platform-folders"] }
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
+dirs.workspace = true
 tempfile.workspace = true
 
 [lints]

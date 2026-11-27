@@ -3,7 +3,10 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{EntryFailure, ExtractionReport, RecordExportReport};
+use p4kx_extraction::{
+    Entry, EntryFailure, ExtractionReport, RecordExportProvenance, RecordExportProvenanceError,
+    RecordExportReport,
+};
 
 use crate::model::describe;
 use crate::record_export::{FailedRecord, RenamedRecord};
@@ -59,13 +62,34 @@ pub struct ExtractionSummary {
     cancelled: Vec<String>,
     archive_changed: bool,
     records: Option<RecordCounts>,
+    record_written_origin: Option<Result<Box<RecordExportProvenance>, RecordExportProvenanceError>>,
     record_failures: Vec<FailedRecord>,
     records_renamed: Vec<RenamedRecord>,
     excluded_parts: usize,
     not_converted: usize,
+    merged_texture_receipts: Vec<String>,
+    file_origin_receipts: Vec<String>,
+    record_origin_failures: Vec<String>,
 }
 
 impl ExtractionSummary {
+    /// Lists the selected Entries as cancelled before a target was prepared.
+    pub(crate) fn cancelled_selection(
+        target: PathBuf,
+        entries: &[&Entry],
+        convert: bool,
+        archive_changed: bool,
+    ) -> Self {
+        let mut summary = Self::new(target, &ExtractionReport::default());
+        summary.cancelled = entries
+            .iter()
+            .map(|entry| entry.path().to_owned())
+            .collect();
+        summary.converted = convert.then_some(0);
+        summary.archive_changed = archive_changed;
+        summary
+    }
+
     /// Returns the outcome of a conversion cancelled while its input folder was read: nothing
     /// was written, and the input folder is the one thing listed as cancelled.
     pub(crate) fn cancelled_scan(target: PathBuf, input: &Path) -> Self {
@@ -75,6 +99,7 @@ impl ExtractionSummary {
     }
 
     pub(crate) fn new(target: PathBuf, report: &ExtractionReport) -> Self {
+        let file_origin_receipts = file_origin_receipts(report, &target);
         Self {
             target,
             extracted: report.extracted(),
@@ -85,16 +110,31 @@ impl ExtractionSummary {
             cancelled: report.cancelled().to_vec(),
             archive_changed: report.archive_changed(),
             records: report.records().map(RecordCounts::new),
-            record_failures: report
+            record_written_origin: report
                 .records()
-                .map(|records| records.failures().iter().map(FailedRecord::of).collect())
-                .unwrap_or_default(),
-            records_renamed: report
-                .records()
-                .map(|records| records.renamed().iter().map(RenamedRecord::of).collect())
-                .unwrap_or_default(),
+                .and_then(RecordExportReport::written_provenance)
+                .map(|origin| origin.map(|proof| Box::new(proof.clone()))),
+            record_failures: report.records().map_or_default(|records| {
+                records.failures().iter().map(FailedRecord::of).collect()
+            }),
+            records_renamed: report.records().map_or_default(|records| {
+                records.renamed().iter().map(RenamedRecord::of).collect()
+            }),
             excluded_parts: 0,
             not_converted: report.not_converted(),
+            merged_texture_receipts: report
+                .merged_texture_artifacts()
+                .iter()
+                .map(|artifact| artifact.origin_receipt.clone())
+                .collect(),
+            file_origin_receipts,
+            record_origin_failures: report.records().map_or_default(|records| {
+                records
+                    .origin_failures()
+                    .iter()
+                    .map(|error| describe(error))
+                    .collect()
+            }),
         }
     }
 
@@ -149,6 +189,16 @@ impl ExtractionSummary {
         self.records
     }
 
+    /// Returns the original definition evidence for the converted Record count.
+    #[must_use]
+    pub fn record_written_origin(
+        &self,
+    ) -> Option<Result<&RecordExportProvenance, RecordExportProvenanceError>> {
+        self.record_written_origin
+            .as_ref()
+            .map(|origin| origin.as_deref().map_err(|error| *error))
+    }
+
     /// Returns the Records of the DataForge Entry that were not written, with the reason.
     #[must_use]
     pub fn record_failures(&self) -> &[FailedRecord] {
@@ -182,10 +232,55 @@ impl ExtractionSummary {
         self.not_converted
     }
 
+    /// Borrows the relative companions for extracted files, CryXml, audio and Record XML.
+    #[must_use]
+    pub fn file_origin_receipts(&self) -> &[String] {
+        &self.file_origin_receipts
+    }
+
+    /// Borrows the failures publishing companions for committed Record XML files.
+    #[must_use]
+    pub fn record_origin_failures(&self) -> &[String] {
+        &self.record_origin_failures
+    }
+
+    pub(crate) fn merged_texture_receipts(&self) -> &[String] {
+        &self.merged_texture_receipts
+    }
+
     pub(crate) const fn with_excluded_parts(mut self, excluded_parts: usize) -> Self {
         self.excluded_parts = excluded_parts;
         self
     }
+}
+
+fn file_origin_receipts(report: &ExtractionReport, target: &Path) -> Vec<String> {
+    let mut receipts: Vec<String> = report
+        .raw_artifacts()
+        .iter()
+        .chain(report.cryxml_artifacts())
+        .filter_map(|artifact| artifact.origin_receipt.as_ref())
+        .chain(
+            report
+                .sound_artifacts()
+                .iter()
+                .map(|artifact| &artifact.origin_receipt),
+        )
+        .cloned()
+        .collect();
+    if let Some(records) = report.records()
+        && !records.origin_receipts().is_empty()
+    {
+        let root = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
+        receipts.extend(records.origin_receipts().iter().map(|receipt| {
+            receipt
+                .strip_prefix(&root)
+                .unwrap_or(receipt)
+                .to_string_lossy()
+                .replace('\\', "/")
+        }));
+    }
+    receipts
 }
 
 fn failed_entries(failures: &[EntryFailure]) -> Vec<FailedEntry> {

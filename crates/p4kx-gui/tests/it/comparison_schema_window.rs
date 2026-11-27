@@ -110,6 +110,7 @@ fn the_schema_tab_lists_the_structs_properties_and_enums_that_differ() -> TestRe
     );
     for row in [
         "Removed: Struct Legacy",
+        "Removed: Property flag",
         "Changed: Struct Probe",
         "Changed: Property level",
         "Added: Property tag",
@@ -125,9 +126,9 @@ fn the_schema_tab_lists_the_structs_properties_and_enums_that_differ() -> TestRe
     );
     assert!(
         harness
-            .query_by_label("Properties: 1 added, 0 removed, 1 changed")
+            .query_by_label("Properties: 1 added, 1 removed, 1 changed")
             .is_some(),
-        "the properties are counted"
+        "the added, removed and changed properties are counted"
     );
     Ok(())
 }

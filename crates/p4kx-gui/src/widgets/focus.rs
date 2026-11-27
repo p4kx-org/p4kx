@@ -4,12 +4,12 @@
 use egui::{Color32, CornerRadius, Rect, Stroke, StrokeKind, Ui};
 
 use crate::theme::desktop::FOCUS_WIDTH;
-use crate::theme::tokens::RADIUS_SM_POINTS;
+use crate::theme::tokens::RADIUS_CONTROL_POINTS;
 
-/// Paints the 2 point focus ring `offset` outside `rect`, following the `radius-sm` corner of
+/// Paints the 2 point focus ring `offset` outside `rect`, following the `radius-control` corner of
 /// the control; a negative offset draws it inside.
 pub(crate) fn focus_ring(ui: &Ui, rect: Rect, colour: Color32, offset: f32) {
-    focus_ring_rounded(ui, rect, colour, offset, RADIUS_SM_POINTS);
+    focus_ring_rounded(ui, rect, colour, offset, RADIUS_CONTROL_POINTS);
 }
 
 /// Paints the 2 point focus ring like [`focus_ring`] with square corners, for rows, tabs, links
@@ -51,13 +51,18 @@ mod tests {
     use super::ring_radius;
     use crate::theme::desktop::{CHECKBOX_RADIUS, FOCUS_OFFSET, FOCUS_WIDTH};
     use crate::theme::palette;
+    use crate::theme::tokens::RADIUS_CONTROL_POINTS;
     use crate::widgets::text::link;
     use crate::widgets::toggle::{checkbox, radio};
 
     #[test]
     fn a_ring_corner_grows_by_the_offset_and_a_square_corner_stays_square() {
         assert_eq!(ring_radius(CHECKBOX_RADIUS, FOCUS_OFFSET), 4, "checkbox");
-        assert_eq!(ring_radius(4, FOCUS_OFFSET), 6, "radius-sm control");
+        assert_eq!(
+            ring_radius(RADIUS_CONTROL_POINTS, FOCUS_OFFSET),
+            8,
+            "control focus ring follows its radius"
+        );
         assert_eq!(ring_radius(0, FOCUS_OFFSET), 0, "square");
         assert_eq!(ring_radius(3, -3.0), 0, "inside ring cannot go negative");
     }

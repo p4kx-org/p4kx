@@ -116,6 +116,8 @@ pub enum ExtractionText {
     /// The counts of the Records written for the DataForge Entry; takes `written`, `skipped`,
     /// `failed`, `cancelled`, `errors` and `erroneous`.
     SummaryRecords,
+    /// The written Record count could not be bound; takes `reason`.
+    SummaryRecordCountOriginFailed,
     /// The target folder; takes `path`.
     SummaryTarget,
     /// The heading of the failed Entries; takes `number`.
@@ -126,6 +128,10 @@ pub enum ExtractionText {
     SummaryCancelled,
     /// The heading of the textures and sounds that were not converted; takes `number`.
     SummaryUnconverted,
+    /// The list of published origin companions for merged DDS textures.
+    SummaryTextureReceipts,
+    /// The heading of published companions for extracted files and converted XML or audio.
+    SummaryFileOriginReceipts,
     /// One failed Entry; takes `path` and `reason`.
     SummaryFailure,
     /// The heading of the Records that were not written; takes `number`.
@@ -142,7 +148,7 @@ pub enum ExtractionText {
 
 impl ExtractionText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 65] = [
+    pub const ALL: [Self; 68] = [
         Self::ActionSelected,
         Self::ActionShown,
         Self::ActionAll,
@@ -197,11 +203,14 @@ impl ExtractionText {
         Self::SummaryCountsConverted,
         Self::SummaryExcludedParts,
         Self::SummaryRecords,
+        Self::SummaryRecordCountOriginFailed,
         Self::SummaryTarget,
         Self::SummaryFailed,
         Self::SummarySkipped,
         Self::SummaryCancelled,
         Self::SummaryUnconverted,
+        Self::SummaryTextureReceipts,
+        Self::SummaryFileOriginReceipts,
         Self::SummaryFailure,
         Self::SummaryRecordsFailed,
         Self::SummaryRecordFailure,
@@ -269,11 +278,14 @@ impl ExtractionText {
             Self::SummaryCountsConverted => "extraction-summary-counts-converted",
             Self::SummaryExcludedParts => "extraction-summary-excluded-parts",
             Self::SummaryRecords => "extraction-summary-records",
+            Self::SummaryRecordCountOriginFailed => "extraction-summary-record-count-origin-failed",
             Self::SummaryTarget => "extraction-summary-target",
             Self::SummaryFailed => "extraction-summary-failed",
             Self::SummarySkipped => "extraction-summary-skipped",
             Self::SummaryCancelled => "extraction-summary-cancelled",
             Self::SummaryUnconverted => "extraction-summary-unconverted",
+            Self::SummaryTextureReceipts => "extraction-summary-texture-receipts",
+            Self::SummaryFileOriginReceipts => "extraction-summary-file-origin-receipts",
             Self::SummaryFailure => "extraction-summary-failure",
             Self::SummaryRecordsFailed => "extraction-summary-records-failed",
             Self::SummaryRecordFailure => "extraction-summary-record-failure",

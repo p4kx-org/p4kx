@@ -11,6 +11,8 @@ pub const MAX_LISTED_CHUNKS: usize = 200;
 /// The most animations an export summary lists by name; the count covers all of them.
 pub const MAX_LISTED_ANIMATIONS: usize = 200;
 
+const LISTED_MATERIAL_IDS: usize = 24;
+
 static SERIAL: AtomicU64 = AtomicU64::new(1);
 
 /// One level of detail of a model.
@@ -48,6 +50,8 @@ pub enum ChunkFile {
     Geometry,
     /// The geometry companion of a level of detail from 1 on.
     LodGeometry(u32),
+    /// The model file of a level of detail from 1 on, read for its skeleton.
+    LodModel(u32),
 }
 
 /// A chunk the model did not read.
@@ -131,16 +135,12 @@ impl ModelInfo {
     #[must_use]
     pub fn of(model: &Model) -> Self {
         let mut chunks = ChunkCounts::default();
-        let mut unread = Vec::new();
         for chunk in &model.chunks {
             chunks.total += 1;
             match chunk.usage {
                 ChunkUsage::Read => chunks.read += 1,
                 ChunkUsage::Skipped => chunks.skipped += 1,
                 ChunkUsage::Unknown => chunks.unknown += 1,
-            }
-            if chunk.usage != ChunkUsage::Read && unread.len() < MAX_LISTED_CHUNKS {
-                unread.push(note(chunk));
             }
         }
         Self {
@@ -149,7 +149,7 @@ impl ModelInfo {
             geometry: model.geometry.as_deref().map(printable),
             nodes: model.nodes.len(),
             chunks,
-            unread,
+            unread: listed_chunks(model).map(|(_, chunk)| note(chunk)).collect(),
             lods: model
                 .lods
                 .iter()
@@ -182,6 +182,12 @@ impl ModelInfo {
         self.serial
     }
 
+    pub(crate) fn listed_material_ids(&self) -> &[u16] {
+        self.material_ids
+            .get(..LISTED_MATERIAL_IDS)
+            .unwrap_or(&self.material_ids)
+    }
+
     /// Returns the number of meshes of the most detailed level.
     #[must_use]
     pub fn meshes(&self) -> usize {
@@ -204,10 +210,20 @@ pub(crate) fn printable(text: &str) -> String {
         .collect()
 }
 
+pub(crate) fn listed_chunks(model: &Model) -> impl Iterator<Item = (usize, &ModelChunk)> {
+    model
+        .chunks
+        .iter()
+        .enumerate()
+        .filter(|(_, chunk)| chunk.usage != ChunkUsage::Read)
+        .take(MAX_LISTED_CHUNKS)
+}
+
 fn note(chunk: &ModelChunk) -> ChunkNote {
     ChunkNote {
         file: match chunk.file {
             ModelFile::LodGeometry(level) => ChunkFile::LodGeometry(level),
+            ModelFile::LodModel(level) => ChunkFile::LodModel(level),
             ModelFile::Geometry => ChunkFile::Geometry,
             _ => ChunkFile::Model,
         },
@@ -232,7 +248,11 @@ fn materials(status: &MaterialStatus) -> MaterialsInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::printable;
+    use p4kx_extraction::chunks::ChunkFile as SourceChunkFile;
+    use p4kx_extraction::model::{CompanionError, CompanionPath, Model};
+    use p4kx_testkit::TestModel;
+
+    use super::{ChunkFile, ModelInfo, printable};
 
     #[test]
     fn control_and_bidirectional_characters_of_an_untrusted_name_are_replaced() {
@@ -242,5 +262,37 @@ mod tests {
             "replaced"
         );
         assert_eq!(printable("objects/ship"), "objects/ship", "plain stays");
+    }
+
+    #[test]
+    fn a_level_model_chunk_is_not_attributed_to_the_root_file()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const UNKNOWN_CHUNK: u32 = 0xDEAD_BEEF;
+        let fixture = TestModel::two_bone_skin()
+            .with_lod(TestModel::two_bone_skin().with_chunk(UNKNOWN_CHUNK, [7, 8, 9]));
+        let source = SourceChunkFile::parse(fixture.cgf())?;
+        let mut companions = |path: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> {
+            Ok(match path {
+                CompanionPath::Sibling("skin.skinm") => Some(fixture.cgfm()),
+                CompanionPath::Sibling("skin_lod1.skinm") => fixture.lod_cgfm(1),
+                CompanionPath::Sibling("skin_lod1.skin") => fixture.lod_cgf(1),
+                _ => None,
+            })
+        };
+        let model = Model::read("skin.skin", &source, &mut companions)?;
+        let info = ModelInfo::of(&model);
+        let note = info
+            .unread
+            .iter()
+            .find(|note| note.type_id == "0xDEADBEEF")
+            .ok_or("level model chunk note")?;
+        assert_eq!(
+            note.file,
+            ChunkFile::LodModel(1),
+            "actual level-file ownership survives the GUI projection"
+        );
+        assert!(note.unknown, "unknown source disposition is retained");
+        assert_eq!(info.lods.len(), 2, "existing model levels are unchanged");
+        Ok(())
     }
 }

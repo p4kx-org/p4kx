@@ -7,10 +7,22 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use p4kx_dataforge::Guid;
 
 use super::Rest;
+use crate::report::ContentOmissionCode;
 use crate::style::GeometryModifiers;
 
 pub(super) const PARAMETER: &str = "ParamInput";
 pub(super) const STATE_TAG: &str = "StateTag";
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BindingOmission {
+    pub(crate) operation: usize,
+    pub(crate) variable: Option<usize>,
+    pub(crate) widget: usize,
+    pub(crate) field: String,
+    pub(crate) source: Option<String>,
+    pub(crate) code: ContentOmissionCode,
+    pub(crate) detail: Option<String>,
+}
 
 /// What the `operations` of one canvas give its widgets at rest, for the parameters its
 /// `WidgetCanvas` hands it.
@@ -26,12 +38,10 @@ pub(crate) struct AtRest {
     pub(super) text_bound: HashSet<usize>,
     pub(super) state_tags: HashMap<usize, Vec<Guid>>,
     pub(super) geometry: HashMap<usize, GeometryModifiers>,
-    pub(super) left_out: Vec<(usize, String)>,
-    pub(super) unknown: Vec<(usize, String, String)>,
+    pub(super) omissions: Vec<BindingOmission>,
 }
 
-/// Returns whether two typed parameters are the same one: parameters of different kinds, a
-/// boolean and a number, have their own names even where the text of the name is equal.
+/// Returns whether the two parameters have the same name and value kind.
 pub(crate) fn same_parameter(name: &str, value: &Rest, other: &str, other_value: &Rest) -> bool {
     name == other && std::mem::discriminant(value) == std::mem::discriminant(other_value)
 }
@@ -52,13 +62,19 @@ pub(crate) fn key_of(inputs: &[(String, Rest)], texts: &[(String, String)]) -> u
             Rest::Num(number) => (1_u8, number.to_bits()).hash(&mut hasher),
             Rest::Text(text) => (2_u8, text).hash(&mut hasher),
             Rest::Tag(tag) => (3_u8, tag).hash(&mut hasher),
+            Rest::Integer(number) => (4_u8, number.to_bits()).hash(&mut hasher),
         }
     }
     hasher.finish().max(1)
 }
 
 impl AtRest {
-    pub(super) fn set(&mut self, widget: usize, field: &str, value: Rest) {
+    pub(super) fn set(
+        &mut self,
+        widget: usize,
+        field: &str,
+        value: Rest,
+    ) -> Result<(), &'static str> {
         match (field, value) {
             ("Instantiated", Rest::Bool(flag)) => {
                 self.instantiated.insert(widget, flag);
@@ -74,6 +90,8 @@ impl AtRest {
                 let alpha = number.clamp(0.0, 1.0) as f32;
                 self.alpha.insert(widget, alpha);
             }
+            ("Instantiated" | "IsActive", _) => return Err("a value that is not a boolean"),
+            ("Alpha", _) => return Err("a value that is not a number"),
             (field, Rest::Num(number)) if GeometryModifiers::has_field(field) => {
                 #[expect(
                     clippy::cast_possible_truncation,
@@ -92,6 +110,7 @@ impl AtRest {
             }
             _ => {}
         }
+        Ok(())
     }
 
     /// Sets the localised parameter `parameter` that widget `widget` hands to its canvas.
@@ -166,13 +185,8 @@ impl AtRest {
         self.state_tags.get(&widget).map_or(&[], Vec::as_slice)
     }
 
-    /// Returns the bindings of fields that are not evaluated: widget and field.
-    pub(crate) fn left_out(&self) -> &[(usize, String)] {
-        &self.left_out
-    }
-
-    /// Returns the bindings whose inputs could not be evaluated: widget, field and why.
-    pub(crate) fn unknown(&self) -> &[(usize, String, String)] {
-        &self.unknown
+    /// Returns the bindings of fields or inputs that were not evaluated.
+    pub(crate) fn omissions(&self) -> &[BindingOmission] {
+        &self.omissions
     }
 }

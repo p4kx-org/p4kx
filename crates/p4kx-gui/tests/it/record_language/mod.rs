@@ -6,5 +6,6 @@
 
 mod edges;
 mod fixtures;
+mod origins;
 mod switching;
 mod window;

@@ -6,12 +6,14 @@ use std::collections::{BTreeMap, HashMap};
 use gltf_json as json;
 use json::{Index, Root};
 use p4kx_model::{Animation, Lod, Model, Transform};
+use serde_json::Value;
 
-use crate::layout::Layout;
+use crate::factory_bow_reflectance;
+use crate::layout::{Layout, MaterialUse};
 use crate::materials::{MaterialPlan, MaterialTextures, Slot, build_material, display_name};
 use crate::scene_light::SceneLight;
 use crate::scene_rig::SceneRig;
-use crate::texture_plan::TextureSet;
+use crate::texture_plan::{SlotImages, TextureSet};
 
 /// A glTF node of the scene that holds no model of its own.
 pub(crate) struct Wrapper<'m> {
@@ -40,85 +42,97 @@ pub(crate) struct Content<'a, 'm> {
     pub(crate) instances: &'a [Instance<'m>],
     pub(crate) rig: Option<&'a SceneRig<'m>>,
     pub(crate) animations: &'a [&'m Animation],
+    pub(crate) asset_extras: Option<&'a Value>,
 }
 
-pub(crate) type MaterialIds = BTreeMap<u16, Index<json::Material>>;
+pub(crate) type MaterialIds = BTreeMap<MaterialUse, Index<json::Material>>;
 
-/// Pushes the glTF materials of every instance, one per distinct material, and returns the glTF
-/// material of each material ID per instance. Equal materials of different instances are pushed
-/// once.
+/// Pushes the materials of every instance and returns their indices and the number shared.
 pub(crate) fn materials(
     root: &mut Root,
     layout: &Layout<'_>,
     instances: &[Instance<'_>],
     textures: &TextureSet,
     image_textures: &[Index<json::Texture>],
-) -> Vec<MaterialIds> {
-    let mut shared: HashMap<String, Index<json::Material>> = HashMap::new();
-    instances
+) -> (Vec<MaterialIds>, usize) {
+    let mut shared: HashMap<(String, bool), Index<json::Material>> = HashMap::new();
+    let mut requests = 0_usize;
+    let ids = instances
         .iter()
         .enumerate()
         .map(|(part, instance)| {
-            let mut pushed: BTreeMap<Slot, Index<json::Material>> = BTreeMap::new();
+            let mut pushed: BTreeMap<(Slot, bool), Index<json::Material>> = BTreeMap::new();
             let mut by_id = MaterialIds::new();
             if instance.twin.is_some() {
                 return by_id;
             }
-            for id in layout.part_material_ids(part) {
-                let Some(slot) = instance.plan.slot(id) else {
+            for usage in layout.part_materials(part) {
+                let Some(slot) = instance.plan.slot(usage.id) else {
                     continue;
                 };
-                let index = if let Some(&index) = pushed.get(&slot) {
+                let images = if usage.has_uvs {
+                    textures.of(part, slot)
+                } else {
+                    SlotImages::default()
+                };
+                let has_images = images.base.is_some()
+                    || images.normal.is_some()
+                    || images.metallic_roughness.is_some()
+                    || images.specular_colour.is_some();
+                let key = (slot, has_images);
+                let index = if let Some(&index) = pushed.get(&key) {
                     index
                 } else {
-                    let built = built_material(instance, (part, slot), textures, image_textures);
+                    requests += 1;
+                    let built = built_material(instance, slot, images, image_textures);
                     let index = if instances.len() > 1 {
-                        push_shared(root, &mut shared, built)
+                        let physical =
+                            slot == Slot::Default && instance.plan.has_physical_fallback();
+                        push_shared(root, &mut shared, built, physical)
                     } else {
                         root.push(built)
                     };
-                    pushed.insert(slot, index);
+                    pushed.insert(key, index);
                     index
                 };
-                by_id.insert(id, index);
+                by_id.insert(usage, index);
             }
             by_id
         })
-        .collect()
+        .collect();
+    declare_material_extensions(root);
+    (ids, requests.saturating_sub(root.materials.len()))
 }
 
-/// Returns how many materials the instances ask for: one per distinct material slot of each
-/// instance that plans meshes of its own.
-pub(crate) fn material_requests(layout: &Layout<'_>, instances: &[Instance<'_>]) -> usize {
-    instances
-        .iter()
-        .enumerate()
-        .filter(|(_, instance)| instance.twin.is_none())
-        .map(|(part, instance)| {
-            let mut slots: Vec<Slot> = Vec::new();
-            for slot in layout
-                .part_material_ids(part)
-                .into_iter()
-                .filter_map(|id| instance.plan.slot(id))
-            {
-                if !slots.contains(&slot) {
-                    slots.push(slot);
-                }
-            }
-            slots.len()
-        })
-        .sum()
+fn declare_material_extensions(root: &mut Root) {
+    if root.materials.iter().any(|material| {
+        material
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.emissive_strength.is_some())
+    }) {
+        root.extensions_used
+            .push("KHR_materials_emissive_strength".to_owned());
+    }
+    if root.materials.iter().any(|material| {
+        material
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.specular.is_some())
+    }) {
+        root.extensions_used
+            .push(factory_bow_reflectance::EXTENSION.to_owned());
+    }
 }
 
 fn built_material(
     instance: &Instance<'_>,
-    (part, slot): (usize, Slot),
-    textures: &TextureSet,
+    slot: Slot,
+    images: SlotImages,
     image_textures: &[Index<json::Texture>],
 ) -> json::Material {
     let texture = |image: usize| image_textures.get(image).copied();
     let material = instance.plan.material(slot);
-    let images = textures.of(part, slot);
     let drawn_with = MaterialTextures {
         base: images
             .base
@@ -127,18 +141,20 @@ fn built_material(
         metallic_roughness: images
             .metallic_roughness
             .and_then(|packed| Some((texture(packed.image)?, packed.roughness, packed.metallic))),
+        specular_colour: images.specular_colour.and_then(texture),
     };
     build_material(material, &display_name(material, slot), &drawn_with)
 }
 
 fn push_shared(
     root: &mut Root,
-    shared: &mut HashMap<String, Index<json::Material>>,
+    shared: &mut HashMap<(String, bool), Index<json::Material>>,
     material: json::Material,
+    physical_fallback: bool,
 ) -> Index<json::Material> {
     match serde_json::to_string(&material) {
         Ok(key) => *shared
-            .entry(key)
+            .entry((key, physical_fallback))
             .or_insert_with(|| root.push(material.clone())),
         Err(_) => root.push(material),
     }

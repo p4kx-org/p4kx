@@ -99,6 +99,44 @@ fn replaces_characters_that_cannot_appear_in_names() -> TestResult {
 }
 
 #[test]
+fn writes_names_using_xml_character_ranges() -> TestResult {
+    let bytes = little(
+        &TestElement::new("\u{AA}node")
+            .attribute("a\u{AA}", "replaced")
+            .attribute("a_", "disambiguated")
+            .attribute("a\u{B7}", "preserved")
+            .child(TestElement::new("\u{200C}child\u{301}").content("value")),
+    );
+
+    let xml = unchecked_xml(&bytes)?;
+    let document = roxmltree::Document::parse(&xml)?;
+    let root = document.root_element();
+    assert_eq!(root.tag_name().name(), "_node", "invalid name start");
+    assert_eq!(
+        root.attribute("a_"),
+        Some("replaced"),
+        "invalid name character"
+    );
+    assert_eq!(
+        root.attribute("a__2"),
+        Some("disambiguated"),
+        "name collision"
+    );
+    assert_eq!(
+        root.attribute("a\u{B7}"),
+        Some("preserved"),
+        "valid name character"
+    );
+    let child = root.first_element_child().ok_or("the child is present")?;
+    assert_eq!(
+        child.tag_name().name(),
+        "\u{200C}child\u{301}",
+        "valid child name"
+    );
+    Ok(())
+}
+
+#[test]
 fn keeps_non_ascii_text() -> TestResult {
     let bytes = little(&TestElement::new("Größe").attribute("wert", "Ä€😀"));
 

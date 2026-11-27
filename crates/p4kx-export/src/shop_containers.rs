@@ -1,23 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use p4kx_extraction::{Archive, CancelToken, Entry};
-use rayon::prelude::*;
+use p4kx_extraction::{SourceUse, SourceUses};
 
 use crate::CatalogError;
-use crate::shop_container_scan::{Shops, shop_entities};
-use crate::shop_prefabs::Prefabs;
-use crate::starmap_index::key;
+use crate::catalog_read::original::AuthoredEntryPath;
+use crate::export_ledger::ExportLedger;
+use crate::shop_inventory_observations::InventoryObservations;
+use crate::shop_inventory_path::InventoryStem;
 
-const SHOPS: &str = "data\\objectcontainers\\pu\\shops\\";
-const LOC: &str = "data\\objectcontainers\\pu\\loc\\";
-const LOC_KINDS: [&str; 2] = ["shopcomm", "shopfood"];
-const SCANNED: [&str; 2] = [
-    "data\\objectcontainers\\pu\\",
-    "data\\objectcontainers\\ea\\",
-];
+#[path = "shop_classification.rs"]
+mod classification;
+pub(crate) use classification::ShopClassCells;
+use classification::{ClassEvidence, ClassSurvey};
+
+#[path = "shop_container_discovery.rs"]
+mod discovery;
+#[cfg(test)]
+use discovery::classify;
+
+#[cfg(test)]
+#[path = "shop_invalid_suffix_witness.rs"]
+mod invalid_suffix_witness;
 
 /// The kind and the brand of a shop container, from its path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,15 +66,16 @@ pub(crate) enum Component {
     /// The component is there and names no inventory file.
     NoFile,
     /// The component names this file (lower-case stem).
-    File(String),
+    File(InventoryStem),
     /// The container's components for the Entity disagree.
     Conflict,
 }
 
 #[derive(Debug, Default)]
 struct Named {
-    classes: Vec<Class>,
+    classes: ClassEvidence,
     inventories: Vec<Component>,
+    observations: InventoryObservations,
     placed: bool,
     prefab: bool,
 }
@@ -80,8 +87,8 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
     for state in states {
         match state {
             Component::File(stem) => match file {
-                Some(held) if held != stem => conflict = true,
-                _ => file = Some(stem),
+                Some(held) if held != stem.as_str() => conflict = true,
+                _ => file = Some(stem.as_str()),
             },
             Component::Conflict => conflict = true,
             Component::NotFound => not_found = true,
@@ -102,7 +109,13 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
 /// name.
 #[derive(Debug, Default)]
 pub(crate) struct Containers {
+    pub(crate) ledger: ExportLedger,
+    #[cfg(test)]
+    pub(crate) soc_findings: Vec<crate::shop_container_scan::soc_subtypes::EntryFindings>,
+    pub(crate) unattributed_declarations: bool,
     by_entity: HashMap<String, Named>,
+    class_directory: Option<SourceUse>,
+    class_complete: bool,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
     pub(crate) with_shop: usize,
@@ -114,78 +127,21 @@ pub(crate) struct Containers {
 }
 
 impl Containers {
-    /// Opens every socpak below `PU\Shops` and the `shopcomm` and `shopfood` folders below
-    /// `PU\loc`, which give kind and brand, and every other socpak below `PU` and `EA`, and reads
-    /// the `CryGUID`s of its `entitycomponentshop.xml` and the shop components of its `.soc`.
-    pub(crate) fn read(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-    ) -> Result<Self, CatalogError> {
-        let listed = listed(archive);
-        let read: Vec<Option<(Shops, usize)>> = listed
-            .par_iter()
-            .map(|(entry, _)| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return None;
-                }
-                shop_entities(archive, entry)
-            })
-            .collect();
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        let mut containers = Self::default();
-        for ((_, class), entities) in listed.into_iter().zip(read) {
-            if class.is_some() {
-                containers.listed += 1;
-            } else {
-                containers.other_scanned += 1;
-            }
-            let Some((entities, rejected)) = entities else {
-                if class.is_some() {
-                    containers.unreadable += 1;
-                } else {
-                    containers.other_unreadable += 1;
-                }
-                continue;
-            };
-            containers.rejected += rejected;
-            if !entities.is_empty() {
-                if class.is_some() {
-                    containers.with_shop += 1;
-                } else {
-                    containers.other_with_shop += 1;
-                }
-            }
-            for (entity, inventory) in entities {
-                containers.components += usize::from(inventory != Component::NotFound);
-                let named = containers.by_entity.entry(entity).or_default();
-                named.placed = true;
-                if let Some(class) = &class
-                    && !named.classes.contains(class)
-                {
-                    named.classes.push(class.clone());
-                }
-                if !named.inventories.contains(&inventory) {
-                    named.inventories.push(inventory);
-                }
-            }
-        }
-        Ok(containers)
-    }
-
-    /// Adds the inventory files the shop prefabs name as one more place per Entity.
-    pub(crate) fn add_prefabs(&mut self, prefabs: &Prefabs) {
-        for (entity, stems) in &prefabs.by_entity {
-            let named = self.by_entity.entry(entity.clone()).or_default();
+    /// Moves the declared prefab inventories into each Entity and counts ambiguous selections.
+    pub(crate) fn add_prefabs(
+        &mut self,
+        inventories: HashMap<String, Vec<InventoryStem>>,
+    ) -> Result<usize, CatalogError> {
+        let mut ambiguous = 0;
+        for (entity, stems) in inventories {
+            let named = self.by_entity.entry(entity).or_default();
             named.prefab = true;
             for stem in stems {
-                let state = Component::File(stem.clone());
-                if !named.inventories.contains(&state) {
-                    named.inventories.push(state);
-                }
+                append_inventory(&mut named.inventories, Component::File(stem))?;
             }
+            ambiguous += usize::from(matches!(verdict(&named.inventories), Inventory::Ambiguous));
         }
+        Ok(ambiguous)
     }
 
     /// Returns whether a prefab names the Entity and no container holds it.
@@ -197,15 +153,31 @@ impl Containers {
 
     /// Returns what the containers say of the Entity with the `CryGUID` `entity`, ignoring case.
     pub(crate) fn find(&self, entity: &str) -> Found<'_> {
-        match self
-            .by_entity
+        self.by_entity
             .get(&entity.to_ascii_lowercase())
-            .map(|named| named.classes.as_slice())
-        {
-            None | Some([]) => Found::Nowhere,
-            Some([class]) => Found::One(class),
-            Some(_) => Found::Mixed,
-        }
+            .map_or(Found::Nowhere, |named| named.classes.found())
+    }
+
+    pub(crate) fn class_cells(
+        &self,
+        entity: &str,
+        selector: Option<&AuthoredEntryPath>,
+        sources: &SourceUses,
+    ) -> Result<ShopClassCells, CatalogError> {
+        let empty = ClassEvidence::default();
+        let evidence = self
+            .by_entity
+            .get(entity)
+            .map_or(&empty, |named| &named.classes);
+        evidence.cells(
+            selector,
+            &ClassSurvey {
+                directory: self.class_directory.as_ref(),
+                complete: self.class_complete,
+                classified: self.listed > 0,
+            },
+            sources,
+        )
     }
 
     /// Returns the inventory file the containers name for the Entity with the `CryGUID` `entity`,
@@ -214,6 +186,31 @@ impl Containers {
         self.by_entity
             .get(&entity.to_ascii_lowercase())
             .map_or(Inventory::None, |named| verdict(&named.inventories))
+    }
+
+    pub(crate) fn inventory_observations(
+        &self,
+        entity: &str,
+    ) -> Option<(&[Component], &InventoryObservations)> {
+        self.by_entity
+            .get(entity)
+            .map(|named| (named.inventories.as_slice(), &named.observations))
+    }
+
+    pub(crate) fn inventory_selections(
+        &self,
+    ) -> Result<BTreeMap<&str, InventoryStem>, CatalogError> {
+        let mut paths: BTreeMap<&str, InventoryStem> = BTreeMap::new();
+        for state in self.by_entity.values().flat_map(|named| &named.inventories) {
+            if let Component::File(stem) = state {
+                if let Some(held) = paths.get_mut(stem.as_str()) {
+                    held.merge(stem)?;
+                } else {
+                    paths.insert(stem.as_str(), stem.clone());
+                }
+            }
+        }
+        Ok(paths)
     }
 
     /// Returns the inventory file stems any container names, ordered.
@@ -229,48 +226,15 @@ impl Containers {
     }
 }
 
-fn listed(archive: &Archive) -> Vec<(&Entry, Option<Class>)> {
-    archive
-        .entries()
-        .iter()
-        .filter_map(|entry| {
-            let path = key(entry.path());
-            let class = classify(&path);
-            (class.is_some()
-                || (path.ends_with(".socpak")
-                    && SCANNED.iter().any(|folder| path.starts_with(folder))))
-            .then_some((entry, class))
-        })
-        .collect()
-}
-
-/// Returns the kind and brand of the socpak with the normalised path `path`, `None` when it is no
-/// shop container.
-pub(crate) fn classify(path: &str) -> Option<Class> {
-    if !path.ends_with(".socpak") {
-        return None;
+fn append_inventory(states: &mut Vec<Component>, state: Component) -> Result<(), CatalogError> {
+    if let Some(held) = states.iter_mut().find(|held| **held == state) {
+        if let (Component::File(held), Component::File(incoming)) = (held, &state) {
+            held.merge(incoming)?;
+        }
+    } else {
+        states.push(state);
     }
-    if let Some(rest) = path.strip_prefix(SHOPS) {
-        let mut parts = rest.split('\\');
-        let kind = parts
-            .next()
-            .filter(|kind| !kind.is_empty() && rest.contains('\\'))?;
-        let brand = parts
-            .next()
-            .filter(|brand| !brand.is_empty() && parts.next().is_some());
-        return Some(Class {
-            kind: kind.to_owned(),
-            brand: brand.map(str::to_owned),
-        });
-    }
-    let rest = path.strip_prefix(LOC)?;
-    let mut folders: Vec<&str> = rest.split('\\').collect();
-    folders.pop();
-    let kind = folders.last().copied()?;
-    LOC_KINDS.contains(&kind).then(|| Class {
-        kind: kind.to_owned(),
-        brand: None,
-    })
+    Ok(())
 }
 
 #[cfg(test)]
@@ -278,7 +242,7 @@ mod tests {
     use super::{Component, Inventory, classify, verdict};
 
     fn file(stem: &str) -> Component {
-        Component::File(stem.to_owned())
+        Component::File(crate::shop_inventory_path::InventoryStem::accounting(stem))
     }
 
     #[test]

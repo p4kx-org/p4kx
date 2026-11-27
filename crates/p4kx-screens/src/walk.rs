@@ -12,12 +12,16 @@ use crate::canvas::{Canvas, CanvasStore};
 use crate::colour::Palette;
 use crate::context::Context;
 use crate::elements;
+use crate::flex::LayoutApproximation;
 use crate::geometry::Geometry;
 use crate::layout::{Frame, Sibling, place};
 use crate::limits::Limits;
 use crate::look::Look;
 use crate::paint::Area;
+#[cfg(test)]
+use crate::power_source_witness::Observation;
 use crate::rest::{AtRest, RestParams};
+use crate::screen_asset_inputs::WidgetInput;
 use crate::style::preset::PresetStyles;
 use crate::style::{CanvasStyles, Modifiers, StyleCache, Subject, TagPaths, Uses};
 use crate::text::Shaped;
@@ -25,6 +29,7 @@ use crate::transform::Placement;
 use crate::variables::Variable;
 use crate::walk_instance::Override;
 use crate::walk_measure::{MeasureKey, Probe};
+use crate::widget::Widget;
 
 pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) store: &'s mut CanvasStore<'a, 'f>,
@@ -45,6 +50,7 @@ pub(crate) struct Walk<'s, 'a, 'f, 't> {
     pub(crate) pending_sheet: Option<Guid>,
     pub(crate) noted: HashSet<Guid>,
     pub(crate) left_out_noted: HashSet<Guid>,
+    layout_sites: HashSet<(WidgetInput, LayoutApproximation)>,
     pub(crate) params: Vec<ParamValues>,
     pub(crate) resolved: HashMap<(Guid, usize, u64, u64, usize), Rc<Modifiers>>,
     pub(crate) shape: Uses,
@@ -92,6 +98,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
             pending_sheet: None,
             noted: HashSet::new(),
             left_out_noted: HashSet::new(),
+            layout_sites: HashSet::new(),
             params: Vec::new(),
             resolved: HashMap::new(),
             shape: Uses::default(),
@@ -129,12 +136,18 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
     ) -> Option<Sibling<'c>> {
         let widget = canvas.widgets.get(index)?;
         if !self.instantiated(index) {
+            #[cfg(test)]
+            self.trace_site(widget, position >= own, Observation::NotInstantiated);
             self.note_gone(canvas, index, widget, "Instantiated");
             return None;
         }
         let mut plan = self.plan_kids(canvas, index, widget);
         let style = self.style_of(canvas, (index, widget), (position, &plan.kids));
         if self.budget == 0 || !self.shown(index, widget, &style) {
+            #[cfg(test)]
+            if self.budget > 0 {
+                self.trace_inactive(index, widget, position >= own, style.active);
+            }
             if self.budget > 0 && style.active.is_none() {
                 self.note_gone(canvas, index, widget, "IsActive");
             }
@@ -197,7 +210,12 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
                 break;
             }
         }
-        let mut placed_all = place(frame, &siblings);
+        let mut placed_all = place(
+            frame,
+            &siblings,
+            &mut self.cx.report,
+            &mut self.layout_sites,
+        );
         placed_all.sort_by_key(|placed| siblings.get(placed.at).map_or(0, |s| s.widget.layer));
         for placed in placed_all {
             let Some(sibling) = siblings.get(placed.at) else {
@@ -265,18 +283,37 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         if elements::draws_no_background(widget) {
             look.background = None;
         }
-        elements::paint(self.cx, widget, &look, area, alpha);
+        self.paint_and_descend(canvas, sibling, &look, (area, alpha, depth));
+        if moved {
+            self.cx.painter.pop_transform();
+            self.turned = self.turned.saturating_sub(1);
+        }
+    }
+
+    fn paint_and_descend(
+        &mut self,
+        canvas: &Canvas,
+        sibling: &Sibling<'_>,
+        look: &Look<'_>,
+        (area, alpha, depth): (Area, f32, usize),
+    ) {
+        let widget = sibling.widget;
+        #[cfg(test)]
+        self.trace_begin();
+        elements::paint(self.cx, widget, look, area, alpha);
+        #[cfg(test)]
+        self.trace_painted(widget, look, alpha);
+        #[cfg(test)]
+        self.trace_site(widget, sibling.instance, Observation::LaidOut);
         let clipped = widget.overflow.clips();
         if clipped {
             self.cx.painter.push_clip(area);
         }
         self.descend(canvas, sibling, area, alpha, depth);
+        #[cfg(test)]
+        self.trace_leave();
         if clipped {
             self.cx.painter.pop_clip();
-        }
-        if moved {
-            self.cx.painter.pop_transform();
-            self.turned = self.turned.saturating_sub(1);
         }
     }
 
@@ -306,6 +343,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         let frame = Frame {
             content,
             flex: sibling.geometry.flex.as_ref(),
+            owner: Some(widget),
             centred: false,
         };
         self.siblings(
@@ -327,17 +365,8 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
                 alpha,
                 depth + 1,
             );
-        } else if elements::is_standard(&widget.type_name) {
-            self.cx.report.note(
-                &widget.type_name,
-                "the Archive has no canvas for this standard widget",
-                &widget.name,
-            );
-        } else if widget.canvas_dangling {
-            self.cx.report.missing_canvases.push(format!(
-                "{} (a reference that no Record answers)",
-                widget.name
-            ));
+        } else {
+            self.note_unavailable_canvas(widget);
         }
         if overridden {
             self.overrides.pop();
@@ -347,5 +376,25 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
         }
         self.above.pop();
         self.chain.pop();
+    }
+
+    fn note_unavailable_canvas(&mut self, widget: &Widget) {
+        if elements::is_standard(&widget.type_name) {
+            let reason = if widget
+                .button
+                .as_ref()
+                .is_some_and(|button| !button.uses_standard_canvas())
+            {
+                "the explicit button canvas is outside the standard template route"
+            } else {
+                "the Archive has no canvas for this standard widget"
+            };
+            self.cx.report.note(&widget.type_name, reason, &widget.name);
+        } else if widget.canvas.is_unreadable() {
+            self.cx.report.missing_canvases.push(format!(
+                "{} (a reference that no Record answers)",
+                widget.name
+            ));
+        }
     }
 }

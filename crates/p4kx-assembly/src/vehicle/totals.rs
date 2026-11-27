@@ -3,6 +3,11 @@
 
 use p4kx_foundation::read_text_number;
 
+#[path = "totals_field_use.rs"]
+mod field_use;
+
+pub use field_use::{VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric};
+
 use super::{ValueOrigin, VehicleImplementation, VehiclePart};
 
 /// How many values of a sum came from each [`ValueOrigin`].
@@ -251,16 +256,33 @@ impl VehicleImplementation {
     /// thresholds.
     #[must_use]
     pub fn totals(&self) -> VehicleTotals {
+        self.totals_with_field_uses(|_| {})
+    }
+
+    /// Returns the same totals while visiting the mass and hull fields of retained parts.
+    ///
+    /// Field use evidence covers the consulted fields. Aggregate membership and file selection
+    /// require their own evidence.
+    #[must_use]
+    pub fn totals_with_field_uses<'vehicle>(
+        &'vehicle self,
+        mut observe: impl FnMut(VehicleTotalFieldUse<'vehicle>),
+    ) -> VehicleTotals {
         let mut totals = VehicleTotals::default();
         for part in self.iter() {
-            add_part(&mut totals, part);
+            add_part(&mut totals, part, &mut observe);
         }
         totals
     }
 }
 
-fn add_part(totals: &mut VehicleTotals, part: &VehiclePart) {
+fn add_part<'vehicle>(
+    totals: &mut VehicleTotals,
+    part: &'vehicle VehiclePart,
+    observe: &mut impl FnMut(VehicleTotalFieldUse<'vehicle>),
+) {
     let mass = number_of(totals, part, "mass", part.mass);
+    field_use::observe_mass(part, mass.is_some(), observe);
     if let Some(mass) = mass {
         totals.mass += mass;
         totals.mass_parts = totals.mass_parts.saturating_add(1);
@@ -268,12 +290,13 @@ fn add_part(totals: &mut VehicleTotals, part: &VehiclePart) {
         note_partial(totals, part, "mass", mass);
     }
     let detach = number_of(totals, part, "detachRatio", part.detach_ratio);
-    let Some(health) = number_of(totals, part, "damageMax", part.damage_max).filter(|h| *h > 0.0)
-    else {
+    let health = number_of(totals, part, "damageMax", part.damage_max).filter(|h| *h > 0.0);
+    let in_hull = health.is_some() && counts_as_hull(part);
+    field_use::observe_hull(part, health.is_some(), in_hull, observe);
+    let Some(health) = health else {
         return;
     };
     let origin = part.origin_of("damageMax");
-    let in_hull = counts_as_hull(part);
     if in_hull {
         totals.health += health;
         totals.health_parts = totals.health_parts.saturating_add(1);

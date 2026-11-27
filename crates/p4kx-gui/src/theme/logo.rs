@@ -80,7 +80,7 @@ pub fn rgba(variant: Variant, size: u32) -> Vec<u8> {
     {
         pixmap.fill_path(
             &tile,
-            &paint(palette::CANVAS),
+            &paint(palette::BRAND_TILE),
             FillRule::Winding,
             transform,
             None,
@@ -193,7 +193,11 @@ mod tests {
     fn the_tile_is_canvas_with_transparent_corners_and_the_drawing_in_theme_colours() {
         let data = rgba(Variant::Tile, 130);
 
-        assert_eq!(pixel(&data, 130, 65, 10), colour(palette::CANVAS), "canvas");
+        assert_eq!(
+            pixel(&data, 130, 65, 10),
+            colour(palette::BRAND_TILE),
+            "brand tile"
+        );
         assert_eq!(pixel(&data, 130, 0, 0)[3], 0, "rounded corner");
         assert_eq!(
             pixel(&data, 130, 28, 65),

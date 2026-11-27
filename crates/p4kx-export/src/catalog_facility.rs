@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::SourcedValue;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use super::authored_fields::Observed;
+use super::catalog_seat::{self, Seat};
+use super::item_component_owner::ComponentOwner;
+use super::medical::med_bed::{self, MedBed};
+use crate::CatalogError;
+use crate::catalog_projection::CatalogProjection;
+use crate::schema_fields::every_field_required;
+use crate::source_fields::FieldError;
+
+#[path = "facility_cargo_capacity.rs"]
+mod capacity;
+pub use capacity::{CapacityStatus, CargoGridCapacity};
+pub(super) use capacity::{
+    OwnerComponents, project as project_cargo_capacity, target_for_owner as cargo_target_for_owner,
+};
+pub use cargo_grid::CargoGrid;
+#[path = "facility_cargo_grid.rs"]
+mod cargo_grid;
+#[path = "facility_logout.rs"]
+mod logout;
+#[path = "facility_outfit_hanger.rs"]
+mod outfit_hanger;
+
+pub(crate) const CARGO_GRID_SOURCE_TYPE: &str = cargo_grid::COMPONENT;
+
+pub(crate) const SOURCE_TYPES: &[&str] = &[
+    catalog_seat::COMPONENT,
+    med_bed::COMPONENT,
+    cargo_grid::COMPONENT,
+    logout::COMPONENT,
+    outfit_hanger::COMPONENT,
+];
+
+/// The authored family of a facility component.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FacilityKind {
+    /// A seat and its controls.
+    Seat,
+    /// A medical bed and its authored services.
+    MedBed,
+    /// A Cargo Grid and its capacity operands.
+    CargoGrid,
+    /// An authored logout or respawn interaction.
+    Logout,
+    /// An outfit hanger and its interaction settings.
+    OutfitHanger,
+}
+
+impl FacilityKind {
+    pub(super) fn of(source_type: &str) -> Option<Self> {
+        match source_type {
+            catalog_seat::COMPONENT => Some(Self::Seat),
+            med_bed::COMPONENT => Some(Self::MedBed),
+            cargo_grid::COMPONENT => Some(Self::CargoGrid),
+            logout::COMPONENT => Some(Self::Logout),
+            outfit_hanger::COMPONENT => Some(Self::OutfitHanger),
+            _ => None,
+        }
+    }
+}
+
+/// The configuration of one original facility component.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct Facility<'source> {
+    #[serde(flatten)]
+    owner: ComponentOwner,
+    source_type: SourcedValue<&'source str>,
+    #[serde(flatten)]
+    fields: FacilityFields<'source>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum FacilityFields<'source> {
+    Seat(Box<Seat<'source>>),
+    MedBed(Box<MedBed<'source>>),
+    CargoGrid(Box<CargoGrid<'source>>),
+    Logout(Box<logout::Logout<'source>>),
+    OutfitHanger(Box<outfit_hanger::OutfitHanger<'source>>),
+}
+
+impl<'source> Facility<'source> {
+    pub(super) const fn cargo_grid(&self) -> bool {
+        matches!(self.kind(), FacilityKind::CargoGrid)
+    }
+
+    /// Returns the exact authored facility family.
+    #[must_use]
+    pub const fn kind(&self) -> FacilityKind {
+        match self.fields {
+            FacilityFields::Seat(_) => FacilityKind::Seat,
+            FacilityFields::MedBed(_) => FacilityKind::MedBed,
+            FacilityFields::CargoGrid(_) => FacilityKind::CargoGrid,
+            FacilityFields::Logout(_) => FacilityKind::Logout,
+            FacilityFields::OutfitHanger(_) => FacilityKind::OutfitHanger,
+        }
+    }
+
+    /// Borrows the sourced kind declaration of this facility.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored Cargo Grid configuration when this facility represents a Grid.
+    #[must_use]
+    pub fn cargo_grid_fields(&self) -> Option<&CargoGrid<'source>> {
+        match &self.fields {
+            FacilityFields::CargoGrid(grid) => Some(grid),
+            _ => None,
+        }
+    }
+
+    pub(super) fn set_cargo_capacity(
+        &mut self,
+        capacity: CargoGridCapacity,
+    ) -> Result<(), CatalogError> {
+        let FacilityFields::CargoGrid(grid) = &mut self.fields else {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        grid.capacity = Some(capacity);
+        Ok(())
+    }
+
+    pub(super) fn read(
+        kind: FacilityKind,
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        let fields = match kind {
+            FacilityKind::Seat => FacilityFields::Seat(Box::new(Seat::read(source, notes)?)),
+            FacilityKind::MedBed => {
+                FacilityFields::MedBed(Box::new(MedBed::read(source, projection, notes)?))
+            }
+            FacilityKind::Logout => {
+                FacilityFields::Logout(Box::new(logout::Logout::read(source, notes)?))
+            }
+            FacilityKind::OutfitHanger => FacilityFields::OutfitHanger(Box::new(
+                outfit_hanger::OutfitHanger::read(source, notes)?,
+            )),
+            FacilityKind::CargoGrid => {
+                FacilityFields::CargoGrid(Box::new(CargoGrid::read(source, notes)?))
+            }
+        };
+        Ok(Self {
+            owner,
+            source_type: source.source_type_value()?,
+            fields,
+        })
+    }
+
+    /// Borrows the original physical owner and component coordinates.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+}

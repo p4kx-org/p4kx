@@ -8,6 +8,8 @@ menu-recent = Recent Archives
 recent-none = No recent Archives
 channels-heading = Channels
 channels-none = No Channels found. Add a folder or an Archive through the Archive menu.
+channels-discovery-incomplete = Automatic discovery or installation protection was incomplete. Add your game folder or Archive manually if it is missing.
+channels-discovery-stopped = The Channel search stopped without returning a result.
 sidebar-show = Show sidebar
 sidebar-hide = Hide sidebar
 menu-language = Language
@@ -77,7 +79,7 @@ archive-issues =
         [one] The directory of the Archive has one defect in an Entry. The Entry stays listed, but its data may not be readable; an Extraction reports it if it fails, and `p4kx info` names it.
        *[other] The directory of the Archive has { $count } defects in its Entries. The Entries stay listed, but their data may not be readable; an Extraction reports those that fail, and `p4kx info` names them.
     }
-game-running = Star Citizen is running. Use this tool with the game closed: reading continues, but the RSI Launcher can change the Archive when it updates, and the tool never writes into the installation.
+game-running = Star Citizen may be running. Use this tool with the game closed: reading continues, but the RSI Launcher can change the Archive when it updates, and the tool never writes into the installation.
 archive-test-build =
     { $kind ->
         [one] This Archive belongs to the { $channel } Channel, which carries Star Citizen test builds. Material of test builds is confidential under the Star Citizen Terms of Service: do not share or publish anything taken from it.
@@ -147,11 +149,14 @@ extraction-summary-excluded-parts =
        *[other] { $number } part Entries left out of textures that stayed were still read to convert the textures.
     }
 extraction-summary-records = Records written { $written }, skipped { $skipped }, failed { $failed }, cancelled { $cancelled }; { $errors } error values in { $erroneous } Records
+extraction-summary-record-count-origin-failed = Record count origin unavailable ({ $reason })
 extraction-summary-target = Target: { $path }
 extraction-summary-failed = Failed ({ $number })
 extraction-summary-skipped = Skipped ({ $number })
 extraction-summary-cancelled = Cancelled ({ $number })
 extraction-summary-unconverted = Not converted ({ $number })
+extraction-summary-texture-receipts = DDS origin receipts ({ $number })
+extraction-summary-file-origin-receipts = File origin receipts ({ $number })
 extraction-summary-failure = { $path }: { $reason }
 extraction-summary-records-failed = Records not written ({ $number })
 extraction-summary-record-failure = { $path } ({ $guid }): { $reason }
@@ -209,6 +214,8 @@ comparison-report-saving = Saving the report to { $path }…
 comparison-report-saved = Report saved to { $path }
 comparison-report-failed = Cannot save the report to { $path }: { $reason }
 comparison-no-differences = No Entry differs between the Archives.
+comparison-no-confirmed-differences = No confirmed Entry changes.
+comparison-incomparable = { $number } Entry pairs use different checksum algorithms and cannot be compared.
 comparison-no-matches = No change matches the filter.
 comparison-shown = { $number } shown
 comparison-row = { $change }: { $path }
@@ -268,7 +275,8 @@ query-archive-changed = The Archive changed on disk. Reload it to run Queries.
 query-invalid = Line { $line }, column { $column }: { $reason }
 query-empty-title = No Archive open
 query-empty-hint = Open an Archive to run Queries over its DataForge.
-query-prompt = Write a Query and run it with Ctrl+Enter, e.g. from AmmoParams select speed where speed >= 1500
+query-prompt = Write a Query and run it with { $shortcut }, e.g. from AmmoParams select speed where speed >= 1500
+query-run-shortcut = Ctrl+Enter
 query-no-rows = No Record matches the Query.
 query-rows =
     { $count ->
@@ -399,6 +407,10 @@ change-extraction-summary-changed = The Archive changed on disk during the Extra
 preview-tab-image = Image
 image-mip = Mip
 image-format = Format
+image-pixels = Pixels
+image-origin-encrypted = Includes encrypted source data
+image-origin-plain = Unencrypted source data
+image-origin-unknown = Source encryption unknown
 image-size = Size
 image-mips = Mips
 image-faces = Cubemap faces
@@ -449,10 +461,12 @@ record-export-summary-title = Record export finished
 record-export-summary-cancelled-title = Record export cancelled
 record-export-summary-cancelled = The Record export was cancelled before every Record was written.
 record-export-summary-counts = Records written { $written }, skipped { $skipped }, failed { $failed }, cancelled { $cancelled }
+record-export-summary-written = Records written
 record-export-summary-errors = Records with error values: { $erroneous }, error values: { $errors }
 record-export-summary-no-match = No Record matches the filter.
 record-export-summary-target = Target: { $path }
 record-export-summary-file-failed = Cannot write { $path }: { $reason }
+record-export-summary-origin-failures = Origin receipt failures ({ $number })
 record-export-summary-failed = Failed ({ $number })
 record-export-summary-skipped = Skipped ({ $number })
 record-export-summary-failure = { $path } ({ $guid }): { $reason }
@@ -460,10 +474,33 @@ record-export-failed-title = Record export failed
 record-export-failed = The Record export into { $path } failed: { $reason }
 record-export-stopped = The Record export into { $path } stopped without a result.
 
-catalog-action = Basetool catalog…
-catalog-file-filter = Basetool catalog (JSON)
-catalog-file-filter-compressed = Basetool catalog (JSON, zstd-compressed)
-catalog-running-title = Creating the Basetool catalog
+catalog-action = P4KX catalog…
+catalog-full-action = P4KX catalog with full provenance…
+catalog-diagnostic-action = Diagnostic P4KX catalog…
+catalog-diagnostic-running-title = Creating a diagnostic P4KX catalog
+catalog-diagnostic-summary-title = Diagnostic P4KX catalog written
+catalog-diagnostic-notice = Diagnostic catalog. Check its reported export health before treating missing data as removals.
+catalog-incomplete = Some selected data could not be read or included. No file was created or replaced. Use a diagnostic catalog to inspect the partial result.
+catalog-health-complete = Export health: all selected sources were read and projected successfully.
+catalog-health-incomplete = Export health: incomplete. Some selected sources could not be read or projected successfully.
+catalog-health-entry-diagnostic = { $kind ->
+    [catalog] Catalog
+    [shopInventories] Offline shop inventories
+    [shops] Shops
+   *[other] { $kind }
+}: { $reason ->
+    [malformed] invalid source data
+    [unreadable] source could not be read
+    [missing] source is missing
+    [unsupported] unsupported source data
+   *[failed] source operation failed
+} ({ $number } { $singular ->
+    [yes] Archive Entry operation
+   *[no] Archive Entry operations
+})
+catalog-file-filter = P4KX catalog (JSON)
+catalog-file-filter-compressed = P4KX catalog (JSON, zstd-compressed)
+catalog-running-title = Creating the P4KX catalog
 catalog-reading = Reading DataForge…
 catalog-progress = { $done } of { $total } Records checked, { $percent } %
 catalog-crafting-progress = Reading the crafting data: { $done } of { $total } Records, { $percent } %
@@ -483,16 +520,41 @@ catalog-warning = { $kind ->
 }
 catalog-warning-more = and { $number } more
 catalog-writing = Writing { $path }…
-catalog-summary-title = Basetool catalog created
-catalog-kinds-heading = Kinds
+catalog-summary-title = P4KX catalog created
+catalog-kinds-heading = Kinds (selection scope)
 catalog-summary-kind = { $kind ->
+    [tags] Global tags
     [manufacturers] Manufacturers
     [items] Items
     [ships] Ships
     [commodities] Commodities
     [blueprints] Blueprints
     [resourceGroups] Resource groups
+    [resourceTypes] Resource types
+    [missionPropertySets] Mission property sets
     [blueprintCategories] Blueprint categories
+    [blueprintCategoryLists] Blueprint category lists
+    [factions] Factions
+    [factionIdentities] Faction identities
+    [reputationPerks] Reputation perks
+    [reputationTriggerRecords] Reputation trigger records
+    [reputationRewardAmounts] Reputation reward amounts
+    [infractions] Infractions
+    [infractionSets] Infraction sets
+    [jurisdictions] Jurisdictions
+    [securityNetworkManifests] Security network manifests
+    [missionModuleDeclarations] Mission module declarations
+    [locationClasses] Location classes
+    [locationFunctions] Location functions
+    [locationSizes] Location sizes
+    [locationClassRegistries] Location class registries
+    [locationFunctionRegistries] Location function registries
+    [locationSizeRegistries] Location size registries
+    [contractScopes] Contract scopes
+    [inventoryContainers] Inventory containers
+    [starmapTypes] Starmap types
+    [starmapPresets] Starmap presets
+    [starmapAmenities] Starmap amenities
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }
@@ -522,22 +584,22 @@ catalog-summary-texts-unavailable = { $language ->
    *[other] { $language }
 }: the Archive holds no global.ini, { $missing } missing
 catalog-summary-missing = Missing texts: { $number }
-catalog-summary-size = Size: { $size } of the upload limit of { $limit }
-catalog-summary-size-compressed = Size: { $compressed } compressed (of the upload limit of { $limit }), { $size } uncompressed
-catalog-near-limit = The catalog is close to the basetool upload limit of { $limit }.
-catalog-over-limit = The catalog is over the basetool upload limit of { $limit }; the basetool will reject the upload.
-catalog-near-limit-plain = The plain JSON catalog is close to the basetool upload limit of { $limit }. Write the catalog as .json.zst for the upload; plain .json is for inspection.
-catalog-over-limit-plain = The plain JSON catalog is over the basetool upload limit of { $limit }; the basetool will reject it. Write the catalog as .json.zst for the upload; plain .json is for inspection.
-catalog-decompressed-near-limit = The decompressed catalog is close to the basetool limit of { $limit } for decompressed content.
-catalog-decompressed-over-limit = The decompressed catalog is over the basetool limit of { $limit } for decompressed content; the basetool will reject it.
+catalog-summary-size = Size: { $size } (reference threshold { $limit })
+catalog-summary-size-compressed = Size: { $compressed } compressed (reference threshold { $limit }), { $size } decoded
+catalog-near-limit = The catalog is close to the transfer reference threshold of { $limit }.
+catalog-over-limit = The catalog exceeds the transfer reference threshold of { $limit }.
+catalog-near-limit-plain = The JSON catalog is close to the transfer reference threshold of { $limit }. Choose .json.zst for a compressed catalog.
+catalog-over-limit-plain = The JSON catalog exceeds the transfer reference threshold of { $limit }. Choose .json.zst for a compressed catalog.
+catalog-decompressed-near-limit = The decoded catalog is close to the reference threshold of { $limit }.
+catalog-decompressed-over-limit = The decoded catalog exceeds the reference threshold of { $limit }.
 catalog-summary-file = File: { $path }
-catalog-cancelled-title = Basetool catalog cancelled
-catalog-cancelled = The Basetool catalog was cancelled. No file was written.
-catalog-failed-title = Basetool catalog failed
-catalog-failed = The Basetool catalog { $path } could not be created: { $reason }
-catalog-stopped = The Basetool catalog { $path } stopped without a result.
-catalog-output-is-archive = The Basetool catalog cannot be written to { $path }, because that is the open Archive. Choose another file.
-catalog-output-gzip = The Basetool catalog is not written to { $path }, because gzip is not supported. Use a name ending in .json.zst for a compressed catalog or .json for a plain one.
+catalog-cancelled-title = P4KX catalog cancelled
+catalog-cancelled = The P4KX catalog was cancelled. No file was written.
+catalog-failed-title = P4KX catalog failed
+catalog-failed = The P4KX catalog { $path } could not be created: { $reason }
+catalog-stopped = The P4KX catalog { $path } stopped without a result.
+catalog-output-is-archive = The P4KX catalog cannot be written to { $path }, because that is the open Archive. Choose another file.
+catalog-output-gzip = The P4KX catalog is not written to { $path }, because gzip is not supported. Use a name ending in .json.zst for a compressed catalog or .json for a plain one.
 preview-tab-xml = XML
 xml-converting = Converting { $path } to XML…
 xml-too-large = { $path } is { $size }. CryXml Entries larger than { $limit } are not converted in the preview; extract it with Conversion on to read it.
@@ -582,6 +644,7 @@ audio-plugin = Plug-in
 audio-plugin-note = WEM { $id } is plug-in media, such as a convolution reverb impulse, and holds no sound to play.
 audio-midi = MIDI
 audio-midi-note = Media { $id } is a MIDI file and holds no sound to play.
+audio-bank-wem-count = Embedded WEM count
 audio-bank-summary =
     { $size } · { $count ->
         [one] { $number } WEM
@@ -801,6 +864,11 @@ sounds-summary-unconverted =
         [one] { $number } sound was written unchanged because it cannot be converted
        *[other] { $number } sounds were written unchanged because they cannot be converted
     }
+sounds-summary-receipt-failed =
+    { $count ->
+        [one] { $number } origin receipt could not be written
+       *[other] { $number } origin receipts could not be written
+    }
 sounds-summary-failed =
     { $count ->
         [one] { $number } sound was not exported
@@ -910,13 +978,21 @@ model-info-nodes = Nodes
 model-info-meshes = Meshes
 model-info-lods = Levels of detail
 model-info-materials = Material library
+model-info-materials-status = Library status
+model-info-material-count = Material count
+model-info-material-single = Single material
 model-info-material-ids = Material IDs
+model-info-material-ids-listed = Listed material IDs
 model-info-material-ids-none = None
 model-info-bones = Bones
 model-info-animations = Animations
 model-info-animations-unread = Not read
 model-info-animations-reading = Reading…
 model-info-chunks = Chunks
+model-info-chunks-total = Total chunks
+model-info-chunks-read = Read chunks
+model-info-chunks-skipped = Skipped known chunks
+model-info-chunks-unknown = Unknown chunks
 model-info-chunks-value = { $total } ({ $read } read, { $skipped } skipped, { $unknown } unknown)
 model-info-materials-unnamed = None named
 model-info-materials-loaded = { $library }, { $count ->
@@ -941,6 +1017,7 @@ model-info-usage-unknown = Unknown, skipped
 model-info-file-model = Model file
 model-info-file-geometry = Geometry file
 model-info-file-lod = LOD { $level } geometry
+model-info-file-lod-model = LOD { $level } model file
 model-info-type-unknown = Unknown
 model-export-action = Export as GLB…
 model-export-title = Export as GLB
@@ -982,6 +1059,8 @@ model-export-summary-counts = Nodes { $nodes }, meshes { $meshes }, materials { 
 model-export-summary-bones = Bones { $bones }, skinned meshes { $skinned }
 model-export-summary-library-missing = The material library { $library } does not exist; the default material is used.
 model-export-summary-library-unreadable = The material library { $library } cannot be read ({ $reason }); the default material is used.
+model-export-summary-library-missing-mapped = The material library { $library } (resolved to { $target }) does not exist; the default material is used.
+model-export-summary-library-unreadable-mapped = The material library { $library } (resolved to { $target }) cannot be read ({ $reason }); the default material is used.
 model-export-summary-default-materials = { $count ->
     [one] One material ID has no sub-material in the library; the default material is used for it.
    *[other] { $number } material IDs have no sub-material in the library; the default material is used for them.
@@ -1374,6 +1453,7 @@ ui-export-done-incomplete =
         [one] Wrote { $file }: { $width } × { $height } px, with { $number } thing left out (see the Left out tab)
        *[other] Wrote { $file }: { $width } × { $height } px, with { $number } things left out (see the Left out tab)
     }
+ui-export-origin-receipt = Source receipt: { $file }
 ui-export-failed = The export failed: { $reason }
 ui-export-stopped = The export stopped without a result.
 ui-export-is-archive = The file is the open Archive, which is never overwritten.
@@ -1444,6 +1524,16 @@ ui-kind-element-undrawn = Widgets not drawn
 ui-report-skipped = Skipped
 ui-report-effect = Drawn without effect
 ui-report-left-out = Left out
+ui-report-omission-details = Content omissions
+ui-report-omission-row = { $widget } ({ $element }) · Record { $record }, { $section }[{ $slot }] · Field { $field } · Source { $source }
+ui-report-omission-no-source = not specified
+ui-report-omission-source-missing = Source missing
+ui-report-omission-runtime-target = Runtime image
+ui-report-omission-runtime-array = Runtime list
+ui-report-omission-variable-missing = Missing value
+ui-report-omission-unsupported-field = Unsupported field
+ui-report-omission-unresolved-input = Unresolved input
+ui-report-omission-other = Content omitted
 ui-report-missing-canvas = Canvas not drawn
 ui-report-missing-texture = Texture not in the Archive
 ui-report-unknown-variable = Game variable that the screen does not read
@@ -1464,3 +1554,40 @@ folder-conversion-summary-input = Input folder: { $path }
 folder-conversion-failed-title = Conversion failed
 folder-conversion-failed = Cannot convert { $path }: { $reason }
 folder-conversion-stopped = The conversion of { $path } stopped without a result.
+
+protection-target-identity = The destination's host path could not be verified. Writing here is blocked. Choose another folder or check access to its host path.
+protection-source-identity = The archive's host path could not be verified. Writing data from this archive is blocked. Grant access to the archive again.
+protection-source-membership = It could not be determined whether the archive's parent folder { $parent } belongs to a game installation. Choose an export folder outside that folder, or grant access to the source folder.
+protection-identity-unavailable = The output path could not be identified safely. Writing here is blocked.
+protection-prerequisite-title = Flatpak prerequisite unavailable
+protection-prerequisite = This Flatpak needs a Documents portal with API 5 or later and working host path lookup. Update your desktop portal, or use the tar.gz, AppImage or deb package.
+protection-source-overwrite = This output would replace an input archive. Choose a different file or folder.
+gui-command-help =
+    P4KX desktop
+    Usage: p4kx-gui [ARCHIVE]
+    -h, --help: Show this help
+    -V, --version: Show the version
+    Flatpak requires Documents portal API 5 or later with authenticated host path lookup.
+
+output-target-title = Choose export destination
+output-target-parent = Parent folder
+output-target-choose-parent = Choose folder…
+output-target-no-parent = No parent folder chosen
+output-target-file-name = File name
+output-target-package-name = Package folder name
+output-target-destination = Destination
+output-target-no-destination = Choose a parent folder and enter a name.
+output-target-parent-hint = Choose the parent folder. The output will have the name entered below inside that folder.
+output-target-file-hint = The file will be saved in the chosen folder.
+output-target-package-hint = The package is a subfolder of the selected parent. An existing P4KX package is replaced only after its replacement is complete.
+output-target-diagnostic-hint = This diagnostic permission applies only to this export. It is cancelled when this selection is closed.
+output-target-confirm = Use destination
+output-target-start-export = Start export
+output-target-cancel = Cancel
+output-target-empty = Enter a name.
+output-target-component = Enter one name without a parent path, an absolute path, ‘.’ or ‘..’.
+output-target-control = The name cannot contain control characters.
+output-target-picker-failed = The chooser could not be opened: { $reason }
+output-target-picker-failure-title = Chooser failed
+output-target-picker-disconnected = The chooser closed without a reply. Open it again.
+output-target-picker-relative = The folder chooser returned no absolute parent path. The previous choice has been kept.

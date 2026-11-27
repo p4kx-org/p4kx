@@ -4,19 +4,25 @@
 //! `list_soundbank_objects`: one page of the `HIRC` objects of a soundbank, in the shape of
 //! `p4kx bnk objects --json`.
 
-use p4kx_extraction::HircKind;
-use p4kx_extraction::hirc_select::{LayoutCounts, select};
+use std::io::ErrorKind;
+use std::sync::Arc;
+
+use p4kx_extraction::hirc_select::{LayoutCounts, select_with_sources};
 use p4kx_extraction::hirc_view::ObjectView;
+use p4kx_extraction::{FieldOrigins, HircKind, SourceInventory};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 use serde_json::value::RawValue;
 
 use crate::archives::Opened;
 use crate::audio_params::SoundbankObjectsParams;
-use crate::audio_wem::open_bank;
-use crate::budget::{fill_within, json_len};
+use crate::audio_wem::{EvidenceError, open_bank};
+use crate::budget::{Capped, MAX_RESPONSE_LEN, fill_within, fit_prefix};
 use crate::error::ToolError;
 use crate::page::Page;
+
+#[path = "audio_objects_origins.rs"]
+mod origins;
 
 /// The `HIRC` objects of a soundbank, one page.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -42,13 +48,16 @@ pub(crate) struct SoundbankObjectsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }
 
 /// An object rendered once as JSON, with its ID for messages.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Listed {
     id: u32,
-    json: Box<RawValue>,
+    json: Arc<RawValue>,
 }
 
 impl Serialize for Listed {
@@ -59,9 +68,21 @@ impl Serialize for Listed {
 
 impl Listed {
     fn new(view: &ObjectView<'_>) -> Result<Self, ToolError> {
+        let mut output = Capped::new(MAX_RESPONSE_LEN);
+        if let Err(error) = serde_json::to_writer(&mut output, view) {
+            if error.io_error_kind() == Some(ErrorKind::FileTooLarge) {
+                return Err(ToolError::TooLargeItem {
+                    what: format!("object {}", view.id),
+                    limit: MAX_RESPONSE_LEN,
+                    hint: "the complete original object exceeds one response",
+                });
+            }
+            return Err(error.into());
+        }
+        let json = RawValue::from_string(String::from_utf8(output.into_bytes())?)?;
         Ok(Self {
             id: view.id,
-            json: serde_json::value::to_raw_value(view)?,
+            json: json.into(),
         })
     }
 }
@@ -87,29 +108,69 @@ pub(crate) fn soundbank_objects(
     let kind = params.kind.as_deref().map(parse_kind).transpose()?;
     let bank = open_bank(opened, &params.soundbank)?;
     let soundbank = bank.soundbank();
-    let objects = soundbank.objects();
-    let selected = select(objects, kind, params.id, page.offset(), page.limit());
+    let selected = select_with_sources(&bank, kind, params.id, page.offset(), page.limit());
     page.check(selected.matched)?;
-    let mut result = SoundbankObjectsResult {
-        archive: opened.archive().path().display().to_string(),
-        soundbank: bank.name().to_owned(),
-        version: soundbank.header().version,
-        bank_id: soundbank.header().id,
-        total: objects.len(),
-        layouts: LayoutCounts::of(objects),
-        matched: selected.matched,
-        objects: Vec::new(),
-        next_cursor: None,
-    };
     let items = selected.shown.iter().map(Listed::new);
-    let (listed, next_cursor) =
-        fill_within(page, selected.matched, json_len(&result), items, |object| {
-            format!("object {}", object.id)
-        })
+    let (candidates, _) = fill_within(page, selected.matched, 0, items, Listed::describe)
         .map_err(narrowest_filter)?;
-    result.objects = listed;
-    result.next_cursor = next_cursor;
+    let LayoutCounts {
+        decoded,
+        undecoded,
+        unsupported,
+        malformed,
+    } = LayoutCounts::of(soundbank.objects());
+    let response = |count| {
+        let rows = selected
+            .shown
+            .get(..count)
+            .ok_or(ToolError::HircEvidence(EvidenceError::InvalidPrefix))?;
+        let objects = candidates
+            .get(..count)
+            .ok_or(ToolError::HircEvidence(EvidenceError::InvalidPrefix))?;
+        let next_cursor = page.next_cursor_after(count, selected.matched)?;
+        let (field_origins, provenance) = origins::capture(
+            &bank,
+            rows,
+            origins::Listing {
+                filter_kind: kind,
+                filter_id: params.id.is_some(),
+                cursor: next_cursor.is_some(),
+                limited_by_bytes: count < selected.shown.len(),
+            },
+        )
+        .map_err(ToolError::HircEvidence)?;
+        Ok(SoundbankObjectsResult {
+            archive: opened.archive().path().display().to_string(),
+            soundbank: bank.name().to_owned(),
+            version: soundbank.header().version,
+            bank_id: soundbank.header().id,
+            total: soundbank.objects().len(),
+            layouts: LayoutCounts {
+                decoded,
+                undecoded,
+                unsupported,
+                malformed,
+            },
+            matched: selected.matched,
+            objects: objects.to_vec(),
+            next_cursor,
+            field_origins,
+            provenance,
+        })
+    };
+    let (_, result) = fit_prefix(candidates.len(), response, || {
+        candidates
+            .first()
+            .map_or_else(|| "soundbank object listing".to_owned(), Listed::describe)
+    })
+    .map_err(narrowest_filter)?;
     Ok(result)
+}
+
+impl Listed {
+    fn describe(&self) -> String {
+        format!("object {}", self.id)
+    }
 }
 
 /// Rewrites the hint of an object too large for a response: it is too large alone, so the ID

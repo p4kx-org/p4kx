@@ -136,6 +136,7 @@ fn finished(ui: &mut Ui, texts: &Texts, summary: &ExtractionSummary, input: &str
         ("left", number(texts, summary.not_converted())),
     ];
     ui.label(texts.format(T::SummaryCounts, &counts));
+    super::extraction_record_lists::counts(ui, texts, summary);
     ui.label(texts.format(T::SummaryInput, &[("path", input.to_owned().into())]));
     let target = summary.target().display().to_string();
     ui.label(texts.format(ExtractionText::SummaryTarget, &[("path", target.into())]));

@@ -4,12 +4,13 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::{Result, anyhow};
-use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions};
+use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions, SocContainerCapture};
 use p4kx_blender::{
-    InteriorScene, Issue, PackageInfo, PackageSummary, check_output, write_interior_package,
+    InteriorScene, Issue, PackageInfo, PackageSummary, PackageWriteContext, SocScene,
+    check_output_with_context, write_interior_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{GlbOptions, is_same_file};
+use p4kx_extraction::is_same_file;
 use serde::Serialize;
 
 use crate::cli_interior::InteriorPackageArgs;
@@ -18,6 +19,9 @@ use crate::extract::cancel_on_interrupt;
 use crate::interior_glb::{InteriorOutputIsArchive, open};
 use crate::json;
 use crate::query_table::one_line;
+
+#[path = "interior_package_report_origins.rs"]
+mod report_origins;
 
 #[derive(Serialize)]
 struct PackageJson<'a> {
@@ -55,39 +59,53 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(InteriorOutputIsArchive(args.out.clone()).into());
     }
-    check_output(&args.out)?;
     let (layers, chain) = open(&args.archive, &args.containers)?;
     let entry = chain.last().map_or("", String::as_str);
-    let options = InteriorOptions::default().with_lod(args.lod);
+    let options = InteriorOptions::default().with_lod(args.mesh.lod);
     let interior = crate::interior_forge::build(&layers, entry, &options)?;
     let outer = layers
         .first()
         .ok_or_else(|| anyhow!("the Archive was not opened"))?;
-    let models = ArchiveModels::new(outer);
-    let mut glb = GlbOptions::default()
-        .with_lod(args.lod)
-        .with_texture_mip(args.texture_mip);
-    if args.no_vertex_colours {
-        glb = glb.without_vertex_colours();
-    }
-    let info = PackageInfo::new(channel_name(outer.path()), build_info(outer));
     let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(outer.path(), cancel.flag())?;
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    check_output_with_context(&args.out, &context)?;
+    let models = ArchiveModels::new(outer);
+    let glb = args.mesh.glb_options();
+    let info = PackageInfo::new(channel_name(outer.path()), build_info(outer)?);
     let name = name_of(entry);
-    let scene = InteriorScene::new(&name, &interior);
+    let authored = if args.authored_soc {
+        let refs: Vec<_> = layers.iter().collect();
+        let capture = SocContainerCapture::read(&refs, &cancel)?;
+        Some(SocScene::from_archive_capture(&capture, outer, &cancel)?)
+    } else {
+        None
+    };
+    let mut scene = InteriorScene::new(&name, &interior);
+    if let Some(authored) = &authored {
+        scene = scene.with_authored_soc(authored);
+    }
     let loader = models.textures();
-    let summary =
-        write_interior_package(&scene, &models, &loader, &glb, &info, &args.out, &|| {
-            cancel.is_cancelled()
-        })?;
+    let context = context
+        .with_texture_container(args.mesh.texture_container())
+        .with_archive_texture_source(&loader);
+    let context = if args.mesh.vertex_maps {
+        context.with_vertex_maps()
+    } else {
+        context
+    };
+    let summary = write_interior_package_with_context(
+        &scene, &models, &loader, &glb, &info, &args.out, &context,
+    )?;
     if as_json {
-        json::print(&PackageJson::of(
+        let report = PackageJson::of(
             &json::path(&args.archive),
             &chain,
             &interior,
             args,
             &summary,
-        ))?;
-        return Ok(());
+        );
+        return report_origins::print(report, &layers);
     }
     match print_report(&summary, args, entry) {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),
@@ -114,8 +132,8 @@ impl<'a> PackageJson<'a> {
             archive: archive.to_owned(),
             containers: chain,
             out: json::path(&args.out),
-            lod: args.lod,
-            texture_mip: args.texture_mip,
+            lod: args.mesh.lod,
+            texture_mip: args.mesh.texture_mip,
             containers_opened: interior.containers(),
             model_parts: interior.model_parts(),
             modelled_parts: interior.modelled_parts(),

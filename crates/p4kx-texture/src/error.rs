@@ -98,7 +98,7 @@ pub enum TextureError {
     #[error("decoding a texture with {images} images per mip is not supported yet")]
     UnsupportedImage {
         /// Cubemap faces times array elements times volume slices.
-        images: u32,
+        images: u64,
     },
     /// The data of a mip is not exactly one image of its size.
     #[error("the mip holds {actual} bytes, but its size needs {expected}")]

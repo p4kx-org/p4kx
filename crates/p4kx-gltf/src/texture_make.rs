@@ -3,19 +3,23 @@
 
 use std::sync::Arc;
 
-use p4kx_texture::{RgbaImage, write_png};
+use p4kx_texture::{DdsTransfer, RgbaImage, write_png_with_transfer};
 use rayon::prelude::*;
 
 use crate::layer_make::{make_base as make_base_layers, make_normal as make_normal_layers};
 use crate::texture_budget::{Tally, Verdict};
-use crate::texture_cache::{Decoded, MAX_HELD_PIXELS, SourceStore};
+use crate::texture_cache::{Decoded, MAX_HELD_PIXELS, PreparedTextureJob, SourceStore};
 use crate::texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
-use crate::texture_pixels::{base_colour, metallic_roughness, normal_map, opacity_colour};
+use crate::texture_origins::{TexturePaletteUse, TextureReadUse};
 use crate::texture_plan::{EncodedImage, Failure, Job, Key, MAX_TEXTURE_IMAGES};
 use crate::texture_report::TextureRole;
 use crate::texture_roles::Source;
 
 pub(crate) use crate::texture_budget::Budget;
+
+#[path = "texture_make_pixels.rs"]
+mod pixels;
+use pixels::{make_base, make_normal, make_packed};
 
 #[cfg(test)]
 mod tests;
@@ -42,6 +46,9 @@ pub(crate) struct Outcome {
     /// For a metallic-roughness image: whether it carries the metalness.
     pub(crate) metallic: bool,
     pub(crate) failures: Vec<Failure>,
+    pub(crate) texture_sources: Vec<TextureReadUse>,
+    pub(crate) material_layers: Vec<usize>,
+    pub(crate) palette_use: TexturePaletteUse,
 }
 
 impl Outcome {
@@ -138,21 +145,25 @@ fn run_with_guards(
 ) -> Vec<Outcome> {
     let mut tally = Tally::new(budget);
     let mut outcomes: Vec<Outcome> = Vec::with_capacity(jobs.len());
-    let mut rest = jobs;
+    let mut jobs: Vec<_> = jobs
+        .iter()
+        .map(|job| store.admit_layer_specular(job))
+        .collect();
+    let mut rest = jobs.as_mut_slice();
     while !rest.is_empty() {
         let start = outcomes.len();
-        let len = guarded_len(guards, start, store.group_len(rest, PARALLEL_IMAGES));
-        let (chunk, after) = rest.split_at(len);
+        let group_len = store.group_len(rest.iter().map(PreparedTextureJob::job), PARALLEL_IMAGES);
+        let len = guarded_len(guards, start, group_len);
+        let (chunk, after) = rest.split_at_mut(len);
         let next = after.get(..PARALLEL_IMAGES).unwrap_or(after);
-        rest = after;
         let verdicts: Vec<Verdict> = chunk
             .iter()
             .enumerate()
             .map(|(at, job)| {
-                if unneeded(guards.get(start + at), &outcomes) {
-                    Verdict::Skipped
+                if job.needs_image() && !unneeded(guards.get(start + at), &outcomes) {
+                    tally.plan(job.job(), &mut store)
                 } else {
-                    tally.plan(job, &mut store)
+                    Verdict::Skipped
                 }
             })
             .collect();
@@ -161,35 +172,43 @@ fn run_with_guards(
                 .iter()
                 .zip(&verdicts)
                 .filter(|(_, verdict)| verdict.runs())
-                .map(|(job, _)| job),
+                .map(|(job, _)| job.job()),
         );
         let made: Vec<Option<Outcome>> = chunk
             .par_iter()
             .zip(&verdicts)
-            .map(|(job, verdict)| verdict.runs().then(|| make(job, &decoded)))
+            .map(|(job, verdict)| verdict.runs().then(|| make(job.job(), &decoded)))
             .collect();
-        store.keep(decoded, next);
+        store.keep(decoded, next.iter().map(PreparedTextureJob::job));
+        rest = after;
         for verdict in &verdicts {
             if let Verdict::Reserved(size) = verdict {
                 tally.give_back(*size);
             }
         }
-        for ((job, verdict), outcome) in chunk.iter().zip(verdicts).zip(made) {
-            let outcome = match (outcome, verdict) {
-                (Some(outcome), _) => outcome,
-                (None, Verdict::Failed(failure)) => Outcome {
-                    failures: vec![failure],
-                    ..Outcome::default()
-                },
-                (None, Verdict::Skipped) => Outcome::default(),
-                (None, Verdict::Spent) => refused(job, spent_reason()),
-                (None, Verdict::TooLarge) => refused(job, TOO_LARGE.to_owned()),
-                (None, _) => refused(job, OVER_BUDGET.to_owned()),
-            };
-            outcomes.push(settle(job, outcome, &mut tally));
+        for ((prepared, verdict), outcome) in chunk.iter_mut().zip(verdicts).zip(made) {
+            let job = prepared.job();
+            let outcome = job_outcome(job, outcome, verdict);
+            let mut outcome = settle(job, outcome, &mut tally);
+            outcome.failures.append(&mut prepared.failures);
+            outcomes.push(outcome);
         }
     }
     outcomes
+}
+
+fn job_outcome(job: &Job, outcome: Option<Outcome>, verdict: Verdict) -> Outcome {
+    match (outcome, verdict) {
+        (Some(outcome), _) => outcome,
+        (None, Verdict::Failed(failure)) => Outcome {
+            failures: vec![failure],
+            ..Outcome::default()
+        },
+        (None, Verdict::Skipped) => Outcome::default(),
+        (None, Verdict::Spent) => refused(job, spent_reason()),
+        (None, Verdict::TooLarge) => refused(job, TOO_LARGE.to_owned()),
+        (None, _) => refused(job, OVER_BUDGET.to_owned()),
+    }
 }
 
 fn spent_reason() -> String {
@@ -238,13 +257,56 @@ pub(crate) fn load(
     }
 }
 
-pub(crate) fn encode(image: &RgbaImage) -> Result<EncodedImage, String> {
+pub(crate) fn image_transfer_extras(image: &EncodedImage) -> gltf_json::extras::Extras {
+    let inputs: Vec<_> = image
+        .sources
+        .iter()
+        .map(|source| {
+            let mut value = serde_json::Map::from_iter([
+                (
+                    "declared".to_owned(),
+                    serde_json::json!(source.declared_transfer),
+                ),
+                (
+                    "colour_encoding".to_owned(),
+                    serde_json::json!(source.transfer),
+                ),
+            ]);
+            if let Some(association) = source.alpha_association {
+                value.insert(
+                    "alpha_association".to_owned(),
+                    serde_json::json!(association),
+                );
+            }
+            if source.alpha_transform != p4kx_texture::DdsAlphaTransform::Preserve {
+                value.insert(
+                    "alpha_transform".to_owned(),
+                    serde_json::json!(source.alpha_transform),
+                );
+            }
+            value
+        })
+        .collect();
+    serde_json::value::to_raw_value(&serde_json::json!({
+        "p4kx_transfer": { "output": image.transfer, "inputs": inputs },
+    }))
+    .ok()
+}
+
+pub(crate) fn encode(image: &RgbaImage, transfer: DdsTransfer) -> Result<EncodedImage, String> {
     let mut png = Vec::new();
-    write_png(image, &mut png).map_err(|error| error.to_string())?;
+    let tag = if transfer == DdsTransfer::Srgb {
+        transfer
+    } else {
+        DdsTransfer::Unknown
+    };
+    write_png_with_transfer(image, tag, &mut png).map_err(|error| error.to_string())?;
     Ok(EncodedImage {
         png,
         width: image.width(),
         height: image.height(),
+        transfer,
+        sources: Vec::new(),
     })
 }
 
@@ -259,13 +321,31 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
         Key::Base { keep_alpha, .. } => {
             make_base(job, *keep_alpha, decoded, &mut outcome, &mut failures)
         }
-        Key::Normal { .. } => make_normal(job, decoded, &mut failures),
+        Key::Normal { .. } => make_normal(job, decoded, &mut outcome, &mut failures),
         Key::MetallicRoughness { .. } => make_packed(job, decoded, &mut outcome, &mut failures),
         Key::LayerBase { .. } => make_base_layers(job, decoded, &mut outcome, &mut failures),
-        Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut failures),
+        Key::FactoryBowSpecularColour { level_scale, .. } => crate::factory_bow_reflectance::make(
+            job,
+            *level_scale,
+            decoded,
+            &mut outcome,
+            &mut failures,
+        ),
+        Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut outcome, &mut failures),
+        Key::LayerFinish { .. } => {
+            crate::layer_finish::make(job, decoded, &mut outcome, &mut failures)
+        }
     };
     match made {
-        Some(Ok(image)) => outcome.image = Some(image),
+        Some(Ok(mut image)) => {
+            image.sources = outcome
+                .texture_sources
+                .iter()
+                .filter(|source| source.components != crate::TextureComponents::Dimensions)
+                .copied()
+                .collect();
+            outcome.image = Some(image);
+        }
         Some(Err(reason)) => {
             if let Some((role, source)) = job.primary() {
                 failures.push(Failure {
@@ -279,81 +359,4 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
     }
     outcome.failures = failures;
     outcome
-}
-
-fn make_base(
-    job: &Job,
-    keep_alpha: bool,
-    decoded: &Decoded,
-    outcome: &mut Outcome,
-    failures: &mut Vec<Failure>,
-) -> Made {
-    let diffuse = load(
-        decoded,
-        TextureRole::Diffuse,
-        job.diffuse.as_ref(),
-        failures,
-    )?;
-    let specular = load(
-        decoded,
-        TextureRole::Specular,
-        job.specular.as_ref(),
-        failures,
-    );
-    outcome.tinted = specular.is_some();
-    if job.diffuse.as_ref().is_some_and(|source| source.opacity) {
-        return Some(
-            opacity_colour(&diffuse.image, job.tints.decal)
-                .map_err(|error| error.to_string())
-                .and_then(|image| encode(&image)),
-        );
-    }
-    Some(
-        base_colour(
-            &diffuse.image,
-            specular.as_ref().map(|specular| &specular.image),
-            job.tints,
-            keep_alpha,
-        )
-        .map_err(|error| error.to_string())
-        .and_then(|image| encode(&image)),
-    )
-}
-
-fn make_normal(job: &Job, decoded: &Decoded, failures: &mut Vec<Failure>) -> Made {
-    let normal = load(decoded, TextureRole::Normal, job.normal.as_ref(), failures)?;
-    Some(
-        normal_map(&normal.image)
-            .map_err(|error| error.to_string())
-            .and_then(|image| encode(&image)),
-    )
-}
-
-fn make_packed(
-    job: &Job,
-    decoded: &Decoded,
-    outcome: &mut Outcome,
-    failures: &mut Vec<Failure>,
-) -> Made {
-    let gloss = load(decoded, TextureRole::Normal, job.normal.as_ref(), failures)
-        .filter(|gloss| gloss.has_alpha);
-    let specular = load(
-        decoded,
-        TextureRole::Specular,
-        job.specular.as_ref(),
-        failures,
-    );
-    match metallic_roughness(
-        gloss.as_ref().map(|gloss| &gloss.image),
-        specular.as_ref().map(|specular| &specular.image),
-        job.tints.specular,
-    ) {
-        Ok(Some(packed)) => {
-            outcome.roughness = packed.roughness;
-            outcome.metallic = packed.metallic;
-            Some(encode(&packed.image))
-        }
-        Ok(None) => None,
-        Err(error) => Some(Err(error.to_string())),
-    }
 }

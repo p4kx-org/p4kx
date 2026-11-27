@@ -209,16 +209,37 @@ pub(crate) fn build_from(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(forge, filter, p4kx_export::CatalogPublicationMode::Normal)
+}
+
+/// Builds an intentionally unreadable or unsupported recovery fixture for diagnosis.
+pub(crate) fn diagnostic_from(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(
+        forge,
+        filter,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn build_mode(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         write_forge(dir.path(), forge)?,
         Some(p4kx_testkit::test_key()),
     )?;
     let options = CatalogOptions {
+        publication_mode,
         filter,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }

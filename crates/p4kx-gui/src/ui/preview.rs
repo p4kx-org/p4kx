@@ -1,24 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use egui::{Role, Sense, Ui, WidgetInfo, vec2};
-use p4kx_extraction::{Entry, Texture};
+use egui::{Response, Role, Sense, Ui, WidgetInfo, vec2};
+use p4kx_extraction::{Entry, Texture, XmlRenderOrigins};
 
 use super::audio_preview;
 use super::entry_status::status_body;
 use super::preview_bar::Export;
 use super::preview_tab::{Asked, Typed, typed_tab};
 use super::record_preview;
-use super::soundbank_preview;
 use super::{dataforge_summary, image_preview, preview_bar, record_incoming};
+use super::{soundbank_origins, soundbank_preview, source_origin};
 use crate::theme::desktop::{PREVIEW_PADDING_X, PREVIEW_PATH_HEIGHT};
 use crate::theme::palette;
 use crate::theme::tokens::{FS_XS, SPACE_2, Weight};
 use crate::widgets::frames;
 use crate::widgets::scroll_region::Jump;
 use crate::widgets::text::{hairline_below, line, paint_left, plain};
+use crate::widgets::tooltip;
 use crate::{
-    Browser, Model, Preview, PreviewTab, Text, Texts, ViewerSupport, format, is_bank_path,
+    AudioText, Browser, ComparisonText, Model, Preview, PreviewContents, PreviewTab,
+    SoundbankPreview, Text, Texts, ViewerSupport, XmlPreview, XmlText, format, is_bank_path,
     is_model_path, is_wem_path,
 };
 
@@ -171,7 +173,7 @@ fn tab_body(
     match (tab, browser.records()) {
         (PreviewTab::DataForge, Some(tree)) => {
             let size = browser.archive_index().dataforge_size();
-            path_line(ui, tree.entry_path(), &format::size(size, texts.language()));
+            let _response = path_line(ui, tree.entry_path(), &format::size(size, texts.language()));
             dataforge_summary::show(ui, texts, tree);
             None
         }
@@ -212,7 +214,8 @@ fn body(
         .soundbank()
         .and_then(|bank| soundbank_preview::summary(texts, bank, size))
         .unwrap_or_else(|| format::size(size, texts.language()));
-    path_line(ui, path, &size_line);
+    let response = path_line(ui, path, &size_line);
+    path_origins(response, texts, preview, tab);
     let jump = browser
         .hit_line()
         .filter(|hit| hit.entry() == preview.entry())
@@ -236,8 +239,60 @@ fn body(
     None
 }
 
+fn path_origins(response: Response, texts: &Texts, preview: &Preview, tab: PreviewTab) {
+    if matches!(tab, PreviewTab::Text | PreviewTab::Hex)
+        && let Some(contents) = preview.contents()
+    {
+        entry_origins(response, texts, contents, (tab, preview.soundbank()));
+    } else if tab == PreviewTab::Xml
+        && let Some(document) = preview.xml().and_then(XmlPreview::text)
+    {
+        let marker = document
+            .provenance()
+            .and_then(Result::ok)
+            .and_then(XmlRenderOrigins::contains_encrypted_source);
+        tooltip::hover(response, |ui| {
+            source_origin::row_marker(ui, texts, XmlText::Tab, marker);
+        });
+    } else if let Some(bank) = preview.soundbank() {
+        soundbank_origins::summary(response, texts, bank);
+    }
+}
+
+fn entry_origins(
+    response: Response,
+    texts: &Texts,
+    contents: &PreviewContents,
+    (tab, bank): (PreviewTab, Option<&SoundbankPreview>),
+) {
+    let proof = contents.provenance().ok();
+    let (label, origin) = if tab == PreviewTab::Hex {
+        (Text::PreviewTabHex, proof.map(|proof| &proof.hex))
+    } else {
+        (Text::PreviewTabText, proof.map(|proof| &proof.text))
+    };
+    tooltip::hover(response, |ui| {
+        source_origin::row(
+            ui,
+            texts,
+            ComparisonText::ColumnPath,
+            proof.map(|proof| &proof.path),
+        );
+        source_origin::row(ui, texts, Text::ColumnSize, proof.map(|proof| &proof.size));
+        source_origin::row(ui, texts, label, origin);
+        if let Some(bank_proof) = bank.and_then(SoundbankPreview::summary_provenance) {
+            source_origin::row(
+                ui,
+                texts,
+                AudioText::BankWemCount,
+                bank_proof.ok().map(|proof| &proof.wem_count),
+            );
+        }
+    });
+}
+
 /// Shows the path line of the preview: `path`, then `size` muted.
-pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) {
+pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) -> Response {
     let (rect, response) = ui.allocate_exact_size(
         vec2(ui.available_width(), PREVIEW_PATH_HEIGHT),
         Sense::hover(),
@@ -254,4 +309,5 @@ pub(super) fn path_line(ui: &mut Ui, path: &str, size: &str) {
     paint_left(ui, inner, galley, palette::GRAY_1);
     paint_left(ui, size_rect, size, palette::GRAY_2_TEXT);
     hairline_below(ui, rect);
+    response
 }

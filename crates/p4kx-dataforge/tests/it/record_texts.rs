@@ -5,8 +5,13 @@
 
 use std::borrow::Cow;
 use std::error::Error;
+use std::io;
 
-use p4kx_dataforge::{DataForge, JsonLayout, RecordJson, RecordXml, Resolution, TextResolver};
+use p4kx_dataforge::{
+    Annotations, DataForge, Guid, JsonLayout, LocalizationInput, ObservedResolution, RecordJson,
+    RecordJsonObserver, RecordJsonSource, RecordJsonUse, RecordXml, Resolution, TagResolver,
+    TextResolver, TreeBuilder,
+};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -152,5 +157,204 @@ fn json_annotates_every_localisation_key_with_an_object() -> TestResult {
 fn the_same_texts_give_byte_identical_output() -> TestResult {
     assert_eq!(xml(Some(&Texts))?, xml(Some(&Texts))?);
     assert_eq!(json(Some(&Texts))?, json(Some(&Texts))?);
+    Ok(())
+}
+
+#[derive(Default)]
+struct Observations {
+    keys: Vec<String>,
+    selected: Vec<(String, String)>,
+    inputs: Vec<(String, Option<String>)>,
+    tags: Vec<(String, Guid, String)>,
+}
+
+impl RecordJsonObserver for Observations {
+    fn value(
+        &mut self,
+        pointer: &str,
+        _sources: &[RecordJsonSource<'_>],
+        _complete: bool,
+    ) -> io::Result<()> {
+        self.keys.push(pointer.to_owned());
+        Ok(())
+    }
+
+    fn localization(
+        &mut self,
+        pointer: &str,
+        key: &str,
+        _decision: &Resolution<'_>,
+        selectors: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        assert!(
+            complete && !selectors.is_empty(),
+            "authored Locale selection at {pointer}"
+        );
+        self.selected.push((pointer.to_owned(), key.to_owned()));
+        Ok(())
+    }
+
+    fn localization_observed(
+        &mut self,
+        pointer: &str,
+        key: &str,
+        observed: &ObservedResolution<'_>,
+        selectors: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.localization(pointer, key, observed.resolution(), selectors, complete)?;
+        if let LocalizationInput::Lookup(original) = observed.input() {
+            self.inputs
+                .push((pointer.to_owned(), original.map(str::to_owned)));
+        }
+        Ok(())
+    }
+
+    fn tag(
+        &mut self,
+        pointer: &str,
+        guid: Guid,
+        path: &str,
+        selectors: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        assert!(
+            complete && !selectors.is_empty(),
+            "authored Reference selection at {pointer}"
+        );
+        self.tags.push((pointer.to_owned(), guid, path.to_owned()));
+        Ok(())
+    }
+}
+
+fn observed(
+    builder: &DataForgeBuilder,
+    annotations: Annotations<'_>,
+) -> Result<Observations, Box<dyn Error>> {
+    let bytes = builder.build();
+    let forge = DataForge::open(&bytes)?;
+    let record = forge.records().next().ok_or("the Record")?;
+    let positioned = TreeBuilder::new().build_positioned(&record)?;
+    let mut observations = Observations::default();
+    let mut writer = RecordJson::new(JsonLayout::Compact);
+    let mut original = Vec::new();
+    let mut measured = Vec::new();
+    writer.write_annotated(positioned.tree(), annotations, &mut original)?;
+    writer.write_observed_annotated(&positioned, annotations, &mut measured, &mut observations)?;
+    assert_eq!(measured, original, "same annotated canonical bytes");
+    Ok(observations)
+}
+
+#[test]
+fn observed_json_identifies_the_emitted_localization_members() -> TestResult {
+    let annotations = Annotations::none().with_texts(Some(&Texts));
+    let capture = observed(&builder(), annotations)?;
+    for (path, authored) in [
+        ("/name/text", "@item_Name"),
+        ("/gone/missing", "@item_Gone"),
+        ("/path/text", "@item_Desc"),
+        ("/lines/0/text", "@item_Name"),
+        ("/lines/1/missing", "@item_Gone"),
+    ] {
+        assert!(
+            capture
+                .selected
+                .iter()
+                .any(|(pointer, key)| pointer == path && key == authored),
+            "annotation {path}"
+        );
+    }
+    assert_eq!(capture.selected.len(), 5, "only actual annotations");
+    for key in ["/name/key", "/gone/key", "/lines/0/key", "/blank", "/unset"] {
+        assert!(
+            capture.keys.iter().any(|pointer| pointer == key),
+            "stored key {key}"
+        );
+    }
+    Ok(())
+}
+
+static STATIC_TEXTS: Texts = Texts;
+
+struct ObservedTexts;
+
+impl TextResolver for ObservedTexts {
+    fn resolve<'a>(&'a self, key: &str) -> Resolution<'a> {
+        STATIC_TEXTS.resolve(key)
+    }
+
+    fn resolve_observed<'a>(&'a self, key: &str) -> ObservedResolution<'a> {
+        let resolution = self.resolve(key);
+        let original = match key {
+            "@item_Name" => Some("Crate & \"Co\""),
+            "@item_Desc" => Some("Line one\\nLine two"),
+            _ => None,
+        };
+        ObservedResolution::from_lookup(resolution, original)
+    }
+}
+
+#[test]
+fn json_annotations_carry_the_original_lookup_at_their_output_pointer() -> TestResult {
+    let ordinary = observed(&builder(), Annotations::none().with_texts(Some(&Texts)))?;
+    let retained = observed(
+        &builder(),
+        Annotations::none().with_texts(Some(&ObservedTexts)),
+    )?;
+    assert!(
+        ordinary.inputs.is_empty(),
+        "a generic resolver carries no lookup"
+    );
+    assert_eq!(
+        retained.selected, ordinary.selected,
+        "observed lookup retains the rendered annotations"
+    );
+    assert_eq!(retained.inputs.len(), 5, "only the rendered annotations");
+    assert!(
+        retained.inputs.contains(&(
+            "/path/text".to_owned(),
+            Some("Line one\\nLine two".to_owned())
+        )),
+        "the escaped source and the output address are distinct"
+    );
+    assert!(
+        retained
+            .inputs
+            .contains(&("/lines/1/missing".to_owned(), None)),
+        "the missing array element retains its lookup"
+    );
+    Ok(())
+}
+
+struct TagPaths;
+
+impl TagResolver for TagPaths {
+    fn tag_path(&self, _guid: Guid) -> Option<&str> {
+        Some("Fixture.Leaf")
+    }
+}
+
+#[test]
+fn observed_json_identifies_the_applied_tag_path_and_target() -> TestResult {
+    let tags = DataForgeBuilder::new()
+        .structure(TestStruct::new("Item").field("relation", TestType::Reference))
+        .structure(TestStruct::new("Tag"))
+        .record(
+            TestRecord::new(GUID, "Item", "Item.One", "fixture/item.xml")
+                .value("relation", TestValue::Reference(1)),
+        )
+        .record(TestRecord::new(1, "Tag", "Tag.Leaf", "fixture/tag.xml"));
+    let annotations = Annotations::none().with_tags(Some(&TagPaths));
+    let capture = observed(&tags, annotations)?;
+    assert_eq!(
+        capture.tags,
+        [(
+            "/relation/tag".to_owned(),
+            "00000000-0000-0000-0000-000000000001".parse()?,
+            "Fixture.Leaf".to_owned()
+        )],
+        "the applied path cites the original canonical target"
+    );
     Ok(())
 }

@@ -13,6 +13,11 @@ use p4kx_testkit::{
     real_archive_path,
 };
 
+use serde_json::{Map, Value};
+
+#[path = "dcb_refs_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const TERRA: u128 = 0x10;
@@ -31,6 +36,10 @@ fn ship(guid: u128, name: &str, path: &str) -> TestRecord {
 }
 
 fn database() -> Vec<u8> {
+    original_database().build()
+}
+
+fn schema() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .structure(TestStruct::new("Planet").field("name", TestType::String))
         .structure(TestStruct::new("Manufacturer").field("home", reference_to("Planet")))
@@ -39,6 +48,10 @@ fn database() -> Vec<u8> {
                 .field("maker", reference_to("Manufacturer"))
                 .array("escorts", reference_to("Ship")),
         )
+}
+
+fn original_database() -> DataForgeBuilder {
+    schema()
         .record(TestRecord::new(
             TERRA,
             "Planet",
@@ -73,7 +86,6 @@ fn database() -> Vec<u8> {
             ship(GAMMA, "Gamma", "libs/ships/beta.xml")
                 .value("maker", TestValue::Reference(MISSING)),
         )
-        .build()
 }
 
 fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
@@ -108,6 +120,58 @@ fn stdout(args: &[&str]) -> Result<String, Box<dyn Error>> {
     Ok(stdout)
 }
 
+fn assert_json_payload(args: &[&str], snapshot: &str) -> TestResult {
+    let output = stdout(args)?;
+    assert!(
+        output.ends_with('\n') && output.lines().count() == 1,
+        "the structured command emits one JSON line"
+    );
+    let mut actual: Value = serde_json::from_str(&output)?;
+    strip_reference_origins(&mut actual)?;
+    let payload = snapshot
+        .lines()
+        .skip(1)
+        .skip_while(|line| *line != "---")
+        .nth(1)
+        .ok_or("original JSON snapshot payload")?;
+    assert_eq!(
+        actual,
+        serde_json::from_str::<Value>(payload)?,
+        "the original JSON payload is preserved"
+    );
+    Ok(())
+}
+
+fn strip_reference_origins(document: &mut Value) -> TestResult {
+    let envelope = document.as_object_mut().ok_or("actual refs JSON object")?;
+    envelope.remove("fieldOrigins");
+    envelope.remove("provenance");
+    for field in ["edges", "unresolved"] {
+        strip_row_origins(envelope, field)?;
+    }
+    if let Some(records) = envelope.get_mut("records") {
+        for row in records.as_array_mut().ok_or("actual records array")? {
+            let listing = row.as_object_mut().ok_or("actual Record listing")?;
+            listing.remove("fieldOrigins");
+            for field in ["references", "unresolved"] {
+                strip_row_origins(listing, field)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn strip_row_origins(parent: &mut Map<String, Value>, field: &str) -> TestResult {
+    if let Some(rows) = parent.get_mut(field) {
+        for row in rows.as_array_mut().ok_or("actual refs rows")? {
+            row.as_object_mut()
+                .ok_or("actual refs row")?
+                .remove("fieldOrigins");
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn incoming_lists_the_referring_records_with_their_fields() -> TestResult {
     insta::assert_snapshot!(stdout(&["libs/makers/aegis", "--incoming"])?);
@@ -136,19 +200,29 @@ fn a_record_path_that_several_records_share_lists_each_of_them() -> TestResult {
 
 #[test]
 fn incoming_as_json_keeps_field_path_and_indices() -> TestResult {
-    insta::assert_snapshot!(stdout(&["libs/ships/beta", "--incoming", "--json"])?);
-    Ok(())
+    assert_json_payload(
+        &["libs/ships/beta", "--incoming", "--json"],
+        include_str!(concat!(
+            "snapshots/it__dcb_refs__",
+            "incoming_as_json_keeps_field_path_and_indices.snap"
+        )),
+    )
 }
 
 #[test]
 fn outgoing_as_json_lists_unresolved_references_separately() -> TestResult {
-    insta::assert_snapshot!(stdout(&[
-        "00000000-0000-0000-0000-000000000031",
-        "--outgoing",
-        "--format",
-        "json"
-    ])?);
-    Ok(())
+    assert_json_payload(
+        &[
+            "00000000-0000-0000-0000-000000000031",
+            "--outgoing",
+            "--format",
+            "json",
+        ],
+        include_str!(concat!(
+            "snapshots/it__dcb_refs__",
+            "outgoing_as_json_lists_unresolved_references_separately.snap"
+        )),
+    )
 }
 
 #[test]
@@ -165,15 +239,19 @@ fn files_with_a_record_keeps_the_edges_of_its_file() -> TestResult {
 
 #[test]
 fn files_as_json_counts_files_and_edges() -> TestResult {
-    insta::assert_snapshot!(stdout(&["--files", "--json"])?);
-    Ok(())
+    assert_json_payload(
+        &["--files", "--json"],
+        include_str!("snapshots/it__dcb_refs__files_as_json_counts_files_and_edges.snap"),
+    )
 }
 
 #[test]
 fn unresolved_lists_every_reference_to_a_missing_guid() -> TestResult {
     insta::assert_snapshot!(stdout(&["--unresolved"])?);
-    insta::assert_snapshot!("unresolved_json", stdout(&["--unresolved", "--json"])?);
-    Ok(())
+    assert_json_payload(
+        &["--unresolved", "--json"],
+        include_str!("snapshots/it__dcb_refs__unresolved_json.snap"),
+    )
 }
 
 #[test]
@@ -235,7 +313,7 @@ fn a_query_selects_the_records_that_refer_to_a_record() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_real_archive_has_plausible_counts_and_incoming_references_of_a_ship() -> TestResult {
     let archive = real_archive_path()?;
-    let run = |args: &[&str]| -> Result<serde_json::Value, Box<dyn Error>> {
+    let run = |args: &[&str]| -> Result<Value, Box<dyn Error>> {
         let output = p4kx_testkit::p4kx()?
             .args(["dcb", "refs"])
             .arg(&archive)

@@ -53,7 +53,7 @@ fn with_font() -> p4kx_testkit::TestMovie {
     )
 }
 
-fn field(text: &TestEditText) -> Vec<u8> {
+pub(crate) fn field(text: &TestEditText) -> Vec<u8> {
     with_font()
         .tag(37, &text.body())
         .tag(26, &TestPlace::new(1, 7).body2())
@@ -96,7 +96,7 @@ fn drawn(image: &RgbaImage, x: std::ops::Range<u32>, y: std::ops::Range<u32>) ->
         .count()
 }
 
-fn plain(text: &str) -> TestEditText {
+pub(crate) fn plain(text: &str) -> TestEditText {
     TestEditText::new(7, FIELD)
         .text(text)
         .font(FONT, HEIGHT)

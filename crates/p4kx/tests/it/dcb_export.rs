@@ -15,6 +15,9 @@ use p4kx_testkit::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "dcb_export_xml_origins.rs"]
+mod origins;
+
 fn database() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .enumeration("Size", ["Small", "Large"])
@@ -112,7 +115,7 @@ fn export(archive: &Path, out: &Path, args: &[&str], code: i32) -> Result<Run, B
     })
 }
 
-/// Returns every file below `root` with its content, in path order.
+/// Returns every XML file below `root` with its content, in path order.
 fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
     let mut files = Vec::new();
     let mut folders = vec![root.to_path_buf()];
@@ -121,7 +124,7 @@ fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
             let path = entry?.path();
             if path.is_dir() {
                 folders.push(path);
-            } else {
+            } else if path.extension().is_some_and(|extension| extension == "xml") {
                 files.push(path);
             }
         }
@@ -250,7 +253,17 @@ fn dcb_export_prints_one_line_of_json() -> TestResult {
     let run = export(&archive, &dir.path().join("out"), &["--json"], 0)?;
 
     assert_eq!(run.stdout.lines().count(), 1, "one line: {}", run.stdout);
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let receipts = value
+        .as_object_mut()
+        .and_then(|summary| summary.remove("origin_receipts"))
+        .ok_or("per-Record origin receipts")?;
+    assert_eq!(
+        receipts.as_array().ok_or("receipt paths")?.len(),
+        3,
+        "every XML payload has a companion"
+    );
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

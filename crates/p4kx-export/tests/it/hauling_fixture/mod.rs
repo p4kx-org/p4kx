@@ -15,7 +15,7 @@ use p4kx_testkit::{
     TestValue,
 };
 
-use manifests::{manifest_custom, manifest_even};
+use manifests::{manifest_custom, manifest_even, manifest_random};
 use structures::structures;
 
 pub(crate) const GENERATOR: u128 = 0xf000_0000_0000_4000_8000_0000_0000_0001;
@@ -35,6 +35,7 @@ pub(crate) const CRATE: u128 = 0xf600_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const CRATES: u128 = 0xf600_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const MANIFEST_EVEN: u128 = 0xf700_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const MANIFEST_CUSTOM: u128 = 0xf700_0000_0000_4000_8000_0000_0000_0002;
+pub(crate) const MANIFEST_RANDOM: u128 = 0xf700_0000_0000_4000_8000_0000_0000_0003;
 
 const RECORDS: &str = "libs/foundry/records/";
 
@@ -350,6 +351,8 @@ fn database() -> DataForgeBuilder {
         ),
         manifest_even(),
         manifest_custom(),
+        manifest_random(),
+        manifest_random(),
         record(SCRAP, "ResourceType", "Scrap", "resourcetypedatabase/scrap"),
         record(GOLD, "ResourceType", "Gold", "resourcetypedatabase/gold"),
         record(CRATE, "Placeholder", "crate", "entities/crate"),

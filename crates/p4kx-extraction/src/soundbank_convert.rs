@@ -3,20 +3,21 @@
 
 use std::fmt::Write as _;
 use std::fs;
-use std::io::Write;
+
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use p4kx_audio::{AudioError, Soundbank};
+use p4kx_audio::Soundbank;
 
 use crate::buffers::Buffers;
 use crate::entry_path::relative_path;
 use crate::sound_convert::{Converted, SoundFile};
 use crate::sound_job::sound_role;
+use crate::sound_output::{SoundArtifactSource, sound_input};
 use crate::source::SourceEntry;
 use crate::texture_convert::Step;
 use crate::write::{EntryWriter, Outcome};
-use crate::{ConversionError, ExtractionError};
+use crate::{ConversionError, ExtractionError, SourceInput};
 
 /// What unpacking a soundbank got done: how its files ended, whether a WEM was written converted,
 /// the first error that stopped a file,
@@ -40,7 +41,7 @@ impl Unpacked {
         let outcome = if let Some(error) = self.error {
             Outcome::Failed(error)
         } else if self.converted {
-            Outcome::Converted
+            Outcome::Converted(None)
         } else if self.steps.contains(&Step::Written) {
             Outcome::Written
         } else {
@@ -76,36 +77,33 @@ impl EntryWriter<'_> {
             .ok_or(ExtractionError::UnsafePath)?;
         let wem_folder = relative_path(stem)?;
         let destination = self.destination(entry)?;
-        if !self.read_sound(entry, buffers, credited)? {
+        let Some(read) = self.read_sound(entry, buffers, credited)? else {
             return Ok(Converted::of(Outcome::Cancelled));
-        }
+        };
+        let file = read.file_origin();
+        drop(read);
+        let input = sound_input(entry, file.as_ref());
         let Buffers { chunk, data, .. } = buffers;
         let bytes = data.as_slice();
-        let raw = self
-            .write_converted(
-                &destination,
-                |sink| sink.write_all(bytes).map_err(AudioError::Write),
-                chunk,
-            )?
-            .unwrap_or(Step::Cancelled);
-        if raw == Step::Cancelled {
+        let raw = self.write_buffered_raw_entry(&destination, bytes, entry, input, chunk)?;
+        if let Some(error) = raw.receipt_failure {
+            return Ok(Converted::of(Outcome::RawWritten(Some(error))));
+        }
+        if raw.step == Step::Cancelled {
             return Ok(Converted::of(Outcome::Cancelled));
         }
         let mut unpacked = Unpacked {
-            steps: vec![raw],
+            steps: vec![raw.step],
             ..Unpacked::default()
         };
         match Soundbank::parse(bytes) {
             Ok(bank) => {
                 if bank.wems().next().is_some() {
                     let existed = self.target.join(&wem_folder).symlink_metadata().is_ok();
-                    let folder = self
-                        .tracker
-                        .folders
-                        .folder(self.target, Some(&wem_folder))?;
+                    let folder = self.folder(Some(&wem_folder))?;
                     self.unpack(
                         entry,
-                        &bank,
+                        (&bank, input),
                         (folder.as_path(), chunk),
                         credited,
                         &mut unpacked,
@@ -134,7 +132,7 @@ impl EntryWriter<'_> {
     fn unpack(
         &self,
         entry: &SourceEntry<'_>,
-        bank: &Soundbank<&[u8]>,
+        (bank, input): (&Soundbank<&[u8]>, Option<SourceInput<'_>>),
         (folder, chunk): (&Path, &mut [u8]),
         credited: &AtomicU64,
         unpacked: &mut Unpacked,
@@ -157,13 +155,18 @@ impl EntryWriter<'_> {
                 stem: &stem,
                 name: &name,
                 prefetch: wem.is_prefetch(),
+                source: SoundArtifactSource::embedded(*entry, input, wem.source()),
             };
             match self.write_sound(wem.bytes(), &sound, chunk) {
                 Ok(end) => {
-                    unpacked.converted |= end.converted && end.step == Step::Written;
-                    unpacked.steps.push(end.step);
+                    unpacked.converted |= end.converted && end.output.step == Step::Written;
+                    unpacked.steps.push(end.output.step);
                     unpacked.unconverted.extend(end.unconverted);
-                    if end.step == Step::Cancelled {
+                    if let Some(error) = end.output.receipt_failure {
+                        unpacked.error = Some(error);
+                        return;
+                    }
+                    if end.output.step == Step::Cancelled {
                         unpacked.cancelled = bank
                             .wems()
                             .skip(position)

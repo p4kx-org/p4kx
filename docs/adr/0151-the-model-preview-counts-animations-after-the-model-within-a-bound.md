@@ -13,7 +13,11 @@ animations the export could not write.
   soon as they exist, with the animation count `Reading`, and the count and the animations that
   move the skeleton in a second event. `ModelPreview::is_reading_animations` tells which state it
   is in. The Export as GLB is unavailable until the count is known.
-- **A bound.** `AnimationSet::from_archive_bounded` reads the animation files of the model's
+- Hover over the animation count for its source encryption marker. The same bounded
+  read retains one explicit use per distinct Archive Entry containing a selected
+  animation. Additive and unread clips fall outside this count. The marker records
+  incomplete source coverage. A count without a source witness has unknown origin.
+- **A bound.** `ArchiveAnimationRead::for_model_bounded` reads the animation files of the model's
   folders unless they are more than `AnimationBounds::files` files or `AnimationBounds::bytes`
   uncompressed bytes, checked before any is read. The preview passes 64 files and 64 MiB
   (`PREVIEW_ANIMATION_BOUNDS`). Beyond the bound the count is `AnimationCount::TooMany`, shown as

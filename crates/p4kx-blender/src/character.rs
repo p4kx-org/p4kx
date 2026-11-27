@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
-use p4kx_assembly::{Armour, CharacterAnimations, PartOrigin};
-use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
+use p4kx_assembly::{Armour, ArmourPart, CharacterAnimations, PartOrigin};
+use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MeshVertexMap, TextureLoader};
 
 use crate::build::assembly_issue;
+use crate::character_body_zones::ObserveBodyZones;
 use crate::manifest::{CharacterSource, EntityRef, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
-use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
+use crate::mesh_vertex_map::Writer;
+use crate::rig_package::{RigScene, RigWriter, WrittenRig, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary};
 
 /// A Character ready to be written as a package: its [`Armour`] with the body, head and pieces it
@@ -21,6 +25,7 @@ pub struct CharacterScene<'a> {
     animations: &'a CharacterAnimations<'a>,
     chf: Option<&'a str>,
     loadout: Option<&'a str>,
+    body_zones: bool,
 }
 
 impl<'a> CharacterScene<'a> {
@@ -30,6 +35,13 @@ impl<'a> CharacterScene<'a> {
     pub const fn with_origin(mut self, chf: Option<&'a str>, loadout: Option<&'a str>) -> Self {
         self.chf = chf;
         self.loadout = loadout;
+        self
+    }
+
+    /// Includes original body zones and their emitted geometry addresses in the package.
+    #[must_use]
+    pub const fn with_body_zones(mut self) -> Self {
+        self.body_zones = true;
         self
     }
 
@@ -47,6 +59,7 @@ impl<'a> CharacterScene<'a> {
             animations,
             chf: None,
             loadout: None,
+            body_zones: false,
         }
     }
 }
@@ -68,11 +81,11 @@ impl<'a> CharacterScene<'a> {
 ///
 /// # Errors
 ///
-/// Returns [`PackageError::Refused`] when `out` lies inside a Star Citizen installation,
-/// [`PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
-/// [`PackageError::Mesh`] when the Character does not fit in a GLB file,
-/// [`PackageError::Write`] when a file or folder cannot be written and
-/// [`PackageError::Cancelled`] when `cancelled` returned true.
+/// Returns [`crate::PackageError::Refused`] when `out` lies inside a Star Citizen installation,
+/// [`crate::PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
+/// [`crate::PackageError::Mesh`] when the Character does not fit in a GLB file,
+/// [`crate::PackageError::Write`] when a file or folder cannot be written and
+/// [`crate::PackageError::Cancelled`] when `cancelled` returned true.
 pub fn write_character_package(
     character: &CharacterScene<'_>,
     textures: &dyn TextureLoader,
@@ -81,21 +94,102 @@ pub fn write_character_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_character_package_with_context(
+        character,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes a Character package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_character_package_with_context(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     write_rig_package(
         out,
         character.name,
         options,
-        cancelled,
-        |options, writer| {
-            character.armour.write_glb_animated_with(
-                character.animations,
+        context,
+        |options, writer, map| write_mesh(character, textures, options, writer, map, context),
+        |written| manifest(character, info, options, written),
+    )
+}
+
+fn write_mesh(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    writer: &mut RigWriter<'_, '_>,
+    map: Option<&mut Writer>,
+    context: &crate::PackageWriteContext<'_>,
+) -> Result<WrittenRig, GltfError> {
+    let armour = character.armour;
+    let animations = character.animations;
+    let mut map = map;
+    let mut zones = character
+        .body_zones
+        .then(|| ObserveBodyZones::new(armour, options.lod));
+    let observe = map.is_some() || zones.is_some();
+    let mut visitor = |row: MeshVertexMap<'_>, part: &ArmourPart| {
+        if let Some(map) = map.as_deref_mut() {
+            map.observe(&row, part.model(), part.model_archive_sources(), context)?;
+        }
+        if let Some(zones) = &mut zones {
+            zones.observe(&row, part)?;
+        }
+        Ok(())
+    };
+    let mounts = armour
+        .parts()
+        .iter()
+        .any(|part| part.mount_source().is_some());
+    let (summary, emission) = match (mounts, observe) {
+        (true, true) => armour
+            .write_glb_animated_observed_with_vertex_origins(
+                animations,
                 options,
                 textures,
                 writer,
+                &mut visitor,
             )
-        },
-        |written| manifest(character, info, options, written),
-    )
+            .map(|(summary, emission)| (summary, Some(emission))),
+        (true, false) => armour
+            .write_glb_animated_observed(animations, options, textures, writer)
+            .map(|(summary, emission)| (summary, Some(emission))),
+        (false, true) => armour
+            .write_glb_with_vertex_origins(animations, options, textures, writer, &mut visitor)
+            .map(|summary| (summary, None)),
+        (false, false) => armour
+            .write_glb_animated_with(animations, options, textures, writer)
+            .map(|summary| (summary, None)),
+    }?;
+    let worn_origins = emission
+        .as_ref()
+        .map(|emission| armour.worn_mount_origins(emission))
+        .transpose()
+        .map_err(|error| GltfError::Write(io::Error::other(error)))?;
+    Ok(WrittenRig {
+        scene_fields: crate::character_clip_origins::capture(animations, &summary)
+            .map_err(GltfError::Write)?,
+        summary,
+        worn_origins,
+        body_zones: zones
+            .map(|zones| zones.finish(armour))
+            .transpose()
+            .map_err(GltfError::Write)?,
+    })
 }
 
 fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
@@ -105,6 +199,7 @@ fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
         entity: EntityRef {
             class_name: character.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         character: Some(CharacterSource {
             name: character.name.to_owned(),
@@ -148,12 +243,20 @@ fn manifest(
             .map(assembly_issue)
             .collect(),
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = armour
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(armour: &Armour, written: &GlbSummary) -> Rig {
     Rig {
         body: Some(armour.variant().code().to_owned()),
+        worn_mount_provenance: None,
+        body_zones: None,
         skeleton: armour.skeleton_file().to_owned(),
         bones: written.bones,
         skinned_meshes: written.skinned_meshes,

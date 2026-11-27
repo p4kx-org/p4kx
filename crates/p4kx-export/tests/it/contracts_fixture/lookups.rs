@@ -173,7 +173,15 @@ pub(super) fn places(builder: DataForgeBuilder) -> DataForgeBuilder {
     records.into_iter().fold(builder, DataForgeBuilder::record)
 }
 
-pub(super) fn reputation(builder: DataForgeBuilder) -> DataForgeBuilder {
+pub(super) fn faction_scope() -> TestRecord {
+    plain_record(
+        FACTION_SCOPE,
+        "ReputationScope",
+        "reputation/scopes/faction",
+    )
+}
+
+pub(super) fn reputation(builder: DataForgeBuilder, scope: TestRecord) -> DataForgeBuilder {
     [
         plain_record(
             FACTION,
@@ -192,11 +200,7 @@ pub(super) fn reputation(builder: DataForgeBuilder) -> DataForgeBuilder {
             .value("description", TestValue::text("@desc_broker"))
             .value("type", TestValue::Reference(DELIVERY))
             .value("locationMissionAvailable", TestValue::Reference(OBJ_PLANET)),
-        plain_record(
-            FACTION_SCOPE,
-            "ReputationScope",
-            "reputation/scopes/faction",
-        ),
+        scope,
         plain_record(AFFINITY, "ReputationScope", "reputation/scopes/affinity"),
         reward(RANK_TWO_HUNDRED, "gain_200", 200),
         reward(RANK_FIFTY, "gain_50", 50),

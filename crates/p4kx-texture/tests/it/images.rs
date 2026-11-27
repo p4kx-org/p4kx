@@ -5,12 +5,13 @@
 //! the bounds of untrusted headers and the formats `R16G16_FLOAT` and `R32_UINT`.
 
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::io;
 
 use p4kx_testkit::{SplitDds, TestTextureFormat};
 use p4kx_texture::{
-    DdsHeader, DxgiFormat, Mip, RgbaImage, SiblingReader, TextureError, TextureFormat, decode,
-    read_mip, sheet_columns, tile,
+    DdsHeader, DdsRawHeader, DxgiFormat, Mip, RgbaImage, SiblingReader, TextureError,
+    TextureFormat, decode, read_mip, sheet_columns, tile,
 };
 
 struct Parts(BTreeMap<u32, Vec<u8>>);
@@ -60,7 +61,7 @@ const fn dxgi(code: u32) -> TextureFormat {
 
 #[test]
 fn a_volume_mip_holds_one_image_per_slice_and_the_slices_halve_per_level()
--> Result<(), TextureError> {
+-> Result<(), Box<dyn Error>> {
     let dds = SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 8)
         .volume(4)
         .split(2);
@@ -69,9 +70,9 @@ fn a_volume_mip_holds_one_image_per_slice_and_the_slices_halve_per_level()
         let mip = read(&dds, level)?;
         assert_eq!(mip.surfaces(), slices, "slices of mip {level}");
         assert_eq!(mip.data(), dds.mip(level).as_slice(), "data of mip {level}");
-        let slice_len = mip.data().len() / slices as usize;
+        let slice_len = mip.data().len() / usize::try_from(slices)?;
         for slice in 0..slices {
-            let start = slice as usize * slice_len;
+            let start = usize::try_from(slice)? * slice_len;
             assert_eq!(
                 mip.surface(slice),
                 mip.data().get(start..start + slice_len),
@@ -122,7 +123,7 @@ fn an_array_mip_holds_one_image_per_element_from_its_part_or_the_header() -> Res
         assert_eq!(mip.surfaces(), 3, "three elements of mip {level}");
         for element in 0..3 {
             assert_eq!(
-                mip.surface(element),
+                mip.surface(u64::from(element)),
                 Some(dds.surface_mip(element, level).as_slice()),
                 "element {element} of mip {level}"
             );
@@ -156,7 +157,7 @@ fn a_volume_array_and_cubemap_array_count_their_images() -> Result<(), TextureEr
 
 #[test]
 fn sheets_are_the_smallest_square_that_holds_the_images() {
-    let columns: Vec<u32> = [1, 2, 3, 4, 5, 9, 10, 86, 2048]
+    let columns: Vec<u64> = [1, 2, 3, 4, 5, 9, 10, 86, 2048]
         .into_iter()
         .map(sheet_columns)
         .collect();
@@ -237,7 +238,7 @@ fn a_sheet_refuses_no_images_no_columns_and_images_of_two_sizes() -> Result<(), 
 }
 
 #[test]
-fn a_header_with_a_depth_or_array_size_beyond_the_limits_is_invalid() {
+fn large_source_topologies_keep_exact_readable_mip_counts() -> Result<(), TextureError> {
     let volume = SplitDds::new(TestTextureFormat::LegacyBgra8, 1, 1)
         .volume(4096)
         .mips(1);
@@ -246,12 +247,27 @@ fn a_header_with_a_depth_or_array_size_beyond_the_limits_is_invalid() {
         .mips(1);
 
     for (name, dds) in [("volume", volume), ("array", array)] {
-        let result = header_of(&dds);
-        assert!(
-            matches!(result, Err(TextureError::InvalidHeader(_))),
-            "{name}: {result:?}"
+        let bytes = dds.header_bytes();
+        let raw = DdsRawHeader::parse(&bytes)?;
+        let original = raw
+            .dx10()
+            .map_or_else(|| raw.legacy().depth, |extended| extended.array_size);
+        assert_eq!(original, 4096, "{name} keeps the same actual source count");
+        let header = header_of(&dds)?;
+        assert_eq!(
+            header.images(0),
+            4096,
+            "{name} has no device-derived source cap"
         );
+        assert_eq!(
+            header.mip_size(0),
+            Some(dds.mip(0).len() as u64),
+            "the exact physical byte extent"
+        );
+        let mip = read_mip(bytes.as_slice(), bytes.len() as u64, &Parts::of(&dds), 0)?;
+        assert_eq!(mip.data(), dds.mip(0), "{name} retains every source byte");
     }
+    Ok(())
 }
 
 #[test]

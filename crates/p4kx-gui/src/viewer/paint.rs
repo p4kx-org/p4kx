@@ -118,8 +118,7 @@ impl egui_wgpu::CallbackTrait for SceneCallback {
     ) -> Vec<wgpu::CommandBuffer> {
         resources
             .get_mut::<Renderer>()
-            .map(|renderer| renderer.prepare(device, queue, &self.frame))
-            .unwrap_or_default()
+            .map_or_default(|renderer| renderer.prepare(device, queue, &self.frame))
     }
 
     fn paint(

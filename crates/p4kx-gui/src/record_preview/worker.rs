@@ -6,9 +6,9 @@ use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, OnceLock};
 use std::thread;
 
-use p4kx_extraction::{DataForge, Guid, LanguageTexts, TagResolver, TagTree, TextResolver};
+use p4kx_extraction::{DataForge, Guid, ObservedTagTree, TagResolver, TextResolver, TreeBuilder};
 
-use super::{RecordView, lines};
+use super::{RecordPreviewProvenance, RecordView, lines};
 use crate::forge_cache::{ForgeSource, ReadFailure};
 use crate::model::describe;
 use crate::text_cache::TextFailure;
@@ -135,7 +135,7 @@ struct SourceTags<'a> {
     source: &'a ForgeSource,
     index: &'a EntryIndex,
     dropped: &'a AtomicBool,
-    tree: OnceLock<Arc<TagTree>>,
+    tree: OnceLock<Arc<ObservedTagTree>>,
 }
 
 impl<'a> SourceTags<'a> {
@@ -148,12 +148,12 @@ impl<'a> SourceTags<'a> {
         }
     }
 
-    fn tree(&self) -> Option<&TagTree> {
+    fn tree(&self) -> Option<&ObservedTagTree> {
         if let Some(tree) = self.tree.get() {
             return Some(tree);
         }
         let stop = || self.dropped.load(Ordering::Relaxed) || self.index.watch().is_changed();
-        let built = self.source.tags(&stop).ok().flatten()?;
+        let built = self.source.observed_tags(&stop).ok().flatten()?;
         Some(self.tree.get_or_init(|| built))
     }
 }
@@ -167,34 +167,51 @@ impl TagResolver for SourceTags<'_> {
 fn read(
     index: &EntryIndex,
     forge: &DataForge<'_>,
-    tags: &dyn TagResolver,
+    tags: &SourceTags<'_>,
     request: Request,
 ) -> Result<RecordView, Unread> {
     let record = forge
         .record(request.id.0)
         .ok_or_else(|| Unread::Failed(format!("the DataForge has no Record {}", request.id.0)))?;
-    let tree = record
-        .tree()
+    let record = TreeBuilder::new()
+        .build_positioned_partial(&record)
         .map_err(|error| Unread::Failed(describe(&error)))?;
     let mut failure = None;
-    let mut view = match request.language {
-        None => lines::view(forge, &tree, None, tags),
+    let loaded = match request.language {
+        None => None,
         Some(language) => match index.texts().load(index, language) {
-            Ok(texts) => {
-                let resolver = LanguageTexts::owned(&texts, language);
-                let texts = Some(&resolver as &dyn TextResolver);
-                let mut view = lines::view(forge, &tree, texts, tags);
-                view.language = Some(language);
-                view
-            }
-            Err(TextFailure::ArchiveChanged) => return Err(Unread::ArchiveChanged),
-            Err(TextFailure::Unreadable(reason)) => {
+            Ok(texts) => Some((language, texts)),
+            Err(error) => {
+                let reason = match error {
+                    TextFailure::ArchiveChanged => return Err(Unread::ArchiveChanged),
+                    TextFailure::Unreadable(reason) => reason,
+                };
                 failure = Some((language, reason.into_boxed_str()));
-                lines::view(forge, &tree, None, tags)
+                None
             }
         },
     };
+    let resolver = loaded.as_ref().map(|(_, texts)| texts.as_ref());
+    let (mut view, xml) = lines::view(
+        forge,
+        record.tree(),
+        resolver.map(|resolver| resolver as &dyn TextResolver),
+        tags,
+    );
+    view.language = loaded.as_ref().map(|(language, _)| *language);
     view.texts_failure = failure;
+    view.provenance = Some(
+        RecordPreviewProvenance::capture(
+            forge,
+            &record,
+            tags.source.entry.origin_of(forge),
+            resolver.and_then(|texts| texts.indexed.as_ref()),
+            tags.tree.get().map(Arc::as_ref),
+            &view.lines,
+            xml.map(|pending| (pending, view.xml().bytes().len() as u64)),
+        )
+        .map(Box::new),
+    );
     if index.watch().check().is_err() {
         return Err(Unread::ArchiveChanged);
     }

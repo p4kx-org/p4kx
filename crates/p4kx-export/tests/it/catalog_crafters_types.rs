@@ -7,7 +7,7 @@
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
@@ -159,8 +159,8 @@ fn attachable(shape: Shape) -> TestValue {
     TestValue::Struct(TestInstance::new("SAttachableComponentParams").value("AttachDef", attach))
 }
 
-/// Builds the catalog of an Archive with one crafter of `shape` and returns that crafter.
-fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
+/// Builds the catalog of an Archive with one crafter of the given shape.
+fn crafter_catalog(shape: Shape) -> Result<Value, Box<dyn Error>> {
     let record = TestRecord::new(
         CRAFTER,
         "EntityClassDefinition",
@@ -180,96 +180,157 @@ fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
         )
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    Ok(serde_json::from_slice(
+        build_catalog(&archive, options.with_full_provenance())?.json(),
+    )?)
+}
+
+fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
+    let catalog = crafter_catalog(shape)?;
     catalog
-        .get("crafters")
-        .and_then(Value::as_array)
-        .and_then(|crafters| crafters.first())
+        .pointer("/definitions/crafters/rows/0")
         .cloned()
         .ok_or_else(|| "the crafter".into())
 }
 
 #[test]
-fn absent_fields_read_as_empty_without_an_issue() -> TestResult {
+fn absent_fields_and_original_attachment_values_are_distinct() -> TestResult {
     let entry = crafter(Shape::Absent)?;
-    assert_eq!(entry["baseCraftingTime"], Value::Null);
-    assert_eq!(entry["modifiers"], json!([]));
-    assert_eq!(entry["issues"], json!([]));
-    assert_eq!(entry["type"], "Crafter");
-    assert_eq!(entry["size"], 1);
-    assert_eq!(entry["subType"], Value::Null, "the struct lacks SubType");
-    Ok(())
-}
-
-#[test]
-fn a_modifiers_value_that_is_no_array_is_reported() -> TestResult {
-    let entry = crafter(Shape::ModifiersNoArray)?;
-    assert_eq!(entry["modifiers"], json!([]));
-    assert_eq!(entry["issues"], json!(["unreadable_modifiers"]));
-    Ok(())
-}
-
-#[test]
-fn a_process_type_value_that_is_no_array_is_reported() -> TestResult {
-    let entry = crafter(Shape::ProcessTypesNoArray)?;
-    assert_eq!(entry["queues"][0]["processTypeAvailability"], json!([]));
-    assert_eq!(entry["issues"], json!(["unreadable_process_types"]));
-    Ok(())
-}
-
-#[test]
-fn a_queue_that_is_no_struct_is_kept_empty_and_reported() -> TestResult {
-    let entry = crafter(Shape::QueueNoStruct)?;
+    let component = &entry["component"]["value"];
+    let attach = &entry["attachment"]["value"]["attachDef"]["value"];
     assert_eq!(
-        entry["queues"],
-        json!([{
-            "name": null,
-            "maxJobsInProgress": null,
-            "maxJobsWaiting": null,
-            "blueprintCategoryAvailability":
-                {"kind": "none", "structName": null, "blueprintCategoryGuids": []},
-            "processTypeAvailability": [],
-        }])
+        component["baseCraftingTime"]["state"], "absent",
+        "the field is undeclared"
     );
-    assert_eq!(entry["issues"], json!(["unreadable_queue"]));
-    Ok(())
-}
-
-#[test]
-fn a_queues_value_that_is_no_array_is_reported() -> TestResult {
-    let entry = crafter(Shape::QueuesNoArray)?;
-    assert_eq!(entry["queues"], json!([]));
-    assert_eq!(entry["issues"], json!(["unreadable_queues"]));
-    Ok(())
-}
-
-#[test]
-fn a_base_crafting_time_that_is_no_number_is_reported() -> TestResult {
-    let entry = crafter(Shape::BaseTimeText)?;
-    assert_eq!(entry["baseCraftingTime"], Value::Null);
-    assert_eq!(entry["issues"], json!(["unreadable_base_crafting_time"]));
-    Ok(())
-}
-
-#[test]
-fn an_attach_def_with_a_wrong_type_is_reported() -> TestResult {
-    let entry = crafter(Shape::AttachDefNoStruct)?;
     assert_eq!(
-        (&entry["type"], &entry["size"], &entry["issues"]),
+        component["modifiers"]["state"], "absent",
+        "the field is undeclared"
+    );
+    assert_eq!(
+        attach["itemType"]["value"], "Crafter",
+        "the original attach type"
+    );
+    assert_eq!(
+        attach["size"]["value"],
+        json!({"type":"int32","value":1}),
+        "the original attach size"
+    );
+    assert_eq!(
+        attach["itemSubtype"]["state"], "absent",
+        "the definition lacks SubType"
+    );
+    Ok(())
+}
+
+#[test]
+fn invalid_component_fields_keep_their_original_members() -> TestResult {
+    for (shape, owner_path, key, authored) in [
         (
-            &Value::Null,
-            &Value::Null,
-            &json!(["unreadable_attach_def"])
-        )
+            Shape::ModifiersNoArray,
+            "/component/value",
+            "modifiers",
+            "modifiers",
+        ),
+        (
+            Shape::ProcessTypesNoArray,
+            "/component/value/queues/value/0/value",
+            "processTypeAvailability",
+            "processTypeAvailability",
+        ),
+        (Shape::QueueNoStruct, "/component/value", "queues", "queues"),
+        (Shape::QueuesNoArray, "/component/value", "queues", "queues"),
+        (
+            Shape::BaseTimeText,
+            "/component/value",
+            "baseCraftingTime",
+            "baseCraftingTime",
+        ),
+        (
+            Shape::AttachTypeNumber,
+            "/attachment/value/attachDef/value",
+            "itemType",
+            "Type",
+        ),
+        (
+            Shape::AttachSizeText,
+            "/attachment/value/attachDef/value",
+            "size",
+            "Size",
+        ),
+    ] {
+        let entry = crafter(shape)?;
+        let owner = entry.pointer(owner_path).ok_or("the owning definition")?;
+        assert_eq!(
+            owner[key]["state"], "invalid",
+            "unexpected storage for {key}"
+        );
+        assert_eq!(
+            owner[key]["containsEncryptedSource"], true,
+            "the invalid source is encrypted"
+        );
+        assert!(
+            owner
+                .pointer("/additionalFields/roots")
+                .and_then(Value::as_array)
+                .is_some_and(|roots| {
+                    roots.iter().any(|root| root["name"]["value"] == authored)
+                }),
+            "the original {authored} survives in the owner's field arena"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_malformed_attachment_definition_retains_its_source_state() -> TestResult {
+    let entry = crafter(Shape::AttachDefNoStruct)?;
+    let attach = &entry["attachment"]["value"]["attachDef"];
+    assert_eq!(
+        attach["state"], "invalid",
+        "wrong AttachDef storage is retained as invalid"
     );
-    let entry = crafter(Shape::AttachTypeNumber)?;
-    assert_eq!(entry["type"], Value::Null);
-    assert_eq!(entry["size"], 1);
-    assert_eq!(entry["issues"], json!(["unreadable_attach_def"]));
-    let entry = crafter(Shape::AttachSizeText)?;
-    assert_eq!(entry["type"], "Crafter");
-    assert_eq!(entry["size"], Value::Null);
-    assert_eq!(entry["issues"], json!(["unreadable_attach_def"]));
+    assert_eq!(
+        attach["containsEncryptedSource"], true,
+        "the invalid AttachDef has original evidence"
+    );
+    Ok(())
+}
+
+#[test]
+fn readable_alternate_attach_restrictions_retain_their_original_storage() -> TestResult {
+    for (shape, key, original) in [
+        (
+            Shape::AttachTypeNumber,
+            "itemType",
+            json!({"type":"number", "value":{"type":"int32", "value":5}}),
+        ),
+        (
+            Shape::AttachSizeText,
+            "size",
+            json!({"type":"string", "value":{"type":"gameText", "sourceText":"large"}}),
+        ),
+    ] {
+        let catalog = crafter_catalog(shape)?;
+        let cell = catalog
+            .pointer(&format!(
+                "/configurations/itemAttachmentConstraints/rows/0/definition/value/{key}"
+            ))
+            .ok_or("authored alternate restriction")?;
+        assert_eq!(
+            cell["state"], "present",
+            "the original storage was readable"
+        );
+        assert_eq!(
+            cell["containsEncryptedSource"], true,
+            "the original DCB was encrypted"
+        );
+        assert_eq!(
+            cell.pointer("/value/values/0/value/value"),
+            Some(&original),
+            "the original restriction keeps its storage and value"
+        );
+    }
     Ok(())
 }

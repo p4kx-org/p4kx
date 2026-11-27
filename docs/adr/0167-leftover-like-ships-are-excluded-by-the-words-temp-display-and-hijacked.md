@@ -1,7 +1,7 @@
 # Leftover-like ships are excluded by the words `temp`, `display` and `hijacked`
 
 Decided for issue #423. Builds on ADR-0002 and ADR-0054, and on the playability rules of
-`docs/basetool-catalog.md`.
+`docs/catalog.md`.
 
 ## Decision
 

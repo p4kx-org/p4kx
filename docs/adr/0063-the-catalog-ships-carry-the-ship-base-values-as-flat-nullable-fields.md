@@ -2,7 +2,9 @@
 
 Decided for issue #395. Builds on ADR-0054 and ADR-0061.
 
-The Basetool wants the mass, hull points, cargo capacity, size and kind of a ship from the Archive.
+Schema v3 replaces the flat cargo fields with the [sourced projection](0416-ship-cargo-projection-retains-physical-mount-evidence.md).
+
+Catalog consumers need the mass, hull points, cargo capacity, size and kind of a ship from the Archive.
 ADR-0061 reads them for `p4kx ships` with a source per value; this decision puts them into the
 `ships` kind of the catalog.
 

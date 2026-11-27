@@ -5,46 +5,83 @@
 //! to Wwise events and the soundbanks that hold those events.
 
 mod atl;
+mod atl_definitions;
+mod atl_trigger_origins;
 mod banks;
 mod breaks;
 mod cache;
 mod entity;
 mod error;
+mod event_sources;
 mod export;
-mod hash;
+mod export_preflight;
+mod hirc_diagnostic_sites;
+mod hirc_path_source;
+mod hirc_path_uses;
+mod hirc_route_source;
 mod index;
 mod index_read;
+mod inventory;
 mod language;
 mod locate;
 mod media;
+mod music_clip_features;
+mod playback_features;
 mod read;
 mod references;
 mod resolve;
+mod resolve_bounded;
+mod resolve_options;
 mod search;
 mod sounds;
+mod terminal_media_origin;
 mod txtp;
 mod users;
 mod walk;
 mod walk_banks;
+mod wem_location_origin;
+mod wem_selection;
+
+pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
 
 pub use atl::{AtlTrigger, WwiseEvent};
+pub use atl_definitions::AtlDefinitions;
+pub use atl_trigger_origins::AtlTriggerOrigins;
 pub use banks::IndexedSoundbank;
 pub use breaks::{BreakReason, BrokenLink};
 pub use cache::ArchiveAudio;
 pub use entity::{EntityAudio, EntityTrigger, EventMatch, Unmatched};
 pub use error::{AudioFileError, AudioIssue};
+pub use event_sources::SoundbankEventSource;
+pub(crate) use export::ExportedWemOrigin;
 pub use export::{
-    ExportFailure, ExportOptions, ExportReport, ExportState, ExportWatch, ExportedSound,
-    SoundFormat,
+    ExportFailure, ExportFailureKind, ExportFailureOrigin, ExportLoopOrigin, ExportLoopOrigins,
+    ExportOptions, ExportReport, ExportReportCapture, ExportReportOrigins, ExportSoundSelection,
+    ExportState, ExportWatch, ExportedSound, SoundFormat, WemExportSource,
 };
-pub use hash::wwise_id;
+pub use hirc_path_source::{HircPathOrigins, HircPathSource};
 pub use index::AudioIndex;
+pub use inventory::{
+    AudioCandidate, AudioCandidateState, AudioSurvey, AudioSurveyKind, AudioSurveyProof,
+};
 pub use language::LanguageChoice;
-pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
+pub use p4kx_audio::wwise_id;
+pub use references::{
+    PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope,
+    positioned_trigger_references_in, trigger_references, trigger_references_in,
+};
+pub use resolve_options::ResolveOptions;
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
-pub use txtp::{TxtpFile, TxtpReport, TxtpSkip, write_txtp};
+pub use terminal_media_origin::TerminalMediaOrigins;
+pub use txtp::{
+    TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpReportWithOrigins, TxtpSkip,
+    TxtpSkipSource, write_txtp, write_txtp_with_loop_origins, write_txtp_with_origins,
+    write_txtp_with_report_origins,
+};
 pub use users::TriggerUsers;
+pub use wem_location_origin::WemLocationOrigins;
+pub use wem_selection::WemSelection;
 
 /// The largest soundbank Entry that is read, 32 MiB: six times the largest live soundbank.
 pub const MAX_SOUNDBANK_LEN: u64 = 32 << 20;
@@ -59,12 +96,6 @@ pub const MAX_ATL_NODES: u32 = 1 << 20;
 /// the ATL definition that brings the first of them is reported.
 pub const MAX_AUDIO_TRIGGERS: usize = 1 << 18;
 
-/// The most Wwise events one ATL trigger posts; further events are left out.
-pub const MAX_TRIGGER_EVENTS: usize = 256;
-
-/// The folder of the ATL definition Entries, ignoring ASCII case.
-pub const ATL_FOLDER: &str = "Data\\Libs\\GameAudio\\";
-
 /// The language folder the game reads when its settings name none.
 pub const DEFAULT_LANGUAGE: &str = "English(US)";
 
@@ -74,22 +105,3 @@ pub const MAX_LOOSE_WEMS: usize = 1 << 22;
 
 /// The most language folders one index holds; WEMs in further ones are left out.
 pub const MAX_LANGUAGES: usize = 1 << 10;
-
-/// The most objects a container path holds, the Event object included.
-pub const MAX_PATH_DEPTH: usize = 32;
-
-/// The most stingers one index holds; further ones are left out.
-pub const MAX_STINGERS: usize = 1 << 18;
-
-/// The most `PlayEvent` and `Trigger` actions that follow one another on one path.
-pub const MAX_ACTION_CHAIN: usize = 8;
-
-/// The most children of one container that are followed.
-pub const MAX_CONTAINER_CHILDREN: usize = 1024;
-
-/// The most objects followed from one Wwise event in one soundbank.
-pub const MAX_EVENT_OBJECTS: usize = 1 << 14;
-
-/// The most objects followed for one audio trigger over all its events and soundbanks; the share
-/// of each event in each soundbank shrinks once the product exceeds it.
-pub const MAX_TRIGGER_OBJECTS: usize = 1 << 21;

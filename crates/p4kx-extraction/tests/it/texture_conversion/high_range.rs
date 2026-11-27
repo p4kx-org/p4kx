@@ -49,7 +49,11 @@ fn a_high_range_texture_is_exported_as_openexr_with_its_range() -> TestResult {
     assert_eq!(report.converted(), Some(3), "header and two parts");
     assert_eq!(
         files(&fixture.target)?,
-        ["Data/Textures/rock_diff.dds", "Data/Textures/rock_diff.exr"],
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.exr",
+        ],
         "the merged DDS and OpenEXR instead of PNG"
     );
     let expected = Texture::from_archive(&fixture.archive, HEADER)?.decode_mip_hdr(0)?;
@@ -75,7 +79,10 @@ fn a_high_range_cubemap_is_exported_as_six_openexr_faces() -> TestResult {
     let report = run(&fixture, ConflictPolicy::Skip);
 
     assert!(report.is_complete(), "{report:?}");
-    let mut expected = vec!["Data/Textures/rock_diff.dds".to_owned()];
+    let mut expected = vec![
+        "Data/Textures/rock_diff.dds".to_owned(),
+        "Data/Textures/rock_diff.dds.p4kx-origin.jsonl".to_owned(),
+    ];
     expected.extend(
         CUBE_FACE_NAMES
             .iter()

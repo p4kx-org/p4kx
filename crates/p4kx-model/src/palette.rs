@@ -73,6 +73,8 @@ pub struct TintPalette {
     /// The decal colours `decalColorR`, `decalColorG` and `decalColorB`, the colours of the red,
     /// green and blue masks of a stencil map; `None` when the palette states none.
     pub decal: Option<[[f32; 3]; 3]>,
+    /// The palette's original decal texture resource string, including a stated empty string.
+    pub decal_texture: Option<Box<str>>,
 }
 
 impl TintPalette {
@@ -87,6 +89,7 @@ impl TintPalette {
             tertiary,
             glass,
             decal: None,
+            decal_texture: None,
         }
     }
 
@@ -94,6 +97,13 @@ impl TintPalette {
     #[must_use]
     pub const fn with_decal(mut self, decal: [[f32; 3]; 3]) -> Self {
         self.decal = Some(decal);
+        self
+    }
+
+    /// Returns the palette with its original decal texture resource string.
+    #[must_use]
+    pub fn with_decal_texture(mut self, file: impl Into<Box<str>>) -> Self {
+        self.decal_texture = Some(file.into());
         self
     }
 

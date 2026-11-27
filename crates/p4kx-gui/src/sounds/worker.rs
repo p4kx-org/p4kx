@@ -8,13 +8,14 @@ use std::thread;
 
 use p4kx_assembly::audio::{
     ArchiveAudio, AudioIndex, ExportOptions, ExportReport, ExportWatch, LanguageChoice,
-    TriggerSounds,
+    ResolveOptions, TriggerSounds,
 };
 use p4kx_assembly::{ENTITY_TYPE, Entities};
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, ConversionError};
 
+use super::provenance::{ResolvedSoundList, SoundListProvenance};
 use super::resolve::{entity_rows, search_rows, sound_list};
-use super::view::{EntityInfo, IndexInfo, ListSource, SoundList, TriggerList};
+use super::view::{EntityInfo, IndexInfo, ListSource, TriggerList};
 use crate::EntryIndex;
 use crate::forge_cache::ReadFailure;
 use crate::model::describe;
@@ -69,7 +70,7 @@ pub(super) enum Answer {
     Ready(IndexInfo),
     Unavailable,
     List(u64, Result<TriggerList, ListError>),
-    Sounds(u64, Result<SoundList, String>),
+    Sounds(u64, Result<Box<ResolvedSoundList>, String>),
     Exported(u64, Result<Written, String>),
 }
 
@@ -158,11 +159,8 @@ pub(super) fn run(
     cancel: &CancelToken,
     wake: Wake<'_>,
 ) {
-    if index.watch().check().is_err() {
-        send(answers, wake, Answer::Unavailable);
-        return;
-    }
-    let Some(archive) = index.archive() else {
+    let archive = index.watch().check().ok().and_then(|()| index.archive());
+    let Some(archive) = archive else {
         send(answers, wake, Answer::Unavailable);
         return;
     };
@@ -193,9 +191,10 @@ pub(super) fn run(
                     Request::List(generation, list) => {
                         Answer::List(generation, make_list(index, &audio, list))
                     }
-                    Request::Resolve(generation, trigger) => {
-                        Answer::Sounds(generation, resolve(&audio, &choice, &trigger))
-                    }
+                    Request::Resolve(generation, trigger) => Answer::Sounds(
+                        generation,
+                        resolve(index, &audio, &choice, &trigger, cancel),
+                    ),
                     Request::Language(name) => {
                         choice = LanguageChoice::new(name.as_deref(), default_language);
                         continue;
@@ -311,14 +310,23 @@ fn entity_list(
 }
 
 fn resolve(
+    index: &EntryIndex,
     audio: &ArchiveAudio<'_>,
     choice: &LanguageChoice,
     trigger: &str,
-) -> Result<SoundList, String> {
-    audio
-        .resolve_trigger_in(trigger, choice)
-        .map(|sounds| sound_list(&sounds))
-        .ok_or_else(|| trigger.to_owned())
+    cancel: &CancelToken,
+) -> Result<Box<ResolvedSoundList>, String> {
+    let options = ResolveOptions::default()
+        .with_cancel(cancel)
+        .with_path_sources();
+    let sounds = audio
+        .resolve_trigger_with_options(trigger, choice, options)
+        .map_err(|error| describe(&error))?
+        .ok_or_else(|| trigger.to_owned())?;
+    Ok(Box::new(ResolvedSoundList {
+        list: sound_list(index, &sounds),
+        provenance: SoundListProvenance::capture(audio.archive(), audio.index(), &sounds),
+    }))
 }
 
 fn write(
@@ -328,10 +336,21 @@ fn write(
 ) -> Result<Written, String> {
     let mut missing = Vec::new();
     let mut resolved: Vec<TriggerSounds<'_>> = Vec::new();
+    let options = ResolveOptions::default().with_cancel(export.watch.cancel_token());
     for name in &export.triggers {
-        match audio.resolve_trigger_in(name, choice) {
-            Some(sounds) => resolved.push(sounds),
-            None => missing.push(name.clone()),
+        match audio.resolve_trigger_with_options(name, choice, options) {
+            Ok(Some(sounds)) => resolved.push(sounds),
+            Ok(None) => missing.push(name.clone()),
+            Err(ConversionError::Cancelled) => {
+                return Ok((
+                    ExportReport {
+                        cancelled: true,
+                        ..ExportReport::default()
+                    },
+                    missing,
+                ));
+            }
+            Err(error) => return Err(describe(&error)),
         }
     }
     let triggers: Vec<&TriggerSounds<'_>> = resolved.iter().collect();

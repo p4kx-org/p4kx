@@ -9,7 +9,10 @@ palette and the alpha meaning of the textures, so all of it is tested without Bl
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .graph_spec import GraphBuilder, GraphSpec, Ref
+from .material_finish import gloss_sample
 from .material_glass import GlassSurface
 from .material_layers import LayerBlending
 from .package import BLENDER_NAME_BYTES
@@ -129,12 +132,7 @@ class _Maker(LayerBlending, GlassSurface):
         return palette.decal
 
     def _decal_paint(self, colours: tuple[Colour, Colour, Colour]) -> Ref:
-        """Returns the colour of a stencil map painted with ``colours``.
-
-        The masks are layers, red below green below blue: each colour counts by its mask and by
-        what the masks above leave of it, and the result is the weighted mean, so a texel that
-        one mask covers partly takes none of the colours of the masks that are 0 there.
-        """
+        """Blend decal colours with red above blue where green is clear (ADR-0310)."""
         slot = self.desc.slot("stencil")
         assert slot is not None
         b = self.builder
@@ -143,10 +141,15 @@ class _Maker(LayerBlending, GlassSurface):
         mask_red, mask_green, mask_blue = (Ref(split, name) for name in ("Red", "Green", "Blue"))
         below_green = b.math("SUBTRACT", 1.0, mask_green)
         below_blue = b.math("SUBTRACT", 1.0, mask_blue)
+        has_green = b.math("GREATER_THAN", mask_green, 0.0)
+        clear_green = b.math("SUBTRACT", 1.0, has_green)
+        red_over_blue = b.math("MULTIPLY", b.math("MULTIPLY", mask_red, mask_blue), clear_green)
         weight_red = b.math("MULTIPLY", b.math("MULTIPLY", mask_red, below_green), below_blue)
+        weight_red = b.math("ADD", weight_red, red_over_blue)
         weight_green = b.math("MULTIPLY", mask_green, below_blue)
-        weights = (weight_red, weight_green, mask_blue)
-        total = b.math("ADD", b.math("ADD", weight_red, weight_green), mask_blue)
+        weight_blue = b.math("SUBTRACT", mask_blue, red_over_blue)
+        weights = (weight_red, weight_green, weight_blue)
+        total = b.math("ADD", b.math("ADD", weight_red, weight_green), weight_blue)
         floor = b.math("MAXIMUM", total, DECAL_WEIGHT_FLOOR)
         weighted = [
             b.mix(colour, weight, 1.0, blend="MULTIPLY")
@@ -210,19 +213,41 @@ class _Maker(LayerBlending, GlassSurface):
         if slot := desc.slot("normal"):
             image = self._image(slot, tiling)
             map_key = b.add("ShaderNodeNormalMap", props={"space": "TANGENT"})
-            b.link(Ref(image, "Color"), map_key, "Color")
+            samples, smoothness = self._normal_samples(slot, tiling, image)
+            b.link(samples, map_key, "Color")
             normal = Ref(map_key, "Normal")
-            if slot.texture and self.context.texture_alpha.get(slot.texture) == "smoothness":
-                smoothness = Ref(image, "Alpha")
         if smoothness is None and (slot := desc.slot("gloss")):
-            gloss = b.add("ShaderNodeRGBToBW")
-            b.link(Ref(self._image(slot, tiling), "Color"), gloss, "Color")
-            smoothness = Ref(gloss, "Val")
+            smoothness = gloss_sample(b, self._image(slot, tiling), self.desc, self.context.palette)
         if smoothness is None:
             roughness = min(max(1.0 - smooth * gloss_mult, 0.0), 1.0)
             return Surface(colour, roughness, normal, metallic, level)
+        if painted and self.desc.shader.casefold() == "hardsurface":
+            smoothness = b.math("MULTIPLY", smoothness, smooth)
         scaled = smoothness if gloss_mult == 1.0 else b.math("MULTIPLY", smoothness, gloss_mult)
         return Surface(colour, b.math("SUBTRACT", 1.0, scaled, clamp=True), normal, metallic, level)
+
+    def _normal_samples(
+        self, slot: TextureSlot, tiling: float, image: str
+    ) -> tuple[Ref, Ref | None]:
+        colour = Ref(image, "Color")
+        companion = self.context.ddna_pairs.get(slot.texture or "")
+        if companion is None:
+            alpha = Ref(image, "Alpha") if self.context.texture_alpha.get(slot.texture or "") == "smoothness" else None
+            return colour, alpha
+        b = self.builder
+        separated = b.add("ShaderNodeSeparateColor")
+        b.link(colour, separated, "Color")
+        flipped = b.math("SUBTRACT", 1.0, Ref(separated, "Green"))
+        combined = b.add("ShaderNodeCombineColor")
+        b.link(Ref(separated, "Red"), combined, "Red")
+        b.link(flipped, combined, "Green")
+        b.link(Ref(separated, "Blue"), combined, "Blue")
+        if self.context.loadable is not None and not self.context.loadable(companion):
+            return Ref(combined, "Color"), None
+        smooth_image = self._image(replace(slot, texture=companion), tiling)
+        smooth_channels = b.add("ShaderNodeSeparateColor")
+        b.link(Ref(smooth_image, "Color"), smooth_channels, "Color")
+        return Ref(combined, "Color"), Ref(smooth_channels, "Red")
 
     def _metal(
         self,
@@ -281,7 +306,7 @@ class _Maker(LayerBlending, GlassSurface):
             factor,
             smooth,
             specular,
-            layer.gloss_mult or 1.0,
+            1.0 if layer.gloss_mult is None else layer.gloss_mult,
             layer.uv_tiling or 1.0,
             entry is not None,
         )
@@ -366,10 +391,7 @@ class _Maker(LayerBlending, GlassSurface):
         if self.family == "glass":
             b.spec.node(bsdf).inputs["Transmission Weight"] = 1.0
             b.spec.node(bsdf).inputs["IOR"] = 1.45
-        emissive = desc.emissive
-        if desc.glow > 0 and any(c > 0 for c in emissive):
-            b.spec.node(bsdf).inputs["Emission Color"] = emissive
-            b.spec.node(bsdf).inputs["Emission Strength"] = desc.glow
+        self._emission(bsdf)
         if self.family == "hologram":
             b.put(bsdf, "Emission Color", colour)
             b.spec.node(bsdf).inputs["Emission Strength"] = max(desc.glow, 1.0)
@@ -380,3 +402,31 @@ class _Maker(LayerBlending, GlassSurface):
         b.link(Ref(bsdf, "BSDF"), out, "Surface")
         if alpha is not None:
             b.put(bsdf, "Alpha", alpha)
+
+    def _emission(self, bsdf: str) -> None:
+        b, desc = self.builder, self.desc
+        preview = desc.emission
+        if preview is not None:
+            slots = [
+                slot for slot in desc.textures
+                if slot.slot == preview.slot and slot.file == preview.file and slot.texture
+            ]
+            if len(slots) == 1:
+                sampled = Ref(self._image(slots[0], 1.0), "Color")
+                if preview.tint == WHITE:
+                    value = sampled
+                else:
+                    tint = b.add(
+                        "ShaderNodeMix",
+                        props={"data_type": "RGBA", "blend_type": "MULTIPLY"},
+                        inputs={"Factor": 1.0, "B": preview.tint},
+                    )
+                    b.link(sampled, tint, "A")
+                    value = Ref(tint, "Result")
+                b.put(bsdf, "Emission Color", value)
+                b.spec.node(bsdf).inputs["Emission Strength"] = preview.strength
+                return
+        colour = desc.emissive
+        if desc.glow > 0 and any(channel > 0 for channel in colour):
+            b.spec.node(bsdf).inputs["Emission Color"] = colour
+            b.spec.node(bsdf).inputs["Emission Strength"] = desc.glow

@@ -41,9 +41,10 @@ is the Loadout tree (`<port>/<entity>` below the parent) and a part can be hidde
 
 ## Material libraries
 
-The Entity's geometry (`SGeometryResourceParams`) names the model and, usually, a material
-library. That library **replaces** the one the model's `MtlName` chunk names: 46 of 150 sampled
-skins find no library of their own. A named library that is missing is an issue and the part is
+The Entity's `SGeometryResourceParams` names the model and can select its material library.
+The main geometry uses the nonempty path in the component's Material node, then the path in
+the geometry data. The Assembly can use a character definition binding or the model's
+`MtlName` when the Entity supplies no library. A named library that is missing is an issue and the part is
 drawn with the default material; the model's own library does not take over. Models are read
 without their library (`Model::read_without_materials`, `MaterialStatus::Skipped`), and each
 distinct library is read once per Assembly, a bare name relative to the model's folder, and shared
@@ -53,8 +54,8 @@ that names a library (ADR-0150).
 ## Limits and failures
 
 Everything comes from the Archive and is untrusted. An Assembly holds at most 16,384 parts, at most
-2^25 vertices counted per part, and is built no deeper than 2 × 32 + 2 levels; the Loadout's own
-32-level and 65,536-port limits apply before. Models are read in file order in waves of distinct
+2^25 vertices counted per part, and is built no deeper than 2 × 32 + 2 levels. The Loadout's
+32-level depth limit applies before flattening. Models are read in file order in waves of distinct
 files in parallel, and no further wave is started once the models read so far hold the vertex
 budget (ADR-0150); the parts are then taken in order, so the same Archive always gives the same
 Assembly. A part over the

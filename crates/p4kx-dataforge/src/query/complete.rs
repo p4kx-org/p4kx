@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 mod context;
+mod declarations;
 mod index;
 mod resolve;
 

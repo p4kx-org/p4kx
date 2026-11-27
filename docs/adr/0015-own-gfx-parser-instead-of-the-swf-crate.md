@@ -10,7 +10,9 @@ which aborts the process. We would parse the GFx tags, decode the bitmaps and co
 into our own anyway, and could not bound the nesting (ADR-0001's reasoning for the core formats
 applies). `p4kx-gfx` therefore parses the movie itself, on `p4kx-foundation`, with every length
 bounded by the data left and the limits `MAX_MOVIE_LEN`, `MAX_BITMAP_PIXELS` (32 Mi pixels; the
-largest UI texture of the LIVE Archive has 22.3 Mi), `MAX_SHAPE_RECORDS` and `MAX_SPRITE_DEPTH`.
+largest UI texture of the LIVE Archive has 22.3 Mi) and `MAX_SHAPE_RECORDS`.
+Sprite definitions are walked with an explicit stack. Scene composition bounds nested
+placements with `MAX_SPRITE_DEPTH`.
 An extraction decodes its bitmaps in parallel within a budget of twice `MAX_BITMAP_PIXELS`.
 
 It decompresses with `flate2` and `lzma-rs` (MIT) and decodes embedded PNGs with `png`. `lzma-rs`

@@ -7,7 +7,7 @@
 use p4kx_testkit::{TestInstance, TestStruct, TestType, TestValue};
 
 use super::template_parts::object;
-use super::{OWNER, TAG_HIJACKED, TAG_SHIP, array, npc, property, reference, term, text};
+use super::{OWNER, RESOURCE, TAG_HIJACKED, TAG_SHIP, array, npc, property, reference, term, text};
 
 fn value(name: &str) -> TestStruct {
     TestStruct::new(name).parent("MissionPropertyValue")
@@ -41,14 +41,14 @@ pub(super) fn structs() -> Vec<TestStruct> {
             .field("max", TestType::Int32)
             .field("plusBonuses", TestType::Bool)
             .field("reputationBonus", TestType::Reference),
-        value("MissionPropertyValue_TimeTrialRace"),
+        value("MissionPropertyValue_TimeTrialRace")
+            .array("targetSplits", TestType::Class("TimeTrialSplit".to_owned())),
+        TestStruct::new("TimeTrialSplit").field("targetSplit", TestType::Single),
         value("MissionPropertyValue_StarMapLocation"),
     ]
 }
 
-/// The properties, in this order: an item, a name, combined entries, a reward, a race and a star
-/// map location.
-pub(super) fn properties() -> Vec<TestValue> {
+pub(super) fn item_property() -> TestValue {
     let item = TestInstance::new("MissionPropertyValue_MissionItem")
         .value(
             "matchConditions",
@@ -62,14 +62,27 @@ pub(super) fn properties() -> Vec<TestValue> {
                         ),
                 ),
                 object(
-                    TestInstance::new("DataSetMatchCondition_SpecificItemsDef")
-                        .value("items", array(vec![reference(OWNER)])),
+                    TestInstance::new("DataSetMatchCondition_SpecificItemsDef").value(
+                        "items",
+                        array(vec![
+                            reference(OWNER),
+                            TestValue::Null,
+                            reference(OWNER),
+                            reference(RESOURCE),
+                        ]),
+                    ),
                 ),
             ]),
         )
         .value("debugForceChosenItem", reference(OWNER))
         .value("minItemsToFind", TestValue::Int32(1))
         .value("maxItemsToFind", TestValue::Int32(3));
+    property("Item_BP", "", item)
+}
+
+/// The properties, in this order: an item, a name, combined entries, a reward, a race and a star
+/// map location.
+pub(super) fn properties() -> Vec<TestValue> {
     let combined = TestInstance::new("MissionPropertyValue_CombinedDataSetEntries").value(
         "dataSetEntryProperties",
         array(vec![
@@ -89,7 +102,7 @@ pub(super) fn properties() -> Vec<TestValue> {
         ),
     );
     vec![
-        property("Item_BP", "", item),
+        item_property(),
         npc::name("Name_BP"),
         property("Combined_BP", "", combined),
         property("Pay_BP", "", reward),

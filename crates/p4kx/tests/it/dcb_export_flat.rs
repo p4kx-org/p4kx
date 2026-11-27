@@ -12,12 +12,19 @@ use p4kx_testkit::{
     TestType, TestValue,
 };
 
+#[path = "dcb_export_flat_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
 const TRUCK: u128 = 0x50e8_a9f6_f956_4000_8ace_7c0c_a9a9_1f5d;
 
 fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_with_text(dir, "Cart")
+}
+
+fn write_archive_with_text(dir: &Path, text: &str) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     let database = DataForgeBuilder::new()
         .structure(
@@ -42,7 +49,7 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 .value("name", TestValue::text("")),
         )
         .build();
-    let english = GlobalIniBuilder::new().text("vehicle_Cart", "Cart").build();
+    let english = GlobalIniBuilder::new().text("vehicle_Cart", text).build();
     ArchiveBuilder::new()
         .entry(TestEntry::zstd("Data\\Game2.dcb", database))
         .entry(TestEntry::zstd(
@@ -101,6 +108,18 @@ fn csv_raw_keeps_the_exact_bytes() -> TestResult {
 }
 
 #[test]
+fn strict_csv_is_available_through_the_flat_export_command() -> TestResult {
+    let (dir, _) = export(&["--flat", "--format", "csv-strict"], 0)?;
+    let text = fs::read_to_string(dir.path().join("out").join("values.csv"))?;
+    assert!(text.starts_with("record_guid,"), "no byte order mark");
+    assert!(
+        text.contains(",labels,0,string,=a,\"\",\"\"\r\n"),
+        "verbatim value and quoted empty fields"
+    );
+    Ok(())
+}
+
+#[test]
 fn ndjson_writes_values_ndjson() -> TestResult {
     let (dir, _) = export(&["--flat", "--format", "ndjson"], 0)?;
 
@@ -147,6 +166,8 @@ fn senseless_combinations_are_usage_errors() -> TestResult {
         &["--flat", "--format", "json"],
         &["--flat", "--format", "xml"],
         &["--format", "csv"],
+        &["--format", "csv-strict"],
+        &["--flat", "--format", "csv-strict", "--csv-raw"],
         &["--csv-raw"],
         &["--flat", "--format", "ndjson", "--csv-raw"],
     ] {

@@ -22,9 +22,15 @@ mod entries;
 mod entry_scan;
 mod excerpt;
 mod gate;
+mod line_excerpt;
+mod line_match;
 mod line_sink;
+#[cfg(test)]
+mod line_stream_tests;
 mod localization;
 mod needle;
+mod needle_scan;
+mod observed_search;
 mod options;
 mod records;
 mod report;
@@ -35,6 +41,7 @@ pub use entries::{TEXT_EXTENSIONS, search_entries};
 pub use excerpt::{Excerpt, display_text};
 pub use localization::search_localization;
 pub use needle::{EmptyNeedle, Needle};
+pub use observed_search::{EntryMatchSource, LocalizationMatchSource, ObservedSearch};
 pub use options::{
     DEFAULT_LIMIT, DEFAULT_PER_ITEM, MAX_ENTRY_LEN, MAX_LIMIT, SearchOptions, Source, Sources,
 };
@@ -42,4 +49,4 @@ pub use records::search_records;
 pub use report::{
     EntryHit, Found, LocalizationHit, RecordHit, SearchReport, SearchStats, Unavailable,
 };
-pub use search::{SearchError, search, search_in};
+pub use search::{SearchError, search, search_in, search_observed, search_observed_with_dataforge};

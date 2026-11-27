@@ -5,17 +5,21 @@ use std::time::Duration;
 
 use p4kx_testkit::watchdog::{Guard, arm};
 
-use super::device::{block_on_for, guarded, software_instance};
+#[cfg(target_os = "macos")]
+use super::device::metal_instance as test_instance;
+#[cfg(not(target_os = "macos"))]
+use super::device::software_instance as test_instance;
+use super::device::{block_on_for, guarded};
 use super::resources::filled;
 
 const WAIT: Duration = Duration::from_secs(60);
 
 fn device_limited_to(max_buffer_size: u64, guard: &Guard) -> Option<(wgpu::Device, wgpu::Queue)> {
     guard.phase("adapter");
-    let instance = software_instance();
+    let instance = test_instance();
     let adapter = block_on_for(
         instance.request_adapter(&wgpu::RequestAdapterOptions {
-            force_fallback_adapter: true,
+            force_fallback_adapter: !cfg!(target_os = "macos"),
             ..wgpu::RequestAdapterOptions::default()
         }),
         WAIT,
@@ -58,7 +62,7 @@ fn the_software_instance_sees_only_the_direct3d_12_backend() {
     guard.phase("enumerate adapters");
 
     let adapters = block_on_for(
-        software_instance().enumerate_adapters(wgpu::Backends::all()),
+        test_instance().enumerate_adapters(wgpu::Backends::all()),
         WAIT,
     )
     .expect("the adapters are listed within the limit");
@@ -84,7 +88,7 @@ fn the_software_instance_sees_only_the_direct3d_12_backend() {
 )]
 fn no_adapter(test: &str) {
     assert!(
-        std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
+        !p4kx_testkit::render_adapter_required(),
         "{test}: an adapter is required"
     );
     eprintln!("{test}: no graphics adapter, nothing checked");

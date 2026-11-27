@@ -31,9 +31,10 @@ English is the default, no longer the fixed, font language.
   Entries with the file name of the URL, or its `.swf`/`.gfx` twin, are ranked: the exact path, the
   same tail below `Data\UI`, the same tail below `Data\Localization\english`, the same file in that
   folder, any file below `Data\UI`, then any other; the URL's own extension before the twin, then
-  the path. The two best are tried in turn, because the `.swf` and the `.gfx` of a font file may
-  export different names. English is the default language: it is the Archive's default and the
-  fonts of the other languages hold other glyph sets.
+  the path. Rendering tries the ranked Entries until an export resolves and applies the
+  import resource budgets while reading them. A higher-ranked movie can lack the requested
+  export even when its filename matches. `UiMovie::import_source` opens the first ranked Entry
+  for a URL. English is the default language and other languages hold different glyph sets.
 - **A font without outlines is a missing font.** Fonts that the exporter stripped (the
   `HUD_Font_LocFont` family draws from system fonts at run time) have glyph slots but no shapes;
   drawing them would make blank text without a report, so a font is usable only when at least one

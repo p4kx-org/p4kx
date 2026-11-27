@@ -1,0 +1,120 @@
+name: MSI feedback runner-fuse probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/msi-feedback-probe.yml
+      - .github/workflows/release-windows.yml
+      - .github/scripts/*msi-feedback*.ps1
+      - .github/scripts/msi-diagnostic-budget.ps1
+      - .github/scripts/msi-diagnostic-phase.ps1
+      - .github/scripts/msi-diagnostic-utf8.ps1
+      - .github/scripts/test-msi-phase-journal-encoding.ps1
+      - .github/scripts/msi-diagnostic-runner.ps1
+
+concurrency:
+  group: msi-feedback-fuse-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  platforms:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify strict diagnostic JSON and journal encoding bounds
+        shell: pwsh
+        run: |
+          .github/scripts/test-msi-feedback-probe-json.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'msi-feedback-json-contract')
+          .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'msi-feedback-journal-contract')
+      - id: platforms
+        shell: pwsh
+        run: .github/scripts/read-platform-matrix.ps1 -Os windows
+
+  probe:
+    name: MSI feedback fuse (${{ matrix.platform.target }}, ${{ matrix.mode }})
+    needs: platforms
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 10
+    continue-on-error: ${{ matrix.mode == 'timeout' }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.platforms.outputs.matrix).include }}
+        mode: [complete, timeout]
+    env:
+      P4KX_TARGET: ${{ matrix.platform.target }}
+      P4KX_MSI_PROBE_MODE: ${{ matrix.mode }}
+      P4KX_MSI_PROBE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create isolated diagnostic-only task
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task=New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role consumer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+      - name: Runner step fuse fixture
+        timeout-minutes: 1
+        run: .github/scripts/invoke-msi-feedback-probe.ps1 -Target $env:P4KX_TARGET -Mode $env:P4KX_MSI_PROBE_MODE -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check')
+      - name: Upload actual diagnostic-only capture
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        timeout-minutes: 5
+        with:
+          name: msi-feedback-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.platform.target }}-${{ matrix.mode }}
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.log
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/**/*.jsonl
+          if-no-files-found: error
+
+  verify:
+    name: Verify actual timeout and downloaded feedback
+    needs: [platforms, probe]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      P4KX_MSI_PROBE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        timeout-minutes: 3
+        with:
+          pattern: msi-feedback-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/msi-feedback-artifacts
+      - name: Require service timeout annotations and exact downloaded proof
+        shell: pwsh
+        timeout-minutes: 5
+        run: .github/scripts/verify-msi-feedback-run.ps1 -ArtifactDirectory (Join-Path $env:RUNNER_TEMP 'msi-feedback-artifacts') -EvidenceDirectory (Join-Path $env:RUNNER_TEMP 'msi-feedback-verification')
+      - name: Upload service-bound verdict
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        timeout-minutes: 2
+        with:
+          name: msi-feedback-verdict-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/msi-feedback-verification/*.json
+          if-no-files-found: error

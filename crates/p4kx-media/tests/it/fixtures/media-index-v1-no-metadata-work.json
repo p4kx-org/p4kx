@@ -1,0 +1,63 @@
+{
+  "format": "p4kx-media",
+  "format_version": "1.0",
+  "complete": true,
+  "enumeration_complete": true,
+  "source": {
+    "path": "legacy-empty.p4k",
+    "digest": {
+      "algorithm": "sha256",
+      "scope": "root-archive-file",
+      "hex": "8739c76e681f900923b900c9df0ef75cf421d39cabb54650c4b9ad19b6a76d85"
+    },
+    "size": 22,
+    "build": null,
+    "installation_flags": null,
+    "directory_issue_count": 0,
+    "directory_issues": [],
+    "directory_issue_samples_complete": true,
+    "enumeration_complete": true
+  },
+  "generation": "637d631a598dafd39547a5de3c979de062a6dc0e5d50e6b9a1fdc261243ce350",
+  "artifact_base": "generations/637d631a598dafd39547a5de3c979de062a6dc0e5d50e6b9a1fdc261243ce350",
+  "limits": {
+    "root_bytes": 4398046511104,
+    "sources": 10000000,
+    "source_bytes": 8796093022208,
+    "entry_bytes": 8589934592,
+    "records": 10000000,
+    "record_bytes": 1048576,
+    "chunk_bytes": 67108864,
+    "output_bytes": 8796093022208,
+    "depth": 8,
+    "value_depth": 128,
+    "references": 10000000,
+    "reference_candidates": 128
+  },
+  "source_entries": {
+    "enumerated": 0,
+    "written": 0,
+    "partial": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "kinds": [],
+  "source_manifest": {
+    "path": "sources.jsonl",
+    "size": 0,
+    "digest": {
+      "algorithm": "sha256",
+      "scope": "artifact-file",
+      "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "artifact_manifest": {
+    "path": "artifacts.jsonl",
+    "size": 0,
+    "digest": {
+      "algorithm": "sha256",
+      "scope": "artifact-file",
+      "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

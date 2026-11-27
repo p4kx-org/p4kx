@@ -46,11 +46,10 @@ fn wear(node: &mut EntityNode, own: &Bespoke, head_library: &Arc<str>) {
     let Some(path) = own.skin_for(current.path()) else {
         return;
     };
+    let mut geometry = current.clone();
+    geometry.override_model(path);
     node.own_skin = Some(OwnSkin {
-        geometry: Geometry {
-            path,
-            ..current.clone()
-        },
+        geometry,
         head_library: Arc::clone(head_library),
     });
 }

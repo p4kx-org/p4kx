@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use gltf_json as json;
 use json::Index;
+use json::extensions::material::{EmissiveStrength, EmissiveStrengthFactor, Specular};
 use json::material::{
     AlphaCutoff, EmissiveFactor, PbrBaseColorFactor, PbrMetallicRoughness, StrengthFactor,
 };
 use json::validation::Checked::Valid;
 use p4kx_model::{Lod, Material, MaterialLibrary, TintPalette};
 
+use crate::factory_bow_reflectance;
 use crate::glb_options::VertexColours;
 use crate::material_alpha::{alpha_of, is_cut_out_by_base_image};
 use crate::shading::shading;
@@ -31,25 +34,26 @@ pub(crate) enum Slot {
 pub(crate) struct MaterialPlan<'m> {
     library: Option<&'m MaterialLibrary>,
     slots: BTreeMap<u16, Option<Slot>>,
-    default: Material,
+    default: Cow<'m, Material>,
     overrides: BTreeMap<usize, Material>,
+    factory_bow: bool,
 }
 
 impl<'m> MaterialPlan<'m> {
-    /// Resolves every material ID `lod` uses against `library`, `None` when there is none.
-    pub(crate) fn new(library: Option<&'m MaterialLibrary>, lod: &Lod) -> Self {
-        let ids: BTreeSet<u16> = lod
-            .meshes
-            .iter()
-            .flat_map(|mesh| &mesh.submeshes)
-            .map(|submesh| submesh.material_id)
-            .collect();
+    pub(crate) fn with_fallback(
+        library: Option<&'m MaterialLibrary>,
+        lod: &Lod,
+        fallback: Option<&'m Material>,
+    ) -> Self {
+        let ids: BTreeSet<u16> = lod.drawable_material_ids().collect();
         let slots: BTreeMap<u16, Option<Slot>> = ids
             .into_iter()
             .map(|id| {
                 (
                     id,
-                    library.map_or(Some(Slot::Default), |library| resolve(library, id)),
+                    library.map_or(Some(Slot::Default), |library| {
+                        resolve(library, id, fallback.is_some())
+                    }),
                 )
             })
             .collect();
@@ -69,8 +73,9 @@ impl<'m> MaterialPlan<'m> {
         Self {
             library,
             slots,
-            default: Material::engine_default(),
+            default: fallback.map_or_else(|| Cow::Owned(Material::engine_default()), Cow::Borrowed),
             overrides,
+            factory_bow: false,
         }
     }
 
@@ -79,6 +84,7 @@ impl<'m> MaterialPlan<'m> {
         let (Some(palette), Some(library)) = (palette, self.library) else {
             return self;
         };
+        self.factory_bow = factory_bow_reflectance::matches(&library.path, &palette.name);
         for slot in self.slots.values().flatten() {
             if let Slot::Library(position) = *slot {
                 let base = self
@@ -119,8 +125,9 @@ impl<'m> MaterialPlan<'m> {
         Self {
             library: None,
             slots: BTreeMap::new(),
-            default: Material::engine_default(),
+            default: Cow::Owned(Material::engine_default()),
             overrides: BTreeMap::new(),
+            factory_bow: false,
         }
     }
 
@@ -141,18 +148,36 @@ impl<'m> MaterialPlan<'m> {
         self.slots.get(&id).copied().flatten()
     }
 
-    /// Returns the distinct slots something is drawn with, in the order of the material IDs.
-    pub(crate) fn drawn_slots(&self) -> Vec<Slot> {
-        let mut drawn: Vec<Slot> = Vec::new();
-        for slot in self.slots.values().flatten() {
-            if !drawn.contains(slot) {
-                drawn.push(*slot);
-            }
-        }
-        drawn
+    pub(crate) fn approximates_factory_bow(&self, slot: Slot) -> bool {
+        self.factory_bow && slot == Slot::Library(factory_bow_reflectance::SLOT)
     }
 
-    /// Returns the number of material IDs drawn with the engine's default material.
+    /// Returns distinct drawable slots in first material ID order, with all assigned IDs.
+    pub(crate) fn drawn_slots(&self) -> Vec<(Slot, Vec<u16>)> {
+        let mut by_slot: BTreeMap<Slot, Vec<u16>> = BTreeMap::new();
+        let mut order = Vec::new();
+        for (&id, &slot) in &self.slots {
+            if let Some(slot) = slot {
+                by_slot
+                    .entry(slot)
+                    .or_insert_with(|| {
+                        order.push(slot);
+                        Vec::new()
+                    })
+                    .push(id);
+            }
+        }
+        order
+            .into_iter()
+            .filter_map(|slot| Some((slot, by_slot.remove(&slot)?)))
+            .collect()
+    }
+
+    pub(crate) const fn has_physical_fallback(&self) -> bool {
+        matches!(self.default, Cow::Borrowed(_))
+    }
+
+    /// Returns the number of material IDs drawn with a fallback.
     pub(crate) fn defaulted(&self) -> usize {
         self.slots
             .values()
@@ -176,8 +201,11 @@ impl<'m> MaterialPlan<'m> {
     }
 }
 
-fn resolve(library: &MaterialLibrary, id: u16) -> Option<Slot> {
+fn resolve(library: &MaterialLibrary, id: u16, physical_fallback: bool) -> Option<Slot> {
     let position = if library.single { 0 } else { usize::from(id) };
+    if physical_fallback && library.is_empty_slot(id) {
+        return Some(Slot::Default);
+    }
     match library.materials.get(position) {
         Some(material) if material.hidden() => None,
         Some(_) => Some(Slot::Library(position)),
@@ -196,6 +224,8 @@ pub(crate) struct MaterialTextures {
     /// The metallic-roughness texture and whether it carries the roughness and the metalness; a
     /// channel it lacks keeps the plain value.
     pub(crate) metallic_roughness: Option<(Index<json::Texture>, bool, bool)>,
+    /// The sRGB map of the dielectric normal-incidence reflectance scale.
+    pub(crate) specular_colour: Option<Index<json::Texture>>,
 }
 
 /// Returns the name of the material of `slot`: the file's, or `material_<position>`, or `default`.
@@ -243,12 +273,7 @@ pub(crate) fn build_material(
         alpha = 0.0;
     }
     let decal = is_one_of(&material.shader, &DECAL_SHADERS);
-    let info = |index: Index<json::Texture>| json::texture::Info {
-        index,
-        tex_coord: 0,
-        extensions: None,
-        extras: json::extras::Extras::default(),
-    };
+    let (emissive_factor, extensions) = material_extensions(material, textures.specular_colour);
     json::Material {
         name: Some(if material.name.is_empty() {
             fallback_name.to_owned()
@@ -260,7 +285,7 @@ pub(crate) fn build_material(
         double_sided: decal || material.flags.two_sided(),
         pbr_metallic_roughness: PbrMetallicRoughness {
             base_color_factor: PbrBaseColorFactor([colour[0], colour[1], colour[2], alpha]),
-            base_color_texture: textures.base.map(|(index, _, _)| info(index)),
+            base_color_texture: textures.base.map(|(index, _, _)| texture_info(index)),
             metallic_factor: StrengthFactor(if carries_metalness || plain_metal {
                 1.0
             } else {
@@ -273,7 +298,7 @@ pub(crate) fn build_material(
             }),
             metallic_roughness_texture: textures
                 .metallic_roughness
-                .map(|(index, _, _)| info(index)),
+                .map(|(index, _, _)| texture_info(index)),
             ..PbrMetallicRoughness::default()
         },
         normal_texture: textures.normal.map(|index| json::material::NormalTexture {
@@ -283,9 +308,33 @@ pub(crate) fn build_material(
             extensions: None,
             extras: json::extras::Extras::default(),
         }),
-        emissive_factor: EmissiveFactor(emissive(material)),
+        emissive_factor,
+        extensions,
         ..json::Material::default()
     }
+}
+
+fn texture_info(index: Index<json::Texture>) -> json::texture::Info {
+    json::texture::Info {
+        index,
+        tex_coord: 0,
+        extensions: None,
+        extras: json::extras::Extras::default(),
+    }
+}
+
+fn material_extensions(
+    material: &Material,
+    specular_colour: Option<Index<json::Texture>>,
+) -> (EmissiveFactor, Option<json::extensions::material::Material>) {
+    let (emissive_factor, mut extensions) = emissive(material);
+    if let Some(texture) = specular_colour {
+        extensions.get_or_insert_default().specular = Some(Specular {
+            specular_color_texture: Some(texture_info(texture)),
+            ..Specular::default()
+        });
+    }
+    (emissive_factor, extensions)
 }
 
 pub(crate) fn is_one_of(shader: &str, names: &[&str]) -> bool {
@@ -302,59 +351,34 @@ pub fn base_colour_factor(material: &Material) -> [f32; 3] {
     shading(material).colour
 }
 
-/// The emissive colour times the glow, scaled into 0 to 1 by its brightest channel.
-fn emissive(material: &Material) -> [f32; 3] {
-    let glow = material.glow.max(0.0);
-    let scaled = material.emissive.map(|channel| channel.max(0.0) * glow);
-    let brightest = scaled.into_iter().fold(1.0_f32, f32::max);
-    scaled.map(|channel| channel / brightest)
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "GLB material scalars are f32 and both values are bounded before conversion"
+)]
+fn emissive(material: &Material) -> (EmissiveFactor, Option<json::extensions::material::Material>) {
+    let glow = emission_input(material.glow);
+    let scaled = material
+        .emissive
+        .map(|channel| emission_input(channel) * glow);
+    let brightest = scaled.into_iter().fold(1.0, f64::max);
+    let factor = EmissiveFactor(scaled.map(|channel| (channel / brightest) as f32));
+    let mut extensions: Option<json::extensions::material::Material> = None;
+    if brightest > 1.0 {
+        let strength = brightest.min(f64::from(f32::MAX)) as f32;
+        extensions.get_or_insert_default().emissive_strength = Some(EmissiveStrength {
+            emissive_strength: EmissiveStrengthFactor(strength),
+        });
+    }
+    (factor, extensions)
+}
+
+fn emission_input(value: f32) -> f64 {
+    if value.is_finite() {
+        f64::from(value.max(0.0))
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-
-    use p4kx_model::{MaterialLibrary, TintEntry, TintPalette};
-
-    use super::{Material, MaterialPlan, Slot};
-
-    const CAP: &str = r#"<Material><SubMaterials>
-<Material Name="hair_scalp_m" Shader="HairPBR" StringGenMask="%HAIR_CAP" Diffuse="0,0,0">
-<Textures><Texture Map="TexSlot1" File="Objects/t/sc/female/textures/f_hair_scalp.tif"/></Textures>
-<MatLayers><Layer Name="Primary" PaletteTint="1"/></MatLayers>
-</Material></SubMaterials></Material>"#;
-
-    #[test]
-    fn a_palette_tint_keeps_the_scalp_map_of_the_body() -> Result<(), Box<dyn std::error::Error>> {
-        let library = MaterialLibrary::parse("objects/t/sc/male/m_hair", CAP.as_bytes())?;
-        let entry = TintEntry {
-            tint: [0.5; 3],
-            specular: [0.05; 3],
-            glossiness: 100.0,
-        };
-        let palette = TintPalette::new("p", [entry; 3], [1.0; 3]);
-        let mut plan = MaterialPlan {
-            library: Some(&library),
-            slots: BTreeMap::from([(0, Some(Slot::Library(0)))]),
-            default: Material::engine_default(),
-            overrides: BTreeMap::new(),
-        };
-        let corrected = library
-            .materials
-            .first()
-            .and_then(|material| material.hair_cap_of_body(&library.path))
-            .ok_or("a corrected cap")?;
-        plan.overrides.insert(0, corrected);
-
-        let plan = plan.tinted_by(Some(&palette));
-
-        let cap = plan.material(Slot::Library(0));
-        assert!(cap.tinted, "the palette applied");
-        assert!(
-            cap.textures.iter().all(|slot| slot.file.contains("/male/")),
-            "{:?}",
-            cap.textures
-        );
-        Ok(())
-    }
-}
+mod tests;

@@ -77,6 +77,7 @@ fn a_newer_release_is_reported_with_its_page() -> TestResult {
         Some(Release {
             version: "0.2.0".to_owned(),
             page: PAGE.to_owned(),
+            asset: None,
         }),
         "the newer Release"
     );
@@ -174,4 +175,70 @@ fn the_default_check_asks_the_github_api_of_this_repository() {
         "https://api.github.com/repos/p4kx-org/p4kx/releases/latest",
         "the latest Release of this repository"
     );
+}
+
+#[test]
+fn a_package_check_keeps_the_page_and_selects_only_a_compatible_asset() -> TestResult {
+    let platform = p4kx_update::Platform::current().ok_or("unsupported test platform")?;
+    let row = p4kx_update::supported_targets()?
+        .into_iter()
+        .find(|row| row.platform() == platform)
+        .ok_or("missing native target")?;
+    let package = *row.packages.first().ok_or("missing native package")?;
+    let name =
+        p4kx_update::asset_filename("0.5.0", platform, package)?.ok_or("missing asset name")?;
+    let page = "https://github.com/p4kx-org/p4kx/releases/tag/v0.5.0";
+    let url = format!("https://github.com/p4kx-org/p4kx/releases/download/v0.5.0/{name}");
+    let server = Server::answering(
+        "200 OK",
+        serde_json::json!({
+            "tag_name": "v0.5.0",
+            "html_url": page,
+            "assets": [{"name": name, "browser_download_url": url}]
+        })
+        .to_string(),
+    )?;
+    let release = ReleaseCheck::new(&server.endpoint)
+        .with_package(package)
+        .newer_than("0.4.2")?
+        .ok_or("missing newer release")?;
+    assert_eq!(release.page, page);
+    assert_eq!(release.link(), url);
+    assert_eq!(
+        release.asset.as_ref().map(|asset| &asset.target),
+        Some(&row.target)
+    );
+    server.request()?;
+    Ok(())
+}
+
+#[test]
+fn malformed_package_metadata_retains_the_release_page_fallback() -> TestResult {
+    let platform = p4kx_update::Platform::current().ok_or("unsupported test platform")?;
+    let row = p4kx_update::supported_targets()?
+        .into_iter()
+        .find(|row| row.platform() == platform)
+        .ok_or("missing native target")?;
+    let package = *row.packages.first().ok_or("missing native package")?;
+    for assets in [
+        serde_json::Value::Null,
+        serde_json::json!({"malformed":true}),
+        serde_json::json!([{"name":17}]),
+    ] {
+        let server = Server::answering(
+            "200 OK",
+            serde_json::json!({
+                "tag_name": "v0.5.0", "html_url": PAGE, "assets": assets
+            })
+            .to_string(),
+        )?;
+        let release = ReleaseCheck::new(&server.endpoint)
+            .with_package(package)
+            .newer_than("0.4.2")?
+            .ok_or("missing newer release")?;
+        assert_eq!(release.asset, None);
+        assert_eq!(release.link(), PAGE);
+        server.request()?;
+    }
+    Ok(())
 }

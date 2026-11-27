@@ -4,12 +4,14 @@
 use std::collections::HashMap;
 
 use p4kx_character::Dna;
+use p4kx_extraction::ModelArchiveSource;
 use p4kx_model::{BoneMatch, Model, extend_skeleton};
 
 use super::ArmourPart;
 use super::facial::{FaceLink, FaceSource, Facial, bones_of};
 use super::jobs::{Job, issue};
 use super::mount::place;
+use super::mount_source::PlacementModel;
 use crate::placement::is_unskinned;
 use crate::{Issue, IssueKind};
 
@@ -92,8 +94,7 @@ pub(super) fn extend_with_faces(skeleton: &mut Model, parts: &mut [ArmourPart], 
             .face
             .facial
             .as_ref()
-            .map(|facial| facial.offsets.as_slice())
-            .unwrap_or_default();
+            .map_or_default(|facial| facial.offsets.as_slice());
         skeleton.bones = extend_skeleton(&skeleton.bones, &bones, moves);
         let (Some(facial), Some(source)) = (head.face.facial, head.source) else {
             continue;
@@ -129,7 +130,7 @@ pub(super) fn extend_with_faces(skeleton: &mut Model, parts: &mut [ArmourPart], 
 
 /// Returns `skeleton` with the bones of the heads appended and notes how each part fits it.
 pub(super) fn settled(
-    mut skeleton: Model,
+    (mut skeleton, sources): (Model, &[ModelArchiveSource]),
     parts: &mut [ArmourPart],
     heads: Vec<Found>,
     jobs: &[&Job],
@@ -137,7 +138,13 @@ pub(super) fn settled(
     issues: &mut Vec<Issue>,
 ) -> Model {
     extend_with_faces(&mut skeleton, parts, heads);
-    place(jobs, parts, &skeleton, level, issues);
+    place(
+        jobs,
+        parts,
+        PlacementModel::new(&skeleton, sources),
+        level,
+        issues,
+    );
     for (job, part) in jobs.iter().zip(parts.iter()) {
         note_fit(job, part, &skeleton, level, issues);
     }
@@ -152,7 +159,7 @@ fn note_fit(job: &Job, part: &ArmourPart, skeleton: &Model, level: u32, issues: 
         return;
     };
     if is_unskinned(model, level) {
-        if part.mount.is_none() {
+        if part.mount.is_none() && !job.overlay_mount.requires_mount() {
             issues.push(issue(job, IssueKind::NotSkinned));
         }
         return;

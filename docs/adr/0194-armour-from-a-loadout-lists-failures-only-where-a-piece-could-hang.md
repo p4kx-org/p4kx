@@ -21,9 +21,7 @@ cannot be read are left out, as for the root.
 
 Nothing below an Entity that is not worn is a failure: an optic the Archive lacks on a rifle is no
 armour. A worn Entity that hangs below a non-worn one is still found and worn, and failures below
-it count again. A `TooManyPorts` issue that lands on a non-worn Entity is not listed, although
-the ports it left out may have held a piece. A head is a non-worn Entity here; its parts are the business of `NpcHead`
-(ADR-0109).
+it count again. A head is a non-worn Entity here. Its parts belong to `NpcHead` (ADR-0109).
 
 The reason: the failures exist so that the report does not hide a piece that was meant to be worn.
 Below a weapon or a body part nothing is meant to be worn, and its unresolved attachments are no

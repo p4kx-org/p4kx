@@ -5,7 +5,8 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use p4kx_channels::{SearchPaths, detect};
+use p4kx_channels::SearchRecipe;
+use p4kx_extraction::OriginApplicability;
 use p4kx_settings::{Settings, default_settings_file};
 use serde::Serialize;
 use thiserror::Error;
@@ -29,6 +30,8 @@ pub(crate) enum InvalidPath {
 
 #[derive(Serialize)]
 struct ChannelsJson<'a> {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     channels: Vec<ChannelJson<'a>>,
 }
 
@@ -42,6 +45,8 @@ struct ChannelJson<'a> {
 
 #[derive(Serialize)]
 struct ChangeJson {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     action: Action,
     #[serde(skip_serializing_if = "Option::is_none")]
     kind: Option<Kind>,
@@ -82,17 +87,19 @@ fn settings_file(args: &ChannelsArgs) -> Result<PathBuf> {
 
 fn list(args: &ChannelsArgs, settings_file: &Path, as_json: bool) -> Result<()> {
     let settings = Settings::load(settings_file)?;
-    let standard = SearchPaths::standard();
-    let paths = SearchPaths {
-        default_library: args.default_library.clone().or(standard.default_library),
-        launcher: args.launcher_dir.clone().or(standard.launcher),
-        wine_prefixes: standard.wine_prefixes,
-        manual_folders: settings.channels.folders,
-        manual_archives: settings.channels.archives,
-    };
-    let channels = detect(&paths);
+    let mut recipe = SearchRecipe::standard();
+    if let Some(path) = &args.default_library {
+        recipe = recipe.with_default_library(path.clone());
+    }
+    if let Some(path) = &args.launcher_dir {
+        recipe = recipe.with_launcher(path.clone());
+    }
+    let (channels, _patches) =
+        crate::launcher_discovery::reported(recipe.snapshot_with_settings(&settings).detect())?
+            .into_parts();
     if as_json {
         json::print(&ChannelsJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             channels: channels
                 .iter()
                 .map(|channel| ChannelJson {
@@ -136,10 +143,12 @@ fn add(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
         settings.channels.add_folder(path.clone())
     };
     if added {
+        crate::guard::ensure_writable(settings_file)?;
         settings.save(settings_file)?;
     }
     if as_json {
         json::print(&ChangeJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: if added {
                 Action::Added
             } else {
@@ -166,9 +175,11 @@ fn remove(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
     if !settings.channels.remove(&absolute) {
         return Err(InvalidPath::NotAdded(absolute).into());
     }
+    crate::guard::ensure_writable(settings_file)?;
     settings.save(settings_file)?;
     if as_json {
         json::print(&ChangeJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: Action::Removed,
             kind: None,
             path: json::path(&absolute),

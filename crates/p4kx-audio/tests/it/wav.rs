@@ -3,10 +3,36 @@
 
 //! Writing PCM WEMs as WAV, and the typed error for codecs without a decoder.
 
-use p4kx_audio::{AudioError, Codec, Wem};
+use p4kx_audio::{AudioError, Codec, WavOutputRanges, WavReport, Wem};
 use p4kx_testkit::{TestCodec, TestWem, test_signal};
 
 type TestResult = Result<(), AudioError>;
+
+pub(super) fn assert_output_ranges(
+    bytes: &[u8],
+    ranges: &WavOutputRanges,
+    report: WavReport,
+) -> TestResult {
+    let wave = Wem::parse(bytes)?;
+    let data = wave.metadata().data_chunk();
+    assert_eq!(
+        ranges.header,
+        0..data.body_offset,
+        "original WAV header boundary"
+    );
+    assert_eq!(
+        ranges.samples,
+        data.body_offset..data.body_end_exclusive(),
+        "the output range covers exactly the written sample bytes"
+    );
+    assert_eq!(report.size, bytes.len() as u64, "complete output size");
+    assert_eq!(
+        data.body_len,
+        report.sample_count * u64::from(report.channels) * 2,
+        "samples are interleaved 16-bit PCM"
+    );
+    Ok(())
+}
 
 fn u16_at(bytes: &[u8], offset: usize) -> Option<u16> {
     Some(u16::from_le_bytes(

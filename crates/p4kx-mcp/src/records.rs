@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Filter, Guid, JsonLayout, Record, RecordJson, TreeBuilder};
-use rayon::prelude::*;
+use std::io;
+
+use p4kx_extraction::{
+    DataForge, DataForgeOrigin, Guid, JsonLayout, Record, RecordJson, TreeBuilder,
+};
 use serde_json::value::RawValue;
 
-use crate::budget::{Budget, Capped, MAX_RESPONSE_LEN, fill_within, json_len};
+use crate::budget::{Budget, Capped, MAX_RESPONSE_LEN, fit_prefix, json_len};
 use crate::error::ToolError;
-use crate::forge_shapes::{RecordResult, RecordSearchResult, RecordShape};
+use crate::forge_shapes::RecordResult;
 use crate::page::Page;
+use crate::record_origins::{self, Capture, CapturedRecord, Navigation};
 
 /// How `get_record` names its Records.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -34,41 +38,111 @@ impl Selector {
 /// cap.
 pub(crate) fn get(
     forge: &DataForge<'_>,
-    archive: String,
+    archive: &str,
+    origin: &DataForgeOrigin,
     selector: &Selector,
     page: Page,
 ) -> Result<RecordResult, ToolError> {
     let records = select(forge, selector)?;
-    let total = records.len();
+    let navigation = Navigation::new(forge, selector);
+    let captured = capture_page(&records, archive, page)?;
+    let first = records.get(page.offset());
+    let (_, response) = fit_prefix(
+        captured.rows.len(),
+        |count| {
+            let selected = captured.rows.split_at(count).0;
+            let next_cursor = page.next_cursor_after(count, records.len())?;
+            let origins = record_origins::project(
+                origin,
+                &navigation,
+                selected,
+                next_cursor.as_ref().map(|_| captured.examined.as_slice()),
+            )?;
+            Ok(RecordResult {
+                archive: archive.to_owned(),
+                total: records.len(),
+                records: selected.iter().map(|item| item.value.clone()).collect(),
+                next_cursor,
+                origins,
+            })
+        },
+        || first.map_or_else(|| "get_record".to_owned(), record_description),
+    )
+    .map_err(with_query_hint)?;
+    Ok(response)
+}
+
+#[derive(Default)]
+struct CapturedPage {
+    rows: Vec<CapturedRecord>,
+    examined: Vec<u32>,
+}
+
+fn capture_page(
+    records: &[Record<'_>],
+    archive: &str,
+    page: Page,
+) -> Result<CapturedPage, ToolError> {
     let mut budget = Budget::new();
-    budget.take(json_len(&(&archive, total)).saturating_add(128));
+    budget.take(json_len(&(archive, records.len())));
     let mut builder = TreeBuilder::new();
     let mut writer = RecordJson::new(JsonLayout::Compact);
-    let mut taken = Vec::new();
-    for record in records.iter().skip(page.offset()).take(page.limit()) {
-        let tree = builder.build(record)?;
+    let mut captured = CapturedPage::default();
+    for record in page.slice(records) {
+        captured.examined.push(record.index());
+        let tree = builder.build_positioned(record)?;
         let mut out = Capped::new(budget.left());
-        let fits = writer.write(&tree, &mut out).is_ok();
+        let mut capture = Capture::new(budget.left());
+        match writer.write_observed(&tree, &mut out, &mut capture) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::FileTooLarge => {
+                if captured.rows.is_empty() {
+                    return Err(oversized_record(record));
+                }
+                break;
+            }
+            Err(error) => return Err(error.into()),
+        }
         let bytes = out.into_bytes();
-        if !fits || !budget.take(bytes.len()) {
-            if taken.is_empty() {
-                return Err(ToolError::TooLargeItem {
-                    what: format!("Record {}", record.name()?),
-                    limit: MAX_RESPONSE_LEN,
-                    hint: "run_query selects single values of it",
-                });
+        if !budget.take(bytes.len().saturating_add(capture.minimum_wire_len())) {
+            if captured.rows.is_empty() {
+                return Err(oversized_record(record));
             }
             break;
         }
-        taken.push(RawValue::from_string(String::from_utf8(bytes)?)?);
+        captured.rows.push(CapturedRecord {
+            index: record.index(),
+            value: RawValue::from_string(String::from_utf8(bytes)?)?,
+            capture,
+        });
     }
-    let next_cursor = page.next_cursor_after(taken.len(), total)?;
-    Ok(RecordResult {
-        archive,
-        total,
-        records: taken,
-        next_cursor,
-    })
+    Ok(captured)
+}
+
+fn oversized_record(record: &Record<'_>) -> ToolError {
+    ToolError::TooLargeItem {
+        what: record_description(record),
+        limit: MAX_RESPONSE_LEN,
+        hint: "run_query selects single values of it",
+    }
+}
+
+fn record_description(record: &Record<'_>) -> String {
+    record.name().map_or_else(
+        |_| format!("Record {}", record.index()),
+        |name| format!("Record {name}"),
+    )
+}
+
+fn with_query_hint(error: ToolError) -> ToolError {
+    match error {
+        ToolError::TooLargeItem { what, limit, .. } => ToolError::TooLargeItem {
+            what,
+            limit,
+            hint: "run_query selects single values of it",
+        },
+        other => other,
+    }
 }
 
 fn select<'f>(forge: &'f DataForge<'f>, selector: &Selector) -> Result<Vec<Record<'f>>, ToolError> {
@@ -91,60 +165,4 @@ fn select<'f>(forge: &'f DataForge<'f>, selector: &Selector) -> Result<Vec<Recor
             Ok(records)
         }
     }
-}
-
-/// Returns one page of the Records whose record path matches `path` and whose type name
-/// matches `type_name`, both Filters, in Record order.
-pub(crate) fn search(
-    forge: &DataForge<'_>,
-    archive: String,
-    (path, type_name): (Option<&str>, Option<&str>),
-    page: Page,
-) -> Result<RecordSearchResult, ToolError> {
-    let path = path.map(Filter::parse).transpose()?;
-    let type_name = type_name.map(Filter::parse).transpose()?;
-    let matches: Vec<u32> = forge
-        .path_order()
-        .par_iter()
-        .copied()
-        .filter(|&index| {
-            forge.record(index).is_some_and(|record| {
-                path.as_ref().is_none_or(|filter| {
-                    record.record_path().is_ok_and(|text| filter.matches(text))
-                }) && type_name
-                    .as_ref()
-                    .is_none_or(|filter| record.type_name().is_ok_and(|text| filter.matches(text)))
-            })
-        })
-        .collect();
-    let items = page
-        .slice(&matches)
-        .iter()
-        .filter_map(|&index| forge.record(index))
-        .map(|record| shape(&record));
-    let mut result = RecordSearchResult {
-        archive,
-        total: matches.len(),
-        records: Vec::new(),
-        next_cursor: None,
-    };
-    let (records, next_cursor) = fill_within(
-        page,
-        matches.len(),
-        json_len(&result),
-        items,
-        |record: &RecordShape| format!("Record {}", record.name),
-    )?;
-    result.records = records;
-    result.next_cursor = next_cursor;
-    Ok(result)
-}
-
-fn shape(record: &Record<'_>) -> Result<RecordShape, ToolError> {
-    Ok(RecordShape {
-        guid: record.guid().to_string(),
-        name: record.name()?.to_owned(),
-        type_name: record.type_name()?.to_owned(),
-        path: record.record_path()?.to_owned(),
-    })
 }

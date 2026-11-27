@@ -127,3 +127,45 @@ fn the_index_of_references_is_built_once_per_archive() -> TestResult {
     assert_eq!(browser.dataforge_reads(), 1, "the DataForge is read once");
     Ok(())
 }
+
+#[test]
+fn the_list_binds_field_and_referrer_to_the_original_indexed_occurrence() -> TestResult {
+    use p4kx_extraction::{FieldOrigin, SourceLocation, SourceUseRole};
+
+    let (_dir, _, mut model) = opened()?;
+    select(&mut model, MAKER_PATH)?;
+    let view = listed(&mut model)?;
+    let inventory = view.source_inventory().map_err(ToString::to_string)?;
+    let row = view
+        .line_origins()
+        .and_then(<[_]>::first)
+        .ok_or("the reference row")?;
+    assert_eq!(
+        row.name.contains_encrypted_source(),
+        Some(false),
+        "plain Reference field"
+    );
+    assert_eq!(
+        row.value.contains_encrypted_source(),
+        Some(false),
+        "plain referrer path"
+    );
+    assert!(row.name.source_set_complete(), "known field declaration");
+    assert!(inventory.uses().iter().any(|origin| {
+        row.name.source_uses_refs().contains(origin.id())
+            && matches!(origin.location(), SourceLocation::Subresource { namespace, indices, field }
+                if namespace == "dataforgeReferenceRoute" && indices == &[1, 0] && field == "fieldDeclarations")
+    }), "the original field is on the second Record at its first value");
+    assert!(inventory.uses().iter().any(|origin| {
+        row.value.source_uses_refs().contains(origin.id())
+            && origin.role() == SourceUseRole::Selector
+            && matches!(origin.location(), SourceLocation::Subresource { namespace, indices, field }
+                if namespace == "dataforgeValue" && indices == &[1, 0] && field == "$value")
+    }), "the displayed link cites the actual Reference selection");
+    assert!(
+        view.count_origin()
+            .is_some_and(FieldOrigin::source_set_complete),
+        "complete census"
+    );
+    Ok(())
+}

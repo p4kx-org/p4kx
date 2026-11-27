@@ -1,0 +1,141 @@
+# Audio control source export
+
+`p4kx media export ARCHIVE --out DIR --kind audio-control --filter '*.xml'` exports selected
+XML Entries below `Data/Libs/GameAudio/`, including nested Archive scopes. The path test accepts
+both separator spellings and ASCII case variants. The normal filter still controls which raw
+Entries are retained. Audio-control works independently of WEM and BNK semantic decoding.
+Add `--kind audio` when physical Wwise Event candidates should be available.
+
+Each source keeps its original verified raw bytes and physical Entry identity. The JSONL stream
+uses flat rows and exact original text byte ranges or CryXml table coordinates. Byte ranges are
+half-open and include UTF-8 BOM offsets. Child rows keep parent and sibling ordinals. Original
+text may include adjacent lexical pieces such as entity spellings and CDATA. CryXml node text
+is an independent slot alongside the child order.
+
+| Namespace | Physical keys |
+| --- | --- |
+| `audio-control-document` | Source Entry and empty indices |
+| `audio-control-element` | Source Entry and original traversal occurrence |
+| `audio-control-declaration` | Element occurrence and original declaration ordinal |
+| `audio-control-content` | Original traversal occurrence of text, comment or instruction |
+| `audio-control-binary-text` | Element occurrence of the independent CryXml content slot |
+| `audio-control-definition` | Element occurrence |
+| `audio-control-field` | Element occurrence and original declaration ordinal |
+| `audio-control-radar-definition` | Element occurrence |
+| `audio-control-radar-field` | Element occurrence and original declaration ordinal |
+| `audio-control-cig-audio-definition` | CIG graph element occurrence |
+| `audio-control-cig-audio-field` | CIG graph element occurrence and original declaration ordinal |
+| `audio-control-reference` | Element occurrence and original declaration ordinal |
+| `audio-control-reference-resolution` | Owning Archive directory and query index |
+| `audio-control-reference-candidate` | Owning Archive directory, query index and candidate ordinal |
+| `audio-control-path-candidate` | Source Entry, declaration key and candidate ordinal |
+| `audio-control-failure` | Source Entry and empty indices |
+
+The original element and declaration rows preserve exact qualified names, case, authored order,
+namespace declarations, decoded values and available literal spellings. Unknown elements and
+attributes remain there regardless of typed recognition. Known source families include triggers,
+Wwise Events, RTPCs, switches and states, environments, preloads, groups, platform choices,
+dependees and external sources. Field rows cite the original declaration. Numeric facts include
+authored Wwise duration and radius bounds, RTPC multiplier and shift, and
+`WwiseRtpc` min, max and default. External-source rows retain the authored
+localisation flag, entry language, duration declarations and Wwise filename
+as separate fields. The raw declaration keeps its original literal independently of the typed number. An invalid typed
+literal keeps its original spelling and an explicit typed invalid outcome. The bounds are authored
+metadata and give no runtime timing, unit or playback guarantee.
+
+The independent `RadarAudioData` hierarchy yields ordered radar-definition
+and radar-field rows. The typed view covers the original default zoom limits,
+category names and numeric settings, and each sound-event name and value.
+Values keep their exact spelling. Empty values and invalid numeric declarations
+have explicit states. A missing attribute has no field row. A repeated element
+gets a distinct physical ordinal. Other elements and attributes remain in the
+original syntax stream. A radar sound-event value retains its authored token.
+
+A preload link searches original named requests in the same Archive directory. An RTPC dependee
+searches original RTPC declarations there. A platform group link searches within its exact
+owning preload request. Links retain every physical candidate, including repeated declarations.
+The export writes authored edges without following them, so reciprocal edges remain visible.
+An incomplete directory or unread potential target keeps scope completeness explicit.
+
+Wwise Event links keep the authored name and the Wwise ShortID and can join the owning directory's
+Audio `audio-bank-foreign-target-resolution` by query index. With Audio omitted the link reports
+`not-selected`. Full authored Archive file paths can be checked against physical directory
+metadata. Relative external filenames retain their original spelling and an
+explicit unresolved path state. Exact duplicate entries are emitted in order with independent filter/key information.
+An unsafe or unproved relative spelling retains the original token and an explicit reason. The
+path lookup consumes only directory metadata. Runtime availability belongs to playback.
+
+Each field has immediate source-use receipts and an independent encryption marker. A declaration
+from a protected ATL source keeps that proof, and a reference to other bytes does not establish
+that those bytes contributed. Common generation budgets govern actual input and output work.
+Malformed XML and repaired CryXml string-table bytes produce diagnosed incomplete output when
+requested with `--diagnostic`. The original raw source remains separately recoverable.
+
+## CIG audio graph
+
+`p4kx media export ARCHIVE --out DIR --kind audio-control --filter 'Data/Libs/CIGAudio/CIGAudioData.bin'`
+selects the authored CIG audio graph. Both Archive separator spellings and ASCII case variants
+match the same fixed path. The source must have a `CIGAudioData` root. Its original bytes and
+syntax rows retain the full graph, including unrecognised elements and declarations.
+
+The role rows classify the original object, logic, reference and link hierarchy. A role's
+origin cites the original element, its ancestor elements used for classification and the
+physical Entry path used to select the graph reader. A numbered child under inLinks and
+one under outLinks have different roles even when their names match. Join each definition
+to its original element occurrence to read the exact name, parent and sibling ordinal.
+The original CryXml graph can use decimal-only element names.
+The text spelling also permits an underscore with optional digits.
+A typed field joins the original declaration by the same indices. Object
+types, classes and mixed-form IDs preserve their exact text. GUID-valued slots retain
+verbatim tokens. Numeric and flag fields expose typed values or explicit invalid states
+and keep their original spellings in declaration rows.
+
+An authored link belongs to its logic node through an inLinks or outLinks port occurrence
+and that port's links element.
+The `node`, `source-link-id` and `target-link-id` fields preserve their authored endpoint
+tokens and port values. The export keeps repeated edges and does not resolve endpoints
+or infer a Wwise binding. Every field receipt points to its original CryXml table position
+or XML byte range. The audio-control stream and Media envelope retain their format versions.
+
+On installed PTU Build 13248297, a bounded read of the original CRC-verified Entry
+matched all 1,949 projected roles to independent authored routes and immediate source
+uses. That included 52 input links and 51 output links. The fixed graph Entry was
+absent from the complete LIVE Build 13220821 directory. The encrypted synthetic
+fixture also checks the emitted roles and provenance in the serialized Media stream.
+
+## Installed ATL checks
+
+Both checks use `P4KX_DATA_P4K` and the configured Archive key. The census also
+accepts an optional second Build through `P4KX_DATA_P4K_B`.
+
+```powershell
+cargo test --locked -p p4kx-media --lib sampled_original_atl_families_keep_their_exact_authored_values_and_origins -- --ignored --nocapture
+cargo test --locked -p p4kx-media --lib original_atl_census_reconciles_media_and_assembly_without_exports -- --ignored --nocapture
+```
+
+The sample verifies each selected Entry checksum, original spelling, typed
+values from all six ATL families, and per-value origins down to the XML byte or
+CryXml table position. It walks root Entries in physical order and stops after
+all required declaration groups are represented. An exhausted scan reports
+missing groups by name.
+
+The whole-root census compares independent XML counts of documents, elements,
+declarations, definitions and authored references with serialized Media records,
+separately for each physical Entry. The production writer also emits the
+directory resolution and candidate rows and their JSONL provenance. The test
+matches ATL record digests and field addresses, verifies ordered candidate
+rows, and resolves a format-field origin for each document against the physical
+source and use inventories. It discards the emitted bytes.
+
+The census hashes the root Archive for the source receipt and checks the Build
+before and after the scan. It processes verified XML one Entry at a time and
+requires complete original spans. Its progress log times archive hashing,
+document projection, reference resolution and provenance finalization.
+Assembly's `AtlDefinitions` uses the same
+trigger projection as `AudioIndex` to reconcile winning definitions, event
+order, IDs and localisation. It reads ATL definitions only.
+
+Both installed checks perform zero Media artifact writes. The census has no
+file placement permit. It computes raw sidecar digests from the verified Entry
+bytes in memory. A small synthetic export checks the actual file publication
+and verifies the raw sidecars.

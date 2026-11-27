@@ -13,6 +13,11 @@ use p4kx_testkit::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+const COMPANION: &str = "Game2.xml.p4kx-origin.jsonl";
+
+#[path = "dcb_export_combined_origins.rs"]
+mod origins;
+
 fn database() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .enumeration("Size", ["Small", "Large"])
@@ -75,9 +80,13 @@ fn database() -> DataForgeBuilder {
 }
 
 fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_of(dir, &database())
+}
+
+fn write_archive_of(dir: &Path, database: &DataForgeBuilder) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
         .write_to(&path)?;
     Ok(path)
 }
@@ -122,7 +131,7 @@ fn combined_writes_every_record_into_one_file_in_record_path_order() -> TestResu
 
     assert_eq!(
         listing(&out)?,
-        ["Game2.xml"],
+        ["Game2.xml", COMPANION],
         "one file named after the Entry"
     );
     let xml = fs::read_to_string(out.join("Game2.xml"))?;
@@ -195,7 +204,11 @@ fn combined_applies_the_conflict_policies_to_the_file() -> TestResult {
         "if-changed keeps an unchanged file: {unchanged}"
     );
     assert_eq!(fs::read(&file)?, original, "overwrite replaces the file");
-    assert_eq!(listing(&out)?, ["Game2.xml"], "no temporary file remains");
+    assert_eq!(
+        listing(&out)?,
+        ["Game2.xml", COMPANION],
+        "no temporary file remains"
+    );
     Ok(())
 }
 
@@ -206,7 +219,8 @@ fn combined_prints_one_line_of_json() -> TestResult {
 
     let stdout = export(&archive, &dir.path().join("out"), &["--json"], 0)?;
 
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!("combined_json", serde_json::to_string_pretty(&value)?);
     Ok(())
 }

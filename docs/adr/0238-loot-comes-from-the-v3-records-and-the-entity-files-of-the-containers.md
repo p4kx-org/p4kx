@@ -2,6 +2,10 @@
 
 Decided for issue #322. Evidence: LIVE 4.10, ScDataDumper and NovaSCDataExtractor (facts only).
 
+Pool-filter output shape and its sixteen-level cut are superseded by
+[ADR-0361](0361-loot-filter-definitions-retain-original-value-occurrences.md). Other Loot-family,
+selection and placed-container decisions remain scoped here.
+
 ## Decision
 
 - The catalog exports the V3 loot Records as three kinds of schema version 2 (`lootTables`,

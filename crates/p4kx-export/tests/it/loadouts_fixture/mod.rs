@@ -36,7 +36,7 @@ const ALPHA_XML: &str = r#"<Vehicle name="ACME_Alpha">
     <Part name="hull" class="Animated">
       <Parts>
         <Part name="hardpoint_gun" class="ItemPort">
-          <ItemPort minSize="1" maxSize="3" flags="$uneditable invisible" portTags="$Gun" requiredTags="Mount Unknown Dup">
+          <ItemPort minSize="1" maxSize="3" flags="$uneditable invisible" portTags="$Gun" requiredTags="Mount Unknown Dup" display_name="@LOC_EMPTY">
             <Types><Type type="WeaponGun"/></Types>
           </ItemPort>
         </Part>
@@ -44,11 +44,17 @@ const ALPHA_XML: &str = r#"<Vehicle name="ACME_Alpha">
           <ItemPort minSize="5" maxSize="6" flags="invisible"/>
         </Part>
         <Part name="hardpoint_turret" class="ItemPort">
-          <ItemPort minSize="9" maxSize="9" flags="invisible"/>
+          <ItemPort minSize="9" maxSize="9" flags="invisible" display_name="@fixture_xml_turret">
+            <Types><Type type="VehicleTurret" subtypes="FixtureXmlOnly"/></Types>
+          </ItemPort>
         </Part>
         <Part name="hardpoint_empty" class="ItemPort">
-          <ItemPort minSize="2" maxSize="2">
-            <Types><Type type="Missile"/><Type type="Bomb"/></Types>
+          <ItemPort minSize="2" maxSize="2" display_name="@fixture_vehicle_port">
+            <Types>
+              <Type type="Missile" subtypes="IR, EM, IR"/>
+              <Type type="Bomb"/>
+              <Type type="Missile" subtypes="Dumbfire, , Heat"/>
+            </Types>
           </ItemPort>
         </Part>
         <Part name="hardpoint_empty" class="ItemPort">
@@ -99,7 +105,7 @@ fn entities() -> Vec<TestEntity> {
             .port(
                 TestPort::new("hardpoint_turret")
                     .sizes(2, 4)
-                    .item_type("Turret", ["GunTurret"])
+                    .item_type("Turret", ["GunTurret", "GunTurret"])
                     .flags("uneditable")
                     .tags("Turret", "Mount"),
             )

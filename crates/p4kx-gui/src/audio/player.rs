@@ -145,3 +145,7 @@ impl Drop for Player {
         self.transport.stop();
     }
 }
+
+#[cfg(test)]
+#[path = "player_native_tests.rs"]
+mod native_tests;

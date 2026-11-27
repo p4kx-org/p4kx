@@ -4,16 +4,23 @@
 //! The export of the Character of the Characters tab as GLB: its setup, with progress, cancel and
 //! the refusal of a Star Citizen installation.
 
+use std::fs;
+use std::io::{self, Write as _};
 use std::path::Path;
+use std::process;
 
 use crate::characters::{
     TestResult, Window, built, opened, opened_in_installation, pick, settle, wait_until,
 };
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
+use p4kx_extraction::{GlbOptions, OriginDigestWriter};
 use p4kx_gui::ui::Dialog;
-use p4kx_gui::{CharacterExportStatus, ChooserKind, Language};
+use p4kx_gui::{
+    CharacterExportStatus, CharacterExportSummary, ChooserKind, Language, ModelExportFailure,
+};
 use p4kx_testkit::check_glb;
+use serde_json::Value;
 
 fn ended(window: &mut Window) -> TestResult {
     wait_until(&mut window.1, |model| {
@@ -112,7 +119,20 @@ fn the_character_is_written_as_one_skinned_glb_with_its_morph_targets() -> TestR
     );
     assert!(summary.package().is_none(), "a GLB file");
     assert_eq!(summary.parts(), 4, "body, torso, head and teeth");
-    let checked = check_glb(&std::fs::read(&written)?)?;
+    let bytes = fs::read(&written)?;
+    let armour = model.characters().armour().ok_or("the shown Character")?;
+    let mut ordinary = io::BufWriter::new(Vec::new());
+    armour.write_glb(
+        &GlbOptions::default().with_lod(summary.lod()),
+        &mut ordinary,
+    )?;
+    assert_eq!(
+        bytes,
+        ordinary.into_inner()?,
+        "the ordinary GLB bytes are unchanged"
+    );
+    check_companion(summary, &bytes)?;
+    let checked = check_glb(&bytes)?;
     let skin = checked.document.skins().next().ok_or("a skin")?;
     assert_eq!(skin.joints().count(), 3, "the male skeleton");
     let targets: usize = checked
@@ -122,6 +142,45 @@ fn the_character_is_written_as_one_skinned_glb_with_its_morph_targets() -> TestR
         .map(|primitive| primitive.morph_targets().count())
         .sum();
     assert!(targets >= 2, "the expressions are morph targets: {targets}");
+    Ok(())
+}
+
+fn check_companion(summary: &CharacterExportSummary, bytes: &[u8]) -> TestResult {
+    let path = summary
+        .origin_receipt()
+        .ok_or("the Character GLB receipt")?;
+    let expected = summary.file().with_extension("glb.p4kx-origin.jsonl");
+    assert_eq!(
+        fs::canonicalize(path)?,
+        fs::canonicalize(expected)?,
+        "the summary points to the canonical receipt"
+    );
+    let rows = fs::read_to_string(path)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<Value>, _>>()?;
+    let binding = rows
+        .first()
+        .and_then(|row| row.get("binding"))
+        .ok_or("the artifact binding")?;
+    let mut measured = OriginDigestWriter::new(io::sink());
+    measured.write_all(bytes)?;
+    let expected = serde_json::to_value(measured.finish()?)?;
+    for key in ["sha256", "byteLength"] {
+        assert_eq!(binding.get(key), expected.get(key), "binding field {key}");
+    }
+    assert!(
+        rows.iter().any(|row| {
+            row.pointer("/address/path")
+                .and_then(Value::as_str)
+                .is_some_and(|path| path.starts_with("/accessors/") && path.ends_with("/count"))
+                && row
+                    .get("sourceUsesRefs")
+                    .and_then(Value::as_array)
+                    .is_some_and(|refs| !refs.is_empty())
+        }),
+        "an emitted geometry field names a physical producer"
+    );
     Ok(())
 }
 
@@ -151,9 +210,11 @@ fn the_progress_window_shows_while_it_runs_and_the_summary_after() -> TestResult
 fn a_stopped_export_leaves_no_file() -> TestResult {
     let mut window = composed()?;
     let file = window.0.path().join("stopped.glb");
+    let hold = window.1.state_mut().model.characters_mut().hold_export();
     start(&mut window, &file)?;
 
     window.1.state_mut().model.characters_mut().stop_export();
+    drop(hold);
 
     let export = window
         .1
@@ -162,15 +223,51 @@ fn a_stopped_export_leaves_no_file() -> TestResult {
         .characters()
         .export()
         .ok_or("no export")?;
-    match export.status() {
-        CharacterExportStatus::Cancelled => {
-            assert!(!file.exists(), "no partial file");
-        }
-        CharacterExportStatus::Finished(_) => {
-            assert!(file.exists(), "it was quicker than the stop");
-        }
-        other => return Err(format!("unexpected: {other:?}").into()),
-    }
+    assert!(
+        matches!(export.status(), CharacterExportStatus::Cancelled),
+        "the held export is cancelled"
+    );
+    assert!(!file.try_exists()?, "no partial file");
+    assert!(
+        !file.with_extension("glb.p4kx-origin.jsonl").try_exists()?,
+        "no receipt"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_failed_receipt_reports_that_the_character_glb_was_written() -> TestResult {
+    let mut window = composed()?;
+    let file = window.0.path().join("character.glb");
+    let receipt = file.with_extension("glb.p4kx-origin.jsonl");
+    let staging = receipt.with_extension(format!("jsonl.p4kx-{}.part", process::id()));
+    fs::write(&staging, b"reserved receipt staging path")?;
+
+    assert!(start(&mut window, &file)?, "the export started");
+    ended(&mut window)?;
+    let export = window
+        .1
+        .state()
+        .model
+        .characters()
+        .export()
+        .ok_or("no export")?;
+    assert!(
+        matches!(export.status(), CharacterExportStatus::Failed(ModelExportFailure::Failed(reason))
+            if reason.contains("the GLB was committed")),
+        "the failure names the GLB that already committed: {export:?}"
+    );
+    let bytes = fs::read(&file)?;
+    assert!(
+        check_glb(&bytes)?.document.skins().next().is_some(),
+        "the committed character GLB is valid"
+    );
+    assert!(!receipt.try_exists()?, "no companion was published");
+    assert_eq!(
+        fs::read(staging)?,
+        b"reserved receipt staging path",
+        "the unrelated staging file is preserved"
+    );
     Ok(())
 }
 

@@ -6,15 +6,39 @@
 
 use std::error::Error;
 use std::fs;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use lewton::inside_ogg::OggStreamReader;
+use p4kx_extraction::Soundbank;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestAtl, TestBank, TestCodec, TestEntity, TestEntry,
     TestHircObject, TestVorbis, TestWem, audio_schema, entity_schema, test_signal, wwise_short_id,
 };
 use serde_json::Value;
+mod failure_origins;
+
+#[path = "wwise_extract_publication.rs"]
+mod publication;
+use publication::{assert_sound_receipt, check_size_origin};
+#[path = "wwise_extract_resolution_limits.rs"]
+mod resolution_limits;
+#[path = "wwise_txtp_approximation.rs"]
+mod txtp_approximation;
+#[path = "wwise_txtp_clip_omissions.rs"]
+mod txtp_clip_omissions;
+#[path = "wwise_txtp_container_omissions.rs"]
+mod txtp_container_omissions;
+#[path = "wwise_txtp_loop_origins.rs"]
+mod txtp_loop_origins;
+#[path = "wwise_txtp_origin_assertions.rs"]
+mod txtp_origin_assertions;
+#[path = "wwise_txtp_origins.rs"]
+mod txtp_origins;
+#[path = "wwise_txtp_stinger_scheduling.rs"]
+mod txtp_stinger_scheduling;
+#[path = "wwise_txtp_subtrack_selection.rs"]
+mod txtp_subtrack_selection;
+#[path = "wwise_txtp_transition_omissions.rs"]
+mod txtp_transition_omissions;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -30,6 +54,16 @@ fn vorbis() -> Vec<u8> {
 
 fn pcm() -> Vec<u8> {
     TestWem::pcm(TestCodec::WwisePcm, 1, 48_000, &test_signal(480, 1)).bytes()
+}
+
+fn hirc_payload(object: TestHircObject) -> Result<Vec<u8>, Box<dyn Error>> {
+    let bank = Soundbank::parse(TestBank::new(1).version(154).object(object).bytes())?;
+    let object = bank.objects().first().ok_or("original synthetic object")?;
+    let payload = bank
+        .object_body(object)
+        .get(size_of::<u32>()..)
+        .ok_or("synthetic payload after the object ID")?;
+    Ok(payload.to_vec())
 }
 
 fn xma() -> Vec<u8> {
@@ -71,6 +105,7 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         "TEST_Ship",
         "libs/foundry/records/entities/spaceships/test_ship.xml",
     )
+    .audio_trigger("A_Undefined_Ship")
     .audio_trigger("Play_Single")
     .audio_trigger("play_single_copy");
     let twin = TestEntity::new(
@@ -92,8 +127,8 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .trigger("PLAY_SINGLE_COPY", &["Play_Single"])
         .trigger("..\\Evil:x", &["Play_Single"]);
     let path = dir.join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()))
+    ArchiveBuilder::v2()
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
         .entry(TestEntry::zstd(
             "Data\\Libs\\GameAudio\\SC_Audio.xml",
             definitions.to_cryxml(),
@@ -156,37 +191,13 @@ fn count(report: &Value, key: &str) -> Option<u64> {
 }
 
 #[test]
-fn a_trigger_with_several_sounds_is_named_by_trigger_and_wem() -> TestResult {
-    let fixture = fixture()?;
-    let report = extract(&fixture, "play_multi", &[], 1)?;
-    assert_eq!(
-        names(&fixture.out)?,
-        [
-            "Play_Multi_100.ogg",
-            "Play_Multi_101.wav",
-            "Play_Multi_102.wem",
-            "Play_Multi_103.wav"
-        ]
-    );
-    assert_eq!(report["format"], "ogg");
-    assert_eq!(count(&report, "written"), Some(4));
-    assert_eq!(count(&report, "unconverted"), Some(1));
-    assert_eq!(count(&report, "failed"), Some(1));
-    let failure = report["failures"][0]["wem_id"].as_u64();
-    assert_eq!(failure, Some(104));
-    let ogg = fs::read(fixture.out.join("Play_Multi_100.ogg"))?;
-    OggStreamReader::new(Cursor::new(ogg))?;
-    assert_eq!(fs::read(fixture.out.join("Play_Multi_102.wem"))?, xma());
-    let wav = fs::read(fixture.out.join("Play_Multi_101.wav"))?;
-    assert_eq!(wav.get(..4), Some(&b"RIFF"[..]));
-    Ok(())
-}
-
-#[test]
 fn a_trigger_with_one_sound_is_named_by_the_trigger() -> TestResult {
     let fixture = fixture()?;
     let report = extract(&fixture, "Play_Single", &["--format", "wav"], 0)?;
-    assert_eq!(names(&fixture.out)?, ["Play_Single.wav"]);
+    assert_eq!(
+        names(&fixture.out)?,
+        ["Play_Single.wav", "Play_Single.wav.p4kx-origin.jsonl"]
+    );
     assert_eq!(count(&report, "failed"), Some(0));
     Ok(())
 }
@@ -195,19 +206,12 @@ fn a_trigger_with_one_sound_is_named_by_the_trigger() -> TestResult {
 fn a_wem_reached_through_several_variants_is_written_once() -> TestResult {
     let fixture = fixture()?;
     let report = extract(&fixture, "Play_Twice", &["--format", "wav"], 0)?;
-    assert_eq!(names(&fixture.out)?, ["Play_Twice.wav"]);
+    assert_eq!(
+        names(&fixture.out)?,
+        ["Play_Twice.wav", "Play_Twice.wav.p4kx-origin.jsonl"]
+    );
     assert_eq!(count(&report, "written"), Some(1));
     assert_eq!(report["files"].as_array().map(Vec::len), Some(1));
-    Ok(())
-}
-
-#[test]
-fn raw_keeps_the_wem_bytes() -> TestResult {
-    let fixture = fixture()?;
-    let report = extract(&fixture, "Play_Single", &["--format", "raw"], 0)?;
-    assert_eq!(report["format"], "raw");
-    assert_eq!(report["files"][0]["format"], "wem");
-    assert_eq!(fs::read(fixture.out.join("Play_Single.wem"))?, pcm());
     Ok(())
 }
 
@@ -215,33 +219,16 @@ fn raw_keeps_the_wem_bytes() -> TestResult {
 fn unsafe_trigger_names_stay_inside_the_target() -> TestResult {
     let fixture = fixture()?;
     extract(&fixture, "..\\Evil:x", &[], 0)?;
-    assert_eq!(names(&fixture.out)?, ["..%5CEvil%3Ax.wav"]);
+    assert_eq!(
+        names(&fixture.out)?,
+        ["..%5CEvil%3Ax.wav", "..%5CEvil%3Ax.wav.p4kx-origin.jsonl"]
+    );
     assert!(
         !fixture
             .out
             .parent()
             .is_some_and(|parent| parent.join("Evil_x.wav").exists())
     );
-    Ok(())
-}
-
-#[test]
-fn conflict_policies_decide_about_existing_files() -> TestResult {
-    let fixture = fixture()?;
-    extract(&fixture, "Play_Single", &[], 0)?;
-    let target = fixture.out.join("Play_Single.wav");
-    fs::write(&target, b"old")?;
-    let skipped = extract(&fixture, "Play_Single", &[], 0)?;
-    assert_eq!(count(&skipped, "kept"), Some(1));
-    assert_eq!(fs::read(&target)?, b"old");
-    let replaced = extract(&fixture, "Play_Single", &["--conflict", "if-changed"], 0)?;
-    assert_eq!(count(&replaced, "written"), Some(1));
-    let unchanged = extract(&fixture, "Play_Single", &["--conflict", "if-changed"], 0)?;
-    assert_eq!(count(&unchanged, "kept"), Some(1));
-    fs::write(&target, b"old")?;
-    let overwritten = extract(&fixture, "Play_Single", &["--conflict", "overwrite"], 0)?;
-    assert_eq!(count(&overwritten, "written"), Some(1));
-    assert_ne!(fs::read(&target)?, b"old");
     Ok(())
 }
 
@@ -276,8 +263,47 @@ fn entity_audio_extracts_every_trigger_with_distinct_names() -> TestResult {
     let report: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(count(&report["extraction"], "written"), Some(2));
     assert_eq!(
+        report.pointer("/triggers/0/name").and_then(Value::as_str),
+        Some("A_Undefined_Ship"),
+        "the unmatched trigger is present before the two exportable matches"
+    );
+    assert!(
+        report
+            .pointer("/triggers/0/unmatched")
+            .is_some_and(Value::is_object),
+        "the first Entity trigger does not enter the export plan"
+    );
+    let origins = report.get("fieldOrigins").ok_or("entity audio origins")?;
+    for (ordinal, file) in report["extraction"]["files"]
+        .as_array()
+        .ok_or("entity sound files")?
+        .iter()
+        .enumerate()
+    {
+        assert_sound_receipt(file, "opaquePayload")?;
+        let path = format!("/extraction/files/{ordinal}");
+        check_size_origin(
+            &report,
+            &format!("{path}/size"),
+            "Data\\Sounds\\wwise\\Test.bnk",
+        )?;
+        let name = origins
+            .get(format!("{path}/trigger"))
+            .ok_or("entity audio trigger origin")?;
+        assert_eq!(
+            name.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(true),
+            "the original encrypted Entity selection is used after the unmatched trigger"
+        );
+    }
+    assert_eq!(
         names(&fixture.out)?,
-        ["PLAY_SINGLE_COPY.wem", "Play_Single.wem"]
+        [
+            "PLAY_SINGLE_COPY.wem",
+            "PLAY_SINGLE_COPY.wem.p4kx-origin.jsonl",
+            "Play_Single.wem",
+            "Play_Single.wem.p4kx-origin.jsonl",
+        ]
     );
     Ok(())
 }
@@ -297,7 +323,15 @@ fn entity_audio_separates_triggers_whose_escaped_names_differ() -> TestResult {
     assert_eq!(output.status.code(), Some(0), "exit code: {output:?}");
     let report: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(count(&report["extraction"], "written"), Some(2));
-    assert_eq!(names(&fixture.out)?, ["Play%3ACase.wem", "Play_CASE.wem"]);
+    assert_eq!(
+        names(&fixture.out)?,
+        [
+            "Play%3ACase.wem",
+            "Play%3ACase.wem.p4kx-origin.jsonl",
+            "Play_CASE.wem",
+            "Play_CASE.wem.p4kx-origin.jsonl",
+        ]
+    );
     Ok(())
 }
 
@@ -307,7 +341,12 @@ fn txtp_writes_one_file_per_event_next_to_the_sounds() -> TestResult {
     let report = extract(&fixture, "Play_Single", &["--format", "wav", "--txtp"], 0)?;
     assert_eq!(
         names(&fixture.out)?,
-        ["Play_Single.txtp", "Play_Single.wav"]
+        [
+            "Play_Single.txtp",
+            "Play_Single.txtp.p4kx-origin.jsonl",
+            "Play_Single.wav",
+            "Play_Single.wav.p4kx-origin.jsonl",
+        ]
     );
     assert_eq!(
         fs::read_to_string(fixture.out.join("Play_Single.txtp"))?,
@@ -352,7 +391,10 @@ fn txtp_skips_an_event_with_a_sound_that_has_no_file() -> TestResult {
 fn without_txtp_no_txtp_is_written_or_reported() -> TestResult {
     let fixture = fixture()?;
     let report = extract(&fixture, "Play_Single", &["--format", "wav"], 0)?;
-    assert_eq!(names(&fixture.out)?, ["Play_Single.wav"]);
+    assert_eq!(
+        names(&fixture.out)?,
+        ["Play_Single.wav", "Play_Single.wav.p4kx-origin.jsonl"]
+    );
     assert!(report.get("txtp").is_none());
     Ok(())
 }

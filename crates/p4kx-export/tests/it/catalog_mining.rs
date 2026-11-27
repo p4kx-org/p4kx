@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Mineable elements and refining processes in the Basetool catalog, through the public API.
+//! Mineable elements and refining processes in the P4KX catalog, through the public API.
 
 use crate::mining_fixture::{
     BEXALITE, DANGLING, FAST_CAREFUL, OTHER_RESOURCE, SHARED_RESOURCE, SLOW_WASTEFUL, UNLINKED,
@@ -23,7 +23,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -41,11 +41,15 @@ fn guid(value: u128) -> String {
 }
 
 fn class_names<'a>(catalog: &'a Value, kind: &str) -> Vec<&'a str> {
-    catalog[kind]
-        .as_array()
+    let rows = if kind == "refiningProcesses" {
+        catalog.pointer("/definitions/refiningProcesses/rows")
+    } else {
+        catalog.get(kind)
+    };
+    rows.and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|entry| entry["className"].as_str())
+        .filter_map(|entry| entry.pointer("/className/value").and_then(Value::as_str))
         .collect()
 }
 
@@ -68,8 +72,18 @@ fn every_element_is_exported_even_when_several_share_a_resource_type() -> TestRe
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|entry| entry["resourceTypeGuid"] == shared.as_str())
-        .map(|entry| (entry["className"].as_str(), entry["instability"].as_f64()))
+        .filter(|entry| {
+            entry
+                .pointer("/resourceType/value/guid/value")
+                .and_then(Value::as_str)
+                == Some(shared.as_str())
+        })
+        .map(|entry| {
+            (
+                entry["className"]["value"].as_str(),
+                entry["instability"]["value"]["finite"].as_f64(),
+            )
+        })
         .collect();
     assert_eq!(
         linked,
@@ -89,7 +103,7 @@ fn every_element_is_exported_even_when_several_share_a_resource_type() -> TestRe
 }
 
 #[test]
-fn a_null_or_dangling_resource_type_gives_a_null_guid_and_keeps_the_element() -> TestResult {
+fn a_null_and_dangling_resource_link_keep_distinct_states() -> TestResult {
     let (_, catalog) = build(None)?;
     for (record, class, instability) in [
         (UNLINKED, "unlinked_ore", 12.0),
@@ -99,75 +113,128 @@ fn a_null_or_dangling_resource_type_gives_a_null_guid_and_keeps_the_element() ->
             .as_array()
             .into_iter()
             .flatten()
-            .find(|entry| entry["guid"] == guid(record).as_str())
+            .find(|entry| entry["guid"]["value"] == guid(record).as_str())
             .ok_or("the element")?;
-        assert_eq!(entry["className"], class);
-        assert_eq!(entry["resourceTypeGuid"], Value::Null, "{class}");
-        assert_eq!(entry["instability"], instability, "{class} keeps its facts");
+        assert_eq!(entry["className"]["value"], class, "direct class name");
+        let reference = &entry["resourceType"];
+        if record == UNLINKED {
+            assert_eq!(reference["state"], "null", "authored null reference");
+            assert!(reference["value"].is_null(), "state carries no value");
+        } else {
+            assert_eq!(reference["state"], "present", "the stored GUID survives");
+            assert_eq!(reference["value"]["status"], "dangling", "missing target");
+            assert!(
+                reference["value"]["guid"]["value"].is_string(),
+                "exact authored GUID"
+            );
+        }
+        assert_eq!(
+            entry["instability"]["value"]["finite"], instability,
+            "{class} keeps its facts"
+        );
     }
     Ok(())
 }
 
 #[test]
-fn a_mineable_element_carries_the_plain_facts_of_its_record() -> TestResult {
+fn a_mineable_element_carries_direct_sourced_facts() -> TestResult {
     let (_, catalog) = build(None)?;
     let entry = catalog["mineableElements"]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == guid(BEXALITE).as_str())
-        .ok_or("the element")?;
-    assert_eq!(
-        *entry,
-        json!({
-            "guid": guid(BEXALITE),
-            "className": "bexalite_ore",
-            "recordPath": "libs/foundry/records/mining/mineableelements/bexalite_ore",
-            "resourceTypeGuid": guid(OTHER_RESOURCE),
-            "instability": 0.0,
-            "resistance": -0.5,
-            "optimalWindowMidpoint": 0.5,
-            "optimalWindowMidpointRandomness": 0.25,
-            "optimalWindowThinness": 2.0,
-            "explosionMultiplier": 4.0,
-            "clusterFactor": 0.125,
+        .find(|entry| {
+            entry.pointer("/guid/value").and_then(Value::as_str) == Some(guid(BEXALITE).as_str())
         })
+        .ok_or("the element")?;
+    assert_eq!(entry["className"]["value"], "bexalite_ore", "sourced name");
+    assert_eq!(
+        entry["recordPath"]["value"], "libs/foundry/records/mining/mineableelements/bexalite_ore",
+        "sourced path"
     );
+    assert_eq!(
+        entry["resourceType"]["value"]["guid"]["value"],
+        guid(OTHER_RESOURCE),
+        "sourced link"
+    );
+    for duplicate in ["resourceTypeGuid", "sourceValues"] {
+        assert!(
+            entry.get(duplicate).is_none(),
+            "duplicate wire value {duplicate}"
+        );
+    }
+    let numeric = [
+        ("instability", 0.0_f32),
+        ("resistance", -0.5),
+        ("optimalWindowMidpoint", 0.5),
+        ("optimalWindowMidpointRandomness", 0.25),
+        ("optimalWindowThinness", 2.0),
+        ("explosionMultiplier", 4.0),
+        ("clusterFactor", 0.125),
+    ];
+    for (field, finite) in numeric {
+        let cell = &entry[field];
+        assert_eq!(cell["state"], "present", "{field} source is readable");
+        assert!(
+            cell["containsEncryptedSource"].is_boolean(),
+            "{field} encryption marker"
+        );
+        assert_eq!(cell["sourceSetComplete"], true, "{field} contributor set");
+        assert!(
+            cell["sourceUsesRefs"]
+                .as_array()
+                .is_some_and(|refs| !refs.is_empty()),
+            "{field} source references"
+        );
+        assert_eq!(
+            cell["value"]["finite"], finite,
+            "{field} numeric presentation"
+        );
+        assert_eq!(
+            cell["value"]["rawBits"],
+            format!("{:08x}", finite.to_bits()),
+            "{field} original Single"
+        );
+    }
     Ok(())
 }
 
 #[test]
 fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
     let (built, catalog) = build(None)?;
-    assert_eq!(
-        catalog["refiningProcesses"],
-        json!([
-            {
-                "guid": guid(SLOW_WASTEFUL),
-                "className": "processingtype-slowwasteful",
-                "recordPath": "libs/foundry/records/refiningprocess/processingtype-slowwasteful",
-                "processName": {
-                    "key": "@refinery_ui_ProcessingType_SlowWasteful",
-                    "en": null,
-                    "de": null
-                },
-                "refiningSpeed": "Slow",
-                "refiningQuality": "Wasteful",
-            },
-            {
-                "guid": guid(FAST_CAREFUL),
-                "className": "processingtype-fastcareful",
-                "recordPath": "libs/foundry/records/refiningprocess/processingtype-fastcareful",
-                "processName": {
-                    "key": "@refinery_ui_ProcessingType_FastCareful",
-                    "en": "Fast, Careful",
-                    "de": null
-                },
-                "refiningSpeed": "Fast",
-                "refiningQuality": "Careful",
-            },
-        ]),
-        "ordered by GUID, the leftover left out"
+    let rows = catalog
+        .pointer("/definitions/refiningProcesses/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical refining rows")?;
+    let [slow, fast] = rows.as_slice() else {
+        return Err("two selected refining processes".into());
+    };
+    for (row, identity, class, speed, quality, key, english) in [
+        (
+            slow,
+            SLOW_WASTEFUL,
+            "processingtype-slowwasteful",
+            "Slow",
+            "Wasteful",
+            "@refinery_ui_ProcessingType_SlowWasteful",
+            None,
+        ),
+        (
+            fast,
+            FAST_CAREFUL,
+            "processingtype-fastcareful",
+            "Fast",
+            "Careful",
+            "@refinery_ui_ProcessingType_FastCareful",
+            Some("Fast, Careful"),
+        ),
+    ] {
+        verify_name(&catalog, row, "processName", key, english)?;
+        verify_refining_fields(row, identity, class, speed, quality);
+    }
+    assert!(
+        catalog.get("refiningProcesses").is_none(),
+        "no duplicate legacy root view"
     );
     let kind = built.summary().kind(Kind::RefiningProcesses);
     assert_eq!(
@@ -176,6 +243,30 @@ fn a_refining_process_carries_its_name_speed_and_quality() -> TestResult {
         "counts"
     );
     Ok(())
+}
+
+fn verify_refining_fields(row: &Value, identity: u128, class: &str, speed: &str, quality: &str) {
+    assert_eq!(
+        row.pointer("/guid/value"),
+        Some(&json!(guid(identity))),
+        "original GUID"
+    );
+    assert_eq!(
+        row.pointer("/className/value"),
+        Some(&json!(class)),
+        "original class"
+    );
+    assert_eq!(
+        row.pointer("/refiningSpeed/value"),
+        Some(&json!(speed)),
+        "authored speed label"
+    );
+    assert_eq!(
+        row.pointer("/refiningQuality/value"),
+        Some(&json!(quality)),
+        "authored quality label"
+    );
+    assert!(row.get("fields").is_some(), "complete original owner arena");
 }
 
 #[test]
@@ -199,3 +290,38 @@ fn a_filter_marks_both_kinds_partial_and_selects_by_record_path() -> TestResult 
     }
     Ok(())
 }
+
+pub(super) fn verify_name(
+    catalog: &Value,
+    owner: &Value,
+    field: &str,
+    key: &str,
+    english: Option<&str>,
+) -> TestResult {
+    use crate::health_origin_assertions as proof;
+
+    let id = proof::at(owner, &format!("/{field}/value"))?;
+    proof::present(owner, field, id, Some(true))?;
+    let row = proof::rows(catalog, "/texts/gameTexts")?
+        .iter()
+        .find(|text| text.pointer("/id/value") == Some(id))
+        .ok_or("protected mining text target")?;
+    assert_eq!(
+        row.pointer("/key/value"),
+        Some(&json!(key)),
+        "the original mining text key"
+    );
+    assert_eq!(
+        row.pointer("/translations/value/en/displayText/value"),
+        Some(&json!(english)),
+        "English mining display text"
+    );
+    assert!(
+        row.pointer("/translations/value/de").is_none(),
+        "German was not loaded"
+    );
+    Ok(())
+}
+
+#[path = "mining_process_query_suite.rs"]
+mod processes;

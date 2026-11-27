@@ -183,3 +183,36 @@ fn bad_container_paths_are_errors_that_say_what_is_wrong() -> TestResult {
     assert!(missing.contains("holds no Entry"), "{missing}");
     Ok(())
 }
+
+#[test]
+fn nested_list_and_search_metadata_keep_source_order_before_folder_admission() -> TestResult {
+    let container = TestContainer::new()
+        .entry(TestEntry::stored("Data/", b""))
+        .entry(TestEntry::stored("Data/file.txt", b"file"))
+        .build();
+    let install = Install::new(vec![TestEntry::deflated("nested.socpak", container)])?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let listed = server.ok("list_entries", &json!({"folder": "nested.socpak::Data"}))?;
+    let found = server.ok(
+        "search_entries",
+        &json!({"container": "nested.socpak", "filter": "file.txt"}),
+    )?;
+    for item in [&listed["items"][0], &found["entries"][0]] {
+        assert_eq!(item["metadata"]["owner_entry_index"], 0, "admitted owner");
+        assert_eq!(
+            item["metadata"]["original_directory_ordinal"], "1",
+            "source folder precedes file"
+        );
+        assert_eq!(
+            item["metadata"]["zip_header"]["raw_version_made_by"], 20,
+            "nested ZIP source"
+        );
+        assert_eq!(
+            item["metadata"]["raw_v2_encryption_word"],
+            Value::Null,
+            "ZIP has no v2 encryption word"
+        );
+        assert_eq!(item["size"], 4, "existing numeric size field");
+    }
+    Ok(())
+}

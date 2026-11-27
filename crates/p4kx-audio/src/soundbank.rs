@@ -3,7 +3,12 @@
 
 use std::ops::Range;
 
-use crate::bank_parse::{self, MediaRange, SectionRange};
+#[path = "soundbank_source_fields.rs"]
+mod source_fields;
+
+use crate::bank_parse::{self, MediaRange, MediaSections, MediaTable, SectionRange};
+use crate::bank_structure::DIDX_ENTRY_LEN;
+use crate::media_class;
 use crate::{AudioError, BankError, BankWarning, HircObject, MediaClass, SectionId, Wem};
 
 /// The fields of the `BKHD` section this reader decodes.
@@ -18,6 +23,20 @@ pub struct BankHeader {
     pub language_id: u32,
 }
 
+impl BankHeader {
+    /// Returns whether the decoded bank reader supports this header's version.
+    #[must_use]
+    pub const fn is_supported_version(self) -> bool {
+        bank_parse::supported_version(self.version)
+    }
+
+    /// Returns whether this bank uses the observed shared HIRC node layout.
+    #[must_use]
+    pub const fn has_shared_node_layout(self) -> bool {
+        self.version == crate::hirc_source::NODE_BASE_VERSION
+    }
+}
+
 /// One section of a soundbank with its raw body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Section<'a> {
@@ -27,25 +46,86 @@ pub struct Section<'a> {
     pub body: &'a [u8],
 }
 
-/// A WEM embedded in a soundbank: its ID and its bytes, a slice of the bank.
+/// The physical DIDX triplet and checked DATA placement of an embedded WEM.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmbeddedWemSource {
+    sections: MediaSections,
+    entry_ordinal: u64,
+    start: u64,
+    end: u64,
+}
+
+impl EmbeddedWemSource {
+    /// Returns the zero-based position of DIDX in the bank section directory.
+    #[must_use]
+    pub const fn section_ordinal(&self) -> u64 {
+        self.sections.didx.ordinal
+    }
+
+    /// Returns the zero-based physical triplet position within DIDX.
+    #[must_use]
+    pub const fn entry_ordinal(&self) -> u64 {
+        self.entry_ordinal
+    }
+
+    /// Returns the bank-relative start of the selected twelve-byte DIDX triplet.
+    #[must_use]
+    pub const fn triplet_offset(&self) -> u64 {
+        self.sections.didx.body_offset + self.entry_ordinal * DIDX_ENTRY_LEN as u64
+    }
+
+    /// Returns the zero-based position of the selected DATA section in the directory.
+    #[must_use]
+    pub const fn data_section_ordinal(&self) -> u64 {
+        self.sections.data.ordinal
+    }
+
+    /// Returns the bank-relative start of the selected DATA body.
+    #[must_use]
+    pub const fn data_body_offset(&self) -> u64 {
+        self.sections.data.body_offset
+    }
+
+    /// Returns the checked length of the selected DATA body in bytes.
+    #[must_use]
+    pub const fn data_body_length(&self) -> u64 {
+        self.sections.data.body_length
+    }
+
+    /// Returns the checked half-open WEM payload range relative to the decoded bank.
+    #[must_use]
+    pub const fn byte_range(&self) -> Range<u64> {
+        self.start..self.end
+    }
+}
+
+/// A WEM embedded in a soundbank: its ID and its bytes, a slice of the bank.
+#[derive(Debug, Clone, Copy)]
 pub struct EmbeddedWem<'a> {
-    id: u32,
-    offset: u64,
+    media: &'a MediaRange,
+    sections: &'a MediaSections,
     bytes: &'a [u8],
 }
+
+impl PartialEq for EmbeddedWem<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id() && self.offset() == other.offset() && self.bytes == other.bytes
+    }
+}
+
+impl Eq for EmbeddedWem<'_> {}
 
 impl<'a> EmbeddedWem<'a> {
     /// Returns the WEM ID.
     #[must_use]
     pub const fn id(&self) -> u32 {
-        self.id
+        self.media.id
     }
 
     /// Returns the offset of the WEM in the `DATA` section.
     #[must_use]
     pub const fn offset(&self) -> u64 {
-        self.offset
+        self.media.offset as u64
     }
 
     /// Returns the bytes of the WEM, as a loose WEM file holds them.
@@ -54,29 +134,40 @@ impl<'a> EmbeddedWem<'a> {
         self.bytes
     }
 
+    /// Returns the physical placement of the WEM selected by the decoded reader.
+    #[must_use]
+    pub const fn source(&self) -> EmbeddedWemSource {
+        EmbeddedWemSource {
+            sections: *self.sections,
+            entry_ordinal: self.media.ordinal,
+            start: self.media.range.start as u64,
+            end: self.media.range.end as u64,
+        }
+    }
+
     /// Returns what the media holds: a WEM, MIDI, plug-in data or something unknown.
     #[must_use]
     pub fn class(&self) -> MediaClass {
         MediaClass::of(self.bytes)
     }
 
+    /// Returns the media class and the original fields used to choose it.
+    #[must_use]
+    pub fn class_with_source(&self) -> (MediaClass, crate::BankMediaClassSource) {
+        MediaClass::inspect(self.bytes)
+    }
+
     /// Returns the length the RIFF or RIFX header declares for the whole WEM, if there is one.
     #[must_use]
     pub fn declared_len(&self) -> Option<u64> {
-        let size = match self.bytes.first_chunk::<8>()? {
-            [b'R', b'I', b'F', b'F', size @ ..] => u32::from_le_bytes(*size),
-            [b'R', b'I', b'F', b'X', size @ ..] => u32::from_be_bytes(*size),
-            _ => return None,
-        };
-        Some(u64::from(size) + 8)
+        media_class::declared_len(self.bytes)
     }
 
     /// Returns whether the bank holds only the prefetched start of a streamed WEM, whose whole
     /// file is a loose WEM named by the same ID.
     #[must_use]
     pub fn is_prefetch(&self) -> bool {
-        self.declared_len()
-            .is_some_and(|len| len > self.bytes.len() as u64)
+        media_class::is_prefetch(self.declared_len(), self.bytes.len() as u64)
     }
 
     /// Parses the WEM like a loose one, borrowing the bank's bytes.
@@ -97,7 +188,7 @@ pub struct Soundbank<B> {
     bytes: B,
     header: BankHeader,
     sections: Vec<SectionRange>,
-    media: Vec<MediaRange>,
+    media: MediaTable,
     objects: Vec<HircObject>,
     object_index: Vec<(u32, usize)>,
     names: Vec<(u32, Range<usize>)>,
@@ -144,6 +235,18 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
         })
     }
 
+    /// Returns the physical section tags and their half-open body ranges in bank order.
+    pub fn source_section_bodies(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (SectionId, Range<u64>)> + '_ {
+        self.sections.iter().map(|section| {
+            (
+                section.id,
+                section.body.start as u64..section.body.end as u64,
+            )
+        })
+    }
+
     /// Returns the first section with the tag `id`.
     #[must_use]
     pub fn section(&self, id: SectionId) -> Option<Section<'_>> {
@@ -152,17 +255,15 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
 
     /// Returns the embedded WEMs in ascending ID order.
     pub fn wems(&self) -> impl ExactSizeIterator<Item = EmbeddedWem<'_>> {
-        self.media.iter().map(|media| self.embedded(media))
+        self.media.entries.iter().map(|media| self.embedded(media))
     }
 
     /// Returns the embedded WEM `id`.
     #[must_use]
     pub fn wem(&self, id: u32) -> Option<EmbeddedWem<'_>> {
-        let index = self
-            .media
-            .binary_search_by_key(&id, |media| media.id)
-            .ok()?;
-        self.media.get(index).map(|media| self.embedded(media))
+        let entries = &self.media.entries;
+        let index = entries.binary_search_by_key(&id, |media| media.id).ok()?;
+        entries.get(index).map(|media| self.embedded(media))
     }
 
     /// Returns the raw body of a `HIRC` object of this bank, its ID included.
@@ -186,10 +287,10 @@ impl<B: AsRef<[u8]>> Soundbank<B> {
         self.bytes
     }
 
-    fn embedded(&self, media: &MediaRange) -> EmbeddedWem<'_> {
+    fn embedded<'a>(&'a self, media: &'a MediaRange) -> EmbeddedWem<'a> {
         EmbeddedWem {
-            id: media.id,
-            offset: media.offset,
+            media,
+            sections: &self.media.sections,
             bytes: self.slice(&media.range),
         }
     }
@@ -204,6 +305,15 @@ impl<B> Soundbank<B> {
     #[must_use]
     pub const fn header(&self) -> &BankHeader {
         &self.header
+    }
+
+    /// Returns the bytes of the version used to decode this bank.
+    #[must_use]
+    pub fn version_byte_range(&self) -> Option<Range<usize>> {
+        self.sections
+            .first()
+            .filter(|section| section.id == SectionId::BKHD)
+            .map(|section| section.body.start..section.body.start + size_of::<u32>())
     }
 
     /// Returns the quirks the parser worked around, in the order it met them.

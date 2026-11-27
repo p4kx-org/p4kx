@@ -1,0 +1,14 @@
+Microsoft static runtime and Rust dependency notices
+
+p4kx-msi-path.exe is built with Rust's MSVC target and crt-static enabled.
+Its actual target, compiler, binary hash, imports and dependency SBOM are recorded
+in p4kx-msi-helper.json and p4kx-msi-helper.cdx.json. The helper runs from the MSI
+Binary stream and requires no installed P4KX application or app-local CRT DLL.
+
+Microsoft runtime use and redistribution remain subject to applicable terms:
+https://visualstudio.microsoft.com/license-terms/
+https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+https://learn.microsoft.com/en-us/visualstudio/releases/2026/redistribution
+
+Rust dependency notices are in the accompanying THIRD-PARTY-NOTICES.md. Their
+exact source digest is recorded in p4kx-msi-helper.json.

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 use p4kx_dataforge::{DataForge, Guid, Record};
 
@@ -29,16 +30,28 @@ impl<'f> Entities<'f> {
     pub fn new(forge: &'f DataForge<'f>) -> Self {
         let mut classes: HashMap<Box<str>, Vec<Record<'f>>> = HashMap::new();
         for record in forge.records() {
-            if let Some(class) = record.name().ok().and_then(class_name_of)
-                && is_entity(&record)
-            {
-                classes
-                    .entry(class.to_ascii_lowercase().into_boxed_str())
-                    .or_default()
-                    .push(record);
+            if let Some(class) = class_name(&record) {
+                match classes.entry(class.to_ascii_lowercase().into_boxed_str()) {
+                    Entry::Occupied(mut records) => records.get_mut().push(record),
+                    Entry::Vacant(records) => {
+                        records.insert(vec![record]);
+                    }
+                }
             }
         }
         Self { forge, classes }
+    }
+
+    /// Finds physical Records of one exact class without building the complete class index.
+    #[must_use]
+    pub fn records_of_class(forge: &'f DataForge<'f>, text: &str) -> Vec<Record<'f>> {
+        let name = strip_prefix_ignoring_case(text).unwrap_or(text);
+        forge
+            .records()
+            .filter(|record| {
+                class_name(record).is_some_and(|class| class.eq_ignore_ascii_case(name))
+            })
+            .collect()
     }
 
     /// Returns the DataForge the Entities belong to.
@@ -73,8 +86,7 @@ impl<'f> Entities<'f> {
         } else if text.contains(['/', '\\']) {
             self.forge.records_at_path(text).filter(is_entity).collect()
         } else {
-            let class = strip_prefix_ignoring_case(text).unwrap_or(text);
-            self.class_candidates(class).to_vec()
+            self.named_class_candidates(text).to_vec()
         };
         match matches.as_slice() {
             [record] => Ok(*record),
@@ -95,12 +107,23 @@ impl<'f> Entities<'f> {
         self.class_candidates(name).first().copied()
     }
 
+    /// Returns all original Entity Records for an exact class name in definition order.
+    #[must_use]
+    pub fn named_class_candidates(&self, text: &str) -> &[Record<'f>] {
+        self.class_candidates(strip_prefix_ignoring_case(text).unwrap_or(text))
+    }
+
     /// Returns every Entity with the class name `name` in definition order, ignoring ASCII case.
     pub(crate) fn class_candidates(&self, name: &str) -> &[Record<'f>] {
         self.classes
             .get(name.to_ascii_lowercase().as_str())
             .map_or(&[], Vec::as_slice)
     }
+}
+
+fn class_name<'source>(record: &Record<'source>) -> Option<&'source str> {
+    let name = record.name().ok().and_then(class_name_of)?;
+    is_entity(record).then_some(name)
 }
 
 /// Returns whether the Record is an Entity.

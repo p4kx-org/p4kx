@@ -38,6 +38,18 @@ impl Frames {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) fn report_native_scale(ctx: &egui::Context) {
+    use std::io::Write as _;
+
+    let Some(scale) = ctx.input(|input| input.viewport().native_pixels_per_point) else {
+        return;
+    };
+    if let Err(error) = writeln!(std::io::stdout().lock(), "P4KX_GUI_NATIVE_SCALE={scale}") {
+        log::error!("cannot report GUI smoke scale: {error}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::OsStr;

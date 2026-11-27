@@ -13,6 +13,9 @@ use p4kx_testkit::{
     real_archive_path, sample_ship,
 };
 
+#[path = "entity_loadout_origin_tests.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn write_archive(
@@ -80,15 +83,18 @@ fn the_loadout_tree_is_printed_as_json_with_a_stable_shape() -> TestResult {
         0,
     )?;
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    super::wwise_resolve::remove_origins_for_payload_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 
 #[test]
 fn the_same_entity_by_guid_gives_the_same_tree() -> TestResult {
-    let by_class = sample("test_ship", true, 0)?.stdout;
-    let by_guid = sample("0079c5d5-1678-4f8c-85ba-18ca8f642af6", true, 0)?.stdout;
+    let directory = tempfile::tempdir()?;
+    let archive = write_archive(directory.path(), &sample_ship(), Vec::new())?;
+    let by_class = loadout(&archive, "test_ship", true, 0)?.stdout;
+    let by_guid = loadout(&archive, "0079c5d5-1678-4f8c-85ba-18ca8f642af6", true, 0)?.stdout;
     assert_eq!(by_class, by_guid, "the same Entity");
     Ok(())
 }

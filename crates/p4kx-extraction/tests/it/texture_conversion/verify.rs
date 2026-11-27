@@ -40,7 +40,10 @@ fn a_part_with_a_wrong_checksum_fails_a_verified_texture_run() -> TestResult {
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
-            "Data/Textures/rock_diff.dds.3"
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.3",
+            "Data/Textures/rock_diff.dds.3.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
         ],
         "the mismatching part is not written and the texture falls back to its raw Entries"
     );

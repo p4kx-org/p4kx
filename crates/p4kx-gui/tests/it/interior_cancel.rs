@@ -47,5 +47,9 @@ fn the_interior_export_can_be_cancelled_and_leaves_no_file() -> TestResult {
         "cancelled, not {status:?}"
     );
     assert!(!file.exists(), "no file");
+    assert!(
+        !file.with_extension("glb.p4kx-origin.jsonl").exists(),
+        "no orphan receipt"
+    );
     Ok(())
 }

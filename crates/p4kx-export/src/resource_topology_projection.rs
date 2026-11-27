@@ -1,0 +1,328 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::collections::HashSet;
+
+use p4kx_extraction::{CancelToken, DataForge, SourceUses, SourceValue, SourcedValue};
+
+use super::catalog_entity_configurations::{EntityConfigurationRows, ResourceComponent};
+use super::catalog_item_alignment::ScopedTopologyAlignment;
+use super::loadout_position::{self, LoadoutPosition};
+use super::network_endpoint::{LocalPorts, NetworkEndpoint};
+use super::resource_network_placements::{
+    FuseEvidence, InstalledResourceComponent, LinkFamily, ResourceNetworkLinkBinding,
+    ResourceNetworkNode, ResourceNetworkPlacementTables, ResourceNetworkPlacements,
+    RoomAssociationBinding, StagedResourceNetworkPlacementTables,
+};
+use super::resource_topology_declarations::ResourceTopologyDeclarations;
+use super::resource_topology_index::{TopologyIndex, TopologySource};
+use crate::CatalogError;
+use crate::collected::Collected;
+use crate::contract_loadout::Loadout;
+use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::join::{JoinPort, LoadoutJoin};
+use crate::loadout::staging::StagedLoadouts;
+
+struct Context<'loadout, Port> {
+    position: LoadoutPosition,
+    record: Option<u32>,
+    ports: &'loadout [Port],
+    complete: bool,
+}
+
+impl<Port> Context<'_, Port> {
+    fn child(&self, ordinal: u32) -> LoadoutPosition {
+        let mut position = self.position.clone();
+        position.port_ordinals.push(ordinal);
+        position
+    }
+}
+
+pub(crate) struct CatalogResourceTopology<'source> {
+    pub(crate) declarations: super::resource_topology_declarations::ResourceTopologyTables<'source>,
+    pub(crate) placements: StagedResourceNetworkPlacementTables,
+}
+
+impl<'source> Collected<'source> {
+    pub(crate) fn resource_topology(
+        &mut self,
+        forge: &DataForge<'_>,
+        sources: &SourceUses,
+        cancel: Option<&CancelToken>,
+    ) -> Result<CatalogResourceTopology<'source>, CatalogError> {
+        let placements = project(
+            forge,
+            &mut self.loadouts,
+            &self.entity_configurations,
+            sources,
+            cancel,
+        )?;
+        let declarations =
+            std::mem::take(&mut self.entity_configurations.topology).into_tables(forge);
+        Ok(CatalogResourceTopology {
+            declarations,
+            placements,
+        })
+    }
+}
+
+fn project(
+    forge: &DataForge<'_>,
+    loadouts: &mut StagedLoadouts,
+    selected: &EntityConfigurationRows<'_>,
+    sources: &SourceUses,
+    cancel: Option<&CancelToken>,
+) -> Result<StagedResourceNetworkPlacementTables, CatalogError> {
+    let index = TopologyIndex::new(selected)?;
+    let ships = loadouts.take_ship_joins();
+    if ships.is_empty() {
+        return Ok(ResourceNetworkPlacements::default().into_staged_tables(forge, None, cancel));
+    }
+    let (placements, links) = loadouts.append_topology_links(cancel, |rows| {
+        let mut projection = Projection {
+            placements: ResourceNetworkPlacements::default(),
+            emit_link: |row| rows.append(&row, cancel).map_err(CatalogError::from),
+        };
+        for ship in ships {
+            projection.add_loadout(&ship.view(), &index, sources, cancel)?;
+        }
+        Ok(projection.placements)
+    })?;
+    Ok(placements.into_staged_tables(forge, links, cancel))
+}
+
+pub(crate) fn project_scoped(
+    forge: &DataForge<'_>,
+    loadout: Option<&Loadout>,
+    declarations: &ResourceTopologyDeclarations<'_>,
+    resources: &[ResourceComponent<'_>],
+    alignment: &ScopedTopologyAlignment<'_>,
+    sources: &SourceUses,
+    cancel: Option<&CancelToken>,
+) -> Result<ResourceNetworkPlacementTables, CatalogError> {
+    let mut links = Vec::new();
+    let mut projection = Projection {
+        placements: ResourceNetworkPlacements::default(),
+        emit_link: |row| {
+            links.push(row);
+            Ok(())
+        },
+    };
+    if let Some(loadout) = loadout {
+        let index =
+            TopologyIndex::with_facts(declarations, resources, &alignment.topology_facts())?;
+        projection.add_loadout(&LoadoutJoin::from(loadout), &index, sources, cancel)?;
+    }
+    Ok(projection.placements.into_tables(forge, links))
+}
+
+struct Projection<Emit> {
+    placements: ResourceNetworkPlacements,
+    emit_link: Emit,
+}
+
+impl<Emit> Projection<Emit>
+where
+    Emit: FnMut(ResourceNetworkLinkBinding) -> Result<(), CatalogError>,
+{
+    fn add_loadout(
+        &mut self,
+        loadout: &LoadoutJoin<'_, impl JoinPort>,
+        index: &TopologyIndex<'_, '_>,
+        sources: &SourceUses,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        check_cancel(cancel)?;
+        let record = loadout.record_index;
+        let position = LoadoutPosition::root(record);
+        let root_resources = components(index, Some(record));
+        if !root_resources.is_empty() {
+            self.placements.nodes.push(ResourceNetworkNode {
+                position: position.clone(),
+                original_port: None,
+                attached_item: None,
+                vehicle_boundary: None,
+                resource_components: root_resources,
+                fuse_evidence: FuseEvidence::Unestablished,
+            });
+        }
+        let mut stack = vec![Context {
+            position,
+            record: Some(record),
+            ports: loadout.ports,
+            complete: loadout.port_inventory_complete,
+        }];
+        while let Some(context) = stack.pop() {
+            check_cancel(cancel)?;
+            self.add_context(&context, index, sources, cancel)?;
+            for (ordinal, port) in context.ports.iter().enumerate().rev() {
+                let record = attachment_record(port);
+                let has_declarations = record
+                    .and_then(|record| index.get(record))
+                    .is_some_and(TopologySource::has_declarations);
+                let state = port.state();
+                if state.docked_vehicle || (port.children().is_empty() && !has_declarations) {
+                    continue;
+                }
+                stack.push(Context {
+                    position: context.child(loadout_position::ordinal(ordinal)?),
+                    record,
+                    ports: port.children(),
+                    complete: state.attachment_port_inventory_complete,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn add_context(
+        &mut self,
+        context: &Context<'_, impl JoinPort>,
+        index: &TopologyIndex<'_, '_>,
+        sources: &SourceUses,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        let mut referenced = HashSet::new();
+        if let Some(record) = context.record
+            && let Some(source) = index.get(record)
+        {
+            let local = LocalPorts::new(
+                context.ports,
+                &source.ports,
+                &source.port_inventory_uses,
+                context.complete && !source.incomplete_ports,
+                sources,
+            )?;
+            self.add_bindings(context, source, &local, record, &mut referenced, cancel)?;
+        }
+        for (ordinal, port) in context.ports.iter().enumerate() {
+            check_cancel(cancel)?;
+            let ordinal = loadout_position::ordinal(ordinal)?;
+            let attachment = port.alignment().attachment();
+            let resource_components = components(index, target_record(attachment));
+            if referenced.contains(&ordinal) || !resource_components.is_empty() {
+                self.placements.nodes.push(ResourceNetworkNode {
+                    position: context.child(ordinal),
+                    original_port: port.alignment().physical_port()?,
+                    attached_item: attachment.cloned(),
+                    vehicle_boundary: boundary(port, index, sources)?,
+                    resource_components,
+                    fuse_evidence: FuseEvidence::Unestablished,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn add_bindings<Port: JoinPort>(
+        &mut self,
+        context: &Context<'_, Port>,
+        source: &TopologySource<'_, '_>,
+        local: &LocalPorts<'_, '_, Port>,
+        record: u32,
+        referenced: &mut HashSet<u32>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        for declaration in &source.links {
+            for link in declaration.hardpoints() {
+                check_cancel(cancel)?;
+                let port1 = local.name(&link.port1, link.port1_use.as_ref())?;
+                let port2 = local.name(&link.port2, link.port2_use.as_ref())?;
+                referenced.extend(port_ordinals(&port1).chain(port_ordinals(&port2)));
+                (self.emit_link)(ResourceNetworkLinkBinding {
+                    context: context.position.clone(),
+                    family: LinkFamily::Hardpoint,
+                    owner: declaration.owner().clone(),
+                    link_ordinal: link.link_ordinal.clone(),
+                    port1,
+                    port2,
+                })?;
+            }
+            for link in declaration.resources() {
+                check_cancel(cancel)?;
+                let port1 = local.weak(record, &link.port1, link.port1_use.as_ref())?;
+                let port2 = local.weak(record, &link.port2, link.port2_use.as_ref())?;
+                referenced.extend(port_ordinals(&port1).chain(port_ordinals(&port2)));
+                (self.emit_link)(ResourceNetworkLinkBinding {
+                    context: context.position.clone(),
+                    family: LinkFamily::Resource,
+                    owner: declaration.owner().clone(),
+                    link_ordinal: link.link_ordinal.clone(),
+                    port1,
+                    port2,
+                })?;
+            }
+        }
+        for declaration in &source.rooms {
+            for room in declaration.containers() {
+                check_cancel(cancel)?;
+                let port =
+                    local.name(&room.resource_network_itemport_name, room.port_use.as_ref())?;
+                referenced.extend(port_ordinals(&port));
+                self.placements.rooms.push(RoomAssociationBinding {
+                    context: context.position.clone(),
+                    owner: declaration.owner().clone(),
+                    container_ordinal: room.container_ordinal.clone(),
+                    port,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+fn port_ordinals(cell: &SourcedValue<NetworkEndpoint>) -> impl Iterator<Item = u32> + '_ {
+    cell.value()
+        .into_iter()
+        .flat_map(NetworkEndpoint::port_ordinals)
+}
+
+fn boundary(
+    port: &impl JoinPort,
+    index: &TopologyIndex<'_, '_>,
+    sources: &SourceUses,
+) -> Result<Option<SourcedValue<bool>>, CatalogError> {
+    let Some(attachment) = port.alignment().attachment_proof() else {
+        return Ok(None);
+    };
+    let type_use = port
+        .alignment()
+        .attachment_component()?
+        .and_then(|position| index.attachment_types.get(&position));
+    let mut inputs = attachment.source_uses.clone();
+    inputs.extend(type_use.into_iter().copied().cloned());
+    Ok(Some(sources.value(
+        SourceValue::Present(port.state().docked_vehicle),
+        &inputs,
+        attachment.source_set_complete && type_use.is_some(),
+    )))
+}
+
+pub(crate) fn attachment_record(port: &impl JoinPort) -> Option<u32> {
+    target_record(port.alignment().attachment())
+}
+
+fn target_record(attachment: Option<&AttachmentIdentity>) -> Option<u32> {
+    attachment?.target_record_index.value().copied()
+}
+
+fn components(
+    index: &TopologyIndex<'_, '_>,
+    record: Option<u32>,
+) -> Vec<InstalledResourceComponent> {
+    record
+        .into_iter()
+        .flat_map(|record| index.resources(record))
+        .map(|component| InstalledResourceComponent {
+            owner: component.owner().clone(),
+            is_relay: component.is_relay().clone(),
+        })
+        .collect()
+}
+
+fn check_cancel(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
+    Ok(())
+}

@@ -104,9 +104,9 @@ fn archetype_record(ids: &Ids) -> TestRecord {
     )
 }
 
-fn table_record(guid: u128, name: &str, ids: &Ids) -> TestRecord {
+fn inline_table_entry(ids: &Ids) -> p4kx_testkit::TestInstance {
     let optional = |data: p4kx_testkit::TestInstance| TestValue::Struct(data);
-    let inline = instance("LootTableV3Entry")
+    instance("LootTableV3Entry")
         .value("name", TestValue::text("Ammo"))
         .value("weight", TestValue::Single(10.0))
         .value(
@@ -130,12 +130,24 @@ fn table_record(guid: u128, name: &str, ids: &Ids) -> TestRecord {
                     instance("LootTableOptionalDataV3_DupeLimit")
                         .value("dupeLimit", TestValue::Int32(3)),
                 ),
+                TestValue::Null,
+                optional(
+                    instance("LootTableOptionalDataV3_FixtureExtension")
+                        .value("unknownField", TestValue::UInt16(12)),
+                ),
+                optional(
+                    instance("LootTableOptionalDataV3_DupeLimit")
+                        .value("dupeLimit", TestValue::Int32(7)),
+                ),
                 optional(
                     instance("LootTableOptionalDataV3_ChanceToExist")
                         .value("chanceToExist", TestValue::Single(0.75)),
                 ),
             ]),
-        );
+        )
+}
+
+pub(super) fn table_record(guid: u128, name: &str, ids: &Ids) -> TestRecord {
     let linked = instance("LootTableV3Entry")
         .value("name", TestValue::text("Linked"))
         .value("weight", TestValue::Single(1.0))
@@ -154,9 +166,10 @@ fn table_record(guid: u128, name: &str, ids: &Ids) -> TestRecord {
     )
     .value(
         "lootTable",
-        TestValue::Struct(
-            instance("LootTableV3").value("lootArchetypes", array(vec![inline, linked])),
-        ),
+        TestValue::Struct(instance("LootTableV3").value(
+            "lootArchetypes",
+            array(vec![inline_table_entry(ids), linked]),
+        )),
     )
 }
 

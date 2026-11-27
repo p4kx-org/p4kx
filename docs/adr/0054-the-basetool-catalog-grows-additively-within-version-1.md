@@ -52,7 +52,7 @@ release adapts it, even when the import does not use the addition.
 
 - A catalog written with a new field validates against the older schema; the schema still describes
   what a version-1 reader may rely on.
-- A new field is documented in `docs/basetool-catalog.md` and in the schema in the change that adds
+- A new field is documented in `docs/catalog.md` and in the schema in the change that adds
   it; the schema test keeps the two in step.
 - Deciding whether a change is breaking is part of review: a change that makes an existing reader
   misread data, even without touching a name or a type, raises the version.

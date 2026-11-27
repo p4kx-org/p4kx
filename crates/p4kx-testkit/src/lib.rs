@@ -27,6 +27,7 @@ mod dataforge_schema;
 mod dataforge_strings;
 mod dataforge_value;
 mod dataforge_wide;
+mod dds_origin_receipt;
 mod dna;
 mod entity;
 mod entity_armour;
@@ -35,6 +36,7 @@ mod entity_assembly;
 mod entity_assortment;
 mod entity_bone;
 mod entity_cargo;
+mod entity_cargo_grid_sample;
 mod entity_clothing;
 mod entity_creature;
 mod entity_creature_animated;
@@ -53,6 +55,7 @@ mod entity_npc;
 mod entity_npc_face;
 mod entity_npc_generic;
 mod entity_npc_zones;
+mod entity_package;
 mod entity_painted;
 mod entity_port;
 mod entity_prop_rig;
@@ -60,7 +63,9 @@ mod entity_requirement;
 mod entity_sample;
 mod entity_schema;
 mod entity_skin;
+mod entity_static_relay;
 mod entity_vehicle;
+mod entity_vehicle_paint;
 mod entity_zones;
 mod frames;
 mod gfx;
@@ -84,6 +89,9 @@ mod interior_lit;
 mod interior_sample;
 mod layout_v1;
 mod layout_v2;
+mod material_identity;
+mod material_reference;
+pub mod media_fixture;
 mod mesh_streams;
 mod model;
 mod model_crch;
@@ -95,9 +103,11 @@ mod model_skeleton;
 mod model_skin;
 mod model_zoned;
 mod mtl;
+pub mod offline_seam;
 mod opus;
 mod opus_encode;
 mod prefab;
+pub mod query_selection_sample;
 mod real_archive;
 mod reference_output;
 mod rig_logic;
@@ -119,6 +129,7 @@ mod skin_blendshapes;
 mod soc;
 mod soc_entities;
 mod split_dds;
+mod test_digest;
 mod test_entry;
 mod test_jpeg;
 mod test_key;
@@ -143,22 +154,30 @@ pub use dataforge_builder::DataForgeBuilder;
 pub use dataforge_schema::{TestPool, TestRecord, TestStruct, TestType};
 pub use dataforge_value::{TestInstance, TestValue};
 pub use dataforge_wide::many_paths_database;
+pub use dds_origin_receipt::check_dds_origin_pair;
 pub use dna::{TestCell, TestControl, TestDeltaRecord, TestDna};
 pub use entity::TestEntity;
 pub use entity_armour::{armour_entries, armour_female_skeleton, armour_male_skeleton};
 pub use entity_armour_loadout::{ARMOUR_XML_LOADOUT, armour_xml_loadout};
-pub use entity_assembly::{ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries};
+pub use entity_assembly::{
+    ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries, hologram_suppression_entries,
+    repeated_gimbal_assembly_entries,
+};
 pub use entity_assortment::{TestGroup, assortment_record, assortment_record_requiring};
 pub use entity_bone::{
     BONE_THRUSTER, bone_thruster_definition, bone_thruster_entries, bone_thruster_housing,
 };
 pub use entity_cargo::{TestCapacity, closed_container_record, open_container_record};
+pub use entity_cargo_grid_sample::{
+    TestCargoGridLayout, cargo_grid_facility_database, cargo_grid_facility_database_for,
+};
 pub use entity_clothing::{TestClothingCondition, TestZoneChunk, clothing_component};
 pub use entity_creature::{
     CREATURE, CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,
-    CREATURE_ANIMATION_PARAMS_LOST, CREATURE_ASSORTED, CREATURE_COLLAR_LOST, CREATURE_COLLAR_NODED,
-    CREATURE_COLLARED, CREATURE_DEFINITION, CREATURE_HORNED, CREATURE_LOADOUT_LOST,
-    CREATURE_NO_SKELETON, CREATURE_SHORT_SKELETON, RIGGED_PROP, creature_entries,
+    CREATURE_ANIMATION_PARAMS_LOST, CREATURE_ANIMATION_SCOPED, CREATURE_ASSORTED,
+    CREATURE_COLLAR_LOST, CREATURE_COLLAR_NODED, CREATURE_COLLARED, CREATURE_DEFINITION,
+    CREATURE_HORNED, CREATURE_LOADOUT_LOST, CREATURE_NO_SKELETON, CREATURE_SHORT_SKELETON,
+    RIGGED_PROP, creature_entries,
 };
 pub use entity_dressed::{
     DRESSED_BROWS, DRESSED_EYES, DRESSED_EYES_MATERIAL, DRESSED_GONE_HAIR, DRESSED_HAIR,
@@ -182,12 +201,15 @@ pub use entity_layer_chain::{LAYER_CHAIN_LENGTH, layer_chain_entries};
 pub use entity_layered::{LAYERED_MISSING_TEXTURE, LAYERED_TINTS, layered_entries};
 pub use entity_livery::{
     LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_DECALS,
-    LIVERY_SHIP_TINTS, livery_entries,
+    LIVERY_SHIP_TINTS, livery_entries, livery_entries_with_decal_texture,
 };
 pub use entity_loadout::{TestLoadout, TestLoadoutEntry};
 pub use entity_module_sample::{ENTITY_MODULE_CARRIER, ENTITY_MODULE_CLASS, entity_module_entries};
 pub use entity_mount::{
-    MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, mounted_item_entries,
+    MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, MOUNT_REPLACEMENT_WITHOUT_ROOT, SATCHEL_HELPER_Z,
+    mounted_item_entries, mounted_item_frame_entries, mounted_overlay_entries,
+    mounted_unresolved_helper_entries, mounted_unresolved_helper_without_root_entries,
+    mounted_unresolved_replacement_entries,
 };
 pub use entity_npc::{
     NPC_BROW_SKIN, NPC_CLASS, NPC_EYES_MATERIAL, NPC_FILES_CLASS, NPC_HAIR_BLONDE, NPC_HAIR_BROWN,
@@ -204,21 +226,31 @@ pub use entity_npc_generic::{
 pub use entity_npc_zones::{
     NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
 };
+pub use entity_package::check_entity_package_sources;
 pub use entity_painted::{
-    PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID, PAINTED_SUIT,
-    painted_entries,
+    MAIN_PALETTE_SUIT, PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID,
+    PAINTED_SUIT, painted_entries,
 };
 pub use entity_port::TestPort;
 pub use entity_prop_rig::{
     EMPTY_ON_SKIN_PORT, GARMENT_ON_SKIN_PORT, NODE_ON_SKIN_PORT, PROP_ON_BONE_PORT,
     PROP_ON_LOST_PORT, PROP_ON_SKIN_PORT, PROP_RIG_BAD_SKELETON, PROP_RIG_CREATURE, PROP_RIG_HUMAN,
     PROP_RIG_NO_SKELETON, PROP_RIG_STATIC, SKINNED_ON_SKIN_PORT, prop_rig_entries,
+    prop_rig_unresolved_helper_entries,
 };
 pub use entity_requirement::TestRequirement;
 pub use entity_sample::{SAMPLE_GUN, SAMPLE_MISSING, SAMPLE_MOUNT, SAMPLE_SHIP, sample_ship};
-pub use entity_schema::{entity_schema, tint_palette_record, tint_palette_record_with_decal};
+pub use entity_schema::{
+    entity_schema, tint_palette_record, tint_palette_record_with_decal,
+    tint_palette_record_with_specular,
+};
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
+pub use entity_static_relay::static_relay_entries;
 pub use entity_vehicle::landing_system_record;
+pub use entity_vehicle_paint::{
+    FITTED_CDF_DOCUMENT, FITTED_CDF_MATERIAL, fitted_cdf_paint_vehicle_entries,
+    fitted_paint_vehicle_entries, fitted_same_model_paint_vehicle_entries,
+};
 pub use entity_zones::{
     ZONE_JACKET, ZONE_SHIRT, jacketed_entries, zone_entries, zone_entries_with_layer_textures,
 };
@@ -250,6 +282,8 @@ pub use interior_lit::{LIT_ROOM, lit_room_entries};
 pub use interior_sample::{
     INTERIOR_LAMP, INTERIOR_ROOT, INTERIOR_ROOT_NAME, interior_entries, lit_interior_entries,
 };
+pub use material_identity::material_identity_entries;
+pub use material_reference::{MATERIAL_REFERENCE_MODEL, material_reference_entries};
 pub use mesh_streams::{MeshStream, MeshStreams, mesh_streams};
 pub use model::{
     CUBE_CAPS_MATERIAL, CUBE_MATERIAL_LIBRARY, CUBE_MESH_OFFSET, CUBE_SIDES_MATERIAL, TestModel,
@@ -298,3 +332,10 @@ pub use test_key::{other_test_key, test_key};
 pub use timing::{BENCH_VAR, Timing, bench, bench_enabled, bench_once};
 pub use vorbis::{TestCodebook, TestVorbis};
 pub use wem::{TestCodec, TestWem, test_signal};
+
+/// Returns whether a synthetic graphics test requires an actual adapter.
+#[must_use]
+pub fn render_adapter_required() -> bool {
+    std::env::var_os("P4KX_REQUIRE_RENDER_ADAPTER").is_some()
+        || std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_some()
+}

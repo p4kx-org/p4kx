@@ -28,7 +28,10 @@ fn a_creature_with_its_skeleton_is_one_rig_mesh_and_the_report_counts_the_bones(
         run.stdout
     );
     let manifest = manifest(&out)?;
-    assert_eq!(manifest["version"], p4kx_blender::FORMAT_VERSION);
+    assert_eq!(
+        manifest["version"], "1.25",
+        "addressed Creature triangle evidence"
+    );
     assert_eq!(manifest["meshes"].as_array().map(Vec::len), Some(1));
     assert_eq!(manifest["meshes"][0]["rig"]["bones"], 3);
     assert!(manifest["meshes"][0]["rig"].get("body").is_none());

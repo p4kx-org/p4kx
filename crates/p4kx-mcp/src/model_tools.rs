@@ -4,6 +4,7 @@
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router};
 
+use crate::chunk_pages;
 use crate::error::capped;
 use crate::model_params::{ChunksParams, MAX_TYPE_LEN, ModelItemsParams, ModelParams};
 use crate::model_shapes::{ChunksResult, ModelItemsResult, ModelOverview};
@@ -19,7 +20,8 @@ impl Server {
         description = "List the chunks of a CryEngine chunk file Entry (.cgf, .cga, .skin, .chr, .cgfm, .caf, .dba, ...): \
         container form and version, then per chunk its table index, type name and ID, version, chunk ID, byte order, \
         data offset and size. Chunk types not in the table of known types are listed with known false and no name. \
-        type narrows the list to one chunk type. Paged with a cursor; no chunk data is returned. The content may be forwarded by the client to \
+        type narrows the list to one chunk type. Paged with a cursor; the fieldOrigins and provenance describe the original chunk table and path. \
+        No chunk data is returned. The content may be forwarded by the client to \
         third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<ChunksResult>(),
         annotations(
@@ -43,7 +45,7 @@ impl Server {
             let opened = state.archive(params.archive.as_deref())?;
             let listing = ("list_chunks", opened.version(), path, &params.chunk_type);
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
-            models::chunks(&opened, path, params.chunk_type.as_deref(), page)
+            chunk_pages::list(&opened, path, params.chunk_type.as_deref(), page)
         })
         .await
     }
@@ -53,7 +55,7 @@ impl Server {
         material library it names, material IDs, how the material library read, the levels of detail with vertices, \
         triangles and mesh counts, and the number of materials, nodes, meshes, bones, animations, unread animations \
         and chunks. It is `p4kx model info --json` with the long lists left out; list_model_items returns them, \
-        page by page. Reading the animations of a large model takes time. The content may be forwarded by the client \
+        page by page. Field origins report original contributors and explicitly incomplete evidence. Reading the animations of a large model takes time. The content may be forwarded by the client \
         to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<ModelOverview>(),
         annotations(
@@ -80,7 +82,7 @@ impl Server {
     #[tool(
         description = "List one section of a model Entry, page by page: materials, nodes, meshes (of all levels of \
         detail, each with its lod), bones, animations, unread_animations or chunks. Each item is shaped as in \
-        `p4kx model info --json`. Use get_model_info first for the counts. The content may be forwarded by the \
+        `p4kx model info --json`. Material, mesh, bone, node, animation, unread animation and chunk pages also report original field origins. Use get_model_info first for the counts. The content may be forwarded by the \
         client to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<ModelItemsResult>(),
         annotations(

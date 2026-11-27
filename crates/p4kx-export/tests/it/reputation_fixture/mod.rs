@@ -4,7 +4,7 @@
 //! A synthetic Archive with factions, reputation scopes, standings and contexts, mission types
 //! and localities, and a contract scenario.
 
-mod structures;
+pub(super) mod structures;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -103,7 +103,14 @@ fn faction(guid: u128, name: &str, bare: bool) -> TestRecord {
         )
 }
 
-fn standing(guid: u128, name: &str, minimum: i32, gated: bool) -> TestRecord {
+pub(crate) fn standing(
+    guid: u128,
+    name: &str,
+    minimum: i64,
+    gated: bool,
+    hours: f32,
+    display_name: &str,
+) -> TestRecord {
     record(
         guid,
         "SReputationStandingParams",
@@ -113,28 +120,38 @@ fn standing(guid: u128, name: &str, minimum: i32, gated: bool) -> TestRecord {
             name.to_lowercase()
         ),
     )
-    .value("displayName", TestValue::text("@LOC_PLACEHOLDER"))
-    .value("minReputation", TestValue::Int32(minimum))
-    .value("driftReputation", TestValue::Int32(-5))
-    .value("driftTimeHours", TestValue::Int32(24))
+    .value("name", TestValue::text(name))
+    .value(
+        "description",
+        TestValue::text("Synthetic standing description"),
+    )
+    .value("displayName", TestValue::text(display_name))
+    .value("perkDescription", TestValue::text("@fixture_standing_perk"))
+    .value("icon", TestValue::text("ui/fixture/standing.dds"))
+    .value("missionBoardIcon", TestValue::text("ui/fixture/board.dds"))
+    .value("minReputation", TestValue::Int64(minimum))
+    .value("driftReputation", TestValue::Int64(-5))
+    .value("driftTimeHours", TestValue::Single(hours))
     .value("gated", TestValue::Bool(gated))
 }
 
-fn scope() -> TestRecord {
+pub(crate) fn scope(guid: u128) -> TestRecord {
     record(
-        SCOPE,
+        guid,
         "SReputationScopeParams",
         "FactionReputationScope",
         "reputation/scopes/factionreputationscope",
     )
     .value("scopeName", TestValue::text("FactionReputation"))
     .value("displayName", TestValue::text("@scope_standing"))
+    .value("description", TestValue::text("@scope_fixture_description"))
+    .value("icon", TestValue::text("ui/fixture/reputation_scope.dds"))
     .value(
         "standingMap",
         TestValue::Struct(
             TestInstance::new("SReputationStandingMapParams")
-                .value("reputationCeiling", TestValue::Int32(95_250))
-                .value("initialReputation", TestValue::Int32(0))
+                .value("reputationCeiling", TestValue::Int64(9_007_199_254_740_993))
+                .value("initialReputation", TestValue::Int64(0))
                 .value(
                     "standings",
                     TestValue::Array(vec![
@@ -181,7 +198,11 @@ fn scenario() -> TestRecord {
         .value("minMultiplierThreshold", TestValue::Single(1.0))
         .value(
             "completionType",
-            TestValue::Struct(TestInstance::new("CompletionType_GlobalProgression")),
+            TestValue::Struct(
+                TestInstance::new("CompletionType_CompletionTag")
+                    .value("completionTags", TestValue::Reference(PLAIN_A))
+                    .value("fixtureExtra", TestValue::Int32(42)),
+            ),
         )
         .value(
             "tierRewards",
@@ -214,20 +235,55 @@ fn scenario() -> TestRecord {
     )
 }
 
-fn database() -> DataForgeBuilder {
+fn mission_locality() -> TestRecord {
+    record(
+        LOCALITY,
+        "MissionLocality",
+        "pyro",
+        "missiondata/pu_missionlocality/pyro",
+    )
+    .value(
+        "availableLocations",
+        TestValue::Array(vec![
+            TestValue::Reference(PLAIN_A),
+            TestValue::Reference(MISSING),
+            TestValue::Null,
+            TestValue::Reference(PLAIN_B),
+            TestValue::Reference(PLAIN_A),
+        ]),
+    )
+}
+
+fn database(high_drift_hours: f32) -> DataForgeBuilder {
     [
         faction(FACTION, "Acme", false),
         faction(FACTION_BARE, "Bare", true),
         faction(FACTION_TEST, "Test_Corp", true),
-        scope(),
-        standing(STANDING_LOW, "ReputationStanding_Faction_B0_00", 0, false),
+        scope(SCOPE),
+        standing(
+            STANDING_LOW,
+            "ReputationStanding_Faction_B0_00",
+            0,
+            false,
+            -0.0,
+            "@LOC_PLACEHOLDER",
+        ),
         standing(
             STANDING_HIGH,
             "ReputationStanding_Faction_B0_01",
             4_500,
             true,
+            high_drift_hours,
+            "@LOC_PLACEHOLDER",
         ),
-        standing(STANDING_TEST, "ReputationStanding_Test", 1, false),
+        standing(
+            STANDING_TEST,
+            "ReputationStanding_Test",
+            1,
+            false,
+            3.0,
+            "@LOC_PLACEHOLDER",
+        ),
         context(),
         record(
             MISSION_TYPE,
@@ -236,20 +292,7 @@ fn database() -> DataForgeBuilder {
             "missiontype/missiontype.job",
         )
         .value("LocalisedTypeName", TestValue::text("@type_job")),
-        record(
-            LOCALITY,
-            "MissionLocality",
-            "pyro",
-            "missiondata/pu_missionlocality/pyro",
-        )
-        .value(
-            "availableLocations",
-            TestValue::Array(vec![
-                TestValue::Reference(PLAIN_A),
-                TestValue::Reference(MISSING),
-                TestValue::Reference(PLAIN_B),
-            ]),
-        ),
+        mission_locality(),
         record(PLAIN_A, "Placeholder", "a", "misc/a"),
         record(PLAIN_B, "Placeholder", "b", "misc/b"),
         record(
@@ -270,15 +313,25 @@ fn database() -> DataForgeBuilder {
 
 /// Writes the fixture Archive into `dir` and returns its path.
 pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_with_drift(dir, 24.5)
+}
+
+/// Writes the fixture with a supplied source Single on the higher standing.
+pub(super) fn write_archive_with_drift(
+    dir: &Path,
+    high_drift_hours: f32,
+) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database(high_drift_hours).build()).encrypted())
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()
                 .text("faction_acme", "Acme Emporium")
                 .text("scope_standing", "Standing")
+                .text("scope_fixture_description", "Synthetic scope description")
                 .text("type_job", "Job")
+                .text("fixture_standing_perk", "Synthetic perk")
                 .build(),
         ))
         .write_to(&path)?;

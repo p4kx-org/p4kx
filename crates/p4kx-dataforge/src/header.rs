@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_foundation::{ByteReader, ParseError};
 
 use crate::record_table::RecordLayout;
@@ -18,6 +20,44 @@ const LEADING_WORDS: usize = 9;
 
 /// The number of leading bytes [`looks_like_dataforge`] reads: the whole header.
 pub const SNIFF_LEN: usize = 4 * (LEADING_WORDS + ValueKind::COUNT + 2);
+
+/// DataForge header declarations with fixed original positions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DataForgeHeaderField {
+    /// Format version.
+    Version,
+    /// Number of struct definitions.
+    StructCount,
+    /// Number of enum definitions.
+    EnumCount,
+    /// Number of Record definitions.
+    RecordCount,
+}
+
+impl DataForgeHeaderField {
+    /// Returns the half-open original byte span common to the supported layouts.
+    #[must_use]
+    pub const fn byte_span(self) -> Range<u64> {
+        let word = match self {
+            Self::Version => 1,
+            Self::StructCount => 4,
+            Self::EnumCount => 6,
+            Self::RecordCount => 8,
+        };
+        let width = size_of::<u32>() as u64;
+        word * width..(word + 1) * width
+    }
+}
+
+pub(crate) fn value_pool_count_span(kind: ValueKind) -> Option<Range<u64>> {
+    let ordinal = ValueKind::HEADER
+        .iter()
+        .position(|candidate| *candidate == kind)?;
+    let word = LEADING_WORDS + ordinal;
+    let width = size_of::<u32>() as u64;
+    Some(word as u64 * width..(word as u64 + 1) * width)
+}
 
 /// The largest version word that is taken for a DataForge version.
 const MAX_PLAUSIBLE_VERSION: u32 = u16::MAX as u32;
@@ -115,5 +155,50 @@ impl Header {
             text_len: word()?,
             blob_len: word()?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct};
+
+    use super::{DataForgeHeaderField, SUPPORTED_VERSIONS};
+    use crate::DataForge;
+
+    #[test]
+    fn summary_header_spans_are_the_words_used_by_both_supported_layouts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use DataForgeHeaderField::{EnumCount, RecordCount, StructCount, Version};
+
+        for version in SUPPORTED_VERSIONS {
+            let bytes = DataForgeBuilder::new()
+                .version(version)
+                .structure(TestStruct::new("Item"))
+                .structure(TestStruct::new("Extra"))
+                .enumeration("Selection", ["One"])
+                .record(TestRecord::new(1, "Item", "Item.One", "records/one.xml"))
+                .record(TestRecord::new(2, "Item", "Item.Two", "records/two.xml"))
+                .record(TestRecord::new(
+                    3,
+                    "Item",
+                    "Item.Three",
+                    "records/three.xml",
+                ))
+                .build();
+            let forge = DataForge::open(&bytes)?;
+            for (field, expected) in [
+                (Version, forge.version()),
+                (StructCount, u32::try_from(forge.struct_count())?),
+                (EnumCount, u32::try_from(forge.enum_count())?),
+                (RecordCount, u32::try_from(forge.record_count())?),
+            ] {
+                let span = field.byte_span();
+                let word = bytes
+                    .get(usize::try_from(span.start)?..usize::try_from(span.end)?)
+                    .ok_or("header word")?;
+                assert_eq!(u32::from_le_bytes(word.try_into()?), expected, "{field:?}");
+            }
+        }
+        Ok(())
     }
 }

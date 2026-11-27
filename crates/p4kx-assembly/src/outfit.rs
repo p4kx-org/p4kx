@@ -63,7 +63,7 @@ impl<'f> LoadoutResolver<'f> {
     /// Returns the base Loadout and the outfits of `entity`, or `None` when its default Loadout
     /// is not an outfit or the Record cannot be read.
     pub fn outfits(&mut self, entity: &Record<'f>) -> Option<OutfitReport> {
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         let info = spec.as_ref().as_ref().ok()?.outfit.as_ref()?;
         let name = |tag: &TagSpec| match tag {
             TagSpec::Name(name) => name.clone(),

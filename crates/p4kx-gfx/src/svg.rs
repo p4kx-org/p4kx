@@ -13,6 +13,7 @@ use crate::image::RgbaImage;
 use crate::raster::{Background, RasterOptions, canvas};
 use crate::raster_budget::RasterLimits;
 use crate::raster_paint::path;
+use crate::render_inputs::RenderInputs;
 use crate::scene::{Affine, Scene};
 use crate::scene_report::Skipped;
 use crate::svg_budget::Capped;
@@ -32,6 +33,20 @@ pub struct SvgReport {
     pub height: u32,
     /// The elements skipped by the scene and by the SVG writer, in drawing order.
     pub skipped: Vec<Skipped>,
+}
+
+/// An SVG document report with the bitmaps embedded in its bytes.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedSvgReport {
+    /// Dimensions and diagnostics from the ordinary SVG writer.
+    pub svg: SvgReport,
+    /// Sorted bitmap IDs whose image data were emitted.
+    pub bitmap_inputs: Vec<u16>,
+    /// Scene item ordinals emitted as uses.
+    pub item_inputs: Vec<usize>,
+    /// Scene mask ordinals emitted as definitions.
+    pub mask_inputs: Vec<usize>,
 }
 
 impl Scene {
@@ -64,13 +79,54 @@ impl Scene {
         self.write_svg_with(bitmaps, options, title, out, &RasterLimits::DEFAULT)
     }
 
+    /// Writes the SVG and records the actual embedded bitmap inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Scene::write_svg`].
+    pub fn write_svg_observed<W: Write>(
+        &self,
+        bitmaps: &HashMap<u16, RgbaImage>,
+        options: &RasterOptions,
+        title: Option<&str>,
+        out: W,
+    ) -> Result<ObservedSvgReport, GfxError> {
+        let mut inputs = RenderInputs::default();
+        let svg = self.write_svg_observing(
+            bitmaps,
+            options,
+            title,
+            out,
+            &RasterLimits::DEFAULT,
+            Some(&mut inputs),
+        )?;
+        Ok(ObservedSvgReport {
+            svg,
+            bitmap_inputs: inputs.bitmaps.into_iter().collect(),
+            item_inputs: inputs.items,
+            mask_inputs: inputs.masks,
+        })
+    }
+
     pub(crate) fn write_svg_with<W: Write>(
+        &self,
+        bitmaps: &HashMap<u16, RgbaImage>,
+        options: &RasterOptions,
+        title: Option<&str>,
+        out: W,
+        limits: &RasterLimits,
+    ) -> Result<SvgReport, GfxError> {
+        self.write_svg_observing(bitmaps, options, title, out, limits, None)
+    }
+
+    fn write_svg_observing<W: Write>(
         &self,
         bitmaps: &HashMap<u16, RgbaImage>,
         options: &RasterOptions,
         title: Option<&str>,
         mut out: W,
         limits: &RasterLimits,
+        inputs: Option<&mut RenderInputs>,
     ) -> Result<SvgReport, GfxError> {
         let (width, height, root) = canvas(self, options.size)?;
         let paths: Vec<Vec<Option<tiny_skia::Path>>> = self
@@ -100,7 +156,7 @@ impl Scene {
             size: (width, height),
         };
         let mut capped = Capped::new(&mut out, limits.svg_bytes);
-        let written = document.write(&mut capped, title, background);
+        let written = document.write(&mut capped, title, background, inputs);
         if capped.exceeded() {
             return Err(GfxError::SvgTooLarge {
                 limit: limits.svg_bytes,
@@ -144,6 +200,7 @@ impl Document<'_> {
         out: &mut impl Write,
         title: Option<&str>,
         background: Option<Rgba>,
+        mut inputs: Option<&mut RenderInputs>,
     ) -> Result<(), WriteError> {
         let (width, height) = self.size;
         writeln!(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")?;
@@ -166,20 +223,24 @@ impl Document<'_> {
             out.write_all(b"/>\n")?;
         }
         out.write_all(b"<defs>\n")?;
-        self.write_images(out)?;
-        self.write_masks(out)?;
+        self.write_images(out, inputs.as_deref_mut())?;
+        self.write_masks(out, inputs.as_deref_mut())?;
         self.write_groups(out)?;
         out.write_all(b"</defs>\n")?;
         out.write_all(b"<g")?;
         matrix(out, "transform", &self.root)?;
         out.write_all(b">\n")?;
-        self.write_items(out)?;
+        self.write_items(out, inputs)?;
         out.write_all(b"</g>\n</svg>\n")?;
         out.flush()?;
         Ok(())
     }
 
-    fn write_images(&self, out: &mut impl Write) -> Result<(), WriteError> {
+    fn write_images(
+        &self,
+        out: &mut impl Write,
+        mut inputs: Option<&mut RenderInputs>,
+    ) -> Result<(), WriteError> {
         for (index, image) in self.plan.images.iter().enumerate() {
             let Some(source) = self.bitmaps.get(&image.id) else {
                 continue;
@@ -211,11 +272,18 @@ impl Document<'_> {
             encoder.finish()?;
             drop(encoder);
             out.write_all(b"\"/>\n")?;
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.bitmaps.insert(image.id);
+            }
         }
         Ok(())
     }
 
-    fn write_masks(&self, out: &mut impl Write) -> Result<(), WriteError> {
+    fn write_masks(
+        &self,
+        out: &mut impl Write,
+        mut inputs: Option<&mut RenderInputs>,
+    ) -> Result<(), WriteError> {
         let (width, height) = self.size;
         let scale = self.root.a.max(f32::EPSILON);
         for (index, used) in self.plan.masks.iter().enumerate() {
@@ -260,6 +328,9 @@ impl Document<'_> {
                 out.write_all(b"</g>\n")?;
             }
             out.write_all(b"</mask>\n")?;
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.masks.push(index);
+            }
         }
         Ok(())
     }
@@ -284,7 +355,11 @@ impl Document<'_> {
         Ok(())
     }
 
-    fn write_items(&self, out: &mut impl Write) -> Result<(), WriteError> {
+    fn write_items(
+        &self,
+        out: &mut impl Write,
+        mut inputs: Option<&mut RenderInputs>,
+    ) -> Result<(), WriteError> {
         let mut open: Option<usize> = None;
         for drawn in &self.plan.drawn {
             if drawn.mask != open {
@@ -301,6 +376,9 @@ impl Document<'_> {
                 matrix(out, "transform", &drawn.transform)?;
             }
             out.write_all(b"/>\n")?;
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.items.push(drawn.ordinal);
+            }
         }
         if open.is_some() {
             out.write_all(b"</g>\n")?;

@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "record_xml_origins.rs"]
+mod record_origins;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use egui::{Color32, Galley, Id, Rect, Role, ScrollArea, Sense, Ui, Vec2, WidgetInfo, pos2, vec2};
+use egui::{
+    Color32, Galley, Id, Rect, Response, Role, ScrollArea, Sense, Ui, Vec2, WidgetInfo, pos2, vec2,
+};
 
 use crate::shown_line::display;
 use crate::theme::desktop::{XML_FONT, XML_GUTTER_PADDING_X, XML_ROW_HEIGHT};
 use crate::theme::palette;
 use crate::theme::tokens::{Weight, font};
 use crate::widgets::scroll_region::{self, Jump};
-use crate::{Texts, XmlDocument, XmlText};
+use crate::{RecordXmlFieldProvenance, Texts, XmlDocument, XmlText};
 
 const MAX_ROWS: usize = 512;
 
@@ -30,6 +35,35 @@ struct RowCache {
 /// The view takes the keyboard focus with Tab and then scrolls with the arrow keys, Page Up,
 /// Page Down, Home and End. With a `jump` it scrolls to that line once.
 pub(super) fn show(ui: &mut Ui, texts: &Texts, document: &XmlDocument, jump: Option<Jump<'_>>) {
+    show_lines(
+        ui,
+        texts,
+        document,
+        jump,
+        record_origins::Evidence::Unrequested,
+    );
+}
+
+pub(super) fn show_record(
+    ui: &mut Ui,
+    texts: &Texts,
+    document: &XmlDocument,
+    origins: Option<&[RecordXmlFieldProvenance]>,
+) {
+    let evidence = origins.map_or(
+        record_origins::Evidence::Unknown,
+        record_origins::Evidence::Fields,
+    );
+    show_lines(ui, texts, document, None, evidence);
+}
+
+fn show_lines(
+    ui: &mut Ui,
+    texts: &Texts,
+    document: &XmlDocument,
+    jump: Option<Jump<'_>>,
+    evidence: record_origins::Evidence<'_>,
+) {
     let cache_id = ui.scope_id().with("xml-view-row-cache");
     let (mut cache, fresh) = RowCache::load(ui, cache_id, document);
     let total = document.line_count();
@@ -62,7 +96,15 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, document: &XmlDocument, jump: Opt
                         pos2(left, top),
                         vec2(viewport.width(), XML_ROW_HEIGHT),
                     );
-                    paint_row(ui, document, &mut cache, (index, rect), viewport.min.x);
+                    let response = paint_row(
+                        ui,
+                        document,
+                        &mut cache,
+                        (index, rect),
+                        viewport.min.x,
+                        evidence.sense(),
+                    );
+                    evidence.show(response, texts, document, index);
                 }
             })
         },
@@ -75,7 +117,8 @@ fn paint_row(
     cache: &mut RowCache,
     (index, rect): (usize, Rect),
     scroll: f32,
-) {
+    sense: Sense,
+) -> Response {
     let id = u32::try_from(index).unwrap_or(u32::MAX);
     let (number, text) = cache.row(ui, document, id);
     let painter = ui.painter_at(rect);
@@ -87,11 +130,12 @@ fn paint_row(
     );
     let text_rect = rect.with_min_x(rect.left() + cache.gutter);
     let at = pos2(text_rect.left() - scroll, centre(rect, &text));
-    let response = ui.interact(rect, ui.scope_id().with(("xml-line", id)), Sense::hover());
+    let response = ui.interact(rect, ui.scope_id().with(("xml-line", id)), sense);
     response.widget_info(|| WidgetInfo::labeled(Role::Label, true, text.text()));
     painter
         .with_clip_rect(text_rect.intersect(painter.clip_rect()))
         .galley(at, text, palette::GRAY_1);
+    response
 }
 
 fn centre(rect: Rect, galley: &Galley) -> f32 {

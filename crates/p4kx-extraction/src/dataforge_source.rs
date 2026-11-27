@@ -6,7 +6,9 @@ use std::path::Path;
 
 use p4kx_archive::Archive;
 
-use crate::{ArchiveWatch, DataForgeEntry, DataForgeLoadError, LoadedDataForge};
+use crate::{
+    ArchiveWatch, DataForgeEntry, DataForgeLoadError, DataForgeReadOptions, LoadedDataForge,
+};
 
 /// Where a DataForge is read from: the DataForge Entry of an Archive, or a DataForge file on disk
 /// such as a `Game2.dcb` kept from an earlier patch.
@@ -39,9 +41,24 @@ impl DataForgeSource<'_> {
     /// The same as [`read`](Self::read), and [`DataForgeLoadError::Cancelled`] once `stop`
     /// returned `true`.
     pub fn read_until(self, stop: &dyn Fn() -> bool) -> Result<DataForgeEntry, DataForgeLoadError> {
+        self.read_with_options(DataForgeReadOptions::default(), stop)
+    }
+
+    /// Reads the selected DataForge with caller-selected decoded input admission.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`DataForgeLoadError`] of that read.
+    pub fn read_with_options(
+        self,
+        options: DataForgeReadOptions,
+        stop: &dyn Fn() -> bool,
+    ) -> Result<DataForgeEntry, DataForgeLoadError> {
         match self {
-            Self::Archive(archive) => DataForgeEntry::read_until(archive, stop),
-            Self::File(file) => DataForgeEntry::read_file_until(file, stop),
+            Self::Archive(archive) => {
+                DataForgeEntry::read_until_with_options(archive, options, stop)
+            }
+            Self::File(file) => DataForgeEntry::read_file_until_with_options(file, options, stop),
         }
     }
 

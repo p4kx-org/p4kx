@@ -18,7 +18,8 @@ the product questions on the issue on 2026-10-31.
   result, and the bare form names no group that could be misspelt. A bare typo such as `9` for
   `0` therefore stays silent; a named pick is the form that is checked.
 - **Indices count from 0** (owner decision, confirmed), as `--lod` and `--texture-mip` do: 0 is
-  the first alternative. An index is ASCII digits only and must fit `usize`; a sign (`+1`, `-1`)
+  the first alternative. Null and malformed pointers occupy their stored indices and produce an
+  assortment issue when selected. An index is ASCII digits only and must fit `usize`; a sign (`+1`, `-1`)
   or a value that overflows is no pick.
 - **The key is the group name alone**, matched ignoring ASCII case, in every assortment that has
   a group of that name. The assortments of one Loadout share a handful of group names (`Body`,

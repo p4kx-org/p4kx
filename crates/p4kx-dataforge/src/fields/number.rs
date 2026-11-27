@@ -4,6 +4,8 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+use super::{FieldStatisticsDistinctUse, FieldStatisticsFingerprint, FieldStatisticsOperand};
+
 /// The most distinct values counted per path; more only set [`FieldStat::distinct_capped`].
 ///
 /// [`FieldStat::distinct_capped`]: crate::FieldStat::distinct_capped
@@ -96,32 +98,56 @@ fn float_text<T: fmt::Display + fmt::LowerExp>(
 }
 
 /// The smallest and the largest number seen.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub(crate) struct Extremes {
     pub(crate) min: Number,
     pub(crate) max: Number,
+    proof: Option<Box<[Option<FieldStatisticsOperand>; 2]>>,
 }
 
 impl Extremes {
-    pub(crate) const fn of(value: Number) -> Self {
+    pub(crate) fn of(
+        value: Number,
+        capture: bool,
+        operand: Option<&FieldStatisticsOperand>,
+    ) -> Self {
         Self {
             min: value,
             max: value,
+            proof: capture.then(|| Box::new([operand.cloned(), operand.cloned()])),
         }
     }
 
-    pub(crate) fn add(&mut self, value: Number) {
+    pub(crate) fn add(&mut self, value: Number, operand: Option<&FieldStatisticsOperand>) {
         if value.compare(self.min) == Ordering::Less {
             self.min = value;
+            if let Some([minimum, _]) = self.proof.as_deref_mut() {
+                *minimum = operand.cloned();
+            }
         }
         if value.compare(self.max) == Ordering::Greater {
             self.max = value;
+            if let Some([_, maximum]) = self.proof.as_deref_mut() {
+                *maximum = operand.cloned();
+            }
         }
     }
 
-    pub(crate) fn merge(&mut self, other: Self) {
-        self.add(other.min);
-        self.add(other.max);
+    pub(crate) fn merge(&mut self, mut other: Self) {
+        let (minimum, maximum) = other.take_proof();
+        self.add(other.min, minimum.as_ref());
+        self.add(other.max, maximum.as_ref());
+    }
+
+    pub(super) fn take_proof(
+        &mut self,
+    ) -> (
+        Option<FieldStatisticsOperand>,
+        Option<FieldStatisticsOperand>,
+    ) {
+        self.proof
+            .take()
+            .map_or((None, None), |positions| (*positions).into())
     }
 }
 
@@ -131,18 +157,41 @@ impl Extremes {
 pub(crate) struct Distinct {
     seen: Vec<u64>,
     capped: bool,
+    proof: Option<Vec<FieldStatisticsFingerprint>>,
 }
 
 impl Distinct {
-    pub(crate) fn add(&mut self, fingerprint: u64) {
-        if self.capped || self.seen.contains(&fingerprint) {
-            return;
+    pub(crate) fn new(capture: bool) -> Self {
+        Self {
+            proof: capture.then(Vec::new),
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn add(
+        &mut self,
+        fingerprint: u64,
+        operand: Option<&FieldStatisticsOperand>,
+    ) -> FieldStatisticsDistinctUse {
+        if self.capped {
+            return FieldStatisticsDistinctUse::AfterCap;
+        }
+        if self.seen.contains(&fingerprint) {
+            return FieldStatisticsDistinctUse::ComparedDuplicate;
+        }
+        if let Some(proof) = &mut self.proof {
+            proof.push(FieldStatisticsFingerprint::new(
+                fingerprint,
+                operand.cloned(),
+            ));
         }
         if self.seen.len() == MAX_DISTINCT_VALUES {
             self.capped = true;
             self.seen = Vec::new();
+            FieldStatisticsDistinctUse::ReachedCap
         } else {
             self.seen.push(fingerprint);
+            FieldStatisticsDistinctUse::Admitted
         }
     }
 
@@ -150,10 +199,20 @@ impl Distinct {
         if other.capped {
             self.capped = true;
             self.seen = Vec::new();
+            self.proof = other.proof;
+            return;
         }
+        let mut proof = other.proof.unwrap_or_default().into_iter();
         for fingerprint in other.seen {
-            self.add(fingerprint);
+            let source = proof
+                .next()
+                .and_then(FieldStatisticsFingerprint::into_operand);
+            let _usage = self.add(fingerprint, source.as_ref());
         }
+    }
+
+    pub(super) fn take_proof(&mut self) -> Vec<FieldStatisticsFingerprint> {
+        self.proof.take().unwrap_or_default()
     }
 
     pub(crate) const fn count(&self) -> usize {

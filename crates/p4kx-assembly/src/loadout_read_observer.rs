@@ -1,0 +1,131 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::ops::ControlFlow;
+
+use p4kx_dataforge::{Record, RecordTree};
+
+use super::LoadoutReadEvent;
+use crate::{
+    LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutPathObserver,
+    LoadoutRequest, LoadoutSelection, LoadoutXmlRecordSelector, RecordLoadoutEffect,
+    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite, XmlPortReplacement,
+};
+
+/// Observes actual resolver source operations, including concurrent prefetch reads.
+pub trait LoadoutReadObserver: Send + Sync {
+    /// Returns `Break` to stop the observed resolution.
+    fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()>;
+
+    /// Enables original Record Loadout override and default suppression evidence.
+    fn observes_record_loadout_effects(&self) -> bool {
+        false
+    }
+
+    /// Receives an actual matched Record Loadout decision during resolution.
+    fn record_loadout_effect(&self, _effect: &RecordLoadoutEffect<'_>) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Enables original port-name selections in the resolver's read callbacks.
+    fn observes_port_names(&self) -> bool {
+        false
+    }
+
+    /// Enables evidence for original XML Loadout port replacements.
+    fn observes_xml_port_replacements(&self) -> bool {
+        false
+    }
+
+    /// Receives the replacements of the XML Loadout consumed for the current request.
+    fn xml_port_replacements_used(
+        &self,
+        _observation: &LoadoutFileObservation,
+        _request: &LoadoutPath,
+        _replacements: &[XmlPortReplacement],
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Enables exact DataForge selectors that supply an XML Loadout.
+    fn observes_xml_record_selectors(&self) -> bool {
+        false
+    }
+
+    /// Captures the original DataForge datum accepted by the XML Loadout path getter.
+    fn xml_record_selector(&self, _site: &LoadoutXmlRecordSelector<'_, '_>) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Enables exact XML evidence for effective vehicle visibility fields.
+    fn observes_vehicle_visibility(&self) -> bool {
+        false
+    }
+
+    /// Enables original attribute evidence for effective vehicle port restrictions.
+    fn observes_vehicle_port_attributes(&self) -> bool {
+        false
+    }
+
+    /// Enables exact XML evidence for vehicle mass and hull fields.
+    fn observes_vehicle_totals(&self) -> bool {
+        false
+    }
+
+    /// Captures this Entity's actual vehicle caller, including uses of an existing cache entry.
+    fn vehicle_used(
+        &self,
+        _record_index: u32,
+        _implementation: &VehicleImplementation,
+        _caller: &LoadoutRequest,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Runs the actual Record projection exactly once within a borrowed path scope.
+    fn with_record_paths(
+        &self,
+        _record: &Record<'_>,
+        _tree: &RecordTree<'_>,
+        parse: &mut dyn FnMut(Option<&dyn LoadoutPathObserver>) -> ControlFlow<()>,
+    ) -> ControlFlow<()> {
+        parse(None)
+    }
+
+    /// Captures an actual same-parse XML attribute before its path text is copied.
+    fn xml_path(
+        &self,
+        _selection: &LoadoutSelection,
+        _site: &XmlLoadoutPathSite<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures the actual XML class-name attribute before its text is copied.
+    fn xml_class(
+        &self,
+        _selection: &LoadoutClassSelection,
+        _site: &XmlLoadoutClassSite<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures the actual Record chosen for this class getter before copying its GUID.
+    fn class_record(
+        &self,
+        _selection: &LoadoutClassSelection,
+        _record: &Record<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures one concrete candidate builder from its actual private input pairs.
+    fn derived_path(
+        &self,
+        _selection: &LoadoutSelection,
+        _inputs: &[&LoadoutPath],
+        _value: &str,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+}

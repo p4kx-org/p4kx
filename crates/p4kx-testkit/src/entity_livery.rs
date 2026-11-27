@@ -3,8 +3,8 @@
 
 use crate::{
     DataForgeBuilder, SplitDds, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel,
-    TestMtl, TestMtlMaterial, TestTextureFormat, entity_schema, tint_palette_record,
-    tint_palette_record_with_decal,
+    TestMtl, TestMtlMaterial, TestTextureFormat, TestType, TestValue, entity_schema,
+    tint_palette_record, tint_palette_record_with_decal,
 };
 
 /// The record path of the palette the library `Objects/Test/livery_default` names as its default.
@@ -173,8 +173,39 @@ fn library(default_palette: Option<&str>) -> Vec<u8> {
 ///   (`TEST_Painted`, `p_gun`).
 #[must_use]
 pub fn livery_entries() -> Vec<TestEntry> {
+    entries(&database())
+}
+
+/// Returns the livery fixture with an original `decalTexture` on the hull's palette.
+#[must_use]
+pub fn livery_entries_with_decal_texture(file: &str) -> Vec<TestEntry> {
+    let mut database = database();
+    database.structs = database
+        .structs
+        .into_iter()
+        .map(|structure| {
+            if structure.name == "TintPalette" {
+                structure.field("decalTexture", TestType::String)
+            } else {
+                structure
+            }
+        })
+        .collect();
+    let root = database
+        .records
+        .iter_mut()
+        .find(|record| record.guid == 0x31)
+        .and_then(|record| record.values.iter_mut().find(|(field, _)| field == "root"));
+    if let Some((_, TestValue::Struct(root))) = root {
+        root.values
+            .push(("decalTexture".to_owned(), TestValue::text(file)));
+    }
+    entries(&database)
+}
+
+fn entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
     let model = TestModel::cube();
-    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database().build())];
+    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database.build())];
     for name in ["livery_ship", "livery_part"] {
         entries.push(TestEntry::stored(
             format!("Data\\Objects\\Test\\{name}.cgf"),

@@ -5,13 +5,21 @@
 //! template, handler, contract and sub contract level, and two location templates.
 
 mod broker;
+#[cfg(test)]
+mod broker_query;
 mod broker_structures;
+pub(crate) mod generator_query;
+mod locales;
 mod npc;
+#[cfg(test)]
+mod pool_query_checks;
 mod structures;
 mod template;
 mod template_deep;
 mod template_parts;
 mod template_properties;
+#[cfg(test)]
+mod template_query;
 mod template_structures;
 mod template_values;
 mod unknown_conditions;
@@ -20,10 +28,10 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, TestInstance, TestRecord,
-    TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
 };
 
+use self::locales::{english, french};
 use self::npc::NpcKind;
 
 pub(crate) const GENERATOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
@@ -67,6 +75,7 @@ pub(crate) const TAG_KILL: u128 = 0x9000_0000_0000_4000_8000_0000_0000_0005;
 pub(crate) const LOCATION_A: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const LOCATION_B: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0002;
 pub(crate) const LOCATION_DEV: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0003;
+pub(crate) const LOCATION_DANGLING_TAG: u128 = 0xa000_0000_0000_4000_8000_0000_0000_0004;
 
 const TAG_PATH: &str = "libs/foundry/records/tagdatabase/tagdatabase.tagdatabase.xml";
 
@@ -113,6 +122,7 @@ fn ship_option(weight: i32) -> TestValue {
         TestInstance::new("SpawnDescription_Ship")
             .value("concurrentAmount", TestValue::Int32(2))
             .value("includeLocationAISpawnTags", TestValue::Bool(false))
+            .value("crewInheritsLocationFaction", TestValue::Bool(weight == 3))
             .value("weight", TestValue::Int32(weight))
             .value("tags", tag_list(&[TAG_SHIP]))
             .value("negativeTags", tag_list(&[]))
@@ -275,34 +285,48 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
                 .value("isSecurityNetworkHost", TestValue::Bool(false))
                 .value(
                     "generalTags",
-                    TestValue::Struct(
-                        TestInstance::new("MissionLocationTags")
-                            .value("tags", array(vec![reference(TAG_HIJACKED), reference(0)])),
-                    ),
+                    TestValue::Struct(TestInstance::new("MissionLocationTags").value(
+                        "tags",
+                        array(vec![
+                            reference(TAG_HIJACKED),
+                            reference(0),
+                            reference(TAG_HIJACKED),
+                            reference(LOCATION_DANGLING_TAG),
+                        ]),
+                    )),
                 )
                 .value("producesTags", TestValue::Struct(term(&[TAG_SHIP], &[])))
                 .value("consumesTags", TestValue::Struct(term(&[], &[TAG_KILL])))
                 .value("aiSpawnTags", tag_list(&[TAG_SHIP]))
                 .value(
                     "stringVariants",
-                    TestValue::Struct(TestInstance::new("MissionStringVariants").value(
-                        "variants",
-                        array(vec![TestValue::Struct(
-                            TestInstance::new("MissionStringVariant")
-                                .value("tag", reference(TAG_HIJACKED))
-                                .value("string", TestValue::text("@place_name")),
-                        )]),
-                    )),
+                    TestValue::Struct(
+                        TestInstance::new("MissionStringVariants").value(
+                            "variants",
+                            array(
+                                [
+                                    (TAG_HIJACKED, "@place_name"),
+                                    (TAG_SHIP, "@place_name"),
+                                    (TAG_SHIP, "@LOC_PLACEHOLDER"),
+                                ]
+                                .into_iter()
+                                .map(|(tag, key)| {
+                                    TestValue::Struct(
+                                        TestInstance::new("MissionStringVariant")
+                                            .value("tag", reference(tag))
+                                            .value("string", TestValue::text(key)),
+                                    )
+                                })
+                                .collect(),
+                            ),
+                        ),
+                    ),
                 ),
         ),
     )
 }
 
-fn database() -> DataForgeBuilder {
-    let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
-        "outside",
-        TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),
-    );
+fn tag_records() -> [TestRecord; 5] {
     [
         TestRecord::new(DATABASE, "TagDatabase", "TagDatabase.TagDatabase", TAG_PATH).value(
             "tags",
@@ -316,44 +340,45 @@ fn database() -> DataForgeBuilder {
         tag(TAG_HIJACKED, "Hijacked", vec![]),
         tag(TAG_SHIP, "ShipModel", vec![]),
         tag(TAG_KILL, "Kill", vec![]),
-        generator(),
-        template::template(),
-        template::leftover(),
-        template_parts::owner(),
-        template::elsewhere(),
-        template_deep::deep_phases(),
-        template_deep::deep_flow(),
-        template_deep::unknown_flow(),
-        template_deep::unknown_modifier(),
-        template_deep::unknown_value(),
-        template_deep::unknown_condition(),
-        template_deep::unknown_contract_property(),
-        template_deep::unknown_item_condition(),
-        unknown_conditions::template(),
-        unknown_conditions::template_after_known(),
-        unknown_conditions::generator(),
-        broker::bad_location_condition(),
-        broker::broker(),
-        broker::elsewhere(),
-        broker::leftover(),
-        broker::bad(),
-        broker::bad_property(),
-        broker::reward_record(),
-        location_template(LOCATION_A, "a_hijacked", false),
-        location_template(LOCATION_B, "b_hijacked", true),
-        location_template(LOCATION_DEV, "dev_temp_hijacked", false),
     ]
-    .into_iter()
-    .fold(builder, DataForgeBuilder::record)
 }
 
-fn english() -> TestEntry {
-    TestEntry::zstd(
-        "Data\\Localization\\english\\global.ini",
-        GlobalIniBuilder::new()
-            .text("place_name", "Hijacked Ship")
-            .build(),
-    )
+pub(crate) fn database() -> DataForgeBuilder {
+    let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
+        "outside",
+        TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),
+    );
+    tag_records()
+        .into_iter()
+        .chain([
+            generator(),
+            template::template(),
+            template::leftover(),
+            template_parts::owner(),
+            template::elsewhere(),
+            template_deep::deep_phases(),
+            template_deep::deep_flow(),
+            template_deep::unknown_flow(),
+            template_deep::unknown_modifier(),
+            template_deep::unknown_value(),
+            template_deep::unknown_condition(),
+            template_deep::unknown_contract_property(),
+            template_deep::unknown_item_condition(),
+            unknown_conditions::template(),
+            unknown_conditions::template_after_known(),
+            unknown_conditions::generator(),
+            broker::bad_location_condition(),
+            broker::broker(),
+            broker::elsewhere(),
+            broker::leftover(),
+            broker::bad(),
+            broker::bad_property(),
+            broker::reward_record(),
+            location_template(LOCATION_A, "a_hijacked", false),
+            location_template(LOCATION_B, "b_hijacked", true),
+            location_template(LOCATION_DEV, "dev_temp_hijacked", false),
+        ])
+        .fold(builder, DataForgeBuilder::record)
 }
 
 /// Writes the fixture Archive into `dir` and returns its path.
@@ -362,6 +387,7 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     ArchiveBuilder::new()
         .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
         .entry(english())
+        .entry(french())
         .write_to(&path)?;
     Ok(path)
 }

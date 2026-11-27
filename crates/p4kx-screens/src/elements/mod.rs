@@ -14,7 +14,9 @@ mod unsupported;
 mod vector;
 
 pub(crate) use canvas::{is_canvas_widget, nested as nested_canvas};
-pub(crate) use standard::{is_standard, tags_of as standard_tags};
+#[cfg(test)]
+pub(crate) use standard::{GENERAL_CANVAS, LARGE_CANVAS, SECONDARY_CANVAS};
+pub(crate) use standard::{canvas_of as standard_canvas, is_standard, tags_of as standard_tags};
 
 use crate::context::Context;
 use crate::look::Look;
@@ -23,8 +25,9 @@ use crate::picture::{BODY_BACKGROUND, CUSTOM_SHAPE, FOREGROUND_OVERLAY, ICON, IM
 use crate::text::{TEXT, TEXT_FIELD};
 use crate::widget::Widget;
 
+const DISPLAY: &str = "BuildingBlocks_DisplayWidget";
 const STRUCTURAL: [&str; 7] = [
-    "BuildingBlocks_DisplayWidget",
+    DISPLAY,
     "BuildingBlocks_WidgetBase",
     "BuildingBlocks_WidgetCard",
     "BuildingBlocks_WidgetContainer",
@@ -71,6 +74,7 @@ pub(crate) fn paint(
 ) {
     display::paint(cx, widget, look, area, alpha);
     match widget.type_name.as_str() {
+        DISPLAY => vector::paint_fill(cx, widget, look, area, alpha),
         CIRCLE => circle::paint(cx, widget, look, area, alpha),
         POLYGON => polygon::paint(cx, widget, look, area, alpha),
         TEXT | TEXT_FIELD => text::paint(cx, widget, look, area, alpha),

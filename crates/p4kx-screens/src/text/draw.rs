@@ -3,8 +3,9 @@
 
 use p4kx_gfx::{FontFace, MAX_SCENE_GLYPHS, MAX_TEXT_CHARS, MISSING_GLYPH_EM, Rgba, missing_glyph};
 
-use super::fit::{Fit, MIN_SIZE, shape_fitted};
+use super::fit::{MIN_SIZE, shape_fitted};
 use super::layout::{self, Cell, Shaping};
+use super::prepared::Prepared;
 use super::source::{is_placeholder, resolve};
 use super::spec::{Horizontal, TextSpec, Vertical};
 use super::{Texts, fonts::FontBook};
@@ -12,6 +13,8 @@ use crate::context::Context;
 use crate::glyphs::{self, MISSING};
 use crate::look::Look;
 use crate::paint::{Area, Painter, TWIPS};
+use crate::still_inputs::StillTextInput;
+use crate::style::preset::PresetFillSource;
 use crate::widget::Widget;
 
 const MAX_MISSING_REPORTED: usize = 8;
@@ -20,34 +23,6 @@ const FIELD_SIZE_OF_HEIGHT: f32 = 0.6;
 const MIN_LINE_OF_SIZE: f32 = 0.1;
 
 pub(crate) type Notes = Vec<String>;
-
-#[derive(Debug)]
-pub(crate) struct Prepared {
-    font: usize,
-    size: f32,
-    cells: Vec<Cell>,
-    line_spacing: f32,
-    horizontal: Horizontal,
-    vertical: Vertical,
-    wrap: bool,
-    height_input: Option<f32>,
-    fit: Option<Fit>,
-}
-
-impl Prepared {
-    /// Returns whether shaping the text again in `area` would give this result: the height is
-    /// the one a size taken from the height was counted from, and the width still holds a fitted
-    /// text.
-    fn holds_for(&self, area: Area) -> bool {
-        let height = self
-            .height_input
-            .is_none_or(|height| height.to_bits() == area.height.to_bits());
-        let width = self.fit.as_ref().is_none_or(|fit| {
-            fit.width.to_bits() == area.width.to_bits() || (!fit.shrunk && fit.widest <= area.width)
-        });
-        height && width
-    }
-}
 
 /// A text shaped once, with what the shaping noted; `prepared` is `None` for a text that is not
 /// drawn.
@@ -99,8 +74,8 @@ impl Texts<'_> {
             notes.push("text is empty or filled in by the game at run time".to_owned());
             return None;
         }
-        let resolved = resolve(self.localise, source, notes);
-        let cased = modifiers.case.unwrap_or(spec.case).apply(&resolved);
+        let resolved = resolve(self.localise, source, notes, self.observe_inputs);
+        let cased = modifiers.case.unwrap_or(spec.case).apply(&resolved.text);
         if cased.trim().is_empty() {
             notes.push("text is empty or filled in by the game at run time".to_owned());
             return None;
@@ -131,6 +106,11 @@ impl Texts<'_> {
             font: font.0,
             size,
             cells,
+            input: self.observe_inputs.then_some(StillTextInput {
+                font: font.0,
+                localization_key: resolved.lookup_key,
+                preset_fill: None,
+            }),
             line_spacing: modifiers
                 .line_spacing
                 .unwrap_or(spec.line_spacing)
@@ -284,11 +264,21 @@ impl Context<'_> {
             .text
             .as_ref()
             .and_then(|spec| look.fill.or(spec.colour.as_ref()));
+        let preset_fill = look.style.text.preset_fill.as_ref();
+        let fill = preset_fill.filter(|_| colour_spec.is_none());
+        let colour_spec = colour_spec.or_else(|| fill.map(|fill| &fill.colour));
         if colour_spec.is_none() {
             self.report
                 .note(&widget.type_name, "text has no colour", &widget.name);
         }
         let colour = colour_spec.and_then(|spec| self.colour(spec, alpha, widget));
+        #[cfg(test)]
+        self.note_text_inputs(
+            prepared.is_some(),
+            colour_spec.is_some(),
+            colour.as_ref().map(|colour| colour.alpha),
+            &shaped.notes,
+        );
         let (Some(prepared), Some(colour)) = (prepared, colour) else {
             self.report.texts_left_out += 1;
             return;
@@ -308,9 +298,12 @@ impl Context<'_> {
             self.report.texts_left_out += 1;
             return;
         }
-        if self.place_text(widget, prepared, area, colour) {
+        let paint = (colour, fill.map(|fill| fill.source));
+        if self.place_text(widget, prepared, area, paint) {
             self.report.texts_drawn += 1;
         } else {
+            #[cfg(test)]
+            self.note_text_without_glyphs();
             self.report.texts_left_out += 1;
         }
     }
@@ -320,7 +313,7 @@ impl Context<'_> {
         widget: &Widget,
         prepared: &Prepared,
         area: Area,
-        colour: Rgba,
+        (colour, preset_fill): (Rgba, Option<PresetFillSource>),
     ) -> bool {
         let Some(face) = self
             .texts
@@ -374,7 +367,13 @@ impl Context<'_> {
             line_drawer.draw(&mut self.painter, cells, (pen, baseline));
         }
         self.note_missing(widget, &line_drawer.missing);
-        self.painter.len() > before
+        let end = self.painter.len();
+        if end > before
+            && let (Some(inputs), Some(input)) = (self.inputs.as_mut(), prepared.input.as_ref())
+        {
+            inputs.record_text_paint(before..end, input, preset_fill);
+        }
+        end > before
     }
 
     fn note_missing(&mut self, widget: &Widget, missing: &[char]) {

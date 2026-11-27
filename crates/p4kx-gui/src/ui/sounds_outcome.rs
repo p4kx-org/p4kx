@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::Path;
 use std::time::Duration;
 
 use egui::{Id, Ui};
@@ -182,17 +183,22 @@ fn finished(
             ],
         )
     }));
-    let unconverted: Vec<String> = report
+    let file_note = |path: &Path, reason: &str| {
+        let name = path.file_name()?.to_string_lossy().into_owned();
+        Some(texts.format(
+            T::SummaryFile,
+            &[("name", name.into()), ("reason", reason.to_owned().into())],
+        ))
+    };
+    let unconverted: Vec<_> = report
         .sounds
         .iter()
-        .filter_map(|sound| {
-            let reason = sound.unconverted.as_ref()?;
-            let name = sound.path.file_name()?.to_string_lossy().into_owned();
-            Some(texts.format(
-                T::SummaryFile,
-                &[("name", name.into()), ("reason", reason.clone().into())],
-            ))
-        })
+        .filter_map(|sound| file_note(&sound.path, sound.unconverted.as_deref()?))
+        .collect();
+    let receipt_failures: Vec<_> = report
+        .sounds
+        .iter()
+        .filter_map(|sound| file_note(&sound.path, sound.origin_receipt_failure.as_deref()?))
         .collect();
     let heading = |text: T, len: usize| {
         texts.format(
@@ -210,6 +216,16 @@ fn finished(
         ui,
         (&heading(T::SummaryFailed, failures.len()), "sounds-failed"),
         &failures,
+        None,
+        true,
+    );
+    list(
+        ui,
+        (
+            &heading(T::SummaryReceiptFailed, receipt_failures.len()),
+            "sounds-receipts-failed",
+        ),
+        &receipt_failures,
         None,
         true,
     );

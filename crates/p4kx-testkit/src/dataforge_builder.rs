@@ -30,6 +30,7 @@ pub struct DataForgeBuilder {
     pub(crate) records: Vec<TestRecord>,
     pub(crate) instances: Vec<(String, TestInstance)>,
     extra_values: [u32; TestPool::COUNT],
+    omit_empty_mappings: bool,
 }
 
 impl Default for DataForgeBuilder {
@@ -49,6 +50,7 @@ impl DataForgeBuilder {
             records: Vec::new(),
             instances: Vec::new(),
             extra_values: [0; TestPool::COUNT],
+            omit_empty_mappings: false,
         }
     }
 
@@ -57,6 +59,13 @@ impl DataForgeBuilder {
     #[must_use]
     pub const fn version(mut self, version: u32) -> Self {
         self.version = version;
+        self
+    }
+
+    /// Omits Structs with no instances from the original `DataMapping` table.
+    #[must_use]
+    pub const fn omit_empty_mappings(mut self) -> Self {
+        self.omit_empty_mappings = true;
         self
     }
 
@@ -216,7 +225,7 @@ impl<'a> Writer<'a> {
         let (enums, options) = self.enum_tables();
         let instances = self.instances(options);
         let records = self.records(&instances.records);
-        let mappings = Self::mappings(&instances.counts);
+        let (mappings, mapping_count) = Self::mappings(&instances.counts, spec.omit_empty_mappings);
         let mut out = Vec::new();
         for word in [0, spec.version, 0, 0] {
             put_u32(&mut out, word);
@@ -225,7 +234,7 @@ impl<'a> Writer<'a> {
             to_u32(spec.structs.len()),
             property_count,
             to_u32(spec.enums.len()),
-            to_u32(spec.structs.len()),
+            mapping_count,
             to_u32(spec.records.len()),
         ] {
             put_u32(&mut out, count);
@@ -298,13 +307,18 @@ impl<'a> Writer<'a> {
         (enums, options)
     }
 
-    fn mappings(instance_counts: &[u32]) -> Vec<u8> {
+    fn mappings(instance_counts: &[u32], omit_empty: bool) -> (Vec<u8>, u32) {
         let mut mappings = Vec::new();
-        for (index, count) in instance_counts.iter().enumerate() {
-            put_u32(&mut mappings, *count);
+        let mut rows = 0;
+        for (index, &count) in instance_counts.iter().enumerate() {
+            if count == 0 && omit_empty {
+                continue;
+            }
+            put_u32(&mut mappings, count);
             put_u32(&mut mappings, to_u32(index));
+            rows += 1;
         }
-        mappings
+        (mappings, to_u32(rows))
     }
 
     fn records(&mut self, instances: &[u32]) -> Vec<u8> {
@@ -330,7 +344,12 @@ impl<'a> Writer<'a> {
             }
             put_u32(&mut rows, struct_index);
             rows.extend_from_slice(&guid_bytes(record.guid));
-            put_u16(&mut rows, to_u16(instance as usize));
+            put_u16(
+                &mut rows,
+                record
+                    .instance_index
+                    .unwrap_or_else(|| to_u16(instance as usize)),
+            );
             put_u16(&mut rows, to_u16(size as usize));
         }
         rows

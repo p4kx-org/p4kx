@@ -4,7 +4,7 @@ Decided for issue #809. Applies ADR-0002 (the Archive is the source of the catal
 
 ## Context
 
-The `playability` of ships (ADR-0054, "Playability" in `docs/basetool-catalog.md`) is derived from
+The `playability` of ships (ADR-0054, "Playability" in `docs/catalog.md`) is derived from
 Record data and has never been compared with an outside reference. Another extractor takes "flight
 ready" from the public RSI ship matrix, `https://robertsspaceindustries.com/ship-matrix/index`
 (`production_status == "flight-ready"`). The same data can serve as a development check of our
@@ -37,16 +37,20 @@ never fetches the ship matrix.
 - No code of P4KX requests anything from RSI. CI has no ship matrix: the check is `#[ignore]`d,
   skips without `P4KX_REF_SHIP_MATRIX`, and its comparison logic is tested with a small synthetic
   matrix written for the test.
-- Nothing from the ship matrix is committed, copied into a fixture or doc, or exported: no
-  descriptions, images or stats, and no value is read from it (its stats are often out of date).
-  Docs hold only counts and Archive class names derived by the check.
+- The original Matrix response stays private. Its descriptions, images, stats and other
+  content are excluded from published data. The separate `shipStorePledges` snapshot uses only
+  manually reviewed public identifiers, short names, manufacturer codes and explicit production
+  labels. The date and digest identify the original capture. The candidate review records its
+  own date and scope. A corroborated flight-ready release can exclude a candidate whose Matrix
+  label lags the release. Maintainers review the bundled snapshot by hand during identity
+  refresh and record the revised scope and revision.
 - The check reads the matrix as `{"data": [...]}` or a bare list. A matrix entry maps to a catalog
   ship through the curated `shipStoreSlugs` (ADR-0117): by the RSI ship id (`id`), then by the last
   segment of `url` against the slug. Matrix names the slugs do not map are mapped by an explicit
   name table in the test (`NAME_SUPPLEMENT`), read off the Archive's class names and used only
   there; no name enters the `playability` rule.
 - The `playability` rule is refined only on a structural signal, never by name. The first
-  comparison (see "Comparison" in `docs/basetool-catalog.md`) showed none.
+  comparison (see "Comparison" in `docs/catalog.md`) showed none.
 - The second look (#838) found one for two ships: `ANVL_Hornet_F7C_Mk2_AI_Super` and
   `RSI_Perseus_AI_Super` were `player` although the matrix does not know them. Their hull values,
   crew manifest, tags and inclusion mode equal their `player` siblings. What separates them from

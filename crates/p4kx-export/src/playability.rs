@@ -5,7 +5,7 @@ use serde::Serialize;
 
 /// Who an item, ship or ground vehicle is for, as the Records structurally say.
 ///
-/// The catalog writes the name of the value; a reader maps a value it does not know to `null`.
+/// Catalog rows write the name of the value in `playability.value`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -72,7 +72,7 @@ impl PlayabilityCounts {
         }
     }
 
-    /// Returns the entities for which no rule applies; their playability is `null`.
+    /// Returns the number of entities whose playability value is `null`.
     #[must_use]
     pub const fn unclassified(&self) -> usize {
         self.unclassified

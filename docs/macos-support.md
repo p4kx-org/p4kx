@@ -1,0 +1,144 @@
+# Native macOS support in v0.5.0
+
+This specification extends the [v0.5.0 implementation plan](https://github.com/p4kx-org/p4kx/issues/1115)
+and the [release gate](https://github.com/p4kx-org/p4kx/issues/1116). It defines required release
+acceptance. Delivery requires the evidence below.
+
+## Supported target
+
+- Ship `p4kx` (CLI), `p4kx-gui` (GUI) and `p4kx-mcp` (stdio) for Apple Silicon,
+  `aarch64-apple-darwin`, with macOS 26 Tahoe as the minimum. Declare the deployment target in
+  the build and the minimum OS in the app bundle. Verify the actual packaged Mach-O architecture
+  and deployment target for every shipped executable and any bundled libraries.
+- Exercise the v0.5.0 workflows on the minimum OS and the approved macOS 27 runner.
+  P4KX runs as a native ARM64 process. Wine and CrossOver supply optional game installations.
+  Standalone Archives and manually selected installations work without either runtime.
+- Keep Archive browsing, Comparison, Extraction, conversions, Catalog and Media Exports, and
+  read-only MCP operations available through their existing entry points and shared contracts.
+  Verify the native Blender 5.2 LTS add-on installation and import of a synthetic P4KX package on
+  Apple Silicon. Check the hierarchy, materials, textures and a representative rig and animation
+  against fixture expectations.
+
+## Discovery and desktop behavior
+
+- Extend the shared bounded Channel and launcher-source discovery for Wine and CrossOver. Read
+  the standard Wine prefix (`~/.wine`), explicit `WINEPREFIX` and P4KX-configured roots, standard
+  CrossOver bottle locations and configured CrossOver bottle roots. Document the supported
+  settings and precedence. Finder launches must discover standard locations and saved settings.
+  Keep manual folder and Archive selection available.
+- Reuse the admitted prefix and launcher-log sources for Channels, public patches and the Guard.
+  Test default and custom libraries, drive mapping, duplicate/aliased sources, cache invalidation,
+  missing sources and partial discovery. Read only the existing permitted launcher sources.
+  Retain the protection of discovered and manually selected game installations and Archives.
+- Detect a running Star Citizen process under Wine or CrossOver using native macOS process
+  evidence and the shared Guard states and warnings. Verify running, stopped and unavailable
+  observation cases. A launcher or unrelated Wine process alone is insufficient evidence that
+  the game is running. Cover protected paths through aliases, symlinks and different case
+  spellings according to the actual volume, including write attempts through existing aliases.
+- Verify the macOS profile, data and cache locations, native Metal rendering, and the synthetic
+  desktop and audio cases supported by the hosted runner. The
+  [optional macOS desktop procedure](macos-desktop-verification.md) covers additional observations
+  such as Finder, system clipboard, native dialogs, external volumes and CoreAudio playback.
+
+## DMG, signing and updates
+
+- Publish one ARM64 DMG on GitHub Releases. It contains a relocatable `P4KX.app` with all three
+  native programs, resources and notices. Support Finder drag-to-install and launch. Document
+  CLI invocation and the executable path for an MCP client. Verify these paths after relocating
+  the bundle or launching through a user-owned symlink. Normal use requires neither developer
+  tools nor a package manager.
+- Use Developer ID Application signing with hardened runtime and Apple notarization when
+  available. Validate the signature and stapled ticket on the final DMG in the hosted consumer.
+  Record Gatekeeper behavior when the environment can exercise it. If Developer ID or notarization is unavailable, publish an ad-hoc-signed
+  DMG, identify that mode and its reason in release evidence, and describe the first-launch
+  approval in the Release notes. Report a signing or notarization validation failure as a failure.
+  PR package dry runs must work with ad-hoc signatures and without signing secrets.
+- Store the bounded distribution identity in `Contents/Resources/p4kx-distribution.json`. All
+  three binaries use the shared update selector with their running target and package identity.
+  Cover a compatible DMG, a missing or incompatible asset, malformed identity, and Release-page
+  fallback. Keep the update check opt-in and link-only.
+
+## Native acceptance and release evidence
+
+- Extend the one platform contract in `.config/platforms.json` and its existing build, cache,
+  nextest, runtime and release consumers. Keep the pinned compiler and test runner, add Mach-O
+  checks alongside PE/ELF checks, and reject wrong-target, wrong-host or wrong-source artifacts.
+  Run the required synthetic test suites, doctests, lints and repository checks on native macOS.
+- On each supported verification OS, launch the packaged CLI for synthetic Archive list,
+  Extraction and conversion, use MCP initialize, tools/list and a representative read-only
+  request, and start, draw and exit the GUI. Verify DMG mounting, copied-bundle execution,
+  relocation and profile behavior through the hosted native package consumer.
+- Record OS version, CPU, Mach-O identities, exact source commit, tool pins, binary hashes, DMG
+  hash and successful check results. The hosted native checks determine macOS release acceptance.
+  Record unavailable capabilities and any optional physical observations separately. Required
+  native checks need executed results on Apple Silicon. Real Archive evidence stays local or
+  explicitly private.
+- Final v0.5.0 preflight requires five native targets, thirteen native packages, fifteen
+  target/application SBOMs and five target-bound runtime records, including the macOS minimum and
+  current OS evidence. Include the DMG in existing checksum, notice, provenance, attestation and
+  scan gates for the exact published bytes. The Blender add-on retains its separate asset and
+  provenance. Update the supported-platform guide, installation help, Release notes and changelog
+  when implementation and evidence are ready.
+
+Hosted verification mounts and executes the same DMG on the macOS 26 runner and the native
+macOS 27 runner selected by the xcode-27 label. One target runtime record binds both
+executions to the same DMG and application digests. Both hosted consumers install the exact
+add-on ZIP in pinned native Blender 5.2 LTS and pass the synthetic import on tagged releases,
+release pull requests and full dry runs. The macOS release record retains the actual host and
+Blender versions, Blender distribution and executable digests, add-on artifact identity and
+ZIP digest. Tagged release assembly requires the exact approved macOS 27 runner version
+and publishes the same add-on artifact used for the smoke and attestation.
+
+### Hosted package evidence
+
+For PR #1117 head `ac572e896` at merge revision
+`27da392284eed8c67cf58c15ea473089d6c0a20c`, both hosted Apple Silicon guests
+mounted the DMG read-only, ran the relocated bundle and verified the exact release
+add-on ZIP in native Blender 5.2.4. The `macos-26` guest reported macOS
+26.7.2 (25G332). The `xcode-27` guest reported macOS 27.0.1 (26A434).
+Package assembly accepted the paired receipts. The approved hosted baseline for
+pull-request verification and tagged releases is macOS 27.0.1. Update the release
+pin after GitHub supplies the newer Apple Silicon guest and verifies it with the
+same package and add-on checks. The recorded run establishes only the observed OS builds.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990049485) ·
+[Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990049813) ·
+[Hosted package assembly](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050506)
+
+For PR #1117 head `36181deeb` at merge revision
+`eb6c0aceade893baf0639d337427b072131d0114`, both Apple Silicon guests again
+executed the mounted DMG and verified the add-on ZIP in native Blender 5.2.4.
+The observed versions were macOS 26.7.2 and 27.0.1. Package assembly published
+the DMG after verifying both guest receipts.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139574882502) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139574882535) ·
+[Assembled package](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/artifacts/15072150981)
+
+At PR #1117 merge `4c31057f8325235e54cb0305792560f78c7262e4`, the minimum and
+current hosted Apple Silicon jobs again mounted the DMG read-only, ran the
+relocated app and tested the exact release add-on in native Blender 5.2 LTS.
+The paired workers completed and the macOS release payload was published as
+a workflow artifact for this pull-request candidate.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139954435330) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139954435276) ·
+[Assembled payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15123008996)
+
+At PR #1117 merge `3b2c90ab301587c58e3b0b3c4b07d23d55901bb6`, both Apple
+Silicon guests mounted the DMG read-only, ran the relocated app and tested
+the exact add-on in native Blender 5.2 LTS. Package assembly verified both
+guest receipts against the same release record and uploaded the macOS
+payload.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/job/140407671574) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/job/140407671622) ·
+[Assembled payload](https://github.com/p4kx-org/p4kx/actions/runs/45963862816/artifacts/15184537104)
+
+## References
+
+- [Shared native platform contract (ADR-0343)](adr/0343-one-native-platform-contract-and-target-bound-runtime-evidence.md)
+- [Read-only installations (ADR-0036)](adr/0036-read-only-towards-the-installation.md)
+- [Launcher discovery and protection](channel-discovery.md)
+- [Rust macOS targets](https://doc.rust-lang.org/rustc/platform-support/apple-darwin.html)
+- [GitHub native runner images](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+- [Apple bundle layout](https://developer.apple.com/documentation/bundleresources/placing-content-in-a-bundle)
+- [Apple distribution and notarization](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)
+- [Apple Gatekeeper first-launch behavior](https://support.apple.com/en-us/102445)
+- [CrossOver bottle directories](https://support.codeweavers.com/en_US/change-the-bottle-directory-in-crossover-mac)

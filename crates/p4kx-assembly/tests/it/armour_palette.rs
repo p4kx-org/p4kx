@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Armour drawn with the tint palette of a worn piece: the one its geometry names for the body,
-//! else the default of its material library.
+//! Armour drawn with the palette of its worn geometry, main geometry or material library.
 
 use p4kx_assembly::{
     ArchiveModels, Armour, AssemblyOptions, BodyVariant, IssueKind, LoadoutResolver,
@@ -11,13 +10,14 @@ use p4kx_assembly::{
 use p4kx_dataforge::Guid;
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_model::{Material, PaletteSlot, TintEntry, TintPalette};
-use p4kx_testkit::{PAINTED_LIBRARY_PALETTE, PAINTED_SUIT, painted_entries};
+use p4kx_testkit::{MAIN_PALETTE_SUIT, PAINTED_LIBRARY_PALETTE, PAINTED_SUIT, painted_entries};
 
 use crate::assembly_support::{TestResult, fixture};
 
 const LIBRARY_GUID: [u8; 16] = [7; 16];
 const FROM_MALE: [f32; 3] = [0.03, 0.03, 0.03];
 const FROM_FEMALE: [f32; 3] = [0.02, 0.2, 0.4];
+const FROM_MAIN: [f32; 3] = [0.21, 0.14, 0.35];
 const FROM_LIBRARY: [f32; 3] = [0.8, 0.7, 0.1];
 
 struct Stub {
@@ -38,6 +38,8 @@ impl PaletteProvider for Stub {
         let text = guid.to_string();
         if guid == Guid::from_stored(LIBRARY_GUID) {
             Ok(palette("from_library", FROM_LIBRARY))
+        } else if text.ends_with("7c") {
+            Ok(palette("from_main", FROM_MAIN))
         } else if self.geometry_exists && text.ends_with("7a") {
             Ok(palette("from_male", FROM_MALE))
         } else if self.geometry_exists && text.ends_with("7b") {
@@ -124,6 +126,21 @@ fn each_body_takes_the_palette_of_its_own_sub_geometry() -> TestResult {
 
     assert_eq!(caps(&female)?.diffuse, FROM_FEMALE);
     assert_eq!(caps(&male)?.diffuse, FROM_MALE);
+    Ok(())
+}
+
+#[test]
+fn a_worn_variant_without_a_palette_uses_the_items_main_palette() -> TestResult {
+    let armour = wear(MAIN_PALETTE_SUIT, BodyVariant::Male, Some(&known()))?;
+    let part = armour
+        .parts()
+        .iter()
+        .find(|part| part.origin() == PartOrigin::Piece)
+        .ok_or("the worn part")?;
+
+    assert!(part.file().ends_with("/m_suit.skin"), "{}", part.file());
+    assert_eq!(caps(&armour)?.diffuse, FROM_MAIN);
+    assert!(armour.issues().is_empty(), "{:?}", armour.issues());
     Ok(())
 }
 

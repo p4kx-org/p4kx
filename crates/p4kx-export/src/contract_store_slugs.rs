@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::Guid;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,7 +12,7 @@ use crate::guid_text::CatalogGuid;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShipStoreSlug<'a> {
+pub struct ShipStoreSlug<'a> {
     /// The slug of the ship in the RSI store, the last segment of its pledge URL, e.g.
     /// `Aurora-Mk-I-ES`; entries are ordered by it.
     pub(crate) slug: &'a str,
@@ -26,4 +27,42 @@ pub(crate) struct ShipStoreSlug<'a> {
     /// Whether the slug's ship no longer exists in the game data; the slug stays so that a
     /// pledge of it is recognised as retired.
     pub(crate) retired: bool,
+}
+
+impl ShipStoreSlug<'_> {
+    /// Returns the original curated Store slug.
+    #[must_use]
+    pub const fn slug(&self) -> &str {
+        self.slug
+    }
+
+    /// Returns the curated Store ship identifier.
+    #[must_use]
+    pub const fn rsi_id(&self) -> u32 {
+        self.rsi_id
+    }
+
+    /// Returns the short curated Store name.
+    #[must_use]
+    pub const fn store_name(&self) -> &str {
+        self.store_name
+    }
+
+    /// Returns the exact class name used by the mapping.
+    #[must_use]
+    pub const fn class_name(&self) -> Option<&str> {
+        self.class_name
+    }
+
+    /// Returns the nominal Ship GUID used by the mapping.
+    #[must_use]
+    pub fn ship_guid(&self) -> Option<Guid> {
+        self.ship_guid.map(|guid| guid.0)
+    }
+
+    /// Reports whether the curated mapping is retired.
+    #[must_use]
+    pub const fn is_retired(&self) -> bool {
+        self.retired
+    }
 }

@@ -12,7 +12,16 @@ use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 
+use crate::dcb_export_count_origins::{assert_count, remove_count_origin};
+
 type TestResult = Result<(), Box<dyn Error>>;
+
+const README_RECEIPT: &str = "Data/readme.txt.p4kx-origin.jsonl";
+const RECORD_RECEIPTS: [&str; 3] = [
+    "Data/libs/foundry/records/anchors/anchor.xml.p4kx-origin.jsonl",
+    "Data/libs/foundry/records/items/boxes/Item.Box.xml.p4kx-origin.jsonl",
+    "Data/libs/foundry/records/items/boxes/Item.Crate.xml.p4kx-origin.jsonl",
+];
 
 fn database() -> Vec<u8> {
     DataForgeBuilder::new()
@@ -86,8 +95,12 @@ fn extract(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn 
         .replace('\\', "/"))
 }
 
-/// Returns every file below `root` with its content, in path order.
+/// Returns the payload files with their content, in path order.
 fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
+    let checked_companions: Vec<_> = std::iter::once(README_RECEIPT)
+        .chain(RECORD_RECEIPTS)
+        .map(|relative| root.join(relative))
+        .collect();
     let mut files = Vec::new();
     let mut folders = vec![root.to_path_buf()];
     while let Some(folder) = folders.pop() {
@@ -95,7 +108,7 @@ fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
             let path = entry?.path();
             if path.is_dir() {
                 folders.push(path);
-            } else {
+            } else if !checked_companions.contains(&path) {
                 files.push(path);
             }
         }
@@ -118,8 +131,60 @@ fn convert_writes_the_dataforge_entry_as_record_files() -> TestResult {
 
     let stdout = extract(&archive, &out, &["--convert"])?;
 
+    check_readme_receipt(&out)?;
+    for relative in RECORD_RECEIPTS {
+        let document = fs::read_to_string(out.join(relative))?;
+        let end: serde_json::Value =
+            serde_json::from_str(document.lines().last().ok_or("receipt end")?)?;
+        assert_eq!(
+            end.get("type"),
+            Some(&serde_json::json!("end")),
+            "complete Record receipt {relative}"
+        );
+    }
     insta::assert_snapshot!("convert_dataforge_files", tree(&out)?);
     insta::assert_snapshot!("convert_dataforge_stdout", stdout);
+    Ok(())
+}
+
+fn check_readme_receipt(out: &Path) -> TestResult {
+    let receipt = fs::read_to_string(out.join(README_RECEIPT))?;
+    let rows: Vec<serde_json::Value> = receipt
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    let header = rows.first().ok_or("receipt header")?;
+    assert_eq!(
+        header["binding"],
+        serde_json::json!({
+            "type": "file",
+            "path": {"encoding": "utf8", "value": "readme.txt"},
+            "byteLength": "5",
+            "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+        }),
+        "the receipt binds the original readme bytes",
+    );
+    let payload = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/address/type")
+                .and_then(serde_json::Value::as_str)
+                == Some("opaquePayload")
+        })
+        .ok_or("readme payload origin")?;
+    assert_eq!(
+        payload["sourceSetComplete"], true,
+        "the raw readme source is complete"
+    );
+    assert_eq!(
+        payload["containsEncryptedSource"], false,
+        "the readme is plain Archive data"
+    );
+    assert_eq!(
+        rows.last().ok_or("receipt end")?["type"],
+        "end",
+        "the receipt has a terminal row"
+    );
     Ok(())
 }
 
@@ -130,12 +195,67 @@ fn convert_reports_the_records_as_json() -> TestResult {
 
     let stdout = extract(&archive, &dir.path().join("out"), &["--convert", "--json"])?;
 
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    assert_eq!(
+        value.pointer("/records/origin_receipts"),
+        Some(&serde_json::json!(RECORD_RECEIPTS)),
+        "the summary enumerates the committed Record companions"
+    );
+    let records = value.get_mut("records").ok_or("Record report")?;
+    assert_count(records, 3, Some(true), &[[0, 3]])?;
+    remove_count_origin(records)?;
     insta::assert_snapshot!(
         "convert_dataforge_json",
         serde_json::to_string_pretty(&value)?
     );
     Ok(())
+}
+
+#[test]
+fn converted_record_counts_keep_only_newly_committed_definitions() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = write_archive(dir.path())?;
+    let out = dir.path().join("sparse");
+    let kept = out.join("Data/libs/foundry/records/items/boxes/Item.Crate.xml");
+    fs::create_dir_all(kept.parent().ok_or("kept Record folder")?)?;
+    fs::write(&kept, "previous XML")?;
+
+    let arguments = ["--convert", "--json", "--conflict", "skip"];
+    let result: serde_json::Value = serde_json::from_str(&extract(&archive, &out, &arguments)?)?;
+    let records = result.get("records").ok_or("partial Record report")?;
+    assert_count(records, 2, Some(true), &[[0, 1], [2, 3]])?;
+    assert_eq!(fs::read_to_string(&kept)?, "previous XML", "kept XML");
+
+    let result: serde_json::Value = serde_json::from_str(&extract(&archive, &out, &arguments)?)?;
+    assert_count(
+        result.get("records").ok_or("kept Record report")?,
+        0,
+        Some(false),
+        &[],
+    )
+}
+
+#[test]
+fn loose_dataforge_conversion_reports_unknown_original_archive_encryption() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let input = dir.path().join("input");
+    fs::create_dir(&input)?;
+    fs::write(input.join("Game2.dcb"), database())?;
+    let output = p4kx_testkit::p4kx()?
+        .arg("convert")
+        .arg(&input)
+        .arg("--out")
+        .arg(dir.path().join("out"))
+        .arg("--json")
+        .output()?;
+    assert!(output.status.success(), "loose conversion: {output:?}");
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_count(
+        result.get("records").ok_or("loose Record report")?,
+        3,
+        None,
+        &[[0, 3]],
+    )
 }
 
 #[test]

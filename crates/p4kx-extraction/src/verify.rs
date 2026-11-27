@@ -7,6 +7,7 @@ use std::io::Read;
 use p4kx_archive::{Archive, Entry};
 use rayon::prelude::*;
 
+use crate::observed_verification::{ObservedVerification, VerificationPositions};
 use crate::source::SourceEntry;
 use crate::tracker::Tracker;
 use crate::{ArchiveWatch, CancelToken, EntryFailure, ExtractionError, Progress};
@@ -99,6 +100,39 @@ impl Tally {
         self.cancelled.append(&mut other.cancelled);
         self
     }
+
+    fn report(
+        mut self,
+        entries: &[&Entry],
+        positions: Option<&mut VerificationPositions>,
+    ) -> VerificationReport {
+        self.failures
+            .sort_unstable_by_key(|(position, _)| *position);
+        self.cancelled.sort_unstable();
+        let cancelled = self
+            .cancelled
+            .iter()
+            .filter_map(|&position| entries.get(position))
+            .map(|entry| entry.path().to_owned())
+            .collect();
+        let failures = if let Some(positions) = positions {
+            let (failed, failures) = self.failures.into_iter().unzip();
+            positions.failed = failed;
+            positions.cancelled = self.cancelled;
+            failures
+        } else {
+            self.failures
+                .into_iter()
+                .map(|(_, failure)| failure)
+                .collect()
+        };
+        VerificationReport {
+            verified: self.verified,
+            failures,
+            cancelled,
+            archive_changed: false,
+        }
+    }
 }
 
 enum Verdict {
@@ -120,15 +154,42 @@ pub fn verify(
     entries: &[&Entry],
     options: &VerifyOptions<'_>,
 ) -> VerificationReport {
-    let paths = || {
-        entries
-            .iter()
-            .map(|entry| entry.path().to_owned())
-            .collect()
-    };
+    verify_run(archive, entries, options, None)
+}
+
+/// Verifies the original selected Entries and preserves their physical positions in the report.
+///
+/// This performs the same reads and checks as [verify].
+#[must_use]
+pub fn verify_observed<'entry>(
+    archive: &Archive,
+    entries: &'entry [&'entry Entry],
+    options: &VerifyOptions<'_>,
+) -> ObservedVerification<'entry> {
+    let mut positions = VerificationPositions::default();
+    let report = verify_run(archive, entries, options, Some(&mut positions));
+    ObservedVerification {
+        report,
+        entries,
+        positions,
+    }
+}
+
+fn verify_run(
+    archive: &Archive,
+    entries: &[&Entry],
+    options: &VerifyOptions<'_>,
+    positions: Option<&mut VerificationPositions>,
+) -> VerificationReport {
     if options.watch.is_some_and(|watch| watch.check().is_err()) {
+        if let Some(positions) = positions {
+            positions.cancelled = (0..entries.len()).collect();
+        }
         return VerificationReport {
-            cancelled: paths(),
+            cancelled: entries
+                .iter()
+                .map(|entry| entry.path().to_owned())
+                .collect(),
             archive_changed: true,
             ..VerificationReport::default()
         };
@@ -160,23 +221,9 @@ pub fn verify(
         )
         .map(|(tally, _)| tally)
         .reduce(Tally::default, Tally::merge);
-    let Tally {
-        verified,
-        mut failures,
-        mut cancelled,
-    } = tally;
-    failures.sort_unstable_by_key(|(position, _)| *position);
-    cancelled.sort_unstable();
-    VerificationReport {
-        verified,
-        failures: failures.into_iter().map(|(_, failure)| failure).collect(),
-        cancelled: cancelled
-            .into_iter()
-            .filter_map(|position| entries.get(position))
-            .map(|entry| entry.path().to_owned())
-            .collect(),
-        archive_changed: options.watch.is_some_and(|watch| watch.check().is_err()),
-    }
+    let mut report = tally.report(entries, positions);
+    report.archive_changed = options.watch.is_some_and(|watch| watch.check().is_err());
+    report
 }
 
 fn check(archive: &Archive, entry: &Entry, buffer: &mut Vec<u8>, tracker: &Tracker<'_>) -> Verdict {

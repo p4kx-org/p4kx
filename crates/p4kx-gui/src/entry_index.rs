@@ -259,7 +259,19 @@ impl EntryIndex {
     /// `None` when there is none.
     #[must_use]
     pub fn id_of_path(&self, path: &str) -> Option<u32> {
-        let position = self.path_index()?.position(path)?;
+        self.id_at_position(self.path_index()?.position(path)?)
+    }
+
+    pub(crate) fn id_of_entry(&self, entry: &Entry) -> Option<u32> {
+        let position = entry.index();
+        let archive_entry = self.archive()?.entries().get(position)?;
+        if !std::ptr::eq(archive_entry, entry) {
+            return None;
+        }
+        self.id_at_position(position)
+    }
+
+    fn id_at_position(&self, position: usize) -> Option<u32> {
         self.id_of
             .get(position)
             .copied()

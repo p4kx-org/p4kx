@@ -5,7 +5,8 @@ use std::borrow::Cow;
 
 use thiserror::Error;
 
-use crate::Entry;
+use crate::archive_metadata::ArchiveMetadata;
+use crate::{Entry, ObservedHashBlockSize, ObservedRecoveryDataOutsideFile};
 
 /// How many Entry issues [`Archive::issues`](crate::Archive::issues) lists at most;
 /// [`Archive::issue_count`](crate::Archive::issue_count) still counts all of them.
@@ -18,7 +19,7 @@ pub const MAX_ENTRY_ISSUES: usize = 1024;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum EntryIssue {
-    /// The Entry's data ends behind the start of the trailer or beyond the file; reading it fails.
+    /// The declared data extent overflows or crosses the boundary used to admit the Entry.
     #[error("its data lies outside the file")]
     DataOutsideFile,
     /// The encryption field is neither 0 nor 1; the Entry is read as encrypted.
@@ -82,7 +83,10 @@ impl EntryIssue {
 pub(crate) struct IssueLog {
     pub(crate) listed: Vec<(usize, EntryIssue)>,
     pub(crate) count: usize,
+    pub(crate) empty_folder_issues: usize,
     pub(crate) raw_paths: Vec<(usize, Box<[u8]>)>,
+    pub(crate) hash_block_sizes: Vec<(usize, ObservedHashBlockSize)>,
+    recovery_data_bounds: Vec<(usize, ObservedRecoveryDataOutsideFile)>,
     seen: (usize, u8),
 }
 
@@ -92,24 +96,94 @@ impl IssueLog {
     #[cold]
     #[inline(never)]
     pub(crate) fn record(&mut self, index: usize, issue: EntryIssue) {
+        self.record_sample(index, issue);
+    }
+
+    fn record_sample(&mut self, index: usize, issue: EntryIssue) -> bool {
         if self.seen.0 != index {
             self.seen = (index, 0);
         }
         let kind = issue.kind();
         if self.seen.1 & kind != 0 {
-            return;
+            return false;
         }
         self.seen.1 |= kind;
         self.count += 1;
-        if self.listed.len() < MAX_ENTRY_ISSUES {
-            self.listed.push((index, issue));
+        if self.listed.len() == MAX_ENTRY_ISSUES {
+            return false;
+        }
+        self.listed.push((index, issue));
+        true
+    }
+
+    pub(crate) fn record_hash_block_size(
+        &mut self,
+        index: usize,
+        size: u16,
+        observed: ObservedHashBlockSize,
+    ) {
+        if self.record_sample(index, EntryIssue::HashBlockSize { size }) {
+            self.hash_block_sizes.push((index, observed));
+        }
+    }
+
+    pub(crate) fn hash_block_size(&self, index: usize) -> Option<ObservedHashBlockSize> {
+        let position = self
+            .hash_block_sizes
+            .binary_search_by_key(&index, |(at, _)| *at)
+            .ok()?;
+        self.hash_block_sizes
+            .get(position)
+            .map(|(_, observed)| *observed)
+    }
+
+    pub(crate) fn record_recovery_data_outside_file(
+        &mut self,
+        index: usize,
+        observed: ObservedRecoveryDataOutsideFile,
+    ) {
+        if self.record_sample(index, EntryIssue::DataOutsideFile) {
+            self.recovery_data_bounds.push((index, observed));
+        }
+    }
+
+    pub(crate) fn recovery_data_bounds(
+        &self,
+        index: usize,
+    ) -> Option<ObservedRecoveryDataOutsideFile> {
+        let at = self
+            .recovery_data_bounds
+            .binary_search_by_key(&index, |(at, _)| *at)
+            .ok()?;
+        self.recovery_data_bounds
+            .get(at)
+            .map(|(_, observed)| *observed)
+    }
+
+    /// Retains the diagnostic count of an Entry removed by container admission.
+    pub(crate) fn record_empty_folder_issues(&mut self, entry: &Entry, count_before: usize) {
+        if entry.is_empty_folder() {
+            self.empty_folder_issues += self.count - count_before;
         }
     }
 
     /// Takes over the defects `other` recorded, which carry the Entry positions they were read at.
     pub(crate) fn absorb(&mut self, other: Self) {
+        self.empty_folder_issues += other.empty_folder_issues;
+        let mut hashes = other.hash_block_sizes.into_iter().peekable();
+        let mut recovery = other.recovery_data_bounds.into_iter().peekable();
         for (index, issue) in other.listed {
-            self.record(index, issue);
+            if let EntryIssue::HashBlockSize { size } = issue
+                && let Some((_, observed)) = hashes.next_if(|(at, _)| *at == index)
+            {
+                self.record_hash_block_size(index, size, observed);
+            } else if issue == EntryIssue::DataOutsideFile
+                && let Some((_, observed)) = recovery.next_if(|(at, _)| *at == index)
+            {
+                self.record_recovery_data_outside_file(index, observed);
+            } else {
+                self.record(index, issue);
+            }
         }
         self.raw_paths.extend(other.raw_paths);
     }
@@ -149,4 +223,6 @@ fn lossy_path<'a>(bytes: &'a [u8], index: usize, log: &mut IssueLog) -> Cow<'a, 
 pub(crate) struct Directory {
     pub(crate) entries: Vec<Entry>,
     pub(crate) log: IssueLog,
+    pub(crate) installation_flags: Option<u8>,
+    pub(crate) metadata: ArchiveMetadata,
 }

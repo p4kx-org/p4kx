@@ -18,22 +18,20 @@ type Numbered = (usize, Job);
 /// normal images only a fallback uses, so that when the budget of images runs out, every
 /// material has its colours before a layered one has its normals; returns the jobs with the
 /// numbers in `wanted` following them.
-pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job> {
+pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Job>, Vec<usize>) {
     let primary: HashSet<usize> = wanted
         .iter()
-        .flat_map(|wish| wish.jobs.into_iter().flatten())
+        .flat_map(|wish| wish.jobs.into_iter().flatten().chain(wish.specular_colour))
         .collect();
     let fallbacks: HashSet<usize> = wanted
         .iter()
         .filter_map(|wish| wish.fallback)
         .filter(|job| !primary.contains(job))
         .collect();
-    let rank = |at: usize, job: &Job| {
-        if matches!(job.key, Key::LayerNormal { .. }) {
-            1
-        } else {
-            u8::from(fallbacks.contains(&at)) * 2
-        }
+    let rank = |at: usize, job: &Job| match job.key {
+        Key::FactoryBowSpecularColour { .. } => 3,
+        Key::LayerNormal { .. } => 1,
+        _ => u8::from(fallbacks.contains(&at)) * 2,
     };
     let mut numbered: Vec<(u8, Numbered)> = jobs
         .into_iter()
@@ -53,11 +51,15 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job
             .iter_mut()
             .flatten()
             .chain(wish.fallback.iter_mut())
+            .chain(wish.specular_colour.iter_mut())
         {
             *job = moved.get(*job).copied().unwrap_or(*job);
         }
     }
-    numbered.into_iter().map(|(_, (_, job))| job).collect()
+    numbered
+        .into_iter()
+        .map(|(_, (old, job))| (job, old))
+        .unzip()
 }
 
 /// Returns for each of `len` jobs the layered normal jobs of the materials that use it only as
@@ -66,7 +68,7 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job
 pub(crate) fn fallback_guards(wanted: &[Wish], len: usize) -> Vec<Vec<usize>> {
     let primary: HashSet<usize> = wanted
         .iter()
-        .flat_map(|wish| wish.jobs.into_iter().flatten())
+        .flat_map(|wish| wish.jobs.into_iter().flatten().chain(wish.specular_colour))
         .collect();
     let mut guards = vec![Vec::new(); len];
     for wish in wanted {
@@ -106,6 +108,7 @@ pub(crate) fn layer_job(
         diffuse: None,
         normal: own.cloned(),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints,
         layered: Some(layered.clone()),
     }
@@ -113,10 +116,14 @@ pub(crate) fn layer_job(
 
 /// The jobs of the base colour and the normal image of a layered material, and the texture files
 /// its layers name that have no safe path.
-pub(crate) type LayerJobs = (Option<Job>, Option<Job>, Vec<(TextureRole, String)>);
+pub(crate) type LayerJobs = (
+    Option<Job>,
+    Option<Job>,
+    Option<Job>,
+    Vec<(TextureRole, String)>,
+);
 
-/// Returns the jobs of the base colour and the normal image that the layers of `material` give
-/// when it has no diffuse map of its own and a layer has a diffuse or a normal map.
+/// Plans the base colour, normal and packed finish images for a material without its own diffuse map.
 pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> LayerJobs {
     let Some(layered) = found
         .diffuse
@@ -124,7 +131,7 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         .then(|| layered_of(material))
         .flatten()
     else {
-        return (None, None, Vec::new());
+        return (None, None, None, Vec::new());
     };
     (
         layered
@@ -133,6 +140,17 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         layered
             .has_normal()
             .then(|| layer_job(&layered, true, found.normal.as_ref(), tints)),
+        (layered.has_sampled_finish() || layered.has_specular_map()).then(|| Job {
+            key: Key::LayerFinish {
+                blend: layered.finish_fingerprint(),
+            },
+            diffuse: None,
+            normal: None,
+            specular: None,
+            explicit_gloss: Vec::new(),
+            tints,
+            layered: Some(layered.clone()),
+        }),
         layered.refused,
     )
 }

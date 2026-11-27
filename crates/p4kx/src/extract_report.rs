@@ -4,7 +4,10 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_extraction::{EntryFailure, ExtractionReport};
+use p4kx_extraction::{
+    ConvertedSoundArtifact, EntryFailure, ExtractedFileArtifact, ExtractionReport,
+    MergedTextureArtifact, RawEntryArtifact, RecordExportReport, TextureArtifacts,
+};
 use serde::Serialize;
 
 use crate::cli::Conflict;
@@ -31,6 +34,16 @@ pub(crate) struct ReportJson<'a> {
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     dataforge_left_out: &'a [String],
     archive_changed: bool,
+    #[serde(skip_serializing_if = "<[TextureArtifacts]>::is_empty")]
+    texture_artifacts: &'a [TextureArtifacts],
+    #[serde(skip_serializing_if = "<[MergedTextureArtifact]>::is_empty")]
+    merged_texture_artifacts: &'a [MergedTextureArtifact],
+    #[serde(skip_serializing_if = "<[ConvertedSoundArtifact]>::is_empty")]
+    sound_artifacts: &'a [ConvertedSoundArtifact],
+    #[serde(skip_serializing_if = "<[RawEntryArtifact]>::is_empty")]
+    raw_artifacts: &'a [RawEntryArtifact],
+    #[serde(skip_serializing_if = "<[ExtractedFileArtifact]>::is_empty")]
+    cryxml_artifacts: &'a [ExtractedFileArtifact],
     #[serde(skip_serializing_if = "Option::is_none")]
     records: Option<RecordsJson<'a>>,
 }
@@ -45,6 +58,12 @@ struct RecordsJson<'a> {
     cancelled: usize,
     error_values: usize,
     records_with_errors: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_receipts: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_failures: Vec<String>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    count_origin: Option<dcb_export::CountOrigin>,
 }
 
 pub(crate) fn report_json<'a>(
@@ -72,6 +91,11 @@ pub(crate) fn report_json<'a>(
         not_converted: report.not_converted(),
         dataforge_left_out: report.dataforge_left_out(),
         archive_changed: report.archive_changed(),
+        texture_artifacts: report.texture_artifacts(),
+        merged_texture_artifacts: report.merged_texture_artifacts(),
+        sound_artifacts: report.sound_artifacts(),
+        raw_artifacts: report.raw_artifacts(),
+        cryxml_artifacts: report.cryxml_artifacts(),
         records: report.records().map(|records| RecordsJson {
             exported: records.written(),
             skipped: records.skipped(),
@@ -84,8 +108,28 @@ pub(crate) fn report_json<'a>(
             cancelled: records.cancelled(),
             error_values: records.error_values(),
             records_with_errors: records.records_with_errors(),
+            origin_receipts: record_receipts(records, target),
+            origin_failures: records
+                .origin_failures()
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+            count_origin: dcb_export::CountOrigin::converted(records),
         }),
     }
+}
+
+fn record_receipts(records: &RecordExportReport, target: &Path) -> Vec<String> {
+    let root = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
+    let mut paths: Vec<_> = records
+        .origin_receipts()
+        .iter()
+        .map(|receipt| {
+            json::path(receipt.strip_prefix(&root).unwrap_or(receipt)).replace('\\', "/")
+        })
+        .collect();
+    paths.sort_unstable();
+    paths
 }
 
 #[expect(
@@ -163,6 +207,9 @@ fn write_errors(err: &mut impl Write, report: &ExtractionReport) -> io::Result<(
     }
     if let Some(records) = report.records() {
         write_renamed(err, records.renamed())?;
+        if let Some(Err(error)) = records.written_provenance() {
+            writeln!(err, "Record count origin: {error}")?;
+        }
     }
     for unconverted in report.unconverted() {
         writeln!(

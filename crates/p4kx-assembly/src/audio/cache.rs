@@ -4,6 +4,7 @@
 use std::sync::OnceLock;
 
 use p4kx_archive::Archive;
+use p4kx_extraction::CancelToken;
 
 use super::AudioIndex;
 
@@ -48,13 +49,34 @@ impl<'a> ArchiveAudio<'a> {
     /// return the same index. Callers racing the first call may each build one; the first
     /// stored wins and the others are dropped.
     pub fn index(&self) -> &AudioIndex {
-        if let Some(shared) = self.shared {
-            return shared;
-        }
-        if let Some(index) = self.index.get() {
+        if let Some(index) = self.cached_index() {
             return index;
         }
         let built = AudioIndex::build(self.archive);
         self.index.get_or_init(|| built)
+    }
+
+    /// Returns the index, or stops and returns `None` when the caller cancels.
+    ///
+    /// A cancelled build is discarded so the next call can build the complete index.
+    #[must_use]
+    pub fn index_until(&self, cancel: &CancelToken) -> Option<&AudioIndex> {
+        if cancel.is_cancelled() {
+            return None;
+        }
+        let index = if let Some(index) = self.cached_index() {
+            index
+        } else {
+            let built = AudioIndex::build_until(self.archive, cancel)?;
+            if cancel.is_cancelled() {
+                return None;
+            }
+            self.index.get_or_init(|| built)
+        };
+        (!cancel.is_cancelled()).then_some(index)
+    }
+
+    fn cached_index(&self) -> Option<&AudioIndex> {
+        self.shared.or_else(|| self.index.get())
     }
 }

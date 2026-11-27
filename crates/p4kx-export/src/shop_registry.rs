@@ -1,34 +1,204 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::cryxml::{self, Xml};
+use std::sync::Arc;
 
-use crate::starmap_xml::{Node, attribute};
+use p4kx_assembly::{ArchiveFiles, LoadoutFileError, LoadoutFileRead, LoadoutFiles};
+use p4kx_extraction::{Archive, SourceEvidenceError};
+
+use crate::catalog_read::original::{
+    AuthoredEntryPath, EntryCapture, EntryDiagnosis, EntryRead, EntryXml,
+};
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::shop_summary::ShopSummary;
+use crate::shops::REGISTRY;
+use crate::starmap_xml::Node;
+use crate::{CatalogError, Kind};
+
+#[path = "shop_registry_datum.rs"]
+mod datum;
+pub(crate) use datum::{RegistryAttribute, RegistryAttributeOrigin};
 
 /// One `ShopBackup` entry of the shop registry, as it is stored.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub(crate) struct RegistryShop {
-    pub(crate) platform: String,
-    pub(crate) id: String,
-    pub(crate) super_name: String,
-    pub(crate) default_value: String,
-    pub(crate) shop_name: String,
+    pub(crate) platform: Arc<RegistryAttribute>,
+    pub(crate) id: RegistryId,
+    pub(crate) id_origin: RegistryAttributeOrigin,
+    pub(crate) super_name: RegistryAttribute,
+    pub(crate) default_value: RegistryAttribute,
+    pub(crate) shop_name: RegistryAttribute,
 }
 
-/// Reads the `ShopBackup` entries of the registry `bytes`, text XML or `CryXml`, in document order;
-/// `None` when the bytes are neither.
-pub(crate) fn read(bytes: &[u8]) -> Option<Vec<RegistryShop>> {
-    match cryxml::read(bytes).ok()? {
-        Xml::CryXml(document) => Some(collect(document.root())),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text)
-                .ok()?
-                .trim_start_matches('\u{feff}');
-            cryxml::check_text_depth(text).ok()?;
-            let document = roxmltree::Document::parse(text).ok()?;
-            Some(collect(document.root_element()))
+#[derive(Debug)]
+pub(crate) enum RegistryId {
+    Authored(AuthoredEntryPath),
+    Absent,
+    #[cfg(test)]
+    Fixture(String),
+}
+
+impl RegistryId {
+    pub(crate) fn text(&self) -> &str {
+        match self {
+            Self::Authored(value) => value.as_str(),
+            Self::Absent => "",
+            #[cfg(test)]
+            Self::Fixture(value) => value,
         }
     }
+
+    pub(crate) const fn authored(&self) -> Option<&AuthoredEntryPath> {
+        if let Self::Authored(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+/// Whether the consuming catalog requires a registry to describe its starmap.
+#[derive(Clone, Copy)]
+pub(crate) enum RegistryNeed {
+    Optional,
+    Required,
+}
+
+pub(crate) struct RegistryDocument {
+    pub(crate) rows: Vec<RegistryShop>,
+    pub(crate) source: EntrySource,
+    pub(crate) complete: bool,
+}
+
+/// Reads the registry once and retains its Entry identity until row projection finishes.
+pub(crate) fn read_source(
+    archive: &Archive,
+    files: &ArchiveFiles<'_>,
+    need: RegistryNeed,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<Option<RegistryDocument>, CatalogError> {
+    capture.check_archive(archive.input_origin())?;
+    let observed = files.read_observed(REGISTRY);
+    match observed.outcome() {
+        Ok(_) => project_registry(observed, capture, summary, ledger),
+        Err(
+            error @ (LoadoutFileError::ObservationStopped
+            | LoadoutFileError::SourceEvidenceUnavailable),
+        ) => Err(CatalogError::LoadoutSourceEvidence(error.clone())),
+        Err(error) => {
+            let source =
+                observed_source(capture, &observed)?.operation(EntryOperation::ShopRegistry);
+            if matches!(error, LoadoutFileError::NotFound) {
+                summary.registry_missing = true;
+                missing(source, need, ledger);
+            } else {
+                read_failure(source, error, summary, ledger)?;
+            }
+            Ok(None)
+        }
+    }
+}
+
+fn project_registry(
+    observed: LoadoutFileRead,
+    capture: &EntryCapture<'_>,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+) -> Result<Option<RegistryDocument>, CatalogError> {
+    let read = EntryRead::from_observed(capture, observed)?;
+    let source = EntrySource::from_read(&read, EntryOperation::ShopRegistry);
+    if let Ok(xml) = EntryXml::parse(&read, capture)? {
+        return Ok(Some(RegistryDocument {
+            rows: collect(&xml)?,
+            source,
+            complete: !xml.is_lossy(),
+        }));
+    }
+    summary.registry_unreadable = true;
+    ledger.incomplete_inventory(Kind::Shops);
+    source.diagnosed(
+        ledger,
+        Kind::Shops,
+        SourceDisposition::ProjectionFailed,
+        EntryDiagnosis::technical(
+            ExportDiagnosticCode::MalformedSource,
+            "ShopBackup",
+            "ShopSource",
+        ),
+    );
+    Ok(None)
+}
+
+fn observed_source(
+    capture: &EntryCapture<'_>,
+    read: &LoadoutFileRead,
+) -> Result<EntrySource, CatalogError> {
+    let source = read.source();
+    let original = source
+        .archive_input_origin()
+        .ok_or(SourceEvidenceError::ForeignEvidence)?;
+    capture.check_archive(original)?;
+    match source.entry_origin() {
+        Some(_) => EntrySource::loadout(capture, read),
+        None if source.is_missing_archive()
+            && matches!(read.outcome(), Err(LoadoutFileError::NotFound)) =>
+        {
+            EntrySource::fixed_missing(capture, REGISTRY)
+        }
+        None => Err(SourceEvidenceError::ForeignEvidence.into()),
+    }
+}
+
+fn read_failure(
+    source: EntrySource,
+    error: &LoadoutFileError,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+) -> Result<(), CatalogError> {
+    if matches!(error, LoadoutFileError::Unreadable { .. }) {
+        source.receipt().attempted_payload()?;
+    }
+    summary.registry_unreadable = true;
+    ledger.incomplete_inventory(Kind::Shops);
+    let code = if matches!(error, LoadoutFileError::TooLarge { .. }) {
+        ExportDiagnosticCode::FieldWalkLimit
+    } else {
+        ExportDiagnosticCode::SourceReadFailure
+    };
+    source.diagnosed(
+        ledger,
+        Kind::Shops,
+        SourceDisposition::ReadFailed,
+        EntryDiagnosis::technical(code, "ShopBackup", "ShopSource"),
+    );
+    Ok(())
+}
+
+fn missing(source: EntrySource, need: RegistryNeed, ledger: &mut ExportLedger) {
+    if matches!(need, RegistryNeed::Required) {
+        ledger.incomplete_inventory(Kind::Shops);
+    }
+    let (disposition, code) = match need {
+        RegistryNeed::Required => (
+            SourceDisposition::ReadFailed,
+            ExportDiagnosticCode::DanglingReference,
+        ),
+        RegistryNeed::Optional => (
+            SourceDisposition::SkippedBeforeRead,
+            ExportDiagnosticCode::OptionalAbsent,
+        ),
+    };
+    source.diagnosed(
+        ledger,
+        Kind::Shops,
+        disposition,
+        EntryDiagnosis::technical(code, "ShopBackup", "ShopSource"),
+    );
 }
 
 fn named<'d, N: Node<'d>>(node: N, name: &'static str) -> impl Iterator<Item = N> {
@@ -36,26 +206,28 @@ fn named<'d, N: Node<'d>>(node: N, name: &'static str) -> impl Iterator<Item = N
         .filter(move |child| child.name().eq_ignore_ascii_case(name))
 }
 
-fn collect<'d, N: Node<'d>>(root: N) -> Vec<RegistryShop> {
+fn collect(xml: &EntryXml<'_, '_, '_>) -> Result<Vec<RegistryShop>, CatalogError> {
     let mut shops = Vec::new();
-    for backups in named(root, "LayerBackups") {
+    for backups in named(xml.root(), "LayerBackups") {
         for layer in named(backups, "LayerBackup") {
-            let platform = attribute(layer, "PlatformName").unwrap_or_default();
+            let platform = Arc::new(RegistryAttribute::read(xml, layer, "PlatformName")?);
             for list in named(layer, "ShopBackups") {
                 for shop in named(list, "ShopBackup") {
-                    let text = |name| attribute(shop, name).unwrap_or_default().to_owned();
                     shops.push(RegistryShop {
-                        platform: platform.to_owned(),
-                        id: text("ID"),
-                        super_name: text("SuperName"),
-                        default_value: text("DefaultValue"),
-                        shop_name: text("ShopName"),
+                        platform: Arc::clone(&platform),
+                        id: xml
+                            .attribute(shop, "ID")?
+                            .map_or(RegistryId::Absent, RegistryId::Authored),
+                        id_origin: RegistryAttributeOrigin::read(xml, shop, "ID")?,
+                        super_name: RegistryAttribute::read(xml, shop, "SuperName")?,
+                        default_value: RegistryAttribute::read(xml, shop, "DefaultValue")?,
+                        shop_name: RegistryAttribute::read(xml, shop, "ShopName")?,
                     });
                 }
             }
         }
     }
-    shops
+    Ok(shops)
 }
 
 /// Returns whether `text` is a GUID in the 8-4-4-4-12 hexadecimal form.

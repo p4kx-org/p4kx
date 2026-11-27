@@ -74,7 +74,7 @@ impl fmt::Display for Expected {
     }
 }
 
-/// What the literal of a comparison is, for [`QueryErrorKind::IncompatibleComparison`].
+/// The comparison literal category for [`super::QueryErrorKind::IncompatibleComparison`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LiteralKind {

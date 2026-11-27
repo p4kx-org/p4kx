@@ -6,16 +6,29 @@
 use std::error::Error;
 use std::path::Path;
 
-use p4kx_testkit::{LIT_ROOM, check_glb, lit_room_entries};
+use p4kx_testkit::{
+    INTERIOR_ROOT, LIT_ROOM, check_glb, interior_entries, lit_room_entries, test_key,
+};
 use serde_json::Value;
 
 use crate::entity_package::{Run, manifest, write_archive};
+use crate::interior_glb::assert_container_chain;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn package(
     archive: &Path,
     container: &str,
+    out: &Path,
+    extra: &[&str],
+    json: bool,
+) -> Result<Run, Box<dyn Error>> {
+    package_chain(archive, &[container], out, extra, json)
+}
+
+fn package_chain(
+    archive: &Path,
+    containers: &[&str],
     out: &Path,
     extra: &[&str],
     json: bool,
@@ -27,7 +40,7 @@ fn package(
     let output = command
         .args(["interior", "package"])
         .arg(archive)
-        .arg(container)
+        .args(containers)
         .arg("--out")
         .arg(out)
         .args(extra)
@@ -109,6 +122,56 @@ fn the_json_report_counts_what_the_package_holds() -> TestResult {
         manifest["nodes"].as_array().map(|nodes| nodes.len() as u64)
     );
     assert_eq!(manifest["options"]["lod"], 1);
+    Ok(())
+}
+
+#[test]
+fn the_json_report_binds_selected_container_paths_to_their_directories() -> TestResult {
+    for encrypted in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let entries = interior_entries()
+            .into_iter()
+            .map(|entry| {
+                if encrypted && entry.path() == INTERIOR_ROOT {
+                    entry.encrypted()
+                } else {
+                    entry
+                }
+            })
+            .collect();
+        let archive = write_archive(dir.path(), entries)?;
+        let out = dir.path().join("room");
+        let key = test_key().to_hex();
+        let chain = [INTERIOR_ROOT, "modules/cockpit.socpak"];
+        let args = ["--key", key.as_str()];
+        let run = package_chain(&archive, &chain, &out, &args, true)?;
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        let report: Value = serde_json::from_str(&run.stdout)?;
+        assert_container_chain(&report, encrypted)?;
+        let uses = report
+            .pointer("/provenance/uses")
+            .and_then(Value::as_array)
+            .ok_or("report source uses")?;
+        let reported_paths = uses.iter().filter(|site| {
+            site.get("scope").and_then(Value::as_str) == Some("archiveDirectoryMetadata")
+                && site.get("role").and_then(Value::as_str) == Some("payload")
+                && site.pointer("/location/field").and_then(Value::as_str) == Some("path")
+        });
+        assert_eq!(
+            reported_paths.count(),
+            2,
+            "one directory path payload use for each opened layer"
+        );
+
+        let text_out = dir.path().join("text");
+        let text = package_chain(&archive, &chain, &text_out, &args, false)?;
+        assert_eq!(text.code, Some(0), "{}", text.stderr);
+        assert_eq!(
+            std::fs::read(out.join("scene.json"))?,
+            std::fs::read(text_out.join("scene.json"))?,
+            "the report does not change the emitted package manifest"
+        );
+    }
     Ok(())
 }
 

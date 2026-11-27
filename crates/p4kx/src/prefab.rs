@@ -6,16 +6,26 @@ use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 use p4kx_assembly::{PrefabError, PrefabIssue, PrefabSet, ResolvedObject, ResolvedPrefab};
 use p4kx_extraction::ArchiveError;
+use p4kx_extraction::model::PrefabEntityLinkGroup;
 use serde::Serialize;
 
 use crate::cli_prefab::{PrefabAction, PrefabArgs, PrefabDumpArgs, PrefabListArgs};
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "prefab_dump_origins.rs"]
+mod dump_origins;
+#[path = "prefab_origins.rs"]
+mod origins;
+#[path = "prefab_remapping_json.rs"]
+mod remapping_json;
+
 #[derive(Serialize)]
 struct LibrariesJson<'a> {
     archive: String,
     libraries: Vec<&'a str>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 #[derive(Serialize)]
@@ -33,6 +43,8 @@ struct PrefabsJson<'a> {
     library: &'a str,
     file: &'a str,
     prefabs: Vec<PrefabRowJson<'a>>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 #[derive(Serialize)]
@@ -47,6 +59,8 @@ struct ObjectJson<'a> {
     depth: usize,
     model: Option<&'a str>,
     unexpanded: Option<&'a str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    entity_links: Vec<EntityLinkGroupJson<'a>>,
     attached: bool,
     position: [f32; 3],
     transform: [[f32; 4]; 3],
@@ -65,11 +79,44 @@ impl<'a> From<&'a ResolvedObject> for ObjectJson<'a> {
             depth: object.depth(),
             model: object.model(),
             unexpanded: object.unexpanded().map(|reference| reference.name.as_str()),
+            entity_links: object
+                .entity_links()
+                .iter()
+                .map(EntityLinkGroupJson::from)
+                .collect(),
             attached: object.attached(),
             position: object.world().translation(),
             transform: object.world().rows,
         }
     }
+}
+
+#[derive(Serialize)]
+struct EntityLinkGroupJson<'a> {
+    links: Vec<EntityLinkJson<'a>>,
+}
+
+impl<'a> From<&'a PrefabEntityLinkGroup> for EntityLinkGroupJson<'a> {
+    fn from(group: &'a PrefabEntityLinkGroup) -> Self {
+        Self {
+            links: group
+                .links
+                .iter()
+                .map(|link| EntityLinkJson {
+                    name: link.name.as_deref(),
+                    target_id: link.target_id.as_deref(),
+                    version: link.version.as_deref(),
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct EntityLinkJson<'a> {
+    name: Option<&'a str>,
+    target_id: Option<&'a str>,
+    version: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -99,7 +146,11 @@ struct DumpJson<'a> {
     name: &'a str,
     prefabs_entered: usize,
     objects: Vec<ObjectJson<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    guid_remappings: Vec<remapping_json::InstanceJson<'a>>,
     issues: Vec<IssueJson<'a>>,
+    #[serde(flatten)]
+    origins: origins::Origins,
 }
 
 /// Returns the error as `anyhow` does, with the Archive error of a missing key at the top so that
@@ -149,18 +200,18 @@ fn list_command(args: &PrefabListArgs, as_json: bool) -> Result<()> {
     let archive = crate::key::open(&args.archive)?;
     let mut set = PrefabSet::new(&archive);
     let Some(name) = &args.library else {
-        let libraries: Vec<&str> = set.libraries().collect();
         if as_json {
+            let (libraries, origins) = origins::index(&archive, &set)?;
             json::print(&LibrariesJson {
                 archive: json::path(&args.archive),
                 libraries,
+                origins,
             })?;
             return Ok(());
         }
         let mut out = BufWriter::new(io::stdout().lock());
         return finish(
-            libraries
-                .iter()
+            set.libraries()
                 .try_for_each(|library| writeln!(out, "{}", one_line(library)))
                 .and_then(|()| out.flush()),
         );
@@ -188,6 +239,7 @@ fn list_command(args: &PrefabListArgs, as_json: bool) -> Result<()> {
             library: &library.name,
             file: file.file_name(),
             prefabs: rows,
+            origins: origins::detail(&archive, &set, &file)?,
         })?;
         return Ok(());
     }
@@ -217,7 +269,11 @@ fn print_prefabs(out: &mut impl Write, rows: &[PrefabRowJson<'_>]) -> io::Result
 
 fn dump_command(args: &PrefabDumpArgs, as_json: bool) -> Result<()> {
     let archive = crate::key::open(&args.archive)?;
-    let mut set = PrefabSet::new(&archive);
+    let mut set = if as_json {
+        PrefabSet::with_object_sources(&archive)
+    } else {
+        PrefabSet::new(&archive)
+    };
     let resolved = set.resolve(&args.library, &args.prefab).map_err(lift)?;
     if as_json {
         json::print(&DumpJson {
@@ -227,7 +283,9 @@ fn dump_command(args: &PrefabDumpArgs, as_json: bool) -> Result<()> {
             name: &resolved.name,
             prefabs_entered: resolved.prefabs,
             objects: resolved.objects.iter().map(ObjectJson::from).collect(),
+            guid_remappings: remapping_json::rows(&resolved),
             issues: resolved.issues.iter().map(IssueJson::from).collect(),
+            origins: dump_origins::collect(&archive, &set, &resolved)?,
         })?;
         return Ok(());
     }

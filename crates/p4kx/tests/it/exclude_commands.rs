@@ -169,7 +169,13 @@ fn socpak_extract_takes_an_exclude_without_a_filter() -> TestResult {
         .arg(&out)
         .assert()
         .code(0);
-    assert_eq!(names(&out)?, BTreeSet::from(["room/good.xml".to_owned()]));
+    assert_eq!(
+        names(&out)?,
+        BTreeSet::from([
+            "room/good.xml".to_owned(),
+            "room/good.xml.p4kx-origin.jsonl".to_owned(),
+        ])
+    );
     p4kx()?
         .args(["socpak", "extract"])
         .arg(&archive)
@@ -212,7 +218,13 @@ fn socpak_verify_and_extract_take_an_exclude() -> TestResult {
         .arg(&out)
         .assert()
         .code(0);
-    assert_eq!(names(&out)?, BTreeSet::from(["room/good.xml".to_owned()]));
+    assert_eq!(
+        names(&out)?,
+        BTreeSet::from([
+            "room/good.xml".to_owned(),
+            "room/good.xml.p4kx-origin.jsonl".to_owned(),
+        ])
+    );
     Ok(())
 }
 
@@ -281,9 +293,12 @@ fn convert_notes_an_excluded_part_of_a_kept_texture() -> TestResult {
         written.iter().any(|name| name.ends_with("panel_diff.png")),
         "the texture is built from all its parts: {written:?}"
     );
+    let siblings = written
+        .iter()
+        .filter_map(|name| name.strip_prefix("Data/Textures/panel_diff.dds."));
     assert!(
-        written.iter().all(|name| !name.contains(".dds.")),
-        "the parts are not written: {written:?}"
+        siblings.eq(["p4kx-origin.jsonl"]),
+        "the merged receipt is the only DDS sibling: {written:?}"
     );
     Ok(())
 }

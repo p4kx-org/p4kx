@@ -3,11 +3,12 @@
 
 mod job;
 mod name;
+mod refusal;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
-use p4kx_export::{CatalogPhase, CatalogProgress, CatalogSummary};
+use p4kx_export::{CatalogPhase, CatalogProgress, CatalogPublicationMode, CatalogSummary, Filter};
 
 pub use job::{CatalogExport, CatalogExportStatus};
 pub(crate) use job::{refused, refused_gzip, start};
@@ -15,11 +16,24 @@ pub(crate) use name::{is_gzip, normalised_catalog_file};
 
 use crate::read_gate::ReadGate;
 
-/// The file name the save dialog of the Basetool catalog suggests: the compressed form the
-/// Basetool takes for upload; plain `.json` stays selectable.
-pub const CATALOG_FILE: &str = "basetool-catalog.json.zst";
+/// The proposed file name for a P4KX catalog with full source proofs.
+pub const CATALOG_FILE: &str = "p4kx-catalog.json.zst";
 
-/// The step a running Basetool catalog is at.
+pub(crate) const MARKER_CATALOG_FILE: &str = "p4kx-catalog.markers.json.zst";
+
+/// The distinct filename proposed for explicitly requested diagnostic catalogs.
+pub const DIAGNOSTIC_CATALOG_FILE: &str = "p4kx-catalog.diagnostic.json.zst";
+
+/// The selection and publication policy of one catalog job.
+#[derive(Debug, Default)]
+pub struct CatalogExportOptions {
+    /// The source-Record Filter, or the full source selection.
+    pub filter: Option<Filter>,
+    /// Whether this one job may publish an explicitly marked diagnostic result.
+    pub publication_mode: CatalogPublicationMode,
+}
+
+/// The step a running P4KX catalog is at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CatalogExportStage {
     /// DataForge is read from the Archive.
@@ -30,7 +44,7 @@ pub enum CatalogExportStage {
     Writing,
 }
 
-/// How far a running Basetool catalog has come.
+/// How far a running P4KX catalog has come.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogExportProgress {
     /// The step it is at.
@@ -43,7 +57,7 @@ pub struct CatalogExportProgress {
     pub total: usize,
 }
 
-/// The outcome of a Basetool catalog that was written.
+/// The outcome of a P4KX catalog that was written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogExportSummary {
     file: PathBuf,

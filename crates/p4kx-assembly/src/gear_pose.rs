@@ -7,8 +7,11 @@
 )]
 
 use p4kx_model::{
-    Animation, Bone, BoneTransform, Influences, Keys, Mesh, Model, chained_world_poses,
+    Animation, Bone, BoneTransform, Influences, Keys, Mesh, Model, PositionedAnimation,
+    chained_world_poses, chained_world_poses_observing,
 };
+
+use crate::gear_pose_sources::{GearAnimationKey, GearKeyChannel, PosedBone, PosedLod};
 
 /// Why a model cannot be posed by a clip.
 #[derive(Debug, PartialEq, Eq)]
@@ -31,22 +34,30 @@ impl std::fmt::Display for PoseFailure {
 /// Each bone takes the last key of its track, rotation and translation apart, relative to its
 /// parent, and keeps its bind value where the track lacks that channel. The vertices follow the
 /// bones by their weights. Meshes without influences stay as they are.
-pub(crate) fn posed(model: &Model, animation: &Animation) -> Result<Model, PoseFailure> {
+pub(crate) fn posed(
+    model: &Model,
+    animation: &Animation,
+    positions: Option<&PositionedAnimation>,
+) -> Result<(Model, Vec<PosedLod>), PoseFailure> {
     let mut posed = model.clone();
+    let mut origins = Vec::new();
     let mut moved_any = false;
     let mut skinned = false;
-    for lod in &mut posed.lods {
+    for (ordinal, lod) in posed.lods.iter_mut().enumerate() {
         let bones = lod.bones.as_deref().unwrap_or(&model.bones);
         if lod.meshes.iter().all(|mesh| mesh.influences.is_none()) {
             continue;
         }
         skinned = true;
-        let Some(matrices) = skin_matrices(bones, animation) else {
+        let Some(prepared) = skin_matrices(bones, animation, positions) else {
             continue;
         };
+        if let Some(bones) = prepared.sources {
+            origins.push(PosedLod { ordinal, bones });
+        }
         moved_any = true;
         for mesh in &mut lod.meshes {
-            skin(mesh, &matrices);
+            skin(mesh, &prepared.matrices);
         }
     }
     if !skinned {
@@ -55,39 +66,75 @@ pub(crate) fn posed(model: &Model, animation: &Animation) -> Result<Model, PoseF
     if !moved_any {
         return Err(PoseFailure::NoBonesAnimated);
     }
-    Ok(posed)
+    Ok((posed, origins))
 }
 
 fn last<T: Copy>(keys: Option<&Keys<T>>) -> Option<T> {
     keys.and_then(|keys| keys.values.last().copied())
 }
 
-fn skin_matrices(bones: &[Bone], animation: &Animation) -> Option<Vec<BoneTransform>> {
-    let bound = animation.bind(bones);
-    if bound.bound.is_empty() {
+struct PreparedPose {
+    matrices: Vec<BoneTransform>,
+    sources: Option<Vec<PosedBone>>,
+}
+
+fn skin_matrices(
+    bones: &[Bone],
+    animation: &Animation,
+    positions: Option<&PositionedAnimation>,
+) -> Option<PreparedPose> {
+    let binding = animation.track_binding_indices(bones);
+    if binding.iter().all(Option::is_none) {
         return None;
     }
+    let mut sources = positions.map(|_| vec![PosedBone::default(); bones.len()]);
     let mut moved: Vec<Bone> = bones.to_vec();
-    for (index, track) in bound.bound {
-        let Some(bone) = moved.get_mut(index) else {
+    for (track_index, (track, index)) in animation.tracks.iter().zip(binding).enumerate() {
+        let Some((index, bone)) = index.and_then(|index| Some((index, moved.get_mut(index)?)))
+        else {
             continue;
         };
-        if let Some(rotation) = last(track.rotations.as_ref()) {
+        let rotation = track.rotations.as_ref();
+        let translation = track.translations.as_ref();
+        if let Some(rotation) = last(rotation) {
             bone.relative.rotation = rotation;
         }
-        if let Some(translation) = last(track.translations.as_ref()) {
+        if let Some(translation) = last(translation) {
             bone.relative.translation = translation;
         }
+        if let Some((source, controller)) = sources
+            .as_mut()
+            .and_then(|sources| sources.get_mut(index))
+            .zip(positions.and_then(|positions| positions.controller_ordinal(track_index)))
+        {
+            source.rotation = key(rotation, controller, GearKeyChannel::Rotation);
+            source.translation = key(translation, controller, GearKeyChannel::Translation);
+        }
     }
-    let poses = chained_world_poses(&moved);
+    let poses = chained_world_poses_observing(&moved, |index, parent| {
+        if let Some(source) = sources.as_mut().and_then(|sources| sources.get_mut(index)) {
+            source.parent = parent;
+        }
+    });
     let binds = chained_world_poses(bones);
-    Some(
-        poses
-            .iter()
-            .zip(&binds)
-            .map(|(pose, bind)| pose.then(&inverse(bind)))
-            .collect(),
-    )
+    let matrices = poses
+        .iter()
+        .zip(&binds)
+        .map(|(pose, bind)| pose.then(&inverse(bind)))
+        .collect();
+    Some(PreparedPose { matrices, sources })
+}
+
+fn key<T>(
+    keys: Option<&Keys<T>>,
+    controller: usize,
+    channel: GearKeyChannel,
+) -> Option<GearAnimationKey> {
+    Some(GearAnimationKey {
+        controller,
+        ordinal: keys?.values.len().checked_sub(1)?,
+        channel,
+    })
 }
 
 fn inverse(transform: &BoneTransform) -> BoneTransform {

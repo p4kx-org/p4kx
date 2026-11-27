@@ -1,22 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use rayon::prelude::*;
+use crate::layout_cursor::LayoutCursor;
+use crate::rows::NO_PARENT;
+use crate::source_layout_allocation;
+use crate::source_layout_index::{self, SourceLayout, SourceLayoutIndex};
+use crate::{DataForge, DataForgeError, DataType, LayoutSource};
 
-use crate::dataforge::out_of_range;
-use crate::rows::{NO_PARENT, StructDef};
-use crate::slot::Slot;
-use crate::{DataForge, DataForgeError, DataType, MAX_INHERITANCE_DEPTH, MAX_RECORD_FIELDS};
-
-/// One field of a struct as a Record tree lists it, with its bytes in an instance.
-#[derive(Clone, Copy)]
-pub(crate) struct FieldDef<'f> {
-    pub(crate) name: &'f str,
-    pub(crate) position: u32,
-    pub(crate) slot: Slot,
-    pub(crate) start: u64,
-    pub(crate) end: u64,
-}
+pub(crate) use crate::layout_cursor::LayoutField as FieldDef;
 
 /// Returns whether values of `data_type` are scalars a column can hold.
 pub(crate) const fn is_scalar(data_type: DataType) -> bool {
@@ -26,52 +17,69 @@ pub(crate) const fn is_scalar(data_type: DataType) -> bool {
     )
 }
 
-/// The names and fields of every struct, inherited fields first, read once for compiling.
-pub(crate) struct StructFields<'f> {
-    forge: &'f DataForge<'f>,
-    names: Vec<Option<&'f str>>,
-    fields: Vec<Result<Vec<FieldDef<'f>>, DataForgeError>>,
+/// Optional type names and a borrow of the common validated source-layout index.
+pub(crate) struct StructFields<'source, 'observer> {
+    forge: &'source DataForge<'source>,
+    pub(crate) index: &'source SourceLayoutIndex,
+    names: Vec<Option<&'source str>>,
+    observe: Option<&'observer dyn Fn(LayoutSource)>,
 }
 
-impl<'f> StructFields<'f> {
-    pub(crate) fn read_all(forge: &'f DataForge<'f>) -> Self {
-        let rows: Vec<StructDef> = forge.structs.iter().collect();
-        let names = rows
-            .iter()
-            .map(|row| forge.blob.get(row.name).ok())
-            .collect();
-        let fields = (0..rows.len())
-            .into_par_iter()
-            .map(|index| fields_of(forge, index))
-            .collect();
-        Self {
+impl<'source, 'observer> StructFields<'source, 'observer> {
+    pub(crate) fn read_all(forge: &'source DataForge<'source>) -> Result<Self, DataForgeError> {
+        let index = forge.source_layouts()?;
+        let mut names = Vec::new();
+        source_layout_allocation::reserve(&mut names, forge.structs.len(), "query type names")?;
+        names.extend(
+            forge
+                .structs
+                .iter()
+                .map(|row| forge.blob.get(row.name).ok()),
+        );
+        Ok(Self {
             forge,
+            index,
             names,
-            fields,
-        }
+            observe: None,
+        })
     }
 
-    pub(crate) const fn forge(&self) -> &'f DataForge<'f> {
+    pub(crate) fn observe_layouts(&mut self, observe: Option<&'observer dyn Fn(LayoutSource)>) {
+        self.observe = observe;
+    }
+
+    pub(crate) const fn forge(&self) -> &'source DataForge<'source> {
         self.forge
     }
-
     pub(crate) const fn len(&self) -> usize {
         self.names.len()
     }
 
-    pub(crate) fn names(&self) -> impl Iterator<Item = &'f str> + '_ {
+    pub(crate) fn names(&self) -> impl Iterator<Item = &'source str> + '_ {
         self.names.iter().flatten().copied()
     }
 
-    pub(crate) fn name(&self, index: usize) -> Option<&'f str> {
+    pub(crate) fn name(&self, index: usize) -> Option<&'source str> {
         self.names.get(index).copied().flatten()
     }
 
-    pub(crate) fn positions_of<'s>(&'s self, name: &'s str) -> impl Iterator<Item = usize> + 's {
+    pub(crate) fn positions_of<'name>(
+        &'name self,
+        name: &'name str,
+    ) -> impl Iterator<Item = usize> + 'name {
         self.names
             .iter()
             .enumerate()
-            .filter(move |(_, candidate)| **candidate == Some(name))
+            .filter(move |(index, candidate)| {
+                let candidate = **candidate;
+                if let Some(observe) = self.observe {
+                    observe(LayoutSource::TypeName {
+                        index: *index,
+                        name: candidate.and_then(|name| self.forge.original_text_span(name)),
+                    });
+                }
+                candidate == Some(name)
+            })
             .map(|(index, _)| index)
     }
 
@@ -79,126 +87,144 @@ impl<'f> StructFields<'f> {
         self.positions_of(name).next()
     }
 
-    pub(crate) fn fields(&self, index: usize) -> Result<&[FieldDef<'f>], &DataForgeError> {
-        match self.fields.get(index) {
-            Some(Ok(fields)) => Ok(fields),
-            Some(Err(error)) => Err(error),
-            None => Ok(&[]),
+    pub(super) fn observe_property_target(&self, field: &FieldDef<'_>) {
+        if let Some(observe) = self.observe {
+            observe(LayoutSource::PropertyTarget {
+                property_index: field.slot.property_index(),
+            });
         }
     }
 
-    pub(crate) fn field(&self, index: usize, name: &str) -> Option<FieldDef<'f>> {
-        self.fields(index)
-            .ok()?
-            .iter()
-            .find(|field| field.name == name)
-            .copied()
+    pub(super) fn derives_from(&self, index: usize, target: usize) -> bool {
+        let Some(observe) = self.observe else {
+            return ancestors_include(self.forge, index, &[target]);
+        };
+        ancestors_include_observed(self.forge, index, &[target], |step| {
+            observe(match step {
+                AncestorStep::Parent {
+                    index,
+                    stored_parent,
+                } => LayoutSource::TypeParent {
+                    index,
+                    stored_parent,
+                },
+                AncestorStep::Unavailable { index } => LayoutSource::UnavailableAncestry { index },
+            });
+        })
     }
 
-    pub(crate) fn field_names(&self, index: usize) -> impl Iterator<Item = &'f str> + '_ {
-        self.fields(index)
-            .unwrap_or_default()
-            .iter()
-            .map(|field| field.name)
+    pub(crate) fn source(&self, index: usize) -> Result<SourceLayout<'source>, DataForgeError> {
+        self.index.layout(
+            self.forge,
+            u32::try_from(index).map_err(|_| DataForgeError::LayoutInvariant)?,
+        )
     }
 
-    pub(crate) fn all_field_names(&self) -> impl Iterator<Item = &'f str> + '_ {
-        (0..self.len()).flat_map(|index| self.field_names(index))
+    pub(crate) fn fields(
+        &self,
+        index: usize,
+    ) -> Result<
+        impl Iterator<Item = Result<FieldDef<'source>, DataForgeError>> + use<'source, 'observer>,
+        DataForgeError,
+    > {
+        let observe = self.observe;
+        let cursor = self.source(index).and_then(|layout| layout.cursor());
+        if let (Err(_), Some(observe)) = (&cursor, observe) {
+            observe(LayoutSource::UnavailableLayout { index });
+        }
+        let mut cursor: LayoutCursor<'source> = cursor?;
+        if let Some(observe) = observe {
+            cursor.observe_lineage(observe)?;
+        }
+        Ok(std::iter::from_fn(move || match observe {
+            Some(observe) => {
+                let mut observe = observe;
+                cursor.next_with(Some(&mut observe))
+            }
+            None => cursor.next(),
+        }))
+    }
+
+    pub(crate) fn field(
+        &self,
+        index: usize,
+        name: &str,
+    ) -> Result<Option<FieldDef<'source>>, DataForgeError> {
+        for field in self.fields(index)? {
+            let field = field?;
+            if field.name == name {
+                return Ok(Some(field));
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn field_names(
+        &self,
+        index: usize,
+    ) -> Result<impl Iterator<Item = Result<&'source str, DataForgeError>>, DataForgeError> {
+        Ok(self
+            .fields(index)?
+            .map(|field| field.map(|field| field.name)))
+    }
+
+    pub(crate) fn all_field_names(
+        &self,
+    ) -> impl Iterator<Item = Result<&'source str, DataForgeError>> + '_ {
+        (0..self.len()).flat_map(|index| {
+            let (fields, error) = match self.fields(index) {
+                Ok(fields) => (Some(fields), None),
+                Err(error) if source_layout_index::is_operational(&error) => (None, Some(error)),
+                Err(_) => (None, None),
+            };
+            fields
+                .into_iter()
+                .flatten()
+                .map(|field| field.map(|field| field.name))
+                .chain(error.into_iter().map(Err))
+        })
     }
 }
 
 /// Returns whether the struct at `index` or one of its ancestors is among `targets`.
 pub(crate) fn ancestors_include(forge: &DataForge<'_>, index: usize, targets: &[usize]) -> bool {
+    ancestors_include_observed(forge, index, targets, |_| {})
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum AncestorStep {
+    Parent { index: usize, stored_parent: u32 },
+    Unavailable { index: usize },
+}
+
+pub(super) fn ancestors_include_observed(
+    forge: &DataForge<'_>,
+    index: usize,
+    targets: &[usize],
+    mut observe: impl FnMut(AncestorStep),
+) -> bool {
     let mut current = index;
-    for _ in 0..MAX_INHERITANCE_DEPTH {
+    for _ in 0..forge.struct_count() {
         if targets.contains(&current) {
             return true;
         }
-        match forge.structs.get(current) {
-            Some(row) if row.parent != NO_PARENT => {
-                let Ok(parent) = usize::try_from(row.parent) else {
-                    return false;
-                };
-                current = parent;
-            }
-            _ => return false,
-        }
-    }
-    false
-}
-
-/// Returns the fields of the struct at `index` in Record tree order, the root ancestor's first,
-/// with the layout checks the Record tree makes.
-fn fields_of<'f>(
-    forge: &'f DataForge<'f>,
-    index: usize,
-) -> Result<Vec<FieldDef<'f>>, DataForgeError> {
-    let struct_index = u32::try_from(index).unwrap_or(u32::MAX);
-    let chain = chain_of(forge, index, struct_index)?;
-    let count: usize = chain
-        .iter()
-        .map(|(_, row)| usize::from(row.property_count))
-        .sum();
-    if count > MAX_RECORD_FIELDS {
-        return Err(DataForgeError::TooManyFields {
-            struct_index,
-            count,
-            limit: MAX_RECORD_FIELDS,
+        let Some(row) = forge.structs.get(current) else {
+            observe(AncestorStep::Unavailable { index: current });
+            return false;
+        };
+        observe(AncestorStep::Parent {
+            index: current,
+            stored_parent: row.parent,
         });
-    }
-    let mut fields = Vec::with_capacity(count);
-    let mut offset = 0_u64;
-    for &(owner, row) in chain.iter().rev() {
-        let first = usize::from(row.first_property);
-        for property in first..first.saturating_add(usize::from(row.property_count)) {
-            let slot = Slot::of(forge, owner, property)?;
-            let end = offset.saturating_add(slot.size(forge)?);
-            fields.push(FieldDef {
-                name: slot.name(forge)?,
-                position: u32::try_from(fields.len()).unwrap_or(u32::MAX),
-                slot,
-                start: offset,
-                end,
-            });
-            offset = end;
-        }
-        if offset != u64::from(row.size) {
-            return Err(DataForgeError::StructLayout {
-                struct_index: owner,
-                declared: row.size,
-                fields: offset,
-            });
-        }
-    }
-    Ok(fields)
-}
-
-/// Returns the struct at `index` and its ancestors with their indices, the struct first.
-fn chain_of(
-    forge: &DataForge<'_>,
-    index: usize,
-    struct_index: u32,
-) -> Result<Vec<(u32, StructDef)>, DataForgeError> {
-    let mut chain = Vec::new();
-    let mut current = struct_index;
-    loop {
-        let row = usize::try_from(current)
-            .ok()
-            .and_then(|current| forge.structs.get(current))
-            .ok_or_else(|| out_of_range("struct", index, "struct", current.into()))?;
-        if chain.iter().any(|(seen, _)| *seen == current) {
-            return Err(DataForgeError::StructCycle { struct_index });
-        }
-        if chain.len() == MAX_INHERITANCE_DEPTH {
-            return Err(DataForgeError::InheritanceTooDeep {
-                struct_index,
-                limit: MAX_INHERITANCE_DEPTH,
-            });
-        }
-        chain.push((current, row));
         if row.parent == NO_PARENT {
-            return Ok(chain);
+            return false;
         }
-        current = row.parent;
+        let Ok(parent) = usize::try_from(row.parent) else {
+            observe(AncestorStep::Unavailable { index: current });
+            return false;
+        };
+        current = parent;
     }
+    observe(AncestorStep::Unavailable { index: current });
+    false
 }

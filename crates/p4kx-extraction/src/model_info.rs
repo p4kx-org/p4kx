@@ -1,20 +1,54 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! What `p4kx model info --json` and `p4kx chunks list --json` say, as serialisable shapes.
+//! Model report shapes and their original field positions.
 
 use std::borrow::Cow;
+use std::io;
 
 use p4kx_chunks::Chunk;
-use p4kx_model::{
-    Bone, BoneTransform, ChunkUsage, Mesh, Model, ModelChunk, ModelFile, Node, Submesh,
-};
+use p4kx_model::{Bone, BoneTransform, ChunkUsage, Model, ModelChunk, ModelFile, Node};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::model_info_animations::{AnimationInfo, UnreadInfo};
-use crate::model_info_materials::{LibraryInfo, MaterialInfo};
+use crate::model_info_materials::receipt::MaterialFieldReceipt;
+use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
+
+#[path = "animation_origin_sites.rs"]
+pub mod animation_origin_sites;
+#[path = "model_bone_origins.rs"]
+mod bone_origins;
+#[path = "model_chunk_origins.rs"]
+mod chunk_origins;
+#[path = "model_field_origins.rs"]
+mod field_origins;
+#[path = "glb_animation_origins.rs"]
+mod glb_animation_origins;
+#[path = "model_mesh_info.rs"]
+mod mesh_info;
+#[path = "model_node_origins.rs"]
+mod node_origins;
+
+#[path = "model_overview_mesh_origins.rs"]
+mod overview_mesh_origins;
+#[path = "model_submesh_origins.rs"]
+mod submesh_origins;
+
+pub use bone_origins::{ModelBoneOrigins, primary_skeleton_selection_uses};
+pub use chunk_origins::{
+    ModelChunkOrigins, ModelChunkUsageOrigins, capture_chunk_origins, model_chunk_count_origin,
+    write_chunk_origins, write_chunk_type_origin,
+};
+use field_origins::ModelFieldOrigins;
+pub use glb_animation_origins::{ArchiveClipFieldOrigins, write_glb_animation_origins};
+pub use mesh_info::MeshInfo;
+pub use node_origins::ModelNodeOrigins;
+pub use overview_mesh_origins::{
+    ModelLodCountOrigins, ModelMeshSummaryOrigins, ModelOverviewMeshOrigins, ModelTopologyOrigins,
+};
+pub use submesh_origins::{write_mesh_origins, write_submesh_origins};
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
 #[derive(Debug, Serialize)]
@@ -29,8 +63,14 @@ pub struct ModelInfo<'a> {
     pub material_ids: Vec<u16>,
     /// What reading the material library came to.
     pub library: LibraryInfo<'a>,
+    /// The separately looked-up physical fallback, when the read model needed one.
+    pub default_material: Option<DefaultMaterialInfo<'a>>,
     /// The materials of the library.
     pub materials: Vec<MaterialInfo<'a>>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    material_receipt: Option<&'a MaterialFieldReceipt>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    field_origins: Option<ModelFieldOrigins>,
     /// The list of material indices of the node table.
     pub node_material_indices: &'a [u16],
     /// What a lenient read worked around, as sentences.
@@ -70,6 +110,19 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
+    /// Describes the model with original node, bone, mesh and chunk evidence.
+    ///
+    /// # Errors
+    /// Returns invalid evidence positions or an invalid source inventory.
+    pub fn of_listing_with_submesh_origins(
+        source: &'a ModelSource,
+        listing: &AnimationListing,
+    ) -> io::Result<Self> {
+        let mut info = Self::of_listing(source, listing);
+        info.field_origins = Some(ModelFieldOrigins::capture(source)?);
+        Ok(info)
+    }
+
     fn with_animations(
         source: &'a ModelSource,
         animations: Vec<AnimationInfo>,
@@ -82,7 +135,10 @@ impl<'a> ModelInfo<'a> {
             material_library: model.material_library.as_deref(),
             material_ids: model.material_ids(),
             library: LibraryInfo::of(model),
+            default_material: source.default_material().map(DefaultMaterialInfo::of),
             materials: MaterialInfo::of_model(model),
+            material_receipt: source.material_receipt(),
+            field_origins: None,
             node_material_indices: &model.material_indices,
             issues: model.issues.iter().map(ToString::to_string).collect(),
             nodes: NodeInfo::of_model(model),
@@ -118,10 +174,17 @@ impl<'a> NodeInfo<'a> {
     /// Describes the nodes of `model`.
     #[must_use]
     pub fn of_model(model: &'a Model) -> Vec<Self> {
-        model.nodes.iter().enumerate().map(Self::of).collect()
+        model
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| Self::of_node(index, node))
+            .collect()
     }
 
-    fn of((index, node): (usize, &'a Node)) -> Self {
+    /// Describes the selected original node at its model ordinal.
+    #[must_use]
+    pub fn of_node(index: usize, node: &'a Node) -> Self {
         Self {
             index,
             name: &node.name,
@@ -173,61 +236,6 @@ impl LodInfo {
     }
 }
 
-/// One mesh of a level of detail.
-#[derive(Debug, Serialize)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "the JSON has one flag per optional vertex stream of a mesh"
-)]
-pub struct MeshInfo {
-    node: usize,
-    vertices: usize,
-    triangles: usize,
-    normals: bool,
-    normals_computed: bool,
-    tangents: bool,
-    colours: bool,
-    second_uvs: bool,
-    non_finite_uvs: usize,
-    skinned: bool,
-    submeshes: Vec<SubmeshInfo>,
-}
-
-impl MeshInfo {
-    fn of(mesh: &Mesh) -> Self {
-        Self {
-            node: mesh.node,
-            vertices: mesh.positions.len(),
-            triangles: mesh.indices.len() / 3,
-            normals: mesh.normals.is_some(),
-            normals_computed: mesh.normals_computed,
-            tangents: mesh.tangents.is_some(),
-            colours: mesh.colours.is_some(),
-            second_uvs: mesh.second_uvs.is_some(),
-            non_finite_uvs: mesh.non_finite_uvs,
-            skinned: mesh.influences.is_some(),
-            submeshes: mesh.submeshes.iter().map(SubmeshInfo::of).collect(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct SubmeshInfo {
-    material_id: u16,
-    first_index: usize,
-    index_count: usize,
-}
-
-impl SubmeshInfo {
-    const fn of(submesh: &Submesh) -> Self {
-        Self {
-            material_id: submesh.material_id,
-            first_index: submesh.first_index,
-            index_count: submesh.index_count,
-        }
-    }
-}
-
 /// One bone of a model's skeleton.
 #[derive(Debug, Serialize)]
 pub struct BoneInfo<'a> {
@@ -244,10 +252,17 @@ impl<'a> BoneInfo<'a> {
     /// Describes the bones of `model`.
     #[must_use]
     pub fn of_model(model: &'a Model) -> Vec<Self> {
-        model.bones.iter().enumerate().map(Self::of).collect()
+        model
+            .bones
+            .iter()
+            .enumerate()
+            .map(|(index, bone)| Self::of_bone(index, bone))
+            .collect()
     }
 
-    fn of((index, bone): (usize, &'a Bone)) -> Self {
+    /// Describes the selected original bone at its model ordinal.
+    #[must_use]
+    pub fn of_bone(index: usize, bone: &'a Bone) -> Self {
         Self {
             index,
             name: &bone.name,
@@ -276,13 +291,17 @@ impl PoseInfo {
 }
 
 /// One chunk of a model's files.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = crate::projection_schema::require_properties)]
 pub struct ChunkInfo {
     file: Cow<'static, str>,
+    #[schemars(range(max = u32::MAX))]
     index: usize,
     #[serde(rename = "type")]
     type_name: Option<&'static str>,
+    #[schemars(range(max = u32::MAX))]
     type_id: u32,
+    #[schemars(extend("enum" = ["read", "skipped", "unknown"]))]
     usage: &'static str,
 }
 
@@ -349,13 +368,14 @@ impl ChunkJson {
     }
 }
 
-/// Returns `model`, `geometry` or `lod<n>-geometry`.
+/// Returns the logical model or geometry role, including a level-specific file.
 #[must_use]
 pub fn file_name(file: ModelFile) -> Cow<'static, str> {
     match file {
         ModelFile::Model => Cow::Borrowed("model"),
         ModelFile::Geometry => Cow::Borrowed("geometry"),
         ModelFile::LodGeometry(level) => Cow::Owned(format!("lod{level}-geometry")),
+        ModelFile::LodModel(level) => Cow::Owned(format!("lod{level}-model")),
         _ => Cow::Borrowed("other"),
     }
 }

@@ -3,18 +3,20 @@
 
 use std::sync::Arc;
 
-use egui::{Id, Ui};
+use egui::{Id, Sense, Ui};
 use fluent_bundle::FluentValue;
 
 use super::audio_controls;
+use super::source_origin;
 use crate::theme::desktop::SPINNER_INLINE;
 use crate::theme::palette;
 use crate::widgets::frames;
 use crate::widgets::indicator::spinner;
 use crate::widgets::summary::{Fact, FactsStrip};
+use crate::widgets::tooltip;
 use crate::{
     AudioPreview, AudioStatus, AudioText, Language, MAX_PREVIEW_PCM, Model, PREVIEW_SIZE_LIMIT,
-    SoundInfo, SoundStatus, Text, Texts, format,
+    SoundInfo, SoundStatus, Text, Texts, WemHeaderProvenance, format,
 };
 
 /// What the user did with the controls of the Audio tab.
@@ -59,7 +61,11 @@ pub(super) fn show(
     } = named;
     let status = audio.status();
     if let AudioStatus::Opened(info, _) = status {
-        facts(ui, texts, audio.serial(), info).show(ui);
+        let rect = facts(ui, texts, audio.serial(), info).show(ui);
+        if let Some(origins) = audio.header_provenance() {
+            let response = ui.interact(rect, ui.scope_id().with("wem-origins"), Sense::hover());
+            tooltip::hover(response, |ui| header_origins(ui, texts, origins.ok()));
+        }
     }
     let path_arg = || ("path", FluentValue::from(path.to_owned()));
     let language = texts.language();
@@ -91,6 +97,20 @@ pub(super) fn show(
             }
         })
         .inner
+}
+
+fn header_origins(ui: &mut Ui, texts: &Texts, origins: Option<&WemHeaderProvenance>) {
+    for (label, origin) in [
+        (AudioText::Codec, origins.map(|source| &source.codec)),
+        (AudioText::Channels, origins.map(|source| &source.channels)),
+        (
+            AudioText::SampleRate,
+            origins.map(|source| &source.sample_rate),
+        ),
+        (AudioText::Duration, origins.map(|source| &source.duration)),
+    ] {
+        source_origin::row(ui, texts, label, origin);
+    }
 }
 
 fn sound_body(

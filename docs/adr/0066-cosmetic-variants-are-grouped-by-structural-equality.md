@@ -25,7 +25,7 @@ ship under two definitions).
   fields (`Tags`, the material and palette of the geometry, two inventory interaction fields). The
   3D model stays compared: a different model is not cosmetic, and without it unrelated props
   collapsed into groups of hundreds on LIVE. The exact lists, taken from the field differences
-  between colour siblings on LIVE, are in `docs/basetool-catalog.md`.
+  between colour siblings on LIVE, are in `docs/catalog.md`.
 - **Ships that differ only in the default loadout group together** (owner rule "without
   loadout"). On LIVE `AEGS_Idris_P` groups under `AEGS_Idris_M` and `AEGS_Sabre_Comet` under
   `AEGS_Sabre`.

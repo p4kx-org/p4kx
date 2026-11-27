@@ -1,25 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::ErrorKind;
-use std::path::Path;
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid, SourcedValue};
 use rayon::prelude::*;
 
-use crate::contract::StarmapObject;
-use crate::contract_harvest::HarvestableLocation;
+use crate::catalog_read::original::EntryCapture;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::soc_preset::PresetScan;
+use crate::mining_locations::HarvestableLocation;
+use crate::starmap_containers::proof::PlacementEvidence;
 use crate::starmap_walk::Opened;
 
-/// The most objects followed upwards from a container to find the object it belongs to.
-const MAX_CHAIN: usize = 64;
+#[path = "harvest_location_facts.rs"]
+mod location_facts;
+#[path = "harvest_object_origin.rs"]
+mod object_origin;
+use crate::{CatalogError, Kind};
 
 /// What the first `.soc` of a container says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Soc {
+pub(crate) enum Soc {
     Preset(Guid),
     Plain,
     Unreadable(&'static str),
@@ -33,9 +37,8 @@ pub(crate) enum NoObject {
     NoneAbove,
     /// The object the container hangs below is not in the starmap objects.
     NotInCatalog,
-    /// [`MAX_CHAIN`] or more mining claim markers lie between the container and the first object
-    /// that is none.
-    ChainTooLong,
+    /// Mining claim markers form a cycle above the container.
+    MarkerCycle,
     /// A mining claim marker is the top of the chain, with no object above it.
     MarkerWithoutParent,
 }
@@ -48,7 +51,7 @@ impl NoObject {
             Self::NotInCatalog => {
                 "the object the container hangs below is not in the starmap objects"
             }
-            Self::ChainTooLong => "64 or more mining claim markers lie above the container",
+            Self::MarkerCycle => "mining claim markers form a cycle above the container",
             Self::MarkerWithoutParent => "a mining claim marker has no object above it",
         }
     }
@@ -64,6 +67,7 @@ impl NoObject {
 /// the reason, ordered by path, and how many locations lack an object for each reason that is a
 /// loss, ordered by reason.
 pub(crate) struct Located {
+    pub(crate) ledger: ExportLedger,
     pub(crate) locations: Vec<HarvestableLocation>,
     pub(crate) unreadable: Vec<String>,
     pub(crate) without_object: Vec<(NoObject, usize)>,
@@ -71,40 +75,65 @@ pub(crate) struct Located {
 
 /// The starmap objects a container can hang below, by GUID: whether the object is a mining claim
 /// marker and the object above it.
-pub(crate) struct Objects {
-    by_guid: HashMap<Guid, (bool, Option<Guid>)>,
+pub(crate) struct Objects<'object> {
+    by_guid: HashMap<Guid, LocationObject<'object>>,
 }
 
-impl Objects {
-    pub(crate) fn new(objects: &[StarmapObject<'_>]) -> Self {
-        Self {
-            by_guid: objects
-                .iter()
-                .map(|object| {
-                    (
-                        object.guid.0,
-                        (
-                            object.mining_claim,
-                            object.placed_under_guid.map(|guid| guid.0),
-                        ),
-                    )
-                })
-                .collect(),
+/// The retained ancestry facts of one admitted Starmap Record.
+#[derive(Clone, Copy)]
+pub(crate) struct LocationObject<'object> {
+    mining_claim: bool,
+    above: Option<Guid>,
+    origin: Option<&'object FieldOrigin>,
+    placement: Option<&'object PlacementEvidence>,
+    unique: bool,
+}
+
+#[cfg(test)]
+impl LocationObject<'static> {
+    const fn unobserved(mining_claim: bool, above: Option<Guid>) -> Self {
+        Self::new(mining_claim, above, None, None)
+    }
+}
+
+impl Objects<'_> {
+    /// Returns the first non-marker object above the container or the actual terminal cause.
+    pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
+        self.visit_location(under, |_| {})
+    }
+
+    fn visit_location(
+        &self,
+        under: Option<Guid>,
+        mut observe: impl FnMut(Guid),
+    ) -> Result<CatalogGuid, NoObject> {
+        let mut at = under.ok_or(NoObject::NoneAbove)?;
+        let mut fast = Some(at);
+        loop {
+            let object = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
+            observe(at);
+            if !object.mining_claim {
+                return Ok(CatalogGuid(at));
+            }
+            at = object.above.ok_or(NoObject::MarkerWithoutParent)?;
+            // The fast cursor detects cycles; the main cursor classifies terminal failures.
+            fast = fast
+                .and_then(|node| self.marker_parent(node, &mut observe))
+                .and_then(|node| self.marker_parent(node, &mut observe));
+            if fast == Some(at) {
+                return Err(NoObject::MarkerCycle);
+            }
         }
     }
 
-    /// Returns the object a container hangs below: `under`, else the object above it while it is
-    /// a mining claim marker; the reason when there is none.
-    pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
-        let mut at = under.ok_or(NoObject::NoneAbove)?;
-        for _ in 0..MAX_CHAIN {
-            let &(mining_claim, above) = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
-            if !mining_claim {
-                return Ok(CatalogGuid(at));
-            }
-            at = above.ok_or(NoObject::MarkerWithoutParent)?;
+    fn marker_parent(&self, at: Guid, observe: &mut impl FnMut(Guid)) -> Option<Guid> {
+        let object = self.by_guid.get(&at)?;
+        observe(at);
+        if object.mining_claim {
+            object.above
+        } else {
+            None
         }
-        Err(NoObject::ChainTooLong)
     }
 }
 
@@ -115,17 +144,28 @@ pub(crate) fn locate(
     archive: &Archive,
     opened: &[Opened],
     presets: &HashSet<Guid>,
-    objects: &Objects,
+    objects: &Objects<'_>,
     cancel: Option<&CancelToken>,
-) -> Located {
+    capture: &EntryCapture<'_>,
+) -> Result<Located, CatalogError> {
     let mut entries: Vec<usize> = opened.iter().map(|container| container.entry).collect();
     entries.sort_unstable();
     entries.dedup();
-    let read: HashMap<usize, Soc> = entries
-        .par_iter()
-        .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, soc_of(archive, entry)))
-        .collect();
+    let (read, ledger) = read_sources(archive, &entries, cancel, capture)?;
+    Ok(locate_from_sources(
+        archive, opened, presets, objects, cancel, &read, ledger,
+    ))
+}
+
+fn locate_from_sources(
+    archive: &Archive,
+    opened: &[Opened],
+    presets: &HashSet<Guid>,
+    objects: &Objects<'_>,
+    cancel: Option<&CancelToken>,
+    read: &HashMap<usize, Soc>,
+    mut ledger: ExportLedger,
+) -> Located {
     let mut unreadable: Vec<String> = read
         .iter()
         .filter_map(|(&entry, soc)| match soc {
@@ -144,8 +184,8 @@ pub(crate) fn locate(
             presets.contains(preset).then(|| {
                 (
                     HarvestableLocation {
-                        preset_guid: CatalogGuid(*preset),
-                        starmap_object_guid: object.ok(),
+                        preset_guid: *preset,
+                        starmap_object_guid: object.ok().map(CatalogGuid::get),
                         system: container.system.to_string(),
                         container: path_of(archive, container.entry).to_owned(),
                     },
@@ -154,11 +194,125 @@ pub(crate) fn locate(
             })
         })
         .collect();
+    let authored_rows = rows.len();
     sort_unique(&mut rows);
+    ledger.skipped_rows(Kind::HarvestableLocations, authored_rows - rows.len());
+    if !cancel.is_some_and(CancelToken::is_cancelled) {
+        ledger.inventory(Kind::HarvestableLocations);
+    }
     Located {
+        ledger,
         without_object: losses(&rows),
         locations: rows.into_iter().map(|(location, _)| location).collect(),
         unreadable,
+    }
+}
+
+fn read_sources(
+    archive: &Archive,
+    entries: &[usize],
+    cancel: Option<&CancelToken>,
+    capture: &EntryCapture<'_>,
+) -> Result<(HashMap<usize, Soc>, ExportLedger), CatalogError> {
+    let reads: Vec<_> = entries
+        .par_iter()
+        .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
+        .map(|&entry| {
+            crate::harvest_source::read(archive, entry, capture, cancel).map(|read| (entry, read))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut ledger = ExportLedger::default();
+    let mut sources = HashMap::with_capacity(reads.len());
+    for (entry, (soc, observed)) in reads {
+        ledger.merge(observed);
+        sources.insert(entry, soc);
+    }
+    Ok((sources, ledger))
+}
+
+/// Selected provider observations memoized by physical outer Entry index.
+pub(crate) struct HarvestSurvey<'providers> {
+    presets: &'providers HashSet<Guid>,
+    reads: RefCell<SurveyReads>,
+}
+
+#[derive(Default)]
+struct SurveyReads {
+    by_entry: HashMap<usize, Soc>,
+    selected: HashMap<usize, SourcedValue<Guid>>,
+    ledger: ExportLedger,
+}
+
+impl<'providers> HarvestSurvey<'providers> {
+    pub(crate) fn new(presets: &'providers HashSet<Guid>) -> Self {
+        Self {
+            presets,
+            reads: RefCell::default(),
+        }
+    }
+
+    pub(crate) fn probe(
+        &self,
+        archive: &Archive,
+        entry: usize,
+        capture: &EntryCapture<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Option<Guid>, CatalogError> {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        if self.presets.is_empty() {
+            return Ok(None);
+        }
+        let mut reads = self.reads.borrow_mut();
+        let SurveyReads {
+            by_entry,
+            selected,
+            ledger,
+        } = &mut *reads;
+        if let Entry::Vacant(slot) = by_entry.entry(entry) {
+            let (observed, observations) = crate::harvest_source::read_verified(
+                archive,
+                entry,
+                capture,
+                cancel,
+                self.presets,
+            )?;
+            slot.insert(observed.fact);
+            if let Some(preset) = observed.selected {
+                selected.insert(entry, preset);
+            }
+            ledger.merge(observations);
+        }
+        Ok(selected.get(&entry).and_then(SourcedValue::value).copied())
+    }
+
+    pub(crate) fn finish(
+        self,
+        archive: &Archive,
+        opened: &[Opened],
+        objects: &Objects<'_>,
+        cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+    ) -> Result<(Located, HashMap<usize, SourcedValue<Guid>>), CatalogError> {
+        for occurrence in opened {
+            let _ = self.probe(archive, occurrence.entry, capture, cancel)?;
+        }
+        let SurveyReads {
+            by_entry,
+            selected,
+            ledger,
+        } = self.reads.into_inner();
+        let located = locate_from_sources(
+            archive,
+            opened,
+            self.presets,
+            objects,
+            cancel,
+            &by_entry,
+            ledger,
+        );
+        Ok((located, selected))
     }
 }
 
@@ -168,14 +322,17 @@ type Row = (HarvestableLocation, Option<NoObject>);
 /// Orders `rows` by preset, container, system and object, and drops the repeats.
 fn sort_unique(rows: &mut Vec<Row>) {
     rows.sort_by(|(a, _), (b, _)| {
-        a.preset_guid
+        CatalogGuid(a.preset_guid)
             .text()
-            .cmp(&b.preset_guid.text())
+            .cmp(&CatalogGuid(b.preset_guid).text())
             .then_with(|| a.container.cmp(&b.container))
             .then_with(|| a.system.cmp(&b.system))
             .then_with(|| {
                 let text = |location: &HarvestableLocation| {
-                    location.starmap_object_guid.map(CatalogGuid::text)
+                    location
+                        .starmap_object_guid
+                        .map(CatalogGuid)
+                        .map(CatalogGuid::text)
                 };
                 text(a).cmp(&text(b))
             })
@@ -208,129 +365,10 @@ fn path_of(archive: &Archive, entry: usize) -> &str {
         .map_or("", p4kx_extraction::Entry::path)
 }
 
-fn soc_of(archive: &Archive, entry: usize) -> Soc {
-    let Some(socpak) = archive.entries().get(entry) else {
-        return Soc::Unreadable("no such entry");
-    };
-    let Ok(container) = archive.open_container(socpak) else {
-        return Soc::Unreadable("cannot be opened as a container");
-    };
-    let Some(soc) = container.entries().iter().find(|inner| {
-        Path::new(inner.path())
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("soc"))
-    }) else {
-        return Soc::Plain;
-    };
-    let Ok(reader) = container.open_entry(soc) else {
-        return Soc::Unreadable("its .soc cannot be opened");
-    };
-    match PresetScan::read(reader) {
-        Ok(preset) => preset.map_or(Soc::Plain, Soc::Preset),
-        Err(error) if error.kind() == ErrorKind::FileTooLarge => {
-            Soc::Unreadable("its .soc is over the scan limit")
-        }
-        Err(_) => Soc::Unreadable("its .soc cannot be read"),
-    }
-}
+#[cfg(test)]
+#[path = "harvest_location_tests.rs"]
+mod tests;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn guid(number: u8) -> Guid {
-        format!("00000000-0000-0000-0000-0000000000{number:02x}")
-            .parse()
-            .expect("a GUID")
-    }
-
-    fn objects(entries: &[(u8, bool, Option<u8>)]) -> Objects {
-        Objects {
-            by_guid: entries
-                .iter()
-                .map(|&(own, claim, above)| (guid(own), (claim, above.map(guid))))
-                .collect(),
-        }
-    }
-
-    #[test]
-    fn a_plain_object_is_the_location() {
-        let objects = objects(&[(1, false, None)]);
-        assert_eq!(objects.location(Some(guid(1))), Ok(CatalogGuid(guid(1))));
-    }
-
-    #[test]
-    fn a_marker_gives_way_to_the_object_above() {
-        let objects = objects(&[(1, false, None), (2, true, Some(1))]);
-        assert_eq!(objects.location(Some(guid(2))), Ok(CatalogGuid(guid(1))));
-    }
-
-    #[test]
-    fn each_missing_object_says_why() {
-        let objects = objects(&[(2, true, None)]);
-        assert_eq!(objects.location(None), Err(NoObject::NoneAbove));
-        assert_eq!(objects.location(Some(guid(9))), Err(NoObject::NotInCatalog));
-        assert_eq!(
-            objects.location(Some(guid(2))),
-            Err(NoObject::MarkerWithoutParent)
-        );
-    }
-
-    /// `count` markers, each hanging below the next, then a plain object.
-    fn markers_then_plain(count: u8) -> Objects {
-        let entries: Vec<(u8, bool, Option<u8>)> = (1..=count)
-            .map(|number| (number, true, Some(number + 1)))
-            .chain([(count + 1, false, None)])
-            .collect();
-        objects(&entries)
-    }
-
-    #[test]
-    fn sixty_three_markers_still_reach_the_object_above() {
-        let objects = markers_then_plain(63);
-        assert_eq!(objects.location(Some(guid(1))), Ok(CatalogGuid(guid(64))));
-    }
-
-    #[test]
-    fn sixty_four_markers_are_too_long() {
-        let objects = markers_then_plain(64);
-        assert_eq!(objects.location(Some(guid(1))), Err(NoObject::ChainTooLong));
-        assert_eq!(objects.location(Some(guid(2))), Ok(CatalogGuid(guid(65))));
-    }
-
-    #[test]
-    fn a_container_with_no_object_above_is_no_loss() {
-        assert!(!NoObject::NoneAbove.is_loss());
-        assert!(NoObject::NotInCatalog.is_loss());
-    }
-
-    #[test]
-    fn the_losses_count_every_reason_but_none_above() {
-        let row = |reason| {
-            (
-                HarvestableLocation {
-                    preset_guid: CatalogGuid(guid(1)),
-                    starmap_object_guid: None,
-                    system: String::new(),
-                    container: String::new(),
-                },
-                reason,
-            )
-        };
-        let rows = [
-            row(None),
-            row(Some(NoObject::NoneAbove)),
-            row(Some(NoObject::NoneAbove)),
-            row(Some(NoObject::NotInCatalog)),
-            row(Some(NoObject::NotInCatalog)),
-            row(Some(NoObject::MarkerWithoutParent)),
-        ];
-        assert_eq!(
-            losses(&rows),
-            vec![
-                (NoObject::NotInCatalog, 2),
-                (NoObject::MarkerWithoutParent, 1)
-            ]
-        );
-    }
-}
+#[path = "harvest_location_chain_tests.rs"]
+mod chain_tests;

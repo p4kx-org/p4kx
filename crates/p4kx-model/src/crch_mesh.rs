@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
+use p4kx_chunks::{ByteOrder, crch};
 use p4kx_foundation::ByteReader;
 
 use crate::error::ChunkFailure;
 use crate::reader::ReadValues;
 use crate::smooth_normals::smooth_normals;
-use crate::{CorruptChunk, Mesh, Submesh, UnsupportedLayout};
+use crate::{CorruptChunk, Mesh, ModelChunk, ModelFile, Submesh, UnsupportedLayout};
 
 const STREAM_SLOTS: usize = 16;
 const PHYSICS_SLOTS: usize = 4;
@@ -17,6 +20,69 @@ const COUNTS_AT: usize = 0x48;
 const VERTICES_AT: usize = 0x5A;
 const VERTEX_LEN: u64 = 12;
 const INDEX_LEN: u64 = 2;
+pub(crate) const PHYSICS_DATA_VERSION: u32 = 0x800;
+
+const WORD_BYTES: u64 = size_of::<u32>() as u64;
+
+/// The original selected CrCh physics count words for one emitted mesh.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CrchMeshSource {
+    chunk: usize,
+    counts_start: u64,
+    vertex_count: u32,
+    triangle_count: u32,
+}
+
+impl CrchMeshSource {
+    /// Returns the ordinal in the original primary model's chunk table.
+    #[must_use]
+    pub const fn chunk(self) -> usize {
+        self.chunk
+    }
+
+    /// Returns the selected primitive word's range in the decoded primary model.
+    #[must_use]
+    pub const fn primitive_range(self) -> Range<u64> {
+        let start = self.counts_start - (COUNTS_AT - PRIMITIVE_AT) as u64;
+        start..start + WORD_BYTES
+    }
+
+    /// Returns the original vertex count word's range in the decoded primary model.
+    #[must_use]
+    pub const fn vertex_count_range(self) -> Range<u64> {
+        self.counts_start..self.counts_start + WORD_BYTES
+    }
+
+    /// Returns the original triangle count word's range in the decoded primary model.
+    #[must_use]
+    pub const fn triangle_count_range(self) -> Range<u64> {
+        self.counts_start + WORD_BYTES..self.counts_start + 2 * WORD_BYTES
+    }
+}
+
+impl Mesh {
+    /// Returns the CrCh physics evidence for this mesh from its own model's chunk table.
+    #[must_use]
+    pub fn crch_physics_source(&self, chunks: &[ModelChunk]) -> Option<CrchMeshSource> {
+        let source = self.crch_physics?;
+        let original = chunks.iter().find(|chunk| {
+            chunk.file == ModelFile::Model
+                && chunk.index == source.chunk
+                && chunk.chunk_type == crch::MESH_PHYSICS_DATA
+                && chunk.layout.version == PHYSICS_DATA_VERSION
+                && chunk.layout.byte_order == ByteOrder::Little
+        })?;
+        let end = original.layout.offset.checked_add(original.layout.size)?;
+        let triangles = usize::try_from(source.triangle_count)
+            .ok()?
+            .checked_mul(3)?;
+        (usize::try_from(source.vertex_count).ok() == Some(self.positions.len())
+            && triangles == self.indices.len()
+            && source.primitive_range().start >= original.layout.offset
+            && source.triangle_count_range().end <= end)
+            .then_some(source)
+    }
+}
 
 /// The physics data a `Mesh` header names: the first slot that names any, and how many further
 /// slots name some that are not read.
@@ -74,7 +140,12 @@ pub(crate) fn physics_slots(data: &[u8]) -> Result<PhysicsSlots, ChunkFailure> {
 /// vertices as three `f32` each from byte `0x5A`, then the triangles as three `u16` vertex
 /// indices each. A triangle has no material ID of its own that is read; the mesh is one submesh
 /// of material ID 0, and it has no normals or texture coordinates.
-pub(crate) fn read_physics_mesh(node: usize, chunk: &[u8]) -> Result<Option<Mesh>, ChunkFailure> {
+pub(crate) fn read_physics_mesh(
+    node: usize,
+    chunk_ordinal: usize,
+    chunk_offset: u64,
+    chunk: &[u8],
+) -> Result<Option<Mesh>, ChunkFailure> {
     let mut header = ByteReader::new(chunk);
     let len = usize::try_from(header.read_u32()?).unwrap_or(usize::MAX);
     header.skip(PHYSICS_HEADER_LEN - 4)?;
@@ -85,6 +156,7 @@ pub(crate) fn read_physics_mesh(node: usize, chunk: &[u8]) -> Result<Option<Mesh
         return Err(UnsupportedLayout::PhysicsPrimitive(primitive).into());
     }
     reader.skip(COUNTS_AT - PRIMITIVE_AT - 4)?;
+    let counts_start = chunk_offset + PHYSICS_HEADER_LEN as u64 + reader.offset();
     let vertex_count = reader.read_u32()?;
     let triangle_count = reader.read_u32()?;
     reader.skip(VERTICES_AT - COUNTS_AT - 8)?;
@@ -122,11 +194,26 @@ pub(crate) fn read_physics_mesh(node: usize, chunk: &[u8]) -> Result<Option<Mesh
         }
         indices.push(index);
     }
-    Ok(Some(bare_mesh(node, positions, indices)))
+    let source = CrchMeshSource {
+        chunk: chunk_ordinal,
+        counts_start,
+        vertex_count,
+        triangle_count,
+    };
+    Ok(Some(bare_mesh(node, positions, indices, source)))
 }
 
-fn bare_mesh(node: usize, positions: Vec<[f32; 3]>, indices: Vec<u32>) -> Mesh {
+fn bare_mesh(
+    node: usize,
+    positions: Vec<[f32; 3]>,
+    indices: Vec<u32>,
+    source: CrchMeshSource,
+) -> Mesh {
     Mesh {
+        origin: None,
+        crch_physics: Some(source),
+        index_width: None,
+        original_vertex_order_changed: false,
         node,
         source: (0..u32::try_from(positions.len()).unwrap_or(u32::MAX)).collect(),
         submeshes: vec![Submesh {
@@ -134,6 +221,7 @@ fn bare_mesh(node: usize, positions: Vec<[f32; 3]>, indices: Vec<u32>) -> Mesh {
             node_id: 0,
             first_index: 0,
             index_count: indices.len(),
+            origin: None,
         }],
         normals: (!indices.is_empty()).then(|| smooth_normals(&positions, &indices)),
         normals_computed: !indices.is_empty(),

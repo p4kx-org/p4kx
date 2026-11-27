@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::provenance::ResolvedSoundList;
 use super::view::{IndexInfo, SoundList, TriggerList};
 
 /// Where the audio index of the Sounds tab stands.
@@ -64,5 +65,5 @@ pub(super) enum Sounds {
     None,
     Loading,
     Undefined,
-    Ready(Box<SoundList>),
+    Ready(Box<ResolvedSoundList>),
 }

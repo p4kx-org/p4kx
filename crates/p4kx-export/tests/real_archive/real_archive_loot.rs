@@ -2,16 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Loot tables, archetypes, pool filters and the containers placed with a multi config in the
-//! Basetool catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
+//! P4KX catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
+
+#[path = "real_archive_legacy_loot_sdk.rs"]
+mod legacy_sdk;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -25,7 +28,10 @@ fn print_line(line: &str) {
 
 fn built() -> Result<(Value, Vec<String>), Box<dyn Error>> {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let warnings = built
         .summary()
         .warnings()
@@ -49,8 +55,56 @@ fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
 fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn Error>> {
     Ok(list(catalog, kind)?
         .iter()
-        .filter_map(|entry| entry["guid"].as_str())
+        .filter_map(|entry| {
+            entry
+                .pointer("/guid/value")
+                .or_else(|| entry.get("guid"))
+                .and_then(Value::as_str)
+        })
         .collect())
+}
+
+fn filter_guids(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
+    let table = catalog
+        .pointer("/definitions/lootPoolFilters")
+        .ok_or("canonical Loot definitions table")?;
+    assert_eq!(
+        table.get("availability").and_then(Value::as_str),
+        Some("available"),
+        "the real Archive declares its Loot family"
+    );
+    let rows = table
+        .get("rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical physical Loot rows")?;
+    let mut guids = HashSet::new();
+    for row in rows {
+        let cell = row
+            .get("guid")
+            .ok_or("independently sourced original header GUID")?;
+        assert_eq!(
+            cell.get("state").and_then(Value::as_str),
+            Some("present"),
+            "an emitted original GUID is readable"
+        );
+        for member in [
+            "containsEncryptedSource",
+            "sourceUsesRefs",
+            "sourceSetComplete",
+        ] {
+            assert!(
+                cell.get(member).is_some(),
+                "required immediate origin member {member}"
+            );
+        }
+        let guid = cell
+            .get("value")
+            .and_then(Value::as_str)
+            .ok_or("exact original GUID text")?;
+        let _: Guid = guid.parse()?;
+        guids.insert(guid);
+    }
+    Ok(guids)
 }
 
 fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
@@ -121,7 +175,7 @@ fn the_loot_kinds_and_the_containers_of_a_real_archive_are_linked() -> TestResul
     let catalog = catalog()?;
     let tables = guids(&catalog, "lootTables")?;
     let archetypes = guids(&catalog, "lootArchetypes")?;
-    let filters = guids(&catalog, "lootPoolFilters")?;
+    let filters = filter_guids(&catalog)?;
     let configs = guids(&catalog, "subHarvestableMultiConfigs")?;
     let containers = list(&catalog, "lootContainers")?;
     print_line(&format!(
@@ -171,9 +225,10 @@ fn the_loot_kinds_and_the_containers_of_a_real_archive_are_linked() -> TestResul
     assert!(!containers.is_empty(), "no loot container is placed");
     assert_resolve(
         "the config of a container",
-        containers
-            .iter()
-            .filter_map(|row| row["multiConfigGuid"].as_str()),
+        containers.iter().filter_map(|row| {
+            row.pointer("/multiConfigGuid/value")
+                .and_then(Value::as_str)
+        }),
         &configs,
     );
     Ok(())
@@ -196,9 +251,16 @@ fn the_older_loot_records_of_a_real_archive_resolve_and_the_scan_warns_of_nothin
     for table in list(&catalog, "legacyLootTables")? {
         assert_resolve(
             "the archetypes of an older table",
-            array(table, "entries")
+            table
+                .pointer("/entries/value")
+                .and_then(Value::as_array)
+                .ok_or("sourced legacy table entries")?
                 .iter()
-                .filter_map(|entry| entry["archetypeGuid"].as_str()),
+                .filter_map(|entry| {
+                    entry
+                        .pointer("/value/archetypeGuid/value")
+                        .and_then(Value::as_str)
+                }),
             &archetypes,
         );
     }

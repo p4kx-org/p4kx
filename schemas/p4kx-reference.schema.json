@@ -1,0 +1,503 @@
+{
+  "$defs": {
+    "Algorithm": {
+      "enum": [
+        "sha256"
+      ],
+      "type": "string"
+    },
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fingerprint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/ArtifactRole"
+        }
+      },
+      "required": [
+        "path",
+        "role"
+      ],
+      "type": "object"
+    },
+    "ArtifactRole": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "payload",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "identity": {
+              "$ref": "#/$defs/Identity"
+            },
+            "kind": {
+              "const": "sourceCopy",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "identity"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "producerStdout",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "producerStderr",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "producerErrorLog",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BuildIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "buildId": {
+          "type": "string"
+        },
+        "changeNumber": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "branch",
+        "version",
+        "changeNumber",
+        "buildId"
+      ],
+      "type": "object"
+    },
+    "Completion": {
+      "additionalProperties": false,
+      "properties": {
+        "errors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exitCode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ownerAssertsSuccess": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ownerAssertsSuccess",
+        "errors"
+      ],
+      "type": "object"
+    },
+    "DcbIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/Fingerprint"
+        }
+      },
+      "required": [
+        "entry",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "Digest": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/Algorithm"
+        },
+        "value": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Expected": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/Identity"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/Location"
+          },
+          "maxItems": 2000000,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "identity",
+        "targets"
+      ],
+      "type": "object"
+    },
+    "Fingerprint": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "bytes",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Identity": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "entry",
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "dcb": {
+              "type": "string"
+            },
+            "guid": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "record",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "guid",
+            "dcb"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "subresource": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "PatchScope": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unmodified",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "kind": {
+              "const": "local",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "description",
+            "digest"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Preparation": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "finalized": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "expectedDigest",
+        "finalized"
+      ],
+      "type": "object"
+    },
+    "Producer": {
+      "additionalProperties": false,
+      "properties": {
+        "binary": {
+          "$ref": "#/$defs/Fingerprint"
+        },
+        "patchScope": {
+          "$ref": "#/$defs/PatchScope"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "tool": {
+          "$ref": "#/$defs/Tool"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "version",
+        "revision",
+        "binary",
+        "patchScope"
+      ],
+      "type": "object"
+    },
+    "Selection": {
+      "additionalProperties": false,
+      "properties": {
+        "declaration": {
+          "type": "string"
+        },
+        "emptyReason": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/SelectionMode"
+        }
+      },
+      "required": [
+        "mode",
+        "declaration"
+      ],
+      "type": "object"
+    },
+    "SelectionMode": {
+      "enum": [
+        "all",
+        "mainOnly",
+        "filtered",
+        "sampled"
+      ],
+      "type": "string"
+    },
+    "SourceDataset": {
+      "additionalProperties": false,
+      "properties": {
+        "archive": {
+          "$ref": "#/$defs/Fingerprint"
+        },
+        "build": {
+          "$ref": "#/$defs/BuildIdentity"
+        },
+        "dcb": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DcbIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "inventory": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "archive",
+        "build",
+        "inventory"
+      ],
+      "type": "object"
+    },
+    "Tool": {
+      "enum": [
+        "unp4k",
+        "unforge",
+        "starbreaker"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/Artifact"
+      },
+      "maxItems": 2000000,
+      "type": "array"
+    },
+    "completion": {
+      "$ref": "#/$defs/Completion"
+    },
+    "expected": {
+      "items": {
+        "$ref": "#/$defs/Expected"
+      },
+      "maxItems": 1000000,
+      "type": "array"
+    },
+    "preparation": {
+      "$ref": "#/$defs/Preparation"
+    },
+    "producer": {
+      "$ref": "#/$defs/Producer"
+    },
+    "schemaVersion": {
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "selection": {
+      "$ref": "#/$defs/Selection"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceDataset"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "producer",
+    "source",
+    "selection",
+    "expected",
+    "artifacts",
+    "preparation",
+    "completion"
+  ],
+  "title": "Manifest",
+  "type": "object"
+}

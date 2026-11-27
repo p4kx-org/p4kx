@@ -17,6 +17,9 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{check_glb, real_archive_key, real_archive_path};
 
+#[path = "real_creature_preview.rs"]
+mod selected;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 /// What the creatures of one animation database came to: the most of each count over them.
@@ -73,12 +76,13 @@ fn observe(
         .iter()
         .filter(|animation| animation.channels > 0)
         .count();
-    assert_eq!(
-        written,
-        counted,
-        "{}: the summary counts the written animations",
-        tree.class_name()
-    );
+    if written != counted {
+        return Err(format!(
+            "{}: the GLB and its summary disagree about the written animations",
+            tree.class_name()
+        )
+        .into());
+    }
     Ok(Observed {
         read: clips.set.animations.len(),
         fitted: fitted.len(),
@@ -90,6 +94,12 @@ fn observe(
             .map(|issue| issue.kind().to_string())
             .collect(),
     })
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and P4KX_ANIMATION_SCOPE_ENTITY and pass --ignored"]
+fn selected_creature_writes_an_observed_animated_glb() -> Result<(), String> {
+    selected::verify()
 }
 
 #[test]

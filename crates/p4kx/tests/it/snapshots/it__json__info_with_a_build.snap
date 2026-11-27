@@ -1,5 +1,5 @@
 ---
-source: crates/p4kx/tests/json.rs
+source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
@@ -16,5 +16,79 @@ expression: json
   "encrypted_count": 1,
   "entry_count": 4,
   "issue_count": 0,
+  "metadata": {
+    "declarationState": "available",
+    "layout": "zip64",
+    "sourceLength": "1407",
+    "v2": null,
+    "version": "1.0",
+    "zip": {
+      "count": "4",
+      "end": {
+        "comment": {
+          "available": {
+            "length": "16",
+            "offset": "1391"
+          },
+          "declaredLength": "16",
+          "offset": "1391",
+          "state": "complete"
+        },
+        "commentLength": 16,
+        "directoryDisk": 65535,
+        "directoryOffset": 4294967295,
+        "directorySize": 4294967295,
+        "disk": 65535,
+        "entries": 65535,
+        "entriesOnDisk": 65535,
+        "fixed": {
+          "length": "22",
+          "offset": "1369"
+        },
+        "following": {
+          "length": "0",
+          "offset": "1407"
+        }
+      },
+      "installation": null,
+      "locator": {
+        "disk": 0,
+        "disks": 1,
+        "range": {
+          "length": "20",
+          "offset": "1349"
+        },
+        "target": "1293"
+      },
+      "records": {
+        "length": "1073",
+        "offset": "220"
+      },
+      "zip64": {
+        "declaredSize": "44",
+        "directoryDisk": 0,
+        "directoryOffset": "220",
+        "directorySize": "1073",
+        "disk": 0,
+        "entries": "4",
+        "entriesOnDisk": "4",
+        "extension": {
+          "available": {
+            "length": "0",
+            "offset": "1349"
+          },
+          "declaredLength": "0",
+          "offset": "1349",
+          "state": "complete"
+        },
+        "fixed": {
+          "length": "56",
+          "offset": "1293"
+        },
+        "versionMadeBy": 46,
+        "versionNeeded": 45
+      }
+    }
+  },
   "size": 118
 }

@@ -162,6 +162,139 @@ fn the_json_report_lists_parts_counts_and_issues() -> TestResult {
 }
 
 #[test]
+fn json_origins_keep_the_selected_loadout_separate_from_the_body_override() -> TestResult {
+    use p4kx_testkit::test_key;
+    use serde_json::Value;
+
+    let mut payloads = Vec::new();
+    for encrypted in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let entries = armour_entries()
+            .into_iter()
+            .map(|entry| {
+                if encrypted && entry.path() == "Data\\Game2.dcb" {
+                    entry.encrypted()
+                } else {
+                    entry
+                }
+            })
+            .collect();
+        let archive = write_archive(dir.path(), entries)?;
+        let out = dir.path().join("armour.glb");
+        let key = test_key().to_hex();
+        let result = glb(
+            &archive,
+            &out,
+            &[],
+            &[
+                "--loadout",
+                "TEST_Soldier",
+                "--body",
+                "female",
+                "--key",
+                &key,
+            ],
+            true,
+        )?;
+        assert_eq!(result.code, Some(0), "{}", result.stderr);
+        let report: Value = serde_json::from_str(&result.stdout)?;
+        check_json_origins(&report, encrypted)?;
+        payloads.push(std::fs::read(out)?);
+    }
+    assert_eq!(
+        payloads.first(),
+        payloads.get(1),
+        "Archive encryption does not change the GLB"
+    );
+    Ok(())
+}
+
+fn check_json_origins(report: &serde_json::Value, encrypted: bool) -> TestResult {
+    use serde_json::Value;
+
+    check_loadout_class_origin(report, encrypted)?;
+    let fields = &report["fieldOrigins"];
+    assert_eq!(
+        fields.get("/parts/1/file").ok_or("worn model selector")?["containsEncryptedSource"],
+        if encrypted {
+            Value::Bool(true)
+        } else {
+            Value::Null
+        },
+        "the selected geometry field contributes while model selection remains partial"
+    );
+    assert_eq!(report["body"], "female", "the explicit body override wins");
+    let body = fields.get("/body").ok_or("body origin")?;
+    assert_eq!(
+        body["containsEncryptedSource"], false,
+        "the override is tool-authored"
+    );
+    assert_eq!(
+        body["sourceSetComplete"], true,
+        "the override has complete inputs"
+    );
+    let bones = fields.get("/bones").ok_or("bone count origin")?;
+    assert!(
+        !bones["sourceUsesRefs"]
+            .as_array()
+            .ok_or("rig uses")?
+            .is_empty(),
+        "the emitted bones include the physically read base rig"
+    );
+    let nodes = fields.get("/nodes").ok_or("node count origin")?;
+    assert_eq!(
+        nodes["containsEncryptedSource"],
+        Value::Null,
+        "other node inputs remain unknown"
+    );
+    assert_eq!(
+        nodes["sourceSetComplete"], false,
+        "the base rig alone does not prove this count"
+    );
+    Ok(())
+}
+
+fn check_loadout_class_origin(report: &serde_json::Value, encrypted: bool) -> TestResult {
+    use serde_json::Value;
+
+    let class = report["fieldOrigins"]
+        .get("/loadout/class_name")
+        .ok_or("loadout class origin")?;
+    assert_eq!(
+        report
+            .pointer("/loadout/class_name")
+            .and_then(Value::as_str),
+        Some("TEST_Soldier"),
+        "the original selected class"
+    );
+    assert_eq!(
+        class["containsEncryptedSource"], encrypted,
+        "DataForge origin"
+    );
+    assert_eq!(
+        class["sourceSetComplete"], true,
+        "complete class name inputs"
+    );
+    let refs = class["sourceUsesRefs"].as_array().ok_or("class uses")?;
+    let uses = report
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("source uses")?;
+    assert!(
+        uses.iter().any(|usage| {
+            usage.get("id").is_some_and(|id| refs.contains(id))
+                && usage
+                    .pointer("/location/recordIndex")
+                    .and_then(Value::as_u64)
+                    == Some(12)
+                && usage.pointer("/location/field").and_then(Value::as_str) == Some("recordName")
+        }),
+        "the class evidence identifies the TEST_Soldier fixture Record"
+    );
+    Ok(())
+}
+
+#[test]
 fn the_bare_body_is_written_without_pieces() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path(), armour_entries())?;

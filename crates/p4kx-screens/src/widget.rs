@@ -5,6 +5,7 @@ use p4kx_dataforge::{Guid, Location, Reference, Step, StructValue, Value};
 
 use crate::assets::WidgetAssets;
 use crate::bindings::{ParamValues, param_values, typed_values};
+use crate::button_component::ButtonComponent;
 use crate::colour::ColorSpec;
 use crate::corners::Corner;
 use crate::flex::{Flex, parse_flex};
@@ -12,8 +13,10 @@ use crate::geometry::{Bounds, Dim, Edges, Overflow};
 use crate::picture::Picture;
 use crate::reader::{as_struct, child, flag, float, int, items, reference, text};
 use crate::rest::RestParams;
+use crate::screen_asset_inputs::WidgetInput;
 use crate::style::{Entry, Modifiers, inline_entries, modifiers};
 use crate::text::TextSpec;
+use crate::widget_canvas_ref::WidgetCanvasRef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Parent {
@@ -55,6 +58,7 @@ pub(crate) enum CanvasSizing {
     reason = "the flags mirror the widget fields of the Record one to one"
 )]
 pub(crate) struct Widget {
+    pub(crate) input: WidgetInput,
     pub(crate) type_name: String,
     pub(crate) name: String,
     pub(crate) parent: Parent,
@@ -82,14 +86,14 @@ pub(crate) struct Widget {
     pub(crate) shrink: f32,
     pub(crate) order: i32,
     pub(crate) layer: i32,
-    pub(crate) canvas: Option<Guid>,
-    pub(crate) canvas_dangling: bool,
+    pub(crate) canvas: WidgetCanvasRef,
     pub(crate) canvas_sizing: CanvasSizing,
     pub(crate) stylesheet: Option<Guid>,
     pub(crate) shape: ShapeStyle,
     pub(crate) text: Option<TextSpec>,
     pub(crate) picture: Picture,
     pub(crate) kit: Kit,
+    pub(crate) button: Option<Box<ButtonComponent>>,
     pub(crate) params: ParamValues,
     pub(crate) typed: RestParams,
     pub(crate) assets: WidgetAssets,
@@ -148,11 +152,13 @@ pub(crate) struct Repeat {
     pub(crate) modifiers: Vec<CloneModifier>,
 }
 
+pub(crate) const ARRAY_VARIABLE: &str = "arrayVariable";
+
 impl Repeat {
     fn parse(structure: &StructValue<'_>, canvas: Guid) -> Self {
         Self {
             target: reference(structure, "target").and_then(|target| target_of(target, canvas)),
-            array_variable: text(structure, "arrayVariable")
+            array_variable: text(structure, ARRAY_VARIABLE)
                 .filter(|name| !name.is_empty())
                 .map(str::to_owned),
             modifiers: clone_modifiers(structure, canvas),
@@ -189,7 +195,7 @@ impl ShapeStyle {
 }
 
 impl Widget {
-    pub(crate) fn parse(structure: &StructValue<'_>, canvas: Guid) -> Self {
+    pub(crate) fn parse(structure: &StructValue<'_>, canvas: Guid, input: WidgetInput) -> Self {
         let sizing = child(structure, "sizing");
         let dim = |name| Dim::parse(sizing.and_then(|sizing| child(sizing, name)));
         let layout = child(structure, "layoutPolicy");
@@ -197,6 +203,7 @@ impl Widget {
         let item = child(structure, "layoutPolicyItem");
         let (background, background_enabled, gradient) = background_of(structure);
         Self {
+            input,
             type_name: structure.type_name().to_owned(),
             name: text(structure, "name").unwrap_or_default().to_owned(),
             parent: parent_of(structure, canvas),
@@ -232,8 +239,7 @@ impl Widget {
                 .and_then(|common| int(common, "order"))
                 .unwrap_or(0),
             layer: int(structure, "layer").unwrap_or(0),
-            canvas: reference(structure, "canvas").map(Reference::guid),
-            canvas_dangling: matches!(structure.field("canvas"), Some(Value::Error(_))),
+            canvas: WidgetCanvasRef::read(structure),
             stylesheet: reference(structure, "stylesheetOverride").map(Reference::guid),
             canvas_sizing: if text(structure, "sizingMethod") == Some("Scale") {
                 CanvasSizing::Scale
@@ -244,6 +250,7 @@ impl Widget {
             text: TextSpec::parse(structure),
             picture: Picture::parse(structure),
             kit: Kit::parse(structure),
+            button: ButtonComponent::read(structure).map(Box::new),
             params: param_values(structure),
             typed: typed_values(structure),
             assets: WidgetAssets::scan(structure),

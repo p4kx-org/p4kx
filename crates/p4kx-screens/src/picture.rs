@@ -41,14 +41,15 @@ pub(crate) enum VectorFit {
 }
 
 impl VectorFit {
-    fn parse(name: Option<&str>) -> Self {
-        match name {
-            Some("StretchXY") => Self::StretchXY,
-            Some("StretchX") => Self::StretchX,
-            Some("StretchY") => Self::StretchY,
-            Some("Center") => Self::Center,
-            _ => Self::Contain,
-        }
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        Some(match name {
+            "Contain" => Self::Contain,
+            "StretchXY" => Self::StretchXY,
+            "StretchX" => Self::StretchX,
+            "StretchY" => Self::StretchY,
+            "Center" => Self::Center,
+            _ => return None,
+        })
     }
 }
 
@@ -97,7 +98,9 @@ impl VectorSpec {
         let edge = |name, default| rect.and_then(|rect| float(rect, name)).unwrap_or(default);
         Self {
             path,
-            fit: VectorFit::parse(text(source, "scalingBehavior")),
+            fit: text(source, "scalingBehavior")
+                .and_then(VectorFit::parse)
+                .unwrap_or_default(),
             flip: [
                 flag(source, "flipHorizontal").unwrap_or(false),
                 flag(source, "flipVertical").unwrap_or(false),
@@ -141,14 +144,18 @@ pub(crate) fn icon_preset_path(preset: &str) -> String {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Picture {
     pub(crate) texture: String,
+    pub(crate) runtime_source: Option<String>,
     pub(crate) fit: Fit,
     pub(crate) flip: [bool; 2],
     pub(crate) place: [f32; 2],
     pub(crate) colour: Option<ColorSpec>,
     pub(crate) vector: VectorSpec,
+    pub(crate) has_svg_fill: bool,
     pub(crate) icon_preset: Option<String>,
     pub(crate) url: String,
 }
+
+pub(crate) const RUNTIME_IMAGE_SOURCE: &str = "imageSource";
 
 impl Picture {
     pub(crate) fn parse(structure: &StructValue<'_>) -> Self {
@@ -174,6 +181,9 @@ impl Picture {
         };
         Self {
             texture: text(structure, "imagePath").unwrap_or_default().to_owned(),
+            runtime_source: text(structure, RUNTIME_IMAGE_SOURCE)
+                .filter(|name| !name.trim().is_empty())
+                .map(str::to_owned),
             fit: Fit::parse(text(structure, "imageScalingMethod")),
             flip: [
                 flag(structure, "flipH").unwrap_or(false),
@@ -185,6 +195,7 @@ impl Picture {
             ],
             colour: structure.field("color").and_then(ColorSpec::parse),
             vector,
+            has_svg_fill: svg_fill.is_some(),
             icon_preset: preset.map(str::to_owned),
             url: text(structure, "urlOptional")
                 .unwrap_or_default()

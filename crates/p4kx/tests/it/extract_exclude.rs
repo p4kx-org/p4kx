@@ -88,7 +88,12 @@ fn extract_leaves_out_what_an_exclude_matches() -> TestResult {
 
     assert_eq!(
         files(&fixture.out)?,
-        ["Data/Objects/Sub/part.cga", "Data/Objects/ship.cga"],
+        [
+            "Data/Objects/Sub/part.cga",
+            "Data/Objects/Sub/part.cga.p4kx-origin.jsonl",
+            "Data/Objects/ship.cga",
+            "Data/Objects/ship.cga.p4kx-origin.jsonl",
+        ],
         "the level-of-detail companions are not written"
     );
     Ok(())
@@ -105,7 +110,12 @@ fn extract_takes_several_excludes_ignoring_case_and_separator_kind() -> TestResu
 
     assert_eq!(
         files(&fixture.out)?,
-        ["Data/Objects/ship.cga", "Data/Objects/ship_lod2.cgam"],
+        [
+            "Data/Objects/ship.cga",
+            "Data/Objects/ship.cga.p4kx-origin.jsonl",
+            "Data/Objects/ship_lod2.cgam",
+            "Data/Objects/ship_lod2.cgam.p4kx-origin.jsonl",
+        ],
         "each exclude removes its own Entries"
     );
     Ok(())

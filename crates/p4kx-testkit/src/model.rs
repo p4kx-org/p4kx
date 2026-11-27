@@ -72,6 +72,7 @@ pub struct TestModel {
     pub(crate) vertices: Vec<TestVertex>,
     pub(crate) indices: Vec<u32>,
     pub(crate) submeshes: Vec<TestSubmesh>,
+    pub(crate) mesh_extra_words: Vec<u32>,
     pub(crate) material_library: String,
     pub(crate) positions: TestPositions,
     pub(crate) normals: TestNormals,
@@ -108,6 +109,7 @@ impl TestModel {
             vertices: cube_vertices(),
             indices: (0..36).map(cube_index).collect(),
             submeshes: cube_submeshes(),
+            mesh_extra_words: Vec::new(),
             material_library: CUBE_MATERIAL_LIBRARY.to_owned(),
             positions: TestPositions::Quantized,
             normals: TestNormals::Float,
@@ -187,7 +189,7 @@ impl TestModel {
         self
     }
 
-    /// Names `library` as the material library, instead of [`CUBE_MATERIAL_LIBRARY`].
+    /// Names `library` as the material library, with an empty name omitting the chunk.
     #[must_use]
     pub fn with_material_library(mut self, library: impl Into<String>) -> Self {
         self.material_library = library.into();
@@ -247,6 +249,13 @@ impl TestModel {
         self
     }
 
+    /// Replaces the physical index stream.
+    #[must_use]
+    pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
+        self.indices = indices;
+        self
+    }
+
     /// Replaces the index at `position` with `index`.
     #[must_use]
     pub fn with_index(mut self, position: usize, index: u32) -> Self {
@@ -294,9 +303,10 @@ impl TestModel {
     /// Returns the bytes of the `.cgf` file.
     #[must_use]
     pub fn cgf(&self) -> Vec<u8> {
-        let mut file = TestChunkFile::ivo()
-            .chunk(EXPORT_FLAGS, IVO_VERSION, [0; 128])
-            .chunk(MTL_NAME_320, IVO_VERSION, self.material_name_chunk());
+        let mut file = TestChunkFile::ivo().chunk(EXPORT_FLAGS, IVO_VERSION, [0; 128]);
+        if !self.material_library.is_empty() {
+            file = file.chunk(MTL_NAME_320, IVO_VERSION, self.material_name_chunk());
+        }
         if !self.nodes.is_empty() {
             file = file.chunk(NODE_MESH_COMBO, IVO_VERSION, nmc_chunk(self));
         }

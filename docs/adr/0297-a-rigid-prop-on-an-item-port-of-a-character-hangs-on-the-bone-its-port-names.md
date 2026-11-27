@@ -39,7 +39,7 @@ well; they are character items (`Char_*`) and the box is not meant to be worn.
   helper is no bone of the skeleton, without a note.
 - **No turn is applied.** The bone's frame carries the prop as it is: in the bind pose the tumbler
   lies in the palm of the right hand and the mobiGlas sits flat on the left forearm, checked in
-  Blender. The turn of ADR-0231 belongs to the item helpers of worn armour.
+  Blender. ADR-0231 describes the worn-armour fallback for an unavailable item locator.
 
 ## Consequences
 

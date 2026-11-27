@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder};
+use p4kx_extraction::{DataForge, DataForgeError, RecordTree, StructValue, TreeBuilder};
 
+use super::LinkedStatTarget;
 use super::walk::struct_named;
-use super::weapon::linked;
+use super::weapon::linked_target;
 use crate::contract_stats_gear::{
     ArmorStats, ClothingStats, DamageResistance, RadarStats, ResistanceEntry, SalvageModifier,
     TractorBeamStats, TractorModifier, WeaponModifierStats,
 };
-use crate::record_fields::{boolean, component, number, reference, structure};
+use crate::record_fields::{boolean, component, number, structure};
 
-const RESISTANCE_MACRO: &str = "DamageResistanceMacro";
+pub(super) const RESISTANCE_MACRO: &str = "DamageResistanceMacro";
+pub(super) const ARMOR_COMPONENT: &str = "SCItemSuitArmorParams";
+pub(super) const ARMOR_LINK: &str = "damageResistance";
 const TRACTOR_ACTION: &str = "SWeaponActionFireTractorBeamParams";
 const SALVAGE_MODIFIER: &str = "SSalvageModifier";
 const TRACTOR_MODIFIER: &str = "STractorModifier";
@@ -45,23 +48,32 @@ fn resistance(tree: &RecordTree<'_>) -> Option<DamageResistance> {
 ///
 /// The resistances are read from the `DamageResistanceMacro` Record the item links to; one that
 /// is missing, has another struct or cannot be built leaves them `None`.
-pub(super) fn armor<'f>(
+pub(super) fn armor<'f, E>(
     tree: &RecordTree<'f>,
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
-) -> Option<ArmorStats> {
-    let suit = component(tree, "SCItemSuitArmorParams")?;
-    let damage_resistance = linked(
-        reference(Some(suit), "damageResistance"),
-        RESISTANCE_MACRO,
-        forge,
-        trees,
-    )
-    .and_then(|record| resistance(&record));
-    Some(ArmorStats {
+    observe: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        Result<&RecordTree<'f>, &DataForgeError>,
+    ) -> Result<(), E>,
+) -> Result<Option<ArmorStats>, E> {
+    let Some(suit) = component(tree, ARMOR_COMPONENT) else {
+        return Ok(None);
+    };
+    let linked = suit
+        .field(ARMOR_LINK)
+        .and_then(|selector| linked_target(selector, RESISTANCE_MACRO, forge));
+    let damage_resistance = if let Some(target) = linked {
+        let body = trees.build(&target.record);
+        observe(target, body.as_ref())?;
+        body.as_ref().ok().and_then(resistance)
+    } else {
+        None
+    };
+    Ok(Some(ArmorStats {
         integrity_milestone_to_break: number(Some(suit), "integrityMilestoneToBreak"),
         damage_resistance,
-    })
+    }))
 }
 
 pub(super) fn clothing(tree: &RecordTree<'_>) -> Option<ClothingStats> {

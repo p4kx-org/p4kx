@@ -8,7 +8,7 @@ use crate::DataType;
 use crate::query::lexer::is_bare_name;
 
 /// A name that fits, with the field it names, `None` for a struct name.
-type Named = (u32, Option<Field>);
+type Named = (usize, Option<Field>);
 
 impl QuerySchema {
     /// Returns the names that fit at byte `cursor` of `text`, or `None` where no type or field
@@ -76,15 +76,21 @@ impl QuerySchema {
 
     /// Returns the fields of the structs at `indices`, each name once, in name order.
     fn fields_of(&self, indices: &[usize]) -> Vec<Named> {
-        let mut names: Vec<Named> = indices
-            .iter()
-            .filter_map(|&index| self.entry(index))
-            .flat_map(|entry| entry.fields.iter().map(|field| (field.name, Some(*field))))
-            .collect();
-        if indices.len() > 1 {
-            names.sort_by(|a, b| by_name(self.name(a.0), self.name(b.0)));
-            names.dedup_by_key(|named| named.0);
+        let mut selected = std::collections::HashMap::new();
+        for &index in indices {
+            let mut own = std::collections::HashMap::new();
+            for field in self.fields(index) {
+                own.insert(field.name, field);
+            }
+            for (name, field) in own {
+                selected.entry(name).or_insert(field);
+            }
         }
+        let mut names: Vec<Named> = selected
+            .into_iter()
+            .map(|(name, field)| (name, Some(field)))
+            .collect();
+        names.sort_unstable_by(|a, b| by_name(self.name(a.0), self.name(b.0)));
         names
     }
 
@@ -127,7 +133,7 @@ impl QuerySchema {
     /// Returns the struct names of the structs that are one of `bases`, derive from one or are
     /// one of their bases: every type a component selector accepts.
     fn types_under(&self, bases: &[usize]) -> Vec<Named> {
-        let mut ids: Vec<u32> = (0..self.len())
+        let mut ids: Vec<usize> = (0..self.len())
             .filter(|&index| bases.iter().any(|&base| self.related(index, base)))
             .filter_map(|index| self.entry(index).and_then(|entry| entry.name))
             .collect();
@@ -140,7 +146,7 @@ impl QuerySchema {
     /// field.
     fn ends(&self, from: Option<&str>, path: &Walk<'_>) -> Vec<At> {
         let starts: Vec<usize> = from.map_or_else(
-            || self.declaring(path.head).to_vec(),
+            || self.declaring(path.head).collect(),
             |from| self.position_of(from).into_iter().collect(),
         );
         starts

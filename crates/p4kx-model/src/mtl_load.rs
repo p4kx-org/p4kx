@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::{
-    CompanionError, CompanionPath, CompanionResolver, LayerCache, MaterialLibrary, MaterialStatus,
+    CompanionPath, CompanionResolver, LayerCache, MaterialCompanion, MaterialCompanionUse,
+    MaterialLibrary, MaterialStatus,
 };
 
 /// How much of the material library a model names is read.
@@ -34,53 +35,65 @@ pub(crate) fn load(
         return MaterialStatus::Unnamed;
     };
     let path = name.to_owned();
-    let Some(request) = request_path(name) else {
-        return MaterialStatus::Unreadable {
-            path,
-            reason: "the path leaves the Data folder or is no plain path".to_owned(),
-        };
+    let request = match companions.material_request(name) {
+        Ok(request) => request,
+        Err(error) => {
+            return MaterialStatus::Unreadable {
+                path,
+                reason: error.to_string(),
+                target: None,
+            };
+        }
     };
-    match fetch(&request, companions) {
-        Ok(None) => MaterialStatus::Missing { path },
+    let fetched = fetch(&request, companions);
+    let target = request.into_target();
+    companions.observe_material(MaterialCompanionUse::Library, fetched.origin.as_ref());
+    match fetched.bytes {
+        Ok(None) => MaterialStatus::Missing { path, target },
         Err(error) => MaterialStatus::Unreadable {
             path,
             reason: error.to_string(),
+            target,
         },
-        Ok(Some(bytes)) => match MaterialLibrary::parse(name, &bytes) {
-            Ok(mut library) => {
-                if reading == MaterialReading::Drawn {
-                    crate::mtl_layers::resolve(&mut library, companions, cache);
-                    crate::mtl_relief::check_diffuse_maps(&mut library, companions);
-                }
-                MaterialStatus::Loaded(library)
-            }
+        Ok(Some(bytes)) => match MaterialLibrary::parse_with_resolver(
+            name,
+            &bytes,
+            target.clone(),
+            companions,
+            reading,
+            cache,
+        ) {
+            Ok(library) => MaterialStatus::Loaded(library),
             Err(error) => MaterialStatus::Unreadable {
                 path,
                 reason: error.to_string(),
+                target,
             },
         },
     }
 }
 
-/// Fetches the library: a bare name is first looked for beside the model, as the engine does,
-/// then, like any other path, below `Data`.
+/// Fetches an unrooted bare name beside the model first, then searches below `Data`.
 fn fetch(
-    request: &str,
+    request: &crate::MaterialRequest,
     companions: &mut dyn CompanionResolver,
-) -> Result<Option<Vec<u8>>, CompanionError> {
-    if !request.contains('/')
-        && let Some(bytes) =
-            companions.resolve(CompanionPath::Sibling(&format!("{request}.mtl")))?
-    {
-        return Ok(Some(bytes));
+) -> MaterialCompanion {
+    let path = request.path();
+    if request.searches_sibling() && !path.contains('/') {
+        let sibling =
+            companions.resolve_material_file(CompanionPath::Sibling(&format!("{path}.mtl")));
+        if !matches!(&sibling.bytes, Ok(None)) {
+            return sibling;
+        }
     }
-    companions.resolve(CompanionPath::Material(request))
+    companions.resolve_material_file(CompanionPath::Material(path))
 }
 
 /// Returns `name` with `/` separators and without a leading `Data/` or a `.mtl` extension, or
 /// `None` when it is empty, absolute, names a drive or stream, or has an empty, `.` or `..`
 /// component.
-pub(crate) fn request_path(name: &str) -> Option<String> {
+#[must_use]
+pub fn request_path(name: &str) -> Option<String> {
     let path = name.trim().replace('\\', "/");
     let path = match path.len().checked_sub(4).and_then(|at| path.get(at..)) {
         Some(extension) if extension.eq_ignore_ascii_case(".mtl") => {

@@ -1,0 +1,1234 @@
+# Catalog domain partitioning
+
+## Complete LIVE and PTU measurements
+
+The packaged Windows AMD64 producer at `37605ecae` completed a normal, unfiltered export for
+installed LIVE `13165946` with two Rayon workers, all eleven installed languages, and Zstandard
+level 3. It wrote 1,206,312,950 encoded bytes with 82,668,352,262 decoded bytes pledged in the frame.
+A streaming read verified the checksum, decoded length and single-frame boundary, and measured
+the canonical sections. It counted 93,806 physical sources and 88,689,710 source uses. The
+section census does not read an independent raw export or validate reference closure.
+
+The producer ran for 19 minutes 27 seconds on a Windows host with 93.67 GiB of system-visible RAM.
+Windows recorded a 26.28 GiB process working-set peak. Sampled available system RAM stayed at
+or above 25.99 GiB, with at least 69.52 GiB of commit headroom. The sealed row spools held
+472,249,284 bytes. Windows reported 1,678,571,916 logical process write bytes, including the
+compressed publication. The two historical working-set peaks are below the
+current 40 GB limit. Use the candidate Build and binary with all required
+memory counters for release acceptance.
+
+| Decoded section | LIVE bytes | PTU bytes |
+| --- | ---: | ---: |
+| `loadouts` | 30,674,479,268 | 30,687,183,746 |
+| `provenance` | 22,358,692,968 | 23,679,210,011 |
+| `projections.weaponPlayerAnimationCandidates` | 8,587,490,937 | 8,877,122,157 |
+| `configurations.interactions` | 5,000,644,330 | 5,316,102,335 |
+| `definitions` | 4,875,971,186 | 5,036,210,389 |
+| `placements` | 3,226,353,067 | 3,508,867,924 |
+| `texts` | 1,663,834,064 | 1,787,491,424 |
+
+Loadouts, provenance and weapon animation candidates together account for 74.54% of the decoded
+LIVE document. The target index and source-use inventory need independent parts. Whole-table grouping
+alone would leave several tables above the 1,000,000,000-byte decoded reference limit. At that
+limit LIVE would need at least 83 parts and PTU at least 86, before bundle overhead.
+Measure each encoded part separately because separate frames change compression.
+
+The size comes from JSON records and their source evidence. A resolved Loadout includes the
+ports and attachments under its specific owning entity, including contextual overrides. Each
+weapon animation candidate retains the weapon, actor, original database and tag-token match
+coordinates. The provenance inventory records 88.69 million source-use relationships separately
+from the physical sources. Texture pixels, 3D mesh buffers and audio samples are exported on
+request through the [normal file and media exporters](catalog.md#media-files).
+
+The first normal PTU `13228337` run stopped at the publication check on two unmapped
+mission-phase values. After mapping the original values, the packaged Windows AMD64 producer at
+`1e704c0ae` completed the normal, unfiltered export of the same installed Build. At Zstandard
+level 3, the file is 1,287,882,399 encoded bytes, with 85,600,368,941 decoded bytes pledged in
+the frame. With two Rayon workers, the producer took 21 minutes 14 seconds and reported a
+27.54 GiB Windows working-set peak. Sampled host availability and commit headroom remained at
+or above 29.30 GiB and 74.57 GiB respectively. Windows reported 1,807,985,951 logical process
+write bytes. The PTU byte census verified the frame and counted 114,513 physical sources and
+93,861,565 source uses. [Size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+
+## Reducing the uncompressed document
+
+The normal writer already emits compact JSON. Domain partitioning changes which data a consumer
+fetches. Reducing the total decoded size requires a more compact representation of repeated data.
+
+| Target | Lossless representation | Evidence |
+| --- | --- | --- |
+| `loadouts` | Store each observed Vehicle XML selection sequence once. A field keeps its local uses and a reference to the exact prefix of that sequence. | The 30.67 GB section contains 10,803 trees and 284,449 ports including descendants. The producer shares selected prefixes in memory and expands them in the JSON of multiple port attributes. |
+| `provenance.uses` | Use a typed table with a column declaration and compact row arrays. Encode the three closed scope, role and encryption vocabularies with one-digit codes. | The exact 88,689,710 use rows repeat six required keys of 62 bytes per row. The keys account for 5,498,762,020 bytes. The three vocabularies save at least 2,128,553,040 more bytes with the proposed codes. |
+| `projections.weaponPlayerAnimationCandidates` | Store physical weapon, actor, branch and clip-option endpoints once and retain the ordered match relationships by reference. | The 8.59 GB section contains candidate relationships with repeated endpoints and original tag evidence. |
+
+The model for the provenance table alone reduces the current 82.67 GB LIVE document to about
+75.04 GB before the small table declarations. Its values, exact coordinates and original IDs
+would remain recoverable. Shorter opaque IDs and dictionaries for repeated coordinate names are
+additional candidates. Each byte saved per use ID removes 88,689,710 bytes from the use inventory,
+plus its occurrences in references. Measure those occurrences and the complete dictionary cost
+before choosing an encoding.
+
+A byte census of the completed LIVE file attributed 29,873,701,416 bytes to the
+`sourceUsesRefs` arrays for `displayNameKey`, `flags`, `maxSize`, `minSize`, `portTags` and
+`requiredTags`. Those arrays contain 690,731,520 reference occurrences. They account for 97.39%
+of `loadouts` and 36.14% of the complete decoded file. The census verified the frame and
+reconciled its disjoint counts against all 30,674,479,268 bytes in `loadouts`.
+
+In PTU `13228337`, the same six arrays occupied 29,871,113,599 bytes across 10,340 trees and
+290,711 ports. The string-compatible encoder at `e29c1ffd5` emits shorter opaque IDs for
+known physical CryXml and text XML coordinates. The PTU census priced 509,833,062 eligible
+ID occurrences in those arrays using their original coordinate shapes and exact replacement
+lengths. The modeled reduction in those six fields is 11,303,107,764 bytes. Applying only
+that reduction yields 74,297,261,177 decoded bytes for the complete PTU Catalog.
+
+The paired native Windows AMD64 producer at `8a23763e`, from integration head `e29c1ffd5`,
+completed on the same PTU Archive stamp and options. The decoded size fell from 85,600,368,941
+to 74,174,978,158 bytes, a reduction of 11,425,390,783 bytes (13.35%). The Zstandard level 3
+file fell from 1,287,882,399 to 1,282,450,554 bytes, a reduction of 5,431,845 bytes (0.42%).
+A separate read of the completed candidate frame verified the checksum and exact decoded size.
+It reconciled both runs at 114,513 physical sources, 93,861,565 source uses, 10,340 loadouts,
+290,711 ports and 690,838,290 references across the six dominant fields. The six arrays saved
+exactly 11,303,107,764 bytes. Source-use IDs are document-local strings and each field carries
+its original schema-v3 encryption and completeness markers.
+
+On the compact PTU baseline, `provenance.uses` occupies 23,581,982,024 bytes.
+Applying the positional-row and vocabulary model to its 93,861,565 observed rows
+would save at least 8,072,094,590 bytes before table declarations. `loadouts`
+occupies 19,384,075,982 bytes, including 18,568,005,835 bytes in the six port-field
+reference arrays. Pooling the shared selector prefixes targets that remaining
+repetition. The candidate animation relations occupy 8,877,122,157 bytes.
+
+A deterministic one-to-one remap to nine-character ASCII identifiers would retain the current
+string schema. It bounds the six arrays at 8,292,191,628 bytes including quotes, separators
+and brackets, a reduction of at least 21,581,509,788 bytes for this LIVE inventory. The
+identifier strings would change. Each must still resolve to the same source, location, role
+and encryption state throughout the generation. The calculation excludes the rest of the
+Catalog and the runtime cost of the mapping. It does not reduce the number of reference
+occurrences. Sharing prefixes reduces that number, so the savings from the two approaches
+overlap.
+
+In a synthetic 128-port model, six attributes per port used the same growing selector prefix
+and different local uses. All 768 complete lists were distinct. Sharing the prefixes reduced
+1,451,401 bytes to 134,582 bytes and expanded to the exact original values, immediate markers
+and sorted unique use IDs. The LIVE census measures the current arrays. Installed-build
+savings depend on the observed prefix boundaries, local-use sizes and replacement encoding.
+
+Keep `containsEncryptedSource` and `sourceSetComplete` directly at each datum. The compact
+representation must explicitly identify its encoding and resolve every local use, exact
+selector prefix, physical source and ancestor in the same generation. Match a prefix against
+the observed selection sequence. Provenance inventory order is an independent sort order.
+Whole-list interning and prefix sharing can coexist. Text and content dictionaries preserve
+the existing public and protected text classification.
+
+Compare the full normalized rows, physical occurrence order, original IDs, expanded use sets,
+health and encryption states against the existing writer on synthetic fixtures and the same
+installed Builds. Measure decoded and encoded sizes, reader and writer memory, and selective
+reference closure. A required wire-shape change needs updated contract and consumer fixtures.
+The typed SDK can keep returning the existing domain values and source observations.
+
+## Earlier sizing runs
+
+The installed LIVE `13165946` Starmap diagnostic export was 2.811 GB of decoded JSON. The
+PTU `13189690` Nyx Starmap diagnostic export was 2.995 GB. Both Filter-scoped measurements
+predate compact source-use IDs.
+
+An unfiltered Windows AMD64 LIVE trial using the release producer for `2f134fbfc`
+reached 46.68 GiB of sampled peak working set during `project-contract-generators`.
+The host fell below the 12 GiB physical-memory reserve before JSON sizing or publication,
+so this run provides no encoded or decoded size. The process working set grew from 6.10 GiB
+to 36.70 GiB during `records` and from 40.38 GiB to 44.30 GiB during
+`project-mission-broker-entries`. [Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43803352398/job/133089995250)
+
+A second unfiltered trial used the verified Windows AMD64 release producer for
+`0e1da3f4a` on the same LIVE Archive. Peak sampled working set during `records`
+was 32.37 GiB, down from 36.72 GiB. The run passed `project-contract-generators`
+and reached `project-configurations`, where the 12 GiB physical-memory reserve
+stopped it at 44.87 GiB working set and 11.96 GiB available on the host. It again
+stopped before JSON sizing or publication. The reserves apply to the host's
+available physical memory and system commit headroom in the measurement harness.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133122281746)
+
+A third unfiltered trial used the Windows AMD64 release artifact of merge `867e6b9d9`
+on the same LIVE Archive. The peak sampled working set in `records` was 32.39 GiB.
+The process reached 41.79 GiB during `project-contract-generators`, also the sampled
+peak of that phase in the prior trial. Available physical memory reached 11.97 GiB
+while system commit headroom was 38.01 GiB. The physical-memory reserve stopped the
+process before JSON sizing or publication. The trial preceded the singleton Entity
+class index and prefab-inventory ownership changes.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43826004006/job/133160321493)
+
+A fourth unfiltered trial used the Windows AMD64 release artifact of merge
+`bcd39e238` on the same LIVE Archive with four Rayon workers. Compared with
+the third trial, the sampled working-set peak fell from 32.39 to 28.05 GiB
+during `records` and from 41.79 to 36.37 GiB during
+`project-contract-generators`. Available physical memory at launch was
+50.41 GiB, compared with 50.34 GiB in the third trial. The new run passed
+the contract and configuration phases and reached `project-weapon-animation`.
+The local reserve stopped it at 40.61 GiB working set and 42.04 GiB private
+bytes, with 11.81 GiB physical memory and 36.78 GiB system commit headroom
+available. The writer had yet to size or publish JSON.
+[Release producer](https://github.com/p4kx-org/p4kx/actions/runs/43837672769/job/133201840292)
+
+The Windows AMD64 native package at `9ef12b019` completed preparation for installed
+LIVE `13165946` with two Rayon workers. Windows reported a 25.34 GiB process
+working-set peak. The host retained at least 21.07 GiB of sampled available RAM.
+The process reached `export-health` after about 15 minutes and stopped on an
+accounting error in the harvest dependency of a verified missing Starmap target.
+The memory reserve remained available. No Catalog was published, so decoded and
+compressed sizes still require a complete run. The regression is covered by the
+Normal publication test on the integration branch. [Measurement](https://github.com/p4kx-org/p4kx/issues/1151#issuecomment-7009858377)
+
+| Section | LIVE | PTU |
+| --- | ---: | ---: |
+| `placements.containerInstances` | 1.734 GB | 2.046 GB |
+| `provenance.uses` and `provenance.sources` | 0.678 GB | 0.659 GB |
+| Definitions | 0.177 GB | 0.123 GB |
+| `projections.tagPaths` | 0.146 GB | 0.153 GB |
+
+Container placements alone exceed the 1 GB decoded reference threshold in both captures. Their
+source-use arrays make up roughly three quarters of that section. Moving only that table would leave
+1.077 GB in the LIVE file and 0.949 GB in the PTU file, including the full provenance inventory.
+Split large tables at deterministic boundaries in their existing row order. Start a new part at
+system changes for world placements where practical. A system may span several parts. Keep a row
+and all its nested values together. Treat the requested part size as a target and record an
+oversized row with its actual lengths. Test against decoded bytes, stored bytes and consumer
+limits separately. Retain the complete single-file Export.
+
+## Consumer reference limits
+
+Basetool at `470f3bc` admits LIVE Catalog v2 with a 64,000,000-byte upload limit.
+Its default decoded limit is 1,000,000,000 bytes. The separate 128,000,000-byte default
+limits the aggregate JSON spans the reader retains for known kinds. These are reference
+values for the v3 sizing work. Basetool's v3 importer and its acceptance run are tracked
+in its own repository. Its issue lists P4KX 0.5.0 as a prerequisite and keeps the LIVE
+channel policy. Use a revision-bound LIVE release candidate for the positive import
+and verify the expected PTU channel refusal separately.
+
+### Local consumer refresh
+
+VerseKit 5.4.1 embeds the P4KX 0.4.2 Rust libraries. It uses raw DataForge and
+localization readers and path-filtered calls for contracts, mission locations
+and ship inventory. Its overlay also rebuilds the local mining-location cache
+when the installed Archive stamp or cache format changes. That refresh uses
+`GameData::catalog_all` to build the entire v2 JSON in memory. Its mining projection
+uses mineable elements, compositions, provider presets, harvestable locations
+and Starmap objects, plus names from DataForge and localization.
+
+For v3, read the authored Starmap definition and its parent chain from
+`definitions.starmapObjects`. Resolve placement rows where the projection needs
+the physical placement. The existing path Filter selects Records and still
+permits substantial world and shared data preparation. Streaming the full
+Catalog removes the in-memory JSON buffer while retaining full preparation.
+
+The local mining-location SDK uses `read_mining_locations` for the reachable
+Starmap dependencies and the actual mining-resource joins. Its coverage counts verified
+missing external references by placement occurrence. Those references were authored, and an
+exhaustive directory lookup found no target. Call `has_complete_placement_inventory()` before
+using missing placements to remove entries from a consumer cache. Check harvest and definition
+coverage separately before replacing those results. `with_mineable_entities` reads physical
+scanner definitions and their original scan selectors. The
+standalone `read_planet_resources` query reads terrain resource definitions by
+physical Entry, path or GUID. The selected records carry immediate origin markers.
+Compare the local projection with the same Build's complete Catalog.
+[SDK queries](catalog-sdk.md) An alternative is a
+Build-bound derived cache produced on the producer host and imported locally.
+Measure cold generation or import, changed Build, unchanged cache, failure
+recovery and peak process and system memory. Keep this gate separate from the
+full Catalog upload and interchange checks.
+
+### Embedded consumer trial
+
+A maintainer trial based on VerseKit 5.6.1 embedded P4KX
+`8637591ab1d69a1d72fd7f672fbc36f13d999cb4` with Rust 1.100.0. The reported inputs
+were LIVE `13220821` and PTU `13238477` and `13260598`. For Fundorte, the
+`read_mining_locations` result yielded the same cache bytes as the v2 full Catalog
+path. The consumer read the `finite` member of v3 numeric values. Preserve an
+unavailable numeric value as unknown when that member is absent or null.
+
+| Reported flow without the game running | Selective test time | Selective private memory | 0.4.2 time | 0.4.2 private memory |
+| --- | ---: | ---: | ---: | ---: |
+| Cold startup | 25.8 s | 1,043 MB | 21.9 s | 1,534 MB |
+| LIVE-to-PTU refresh | 22.0 s | 1,092 MB | 26.4 s | 1,560 MB |
+| Warm cache | 0.1 s | Unreported | 0.1 s | Unreported |
+
+These are reported integrated application measurements for the tested scope. Helper
+peaks, minimum host RAM, scratch writes and the exact consumer commit remain unverified.
+With a deliberately truncated Archive and a populated cache, the trial reported errors
+from each module and byte-identical previous cache files. The filtered v3 Catalog calls
+for contracts, mission locations and reputation returned the incomplete-Catalog error.
+`DiagnosticPartial` is the explicit diagnostic export mode. Use the selective readers
+for local refresh.
+
+A later maintainer run measured one process per call on LIVE `13220821` with the game
+closed. After Archive and DataForge opening, the reported baseline was about
+0.8 GB on 0.4.2 and 1.0 GB on the 0.5.0 test revisions.
+
+| SDK call | `8637591ab` elapsed / peak | `fd3160449` elapsed / peak |
+| --- | ---: | ---: |
+| `with_contract_generators(All)` | 16.5 s / 2.4 GB | 4.1 s / 1.1 GB |
+| `with_contracts(All)` | 227 s / 3.1 GB | 120 s / 1.4 GB |
+| `read_loadouts(All)` | 85 s / 5.4 GB | 46 s / 3.5 GB |
+
+At `fd3160449`, `visit_loadouts` took 108 s with memory near the reported
+baseline. `with_item_definitions` and `with_attachment_constraints` reached
+3.1 GB and 3.5 GB respectively. The 0.4.2 contract-generator source read took
+1.2 s at 0.8 GB, and its slot workflow took 20 s at 2.1 GB. The pending
+consumer refresh measurement uses the compact contract and scoped loadout
+routes below. These earlier runs quantify the cost of the individual calls.
+
+The change from 1,028 to 1,033 Ship sources on the same LIVE Build comes from
+admission of the ATLS IKTI Akuma, ATLS IKTI Rad and three GEO Collector owners
+in [the roster extension](https://github.com/p4kx-org/p4kx/commit/6a7db311544a4df96715b3c7a28942173d1f70f6).
+[Exosuit admission](adr/0417-exosuits-share-the-vehicle-catalog.md)
+
+| Consumer data | Selective SDK route |
+| --- | --- |
+| Fundorte and their resource joins | `read_mining_locations` |
+| Contract summaries with titles, offer and location rules, sharing and rewards | `with_contract_summaries` or `with_contract_summary(ContractKey)` |
+| Full contract projections by owner or logical identity | `with_contracts` or `with_contract(ContractKey)` |
+| Contract blueprint reward pool contents | `with_blueprint_pools` for the pool GUIDs in `blueprint_rewards` |
+| Authored mission location templates | `with_mission_location_templates` |
+| Faction reputation, scopes, standing thresholds and rank names | `with_reputation` with the faction selection and `ReputationSelection::ranks()` |
+| Authored reputation reward amounts | `with_reputation_reward_amounts`, with per-contract gains from `reputation_gains` |
+| Declared port rules and candidate attachment constraints | `equipment::visit_declared_equipment` for both families with the physical Ship or Item owner |
+| Resolved ship and Item ports with XML overrides and equipped items | `equipment::read_loadouts` for one owner or `visit_loadout_owners` for Ship roots or a batch of physical owners |
+| Item definitions for attached and standalone parts | `equipment::visit_item_definitions` with the physical Record indices needed by the consumer |
+
+Use a shared `CatalogQuerySession` and parsed view where the routes support it.
+The full and summary results contain the referenced authored rules in `location_queries`. The game
+chooses concrete locations during mission execution. Resolve protected rank names using
+`snapshot.game_text()` in the selected locales. Change cache identity when the
+Archive, Build, locale or cache format changes. Replace entries only after
+outer query success and accepted coverage. The trial covers Fundorte and the cache
+failure path. Integrated refresh and memory checks for contracts, reputation, location
+templates and ports remain required.
+[Contract queries](catalog-contract-queries.md) · [Selective SDK](catalog-sdk.md)
+
+## Proposed domains
+
+| Domain | Canonical data | Example cross-domain links |
+| --- | --- | --- |
+| Shared definitions | Tags, manufacturers and resource types | Entity tags, manufacturers and resource references |
+| Equipment and vehicles | Items, ships, loadouts, ports, equipment configurations, ammunition and weapon modes | `itemGuid` in blueprint results and shop inventory |
+| Crafting and industry | Blueprints, tiers, ingredient positions, quality, mining and refining | Reward pools, resource types and equipment outputs |
+| Contracts and reputation | Mission generators, templates, property sets, factions, requirements and rewards | Locations, spawn targets, items and blueprint pools |
+| Economy and loot | Shops, inventory, loot tables and cargo manifests | Item, resource, mission and world-location identifiers |
+| World and locations | Starmap definitions and placements, physical container and location occurrences, terrain and planetary configuration | Starmap definitions, parent routes, contextual presets and harvest configurations |
+
+Assign each dataset one owning domain. Check an exhaustive manifest registry of JSON Pointers
+against the Schema. Each entry records its shape, row order and key type for arrays and for
+`{availability, rows}` objects. Include singleton values and empty datasets so reconstruction
+retains every property. Register nested collections inside singleton objects independently
+when they need file boundaries, including their parent path and collection order. Keep parent
+routes and child instances in the world domain. Shared text and provenance keep their namespaces
+across the snapshot and can be fetched within a domain's dependency closure. Protected
+`gameTexts` use independent parts. Apply `x-gameText` throughout the bundle, including inline
+values such as a container's authored label.
+
+## Selective imports
+
+The domain is the requested scope. Its dependency closure consists of the parts that contain
+the rows it actually references. A table-level dependency tells the importer where to look. A
+separate, independently readable index maps typed target keys to parts and row ordinals. Shard
+this index by table and key range so small imports can fetch only the ranges they need.
+
+- Index targets by table and its documented row identity. A GUID may map to several physical
+  rows. Use the occurrence qualifier where the source gives one and preserve ambiguity where
+  the logical link is ambiguous. An ordinal by itself only locates bytes in its own table and
+  generation.
+- Distinguish links that need a target's identity from links that need its values. A contract's
+  Starmap identity can resolve in the index. Load the definition when the consumer needs its
+  details. For a physical location, fetch its placement part, any required parents and the
+  associated source evidence. The index stores locators and keeps protected text and authored
+  payloads in their owning parts.
+- Route `sourceUsesRefs`, physical source references and text references through the same
+  generation. Fetch referenced inventory parts, then follow the dependencies of the rows used.
+  Stage resolved link targets even when domains refer to each other. A consumer that only opens
+  the requested domain can report an authored link as pending until those parts arrive.
+
+For example, importing a Crafting recipe can resolve its finished item through
+`definitions.items` and its resources through `definitions.resourceTypes`. A contract that
+awards from a Blueprint pool can look up the pool and fetch any required locations separately.
+The existing IDs and source markers travel with each owning row. A part is the fetch unit.
+An importer follows the dependencies of the actual rows it needs from that part. Following
+every row in a fetched dependency part would make a narrow query load unrelated domains.
+One complete bundle reconstructs the logical single-file Export.
+
+## Referential integrity
+
+- Prepare Catalog v3 once and partition that prepared snapshot. A separate filtered Export per
+  domain would change its selection, provenance inventory and document-local identifiers. Keep
+  table names, selection, availability, ordering and row data. A separate `bundleVersion`
+  describes packaging. `schemaVersion` describes the logical Catalog.
+- The manifest binds one generation to the source Build tuple, archive receipt, export options and
+  each part's relative path, table or row range, row count, stored and decoded length and SHA-256.
+  Bind each table to its total row count and assign nonoverlapping half-open row ranges that
+  cover that total. Validate unique part IDs and physical row keys while preserving repeated
+  authored values at distinct positions. Include publication mode, `exportHealth`, source and
+  selection coverage per dataset, and the table dependency index. Bind the separately readable
+  target index to the same manifest with a digest for each shard. Validate parts against their
+  manifest before combining them.
+- Keep GUIDs, physical Record/component ordinals, tier/slot and Loadout paths, and container
+  occurrence keys. Source-use IDs are opaque and valid within their generation. Follow
+  `sourceUsesRefs` from selected rows, texts and retained inventories until no additional use,
+  selector, source or ancestor remains. Physical source metadata and TextForms carry their
+  own evidence. Preserve the entire provenance inventory in a complete bundle, including
+  observations without an incoming reference. Keep health metadata with its atom table. Preserve
+  `containsEncryptedSource` and `sourceSetComplete` on each datum.
+- Track download state separately from source state. An unfetched part, a Filter-excluded target,
+  a dangling link and unreadable source have distinct meanings. Resolve staged parts and cyclic
+  links before applying records. Stage identities in their own generation. A physical Record index
+  can only resolve in that generation. Deletion requires the intended build, unfiltered selection,
+  every expected part, complete source inventory and Catalog-wide health, including global blockers.
+- Stage the component files at immutable generation-specific paths and publish the manifest
+  last. Verify digests and reference closure before making an imported scope visible. Failure
+  preserves the previous usable snapshot and its part paths.
+
+## Transport options
+
+| Option | Benefits | Costs |
+| --- | --- | --- |
+| Manifest and independent `.json.zst` parts | Selective and resumable downloads, bounded file sizes | New writer, reader and verification contract. Separate frames lose cross-part compression. |
+| Stream complete JSON into a staged import | Lower consumer peak memory with the existing contract | Transfers the complete catalog. Decoder limits and data buffering still need measurement. |
+| Archive containing the parts | One artifact for distribution | Selective fetch depends on its index and range support. Packing compressed parts adds little compression. |
+
+Use manifest and parts for selective imports. Measure the current complete export first. Prototype
+the world domain with shared inventories and one equipment-to-crafting join. Compare reconstructed
+logical Catalog v3 with the single-file export, including row order and source closure. Test
+wrong-generation parts, missing dependencies and nested evidence, overlapping or missing row ranges,
+dangling and cyclic links, protected text, a global health blocker alongside a healthy domain, cancelled
+publication and partial replacement. Check that an equipment-to-crafting join loads zero world
+placement or terrain parts, and that resolving a single world location loads just its indexed
+parts and dependencies. Measure stored and decoded bytes, generation time and peak producer and
+consumer memory. Record selective bytes transferred, including indexes and dependency parts.
+The current writer streams serialization from a prepared catalog.
+Smaller files alone leave that producer preparation cost in place. If the prepared catalog
+exceeds memory before publishing, profile source reading and materialization as their own
+work. Keep those measurements distinct from the package reader and the transfer benchmark.
+
+## System memory acceptance
+
+Measure the peak P4KX application footprint on an available test host. The
+budgets use decimal bytes.
+
+| Operation | Peak P4KX memory | Target system capacity |
+| --- | ---: | ---: |
+| Individual API and SDK queries | Below 2,000,000,000 bytes (2 GB) | 16 GiB total |
+| Reduced Basetool catalog generation | At most 40,000,000,000 bytes (40 GB) | 64 GiB total |
+| Complete unfiltered Catalog v3 export | Below 40,000,000,000 bytes (40 GB) | 64 GiB total |
+
+Subtract the measured peak from the target capacity to estimate the headroom
+for the operating system, desktop and other processes. This measurement is
+the release criterion and can run on a host with more installed memory.
+
+Measure P4KX and any helpers that run with it. Record peak resident memory
+and peak private committed bytes where available. Use the higher observed
+value for the budget and identify the counters and sampling method. Also
+record the exact Build and binary, host RAM, OS, CPU, baseline workload,
+minimum available RAM, paging, elapsed time, process writes and scratch peak.
+
+For cached SDK workflows, exercise cold, changed-Build and warm cases.
+Verify the selected data and dependency coverage and confirm that cancellation
+or failure retains the previous cache. Measure the SDK harness and record
+whole-application memory separately when measuring an embedded integration.
+Verify generation and import of the agreed reduced export.
+
+Run the complete normal packaged exporter for installed LIVE and current PTU.
+Each complete v3 export preserves all fields, languages, cross-domain links
+and per-value origins. Use a single compressed output and verify the decoded
+stream from that artifact in a separate replay, so the measured producer runs
+once per Build.
+
+The Windows AMD64 portable package at integration revision `25287d184`
+completed the normal export for both installed Builds. The package was built
+from merge revision `300226ceeeaf522b7d9af790e8fa3698752cf575` with Rust 1.100.0.
+Its executable SHA-256 was
+`b65c751e4e35e7e9fa9dedc91419af39a67dae4715f3087ea1a7b0438687db70`.
+Both runs used one Rayon worker at below-normal priority, Zstandard level 3
+and a fixed Unix-epoch export time.
+
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,236.869 | 28,416,077,824 | 29,528,719,360 | 25,586,094,080 |
+| PTU `13248297` | 1,389.108 | 29,741,670,400 | 30,899,863,552 | 25,083,817,984 |
+
+| Build | Compressed file (B) | Declared decoded size (B) | Peak temporary bytes (writer) | Process writes (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,197,813,494 | 71,467,922,615 | 1,671,675,932 | 1,671,685,712 |
+| PTU `13248297` | 1,245,958,540 | 74,427,393,008 | 1,772,329,634 | 1,772,339,724 |
+
+The host ran Windows build 26300.9974 on a Ryzen 9 9950X3D with
+100,573,523,968 bytes of physical memory. Windows reported the two process
+lifetime peaks after exit. Host headroom and background activity were
+sampled once per second with an 8 GiB reserve. System-wide page reads
+increased during both exports and page writes stayed unchanged. The archive
+stamps, Build manifests and executable digest were stable across both runs.
+
+The installed mining parity checks streamed both artifacts to completion and
+confirmed the recorded decoded lengths. The independent all-field provenance
+replay and final integrated release-candidate measurement are separate gates.
+The larger private peak leaves an estimated 37,819,613,184 bytes for the OS
+and other processes on a 64 GiB host. This measures production with the
+specified package. Replaying the raw stream and measuring the final release
+candidate are separate acceptance checks.
+[Catalog work](https://github.com/p4kx-org/p4kx/issues/1151) ·
+[Release acceptance](https://github.com/p4kx-org/p4kx/issues/1116)
+
+### LIVE package rehearsal for integration revision `54121ab3e`
+
+The Windows AMD64 portable package built from merge revision
+`23addc5e164f65a28a6f258302b30453b331edce` completed an unfiltered Normal Catalog
+on unchanged LIVE `13220821`. The packaged CLI used Rust 1.100.0, one Rayon
+worker at below-normal priority, Zstandard level 3 and the Unix-epoch export time.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138324296731)
+
+| Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| ---: | ---: | ---: | ---: |
+| 2,114.990 | 35,562,864,640 | 38,409,072,640 | 9,234,272,256 |
+
+Windows reported both process lifetime peaks after exit. The larger peak leaves an
+estimated 30,310,404,096 bytes for the OS and other processes on a 64 GiB system.
+The measured host had 100,573,523,968 bytes of RAM and reached a minimum
+commit headroom of 23,345,311,744 bytes. The host's page-read and page-write
+counters increased by 434,785 and 2,821 during the run.
+
+The Catalog contains 77,896,476,922 decoded bytes and 1,466,041,457 compressed bytes.
+The writer reports 1,915,716,829 peak temporary bytes and Windows reports 1,915,726,571
+process write bytes. The separate replay uses this same sealed compressed output.
+
+The archive-free verifier replayed the sealed LIVE frame twice and checked the
+84,763,855 sourced cells against its original provenance inventory. The passing
+test covered 77,896,476,922 decoded bytes, 254 measured sections, 95,261 physical
+sources, 120,142,831 source uses and 989 variant source-use sets in 5,536.06 s.
+The PowerShell launcher failed while naming its output receipt. An independent
+check verified the preserved test transcript, the signed driver and the
+unchanged sealed frame and Normal receipt. Terminal replay memory and write
+counters were unavailable. The producer measurements above have their own
+Windows lifetime counters.
+
+### Packaged Normal measurement on PTU 13260598
+
+Windows AMD64 producer `93d92ca20bef8a8c3731339214a3301124ade7ba` completed
+the unfiltered Normal export from the unchanged PTU `13260598` Archive.
+The run used one Rayon worker at below-normal priority, Zstandard level 3 and
+the Unix-epoch export time.
+[Native packaged producer](https://github.com/p4kx-org/p4kx/actions/runs/45375154494/job/138382476262)
+
+| Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| ---: | ---: | ---: | ---: |
+| 2,314.908 | 36,488,916,992 | 39,266,893,824 | 14,729,175,040 |
+
+Windows reported the process lifetime peaks after exit. The larger peak leaves
+an estimated 29,452,582,912 bytes for the OS and other processes on a 64 GiB
+system. The measured host had 100,573,523,968 bytes of RAM and a minimum commit
+headroom of 37,464,530,944 bytes. The host counted 554,038 additional page
+reads and 218 additional page writes during the export.
+
+The verified frame has 80,616,097,191 decoded bytes and 1,717,255,370 compressed
+bytes. The writer reports 2,215,745,998 peak temporary bytes and Windows
+reports 2,215,756,050 process write bytes. The separate replay uses this same
+sealed compressed output.
+
+The archive-free replay passed in 5,311.84 s. Two streaming passes verified
+80,616,097,191 decoded bytes, 254 measured sections, 116,775 physical sources,
+125,100,723 source uses, 511 variant source-use sets and 89,005,054 sourced cells.
+The decoded SHA-256 was
+`1a51de43ba862e2bd66e46910b4afdd1fe56847fcfd2c57b7c7ac5e1e2554978`.
+
+The PowerShell launcher failed while naming its output receipt. Independent
+verification matched the closed Rust transcript, original signed preparation
+and producer receipts, driver, and complete original compressed frame. A
+separate query handle retained through termination recorded 17,111,257,088 bytes
+of peak private commit, 16,704,876,544 bytes of peak working set and 23,839
+Windows write-transfer bytes for the replay process. The launcher produced
+no terminal receipt or process exit code. The producer measurements above
+have their own Windows lifetime counters.
+
+### Packaged Normal rehearsal on LIVE 13220821 and PTU 13260598
+
+The Windows AMD64 portable CLI from merge revision
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b` completed both unfiltered Normal
+exports. Its source tree matches integration revision `270d86626`. Both runs
+used one Rayon worker at below-normal priority, Zstandard level 3 and the
+Unix-epoch export time. The executable and installed Archive stamps matched
+before and after each run.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45478285490/job/138745091943)
+
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum sampled host RAM available (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,856.028 | 35,521,933,312 | 38,381,113,344 | 14,010,568,704 |
+| PTU `13260598` | 2,102.871 | 36,689,035,264 | 39,081,578,496 | 13,142,003,712 |
+
+| Build | Compressed file (B) | Measured decoded size (B) | Peak temporary bytes (writer) | Process writes (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,466,921,003 | 77,928,045,838 | 1,917,192,830 | 1,917,202,572 |
+| PTU `13260598` | 1,718,250,277 | 80,649,568,237 | 2,217,352,810 | 2,217,362,862 |
+
+Windows reported both process lifetime peaks after exit. Both private peaks
+meet the strict 40,000,000,000-byte producer limit on the measured host.
+The independent Windows AMD64 verifier from source revision
+`4dbb7572f55b2056488a4f07686db26d9b73e267` replayed both sealed frames.
+Two passes checked the decoded SHA-256, structural references and 254
+section inventory entries per Build.
+
+| Build | Physical sources | Source uses | Sourced cells | Replay elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 95,261 | 120,213,061 | 84,837,272 | 3,784,553 | 17,111,412,736 | 16,720,453,632 |
+| PTU `13260598` | 116,775 | 125,175,330 | 89,082,595 | 4,262,023 | 17,111,347,200 | 16,704,897,024 |
+
+The final release candidate requires its own producer and replay measurements.
+
+### Packaged Normal measurement with updated field provenance
+
+The Windows AMD64 CLI built from merge revision `27da392284eed8c67cf58c15ea473089d6c0a20c`
+completed unfiltered Normal exports on LIVE and PTU. It used an explicit Archive key file, one
+worker, Zstandard level 3 and a fixed Unix-epoch export time. The executable and the installed
+Archive and Build manifest matched their observations before and after each run.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138925533389)
+
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 1,791.078 | 35,879,813,120 | 38,465,208,320 |
+| PTU `13260598` | 2,070.426 | 36,745,424,896 | 39,515,660,288 |
+
+Windows reported the lifetime memory peaks after exit. Both runs used an interactive Windows
+11 Pro 26H2 session (build `26300.9974`) on an AMD Ryzen 9 9950X3D host with
+100,573,523,968 bytes of physical RAM. The larger private peak leaves 29,203,816,448 bytes
+on a 64 GiB system before accounting for other processes and the OS.
+
+| Build | Host samples | Minimum available RAM (B) | Minimum commit headroom (B) | Page reads | Page writes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,730 | 23,320,309,760 | 51,839,676,416 | 218,075 | 4 |
+| PTU `13260598` | 1,995 | 20,344,823,808 | 47,874,867,200 | 49,927 | 27 |
+
+| Build | Compressed bytes | Writer's decoded bytes | Peak temporary bytes | Process write bytes |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,469,260,866 | 78,149,434,545 | 1,919,532,693 | 1,919,542,435 |
+| PTU `13260598` | 1,721,110,756 | 80,905,935,181 | 2,220,213,289 | 2,220,223,341 |
+
+The Windows AMD64 executable SHA-256 was
+`51509c2938a19b75c9717c1d09973db522f29467d57f3b0cb96412eb618a739c`.
+The compressed frame SHA-256 values were
+`eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e` for LIVE and
+`7e3619c0b2055a7ce6915cab2bf10f40c32f66797c79ec2810998f3f8393d70c` for PTU.
+
+The archive-free verifier replayed each sealed frame twice. It verified the compressed digest
+before and after the run, the complete decoded byte count, v3 structure, source-use closure,
+and the selected row inventories without opening the game Archive.
+
+| Build | Physical sources | Source uses | Sourced cells | Replay elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 95,261 | 120,328,885 | 84,917,157 | 4,420,201 | 17,111,363,584 | 16,703,672,320 |
+| PTU `13260598` | 116,775 | 125,297,240 | 89,165,995 | 4,710,955 | 17,111,736,320 | 16,721,633,280 |
+
+The verifier executable SHA-256 was
+`2cc97819308078eb8a5603c8d37b6de9b0901ca5d95e8f350288a57ccdc5d738`.
+The full decoded SHA-256 values were
+`ca8a18cf99249b94e81f41a4efef8b99dd48657066acc0a95ce343ef896a820a` for LIVE and
+`1dc8e6f09663d3266c055cc8a8a996c6890fabbfc64faf5b6b9678b02de36e0e` for PTU.
+
+### Packaged Full measurement on PTU 13273298
+
+The Windows AMD64 CLI from merge `4d334e716cbc87e27525e8e095410a19103c51f5` completed
+the unfiltered PTU `13273298` export with one worker and Zstandard level 3 in
+4,841.461 seconds. Windows recorded a 39,515,860,992-byte private commit peak and
+a 36,655,288,320-byte working set peak. The frame held 1,514,538,432 bytes and its
+writer reported 80,930,456,013 decoded bytes.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139076698399)
+
+The replay read the retained frame, verified the compressed SHA-256 before and
+after reading, and reconciled all 80,930,456,013 decoded bytes. It verified
+116,947 physical sources, 125,354,936 source uses and 89,200,816 sourced cells.
+Its private commit peak was 17,111,584,768 bytes and its working set peak was
+16,705,392,640 bytes. The decoded SHA-256 was
+`4b19edfe7dbb155612f5af02fc21eb1c19ae8582a13a571f36a97481b40e6adc`.
+The producer and replay are the PTU Full baseline for this revision.
+
+### Packaged Catalog provenance mode comparison on LIVE 13220821
+
+The Windows AMD64 CLI from merge `e59c7410f6411302e8101f180751177dd0d6adfb`
+read the same LIVE `13220821` Archive in two fresh processes. The executable
+SHA-256 was `6c2e74e917908920e588cc0953ec0b73cc532b404ccd2b043d28b0b32cacfb5e`.
+Both used one worker, Zstandard level 3, a fixed export time and a 12 GiB
+desktop reserve on the same Windows host. MarkersOnly completed first.
+An interrupted Full attempt preserved the reserve and the repeat completed
+with the same settings.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45633605773/job/139273515249)
+
+| Measurement | Full | MarkersOnly |
+| --- | ---: | ---: |
+| Compressed bytes | 1,469,191,847 | 80,376,902 |
+| Decoded bytes | 78,149,430,408 | 9,131,844,670 |
+| Private commit peak (B) | 38,457,364,480 | 8,765,751,296 |
+| Working set peak (B) | 35,868,237,824 | 8,329,465,856 |
+| Minimum available host memory (B) | 13,352,439,808 | 39,803,142,144 |
+| Peak temporary output and spools (B) | 1,919,463,674 | 218,457,199 |
+| Process elapsed seconds | 1,972.305 | 709.319 |
+
+MarkersOnly reduced compressed size by 94.53% and peak private commit by
+77.21% in this pair. The unfiltered Marker Catalog still used more than the
+2 GB budget for selective consumers.
+
+The archive-free replay verified each stored frame and decoded byte count.
+After unwrapping the Marker envelope and excluding Full-only proof members,
+both streams had 1,100,150,803 retained tokens and the same SHA-256
+`555985a56721d1e5da50e9b5e14f98f36e969d320d794a3ac86ccdfaca1009ad`.
+All 905,999 encrypted, 79,612,651 unencrypted and 4,060,095 unknown immediate
+markers matched. The schemas exported by the same CLI contained the same 118
+`x-gameText` annotations. Media assets use separate outputs.
+
+The current Basetool upload accepts LIVE schema v2. The Marker envelope
+`p4kx-catalog-markers` v1 contains the v3 values, and its compressed and decoded
+sizes exceed the current 64,000,000-byte and 1,000,000,000-byte limits.
+The complete Marker Catalog therefore cannot use the current upload.
+The reduced consumer projection and its actual import are tracked in #1177.
+
+### SDK provenance mode comparison on LIVE 13220821
+
+The SDK test program built from signed revision
+`fe054ccf90bb7eb114148f1c93700e44b1aef225` opened the same installed LIVE
+Archive in four fresh Windows AMD64 processes with one worker each. For each
+scope it ran Full first and MarkersOnly second. Both modes returned identical
+values, coverage and immediate encryption markers. The installed cases had 14
+unencrypted markers in the Loadout owner result and 151,556 in TagPaths.
+The synthetic mode tests cover encrypted and unknown markers too.
+
+| Scope | Rows | Full peak private bytes | Marker peak private bytes | Full source references |
+| --- | ---: | ---: | ---: | ---: |
+| Loadout owner | 1 | 1,091,801,088 | 1,091,735,552 | 91 |
+| TagPaths | 18,961 | 1,091,801,088 | 1,091,735,552 | 1,725,098 |
+
+Both queries stayed below 2 GB and used 65,536 fewer private bytes in Marker
+mode. The Marker results contained zero source references. In this run TagPaths
+took 8.86 seconds in Full and 5.45 seconds in Marker mode. The Loadout owner
+query took 4.51 and 4.57 seconds, respectively. These are timings for one run
+order. The query harness measured in-memory results and the full-catalogue
+size is measured separately.
+
+### Bounded resolved Loadout visitor timing on LIVE 13220821
+
+A diagnostic harness based on signed `7ca457080` exercised the normal SDK
+visitor on installed LIVE `13220821`. Both fresh Windows AMD64 processes kept
+one worker and stopped at the same first 128 owners in canonical order,
+including 127 emitted rows. The Marker callback counted typed rows. The Full
+callback also serialized each selected row and reconciled its source uses.
+
+| Route | Process seconds | Outside callback seconds | Callback seconds | Peak private commit (B) |
+| --- | ---: | ---: | ---: | ---: |
+| MarkersOnly typed census | 54.452 | 51.645 | <0.001 | 1,091,764,224 |
+| Full row and source-use closure | 69.243 | 54.182 | 12.517 | 1,318,268,928 |
+
+The first owner reached the callback in about 29 seconds in both processes.
+This bounded run isolates work before and inside the callback. The all-owner
+SDK refresh retains a separate elapsed-time and memory check under #1166.
+
+## Measuring a complete export
+
+The installed regression checks verify decoded and stored byte counts against the actual writer
+output and report the corresponding size warnings. Catalog schema, references and replay are
+checked at any artifact size. Verify each consumer's import with its own measured limits.
+
+For each Build, record the full Build identity, exporter revision and hash, and archive length
+and modification time before and after the export. Run the normal `p4kx catalog` writer with a
+fixed export time, default text selection, `--progress-phases` and one private `.json.zst` output.
+The completed writer reports `catalog storage:` on stderr. It sums the logical bytes of the
+temporary row spools for container instances, locations, Entity tag declarations,
+Item and Blueprint definitions, particle libraries,
+contract generators, contract templates, mission broker entries, loadouts, item ports,
+interactions, inventory item bounds, durability, Facility instances and weapon animation
+candidates and fragment selectors. It also reports the final bytes of the publication
+temporary. The spools stay
+open until publication. The measurement includes open spools with no visible file name. On an
+interrupted run, a dedicated scratch volume can provide sampled allocation evidence.
+Capture stderr line by line to align process memory samples with preparation, health, provenance,
+JSON size measurement and writing. Within input preparation, record `open-dataforge`,
+`read-localization`, `index-localization` and `initialize-origins` as separate phase starts.
+Within `projections`, record `resolve-loadouts`, `project-locations`, `project-missions`,
+`read-mission-dependencies`, `project-mission-definitions`, `project-contract-templates`,
+`project-mission-broker-entries`, `project-mission-location-templates`,
+`project-contract-generators`, `project-configurations` and
+`finalize-projections` as separate phase starts. Record the configuration phases `project-shops`,
+`resolve-jump-operators`, `read-independent-configurations`, `project-particle-libraries`,
+`project-flare-libraries`, `project-subsumption-events` and `project-weapon-animation` separately. During finalization, distinguish
+`project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
+`project-facility-interiors` when present, `project-resource-topology` and
+`project-starmap-placements`.
+Pending localization keys retain per-language lookup outcomes and their source uses.
+Finalizing the text registries reconstructs the text forms from the in-memory localization index.
+These lookups add CPU work and require no temporary storage or additional Archive reads.
+Catalog health retains the original coordinates and target identity in compact reference proofs.
+It constructs the full diagnostic record when reconciliation needs to report a reference.
+Clean field inspections store one optional findings pointer. An allocation holds the
+diagnostic vectors only when they contain findings. Captured Record subjects share their
+key with the original header receipt and clone the handle. Layout tests verify both
+representations and preserve the original evidence and authority checks.
+
+Item definitions and Entity tag declarations are compressed individually as the Record
+scan produces them. The indexed writer streams each JSON row into its own checksummed
+frame through fixed-size buffers and reuses the compression context. Its index keeps
+the exact encoded length, compressed length and physical offset. The publisher replays
+the frames in canonical GUID and Record order for each JSON pass. Replay still allocates
+the input and output for one frame at a time. The weapon animation join keeps its
+original sourced attachment fields in memory. It stages each edge's fragment selectors
+in graph traversal order after using them to resolve that edge's candidates. The SDK
+returns the same typed original graph. The Catalog replays the fragment rows in the
+same graph object and accounts for spool bytes and replay errors.
+
+An isolated Windows AMD64 comparison with identical synthetic rows and pinned libraries
+measured the preparation stage in four fresh processes per workload. With two wide
+rows, private commit peaked at 211.0 MB with the buffered writer and 2.4 MB with the
+streaming writer, with 120–123 ms and 99–100 ms elapsed. With 40,000 small rows, private
+commit peaked at 5.2 MB and 5.9 MB, with 83–91 ms and 119–124 ms elapsed. These timings
+cover the indexed writer and its final sort. The packaged producer acceptance measures
+the complete preparation, publication and replay separately.
+Facility instances are staged in one sequential spool. Resolved Loadout occurrences precede
+original room occurrences in their existing order. The producer releases each instance after
+serialization. Room coverage, installed configuration rows and typed resource joins retain
+their existing access paths. The spool contributes to the staged bytes reported by the writer.
+The room-helper read validates the selected model, then releases its mesh levels of detail.
+The retained node hierarchy and original source ranges supply the room transform.
+
+
+Inventory item bounds are staged during the same scan in physical Record and Component order.
+Inventory storage selections stay in memory for the capacity and facility joins.
+
+The observed ship base reader visits selected ships in physical Record order. Other entity checks
+run in parallel within each scan window. The first ship to read a shared file owns the observation.
+One observed loadout resolver visits roots in stable GUID order and stages each complete row in
+one sequential compressed spool. It retains only the typed Ship port and owner data needed for
+crafter, facility and resource topology joins. The joins use the original attachment and name
+evidence. The producer releases each tree immediately after joining its resource topology.
+Resource-network link bindings occupy a second checksummed frame in the Loadout spool file, and
+each table replays only its own byte range.
+Each Record-defined port shares the selection evidence for its six attribute fields within
+that specific occurrence. Each field retains its own original inputs and completeness. Stage and SDK tests compare the serialized
+fields against their flat evidence sets in both provenance modes. Record process writes during
+loadout resolution and retained private bytes on entry to location and facility-interior projection.
+
+After each Record and ContractGenerator window and at selected projection boundaries, the
+source registry packs unheld DataForge uses into compact coordinates. It keeps live handles and their original authority. A later observation
+at the same coordinate reuses the original ID and evidence. The publisher streams the
+sorted live and packed rows together with the same IDs, scope, role and encryption.
+Each packed row uses the registered ID as its key and shares the original physical source
+reference with rows from the same source allocation. The 40-byte map entry on 64-bit
+targets holds the ID handle, source handle and typed coordinate with its scope,
+role and encryption. The change from 48 bytes saves about 0.54 GiB of inline entry
+storage at the observed PTU count of 72,126,576 rows. The Working Set and private-byte
+effect require a new measurement.
+Sealing moves the packed map into the immutable inventory. The normal publisher can count and
+serialize the same sorted rows without copying them into a contiguous array. This storage
+uses RAM and adds no provenance spool.
+
+Record peak working set and peak private bytes separately.
+Sample host commit and paging counters alongside the process write counter to distinguish process
+writes from system memory pressure. Record the exit status, elapsed time, file length and decoded
+byte count from the text summary. Count section and decoded bytes by streaming the output through a Zstd
+decoder. Reconcile section totals and JSON framing with the writer's byte count. Measure reader
+memory in a separate process. Diagnostic results and build or source changes invalidate the
+complete measurements.
+
+A normal publication check on LIVE `13165946` at `c9066f14a` refused three required
+Starmap container enumeration operations and 30 separate Loot container enumeration operations.
+A read-only source audit at `bfc242553` followed the original authoring routes and checked the
+root and containing directories. The three Starmap selectors had no candidate in those
+directories. Twelve Loot selectors shared a basename with a root Entry. Basename equality
+alone does not establish a valid authored target. The verifier inspected the refusal directly
+and created no Catalog file. The comparable probe on PTU `13201184` at `bfc242553`
+found ten required Starmap enumerations and 37 distinct Loot enumerations. Twelve Loot
+selectors shared a basename with a root Entry. The attempts establish the failure scopes
+for the two Builds.
+
+The older unfiltered LIVE trial at `bed4144d` peaked at 22.53 GiB working set and
+23.31 GiB private bytes during the Record scan, then 33.09 GiB working set and
+34.36 GiB private bytes during facility interior projection. It refused publication
+after preparing the catalog and recording health. Producer acceptance still requires a
+complete normal export with the current packaged producer on the specified producer host.
+
+The discard-sink witness at `4c601317a` checked both installed Archives with four Rayon
+threads and stable Archive stamps. It refused normal publication for each Build after health
+assessment. The values below are sampled process memory in GiB on a larger host.
+
+| Build | Record scan working set | Record scan private bytes | Peak working set | Peak private bytes | Packed source uses at health |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | 15.47 | 16.08 | 26.22 | 27.60 | 68,920,610 |
+| PTU `13201184` | 16.30 | 16.95 | 28.02 | 31.73 | 72,144,536 |
+
+LIVE reached a sampled 26.22 GiB working set during health assessment. PTU reached its
+peak working set during provenance. Both sampled private-byte peaks occurred during
+provenance. The first PTU provenance sample rose by 4.85 GiB in private bytes. The packed
+array for 72,144,536 rows at 72 bytes each accounts for 4.84 GiB of that reserve.
+The packed source-use counts grew by 17,325,165 and 17,974,970 between the Record scan
+and health. The pair logged 0.756 GiB of logical process writes and produced
+no Catalog file or encoder sizes.
+
+The follow-up discard-sink witness at `0d10b5901` used the same installed Builds, four Rayon
+threads and stable Archive stamps. It included the later compaction checkpoints, 48-byte
+packed rows and ownership transfer at sealing. The key census was disabled.
+
+| Build | Record scan working set | Record scan private bytes | Peak working set | Peak private bytes | Packed source uses at health |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | 13.51 | 14.10 | 21.75 | 22.72 | 68,904,364 |
+| PTU `13201184` | 14.27 | 14.87 | 22.70 | 23.71 | 72,126,576 |
+
+Both sampled peaks occurred during facility interior projection. Minimum sampled host
+available RAM was 28.81 GiB for LIVE and 24.65 GiB for PTU. The pair logged 0.756 GiB of
+logical process writes. Both Builds reached the normal health decision and refused publication
+before serialization. Encoder sizes and the complete normal run on the producer host remain
+unmeasured.
+
+The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
+frame header and then streams serialization into the encoder. A second raw file adds storage
+without changing the measured decoded bytes. A comparison with raw writer timing is a separate
+experiment.
+
+For byte sizing without creating a catalog file, set `P4KX_DATA_P4K` to LIVE and
+`P4KX_DATA_P4K_B` to PTU with the ordinary installed-Archive key configuration. Run the focused
+installed-pair test.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::normal_catalog_sizes_for_installed_pair
+```
+
+The test checks the source Build and Archive stamp, measures the same encoder with a fixed time
+and normal health policy, and discards the frame as it is written. Capture the exact producer
+revision and binary hash separately.
+
+The sink-only library witness also reports the channel, Build change number and producer
+phase on stderr. Use those events to align process memory samples with the producer stages.
+A `catalog retained:` line reports distinct registered source uses and the packed subset
+at the start of `records`, `projections`, selected projection phases and `export-health`.
+The inspected ledgers at each checkpoint supply the field inspection count, capacity
+and reserved inline bytes.
+Each inspection's nested allocations
+and the source registry's own allocation footprint require separate measurements.
+The witness reports decoded and encoded sizes on stdout without creating a catalog file.
+
+```text
+cargo test --release --locked -p p4kx-export --lib -- build::api::size_witness::normal_catalog_size_phases_for_installed_pair --ignored --exact --nocapture
+```
+
+Set `P4KX_CATALOG_PACKED_KEY_CENSUS=1` on the sink-only witness for the packed key count and
+UTF-8 bytes at export health. The counters distinguish direct fields and typed sites, and keys
+held solely by the registry or shared by a source reference. This pass can affect timing and
+resident memory. Measure the producer's peak with the key census disabled.
+
+Set `P4KX_CATALOG_SECTION_CENSUS=1` for section sizes and provenance counts in the same run.
+The writer sends the finished Zstd stream through a bounded pipe. The reader checks the
+encoded and decoded lengths, counts rows in both provenance inventories, and reports the exact
+compact UTF-8 lengths of the top-level members and their registered section members.
+Report framing separately and keep nested measurements inside their parent counts.
+Source-use arrays are counted by byte length and reference occurrences. Repeated nonempty arrays
+are grouped by SHA-256 fingerprint of the emitted array bytes. Their sorted, unique references
+make identical arrays share a fingerprint. The measurement does not establish equality across
+hash collisions.
+
+The census keeps one counter per nonempty fingerprint and includes the decoder's use of memory
+in the benchmark process. Use the sink-only run for producer-only memory measurements. Neither
+mode requires another serialization pass. For atomic file publication and actual consumer import,
+use the separate evidence above.
+
+### Reconciling an existing measurement
+
+Set `P4KX_CATALOG_MEASUREMENT_DIR` to the private directory containing the completed
+normal writer receipt `receipt.private.json` and its `p4kx-catalog.json.zst` output.
+Run the provenance replay as a separate process.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::replay::replay_completed_catalog_provenance_and_sections
+```
+
+Replay checks the measurement's matching archive stamps and the export's Build, Channel, archive
+length and modification time. It requires schema v3, complete publication health and an unfiltered
+selection. The two decoding passes check the receipt lengths and compare SHA-256 digests of the
+decoded bytes. Replay checks source-use IDs, original physical source ancestry, localization selector
+roles and per-value encryption markers against the retained inventory. It rejects complete source
+sets that contain opaque coordinates.
+
+The verifier keeps original source-use IDs in packed UTF-8 chunks. The lookup index stores
+ordinals and compares the original ID bytes for every candidate. Index progress and the end of
+the first decoding pass appear in the transcript. Record the verifier's process peak separately
+from the producer measurement.
+
+The report includes exact section byte lengths, provenance inventory counts and sourced-value
+counts. Row counts cover `/items`, `/definitions/items/rows`, `/definitions/blueprints/rows` and
+`/placements/containerInstances/rows`. Replay opens no installed Archive and creates no raw file.
+Cross-domain link validation and consumer import measurements remain separate release evidence.
+
+#### Loadout census and independent Assembly comparison
+
+Keep the completed producer's `producer.stdout.log` beside `receipt.private.json`
+and the Full Catalog frame in `P4KX_CATALOG_MEASUREMENT_DIR`. Set
+`P4KX_CATALOG_REPLAY_RECEIPT` to the completed replay receipt that seals the
+producer receipt and transcript and records the decoded frame SHA-256. Configure
+the same installed Build with `P4KX_DATA_P4K` and its Archive key.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive real_archive_loadouts::the_loadouts_of_a_real_archive_resolve_and_match_the_loadout_tree_of_a_ship -- --ignored --exact --nocapture --test-threads=1
+```
+
+The comparison streams the retained frame once. It holds compact owner and
+attachment identities, code counts, the selected physical 100i row and one
+current Loadout row. It reconciles the emitted kind count and recursive port
+counts with the sealed producer transcript. Ship and Item joins use the
+physical Record index and its GUID. The pinned 100i witness resolves the port
+tree directly from Assembly against the matching Archive. The separate
+`installed_loadout_visitor_matches_complete_catalog` test covers SDK row and
+provenance parity.
+
+The verifier at `01ae3cb78` completed both passes on the installed outputs from
+producer `25287d184`. It checked the immediate origin of every sourced cell
+present in each artifact and reconciled the decoded bytes with the writer receipts.
+
+| Build | Decoded bytes | Sourced cells checked | Source uses | Peak private bytes | Process write bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 71,467,922,615 | 85,520,379 | 88,973,850 | 8,884,805,632 | 23,057 |
+| PTU `13248297` | 74,427,393,008 | 89,964,616 | 94,272,938 | 9,227,853,824 | 23,260 |
+
+Each readback took about 87 minutes. The results identify those two artifacts
+and that verifier. The release candidate needs its own producer and replay receipts.
+
+The installed SDK parity check for law, resource-quality quantization, cargo,
+turret and radar configuration, resource networks and room associations shares
+one streaming read per Build. Use the same measurement directory, set
+`P4KX_DATA_P4K` to its Archive and `P4KX_LAW_SDK_BUILD` to its changelist.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_batched_catalog_sdk::installed_law_quality_cargo_and_resource_sdk_match_one_complete_catalog
+```
+
+It checks availability, ordered physical rows and their exact source references
+across the 14 selected tables. Record peak memory for individual SDK queries
+separately.
+To produce the raw artifact from the same completed measurement, run the reconciliation test.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_catalog_size::artifact::reconcile_completed_catalog_artifact
+```
+
+One streaming decode produces the section and reference-set census and copies the exact
+UTF-8 bytes to `p4kx-catalog.json` in that directory. Publication requires the encoded
+and decoded lengths to agree with the writer receipt. An existing raw file is preserved.
+The installed Archive is unnecessary for this check.
+
+### Completed PTU 13284307 replay
+
+The packaged Windows AMD64 producer from merge `eada15a2` completed an
+unfiltered Normal Full export in 2,296.843 s, using one worker and Zstandard
+level 3. Its native lifetime peaks were 36,286,316,544 B private commit and
+33,867,112,448 B working set. Both stayed below the 40,000,000,000 B application
+ceiling. The completed frame was 1,596,847,563 B. The producer SHA-256 was
+`aa3103eb4c39c4a6f483550170984b845786c2d15bfb007875f186aed7a07694`. [Native PTU producer](https://github.com/p4kx-org/p4kx/actions/runs/45811044734/artifacts/15116366395)
+
+The optimized verifier at `9db4a8766` replayed the sealed frame in
+4,880.338 s with one worker. It verified the input seals before and after
+the run, while the installed Archive remained closed. The compressed frame
+SHA-256 was `8bae446e2de13c56f9c848cae5e2fcd6015c06e9d69ebb73aa679a6815f7d280`.
+Both passes decoded 84,336,679,622 B with SHA-256
+`c1e5b201e85ce2608ae0ebf6464f1cae7f1a66cb3b031ab8f3562cb609fb1b0a`.
+The verifier binary SHA-256 was
+`746aa923163d8993195912808257f47efce7cadcbb86939f788a7ff8542c6c5b`.
+
+| Replay inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,034,573 |
+| Variant source-use sets | 513 |
+| Sourced cells | 96,392,635 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+
+The section report contains 254 measured members. Its 35 top-level members
+and 37 framing bytes account for the decoded length. The `/provenance` object
+used 33,548,202,851 B, including 33,403,459,131 B under `/provenance/uses`.
+`/loadouts` used 19,435,567,420 B and `/placements` used 3,538,770,689 B.
+These are value bytes inside the decoded document.
+
+The replay's native lifetime peaks were 8,714,493,952 B private commit and
+8,651,968,512 B working set. Minimum sampled host availability was
+39,446,003,712 B physical and 56,382,038,016 B commit headroom, above the
+respective 12 GiB and 16 GiB reserves. The two earlier host-reserve stops
+retain their separate measurements. [Producer and replay measurements](catalog-resource-optimization.md#what-the-measurements-establish)
+
+### Local Windows AMD64 production from signed `84e0a9ca9`
+
+The release-profile executable from signed revision
+`84e0a9ca95ca03da3cae281e24240be9377c7ea5` completed Normal Full exports
+with the entire catalog scope and default languages on installed LIVE and PTU.
+Each used one worker and Zstandard level 3, with 12 GiB of physical availability
+and 16 GiB of commit headroom reserved for the host.
+
+| Build | Producer time | Private commit peak | Working-set peak | Compressed file | Producer decoded count |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 2,182.683 s | 35,245,895,680 B | 32,805,855,232 B | 1,576,271,368 B | 95,109,379,589 B |
+| PTU `13284307` | 2,445.397 s | 36,299,784,192 B | 33,525,100,544 B | 1,625,070,001 B | 98,173,166,243 B |
+
+Both processes exited successfully. Windows supplied the lifetime peaks through
+`K32GetProcessMemoryInfo`. All four peaks were below the 40,000,000,000 B
+producer limit. The writer temporary peak was 2,358,013,506 B on LIVE and
+2,466,879,589 B on PTU. Row spools accounted for 781,742,138 B and
+841,809,588 B respectively.
+
+The host ran Windows 11 Pro 26H2 build 26300.9974 on a Ryzen 9 9950X3D with
+32 logical processors and 100,573,523,968 B of RAM. The samples cover the
+producer lifetime. The 64 GiB headroom estimate subtracts the larger process
+peak from 64 GiB before accounting for the OS and other applications.
+
+| Build | Available before launch | Minimum available RAM | Minimum commit headroom | Estimated 64 GiB headroom | Page read delta | Page write delta | Process writes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 57,574,219,776 B | 23,526,182,912 B | 39,062,331,392 B | 33,473,581,056 B | 1,186,848 | 50 | 2,358,023,306 B |
+| PTU `13284307` | 57,781,686,272 B | 20,213,252,096 B | 37,800,472,576 B | 32,419,692,544 B | 347,415 | 51 | 2,466,889,700 B |
+
+The page counters are host totals. The measurement did not instrument
+desktop responsiveness.
+
+The before/after executable and Archive stamps agreed. The executable SHA-256
+was `d08628363068e0ef672f39430dd8a9c23d09de98ba233ab75853eeb398f30bb8`.
+The sealed LIVE frame SHA-256 was
+`59d7bb9ce387693b737089efca0e84137b6b4c86f3b85c46512357534546ce5b`.
+The sealed PTU frame SHA-256 was
+`a9056680c56fd94017b3b512a554a601977dafdf4be194e0b4f8eb7c2db88ac4`.
+#### Offline LIVE replay
+
+The optimized verifier from the same signed revision replayed the sealed LIVE
+frame in 6,619.026 s with one worker. Both passes decoded 95,109,379,589 B with
+SHA-256 `dbd96c2d9fbe7c328367c143f5db89056eab9c13c9be707235718222f0e9a223`.
+The verifier confirmed the compressed frame hash after the replay and left the
+installed Archive closed. Its binary SHA-256 was
+`a7d90528bd267b98823076568bf82f1a08d9f06a3b342fd2dbd358b147fd33f9`.
+
+| Verified LIVE inventory | Count |
+| --- | ---: |
+| Physical sources | 95,261 |
+| Source uses | 127,623,482 |
+| Variant source-use sets | 989 |
+| Sourced cells | 93,497,114 |
+| Items and item definitions | 23,685 each |
+| Blueprint definitions | 1,634 |
+| Container instances | 196,706 |
+
+The verifier reached 8,552,742,912 B private commit and 8,464,003,072 B working
+set. Minimum host availability was 28,468,948,992 B of physical memory and
+48,151,416,832 B of commit headroom.
+
+#### Offline PTU replay
+
+The same optimized verifier replayed the sealed PTU frame in 6,723.383 s
+with one worker and left the installed Archive closed. Both passes decoded
+98,173,166,243 B with SHA-256
+`da0338196446000d40eb33b57158c119bbbd176c2c5d31e1ebe6ad03e09036dd`.
+The compressed frame hash matched the producer seal after the replay.
+
+| Verified PTU inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,254,383 |
+| Variant source-use sets | 513 |
+| Sourced cells | 98,388,081 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+
+The verifier reached 8,727,654,400 B private commit and 8,664,952,832 B working
+set. Minimum host availability was 25,365,000,192 B of physical memory and
+45,997,916,160 B of commit headroom. These local producer and replay
+measurements bind to the signed source revision above. The packaged release
+candidate requires its own producer and replay measurements.
+
+### Packaged Normal Full measurement on 9499f7d58
+
+The Windows AMD64 CLI from the Release producer tested merge
+`8e2ab5df97cf7c08bd6378606ed232930875586e`. Its verified executable SHA-256
+is `2842f28976d0fefbf72546a388362b36e240d7d3efc9f6ff70594ed53dd4ca2b`.
+The run selected one worker, Normal Full coverage, the default languages
+and Zstandard level 3. The Windows Installer consumer has its own test.
+[Native Windows producer](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/job/140537108090) ·
+[Packaged producer artifact](https://github.com/p4kx-org/p4kx/actions/runs/46008246999/artifacts/15204943084)
+
+| Build | Elapsed (s) | Peak private commit (bytes) | Peak working set (bytes) | Compressed frame (bytes) | Producer decoded count (bytes) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 2,624.272 | 35,377,819,648 | 32,591,794,176 | 1,576,280,717 | 95,109,379,589 |
+| PTU 13284307 | 2,932.659 | 36,296,839,168 | 33,681,752,064 | 1,625,070,804 | 98,173,166,243 |
+
+The interactive Windows 11 Pro 26H2 host (build `26300.9974`) had an AMD Ryzen 9
+9950X3D, 32 logical processors and 100,573,523,968 B of RAM. The packaged
+binary used Rust 1.100.0. Interactive desktop latency remains unmeasured.
+
+Both producers exited 0. Each Archive stamp and binary digest remained
+stable. Windows lifetime counters kept both peaks below decimal 40 GB.
+The 64 GiB headroom estimate subtracts the greater process peak before OS
+and background workload. Paging is measured across the host.
+
+| Build | Available RAM before launch (bytes) | Host commit headroom before launch (bytes) | Minimum physical RAM available (bytes) | Minimum host commit headroom (bytes) | Estimated 64 GiB headroom (bytes) | Host page reads | Host page writes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 53,853,392,896 | 75,989,966,848 | 17,661,386,752 | 37,267,369,984 | 33,341,657,088 | 817,200 | 53 |
+| PTU 13284307 | 51,693,539,328 | 73,356,611,584 | 18,904,772,608 | 39,197,872,128 | 32,422,637,568 | 1,030,917 | 0 |
+
+| Build | Process logical writes (bytes) | Staged row spools (bytes) | Exact writer temporary peak (bytes) |
+| --- | ---: | ---: | ---: |
+| LIVE 13220821 | 2,358,032,612 | 781,742,138 | 2,358,022,855 |
+| PTU 13284307 | 2,466,890,460 | 841,809,588 | 2,466,880,392 |
+
+| Build | Compressed frame SHA-256 | Producer receipt SHA-256 |
+| --- | --- | --- |
+| LIVE 13220821 | `447f8805ca5fdeafa5ef0b6f9af74bf4c7d21db60874fe50880c9cf5c88e0041` | `b6dbec62b1f72447d55e7a5b5feae9c81d4c31633b45f31663af036ca451a340` |
+| PTU 13284307 | `25e43ed28c3e603606cbe58f68933fb5bb1c1a28dd5a0e8132fb1c2f5689623c` | `5fa5adc674e9cff54f8f485fc6e0cae9f40a1c76cb630cf5ef2ac263b08ae827` |
+
+### Packaged LIVE Full readback
+
+The separate signed verifier from `84e0a9ca95ca03da3cae281e24240be9377c7ea5`
+replayed the packaged LIVE 13220821 frame with one worker and kept the
+installed Archive closed. The sealed replay binding matches 29 verifier,
+source-accounting and wire-contract files across the two revisions.
+Both passes decoded 95,109,379,589 B with SHA-256
+`a432f1fa95399837d0cec40d1dbb205aaaa6a7244afe98d13e1ca38934e5c998`.
+The final compressed frame hash matches the producer seal.
+
+| Verified LIVE inventory | Count |
+| --- | ---: |
+| Physical sources | 95,261 |
+| Source uses | 127,623,482 |
+| Variant source-use sets | 989 |
+| Sourced cells | 93,497,114 |
+| Items and item definitions | 23,685 each |
+| Blueprint definitions | 1,634 |
+| Container instances | 196,706 |
+| Counted document sections | 254 |
+
+The verifier exited 0 in 6,078.746 s, with 8,551,821,312 B peak private commit,
+8,463,880,192 B peak working set and 23,964 B of process write transfers.
+Minimum host availability was 41,197,506,560 B physical memory and
+61,723,824,128 B commit headroom. A guarded one-job synthetic compilation
+shared the host during the readback. The terminal receipt SHA-256 is
+`eb72449baf43783075f6676cb86f304f12187b6d39690657d1108350c49cd90b`.
+
+### Packaged PTU Full readback
+
+The same independent verifier replayed the packaged PTU 13284307 frame
+with one worker and kept the installed Archive closed. Both passes
+verified 98,173,166,243 decoded bytes with SHA-256
+`6b0e94358ad66f58c5f56ba4239624490b4d83e05b29ce4450ee31e4ba9c7f2b`.
+The compressed frame hash matched the producer seal after replay.
+
+| Verified PTU inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,254,383 |
+| Variant source-use sets | 513 |
+| Sourced cells | 98,388,081 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+| Counted document sections | 254 |
+
+The verifier exited 0 in 6,346.079 s. Peak private commit was
+8,727,318,528 B, peak working set was 8,664,616,960 B and process write
+transfers were 24,172 B. Minimum host availability was 38,635,184,128 B
+physical memory and 58,139,856,896 B commit headroom. Guarded synthetic
+compilation shared the host during part of the replay.
+
+The PTU terminal receipt SHA-256 is
+`6aeb71a97d01ec97f9511450dc4aa2ae53af0a57c765bd5702c142b9f8f330af`.
+The paired terminal receipt binds both producer frames and both completed
+readbacks. Its SHA-256 is
+`4c86d9dc8463682ce6054c9880b2ed825a2c400364699489464bd8d3650f3bde`.

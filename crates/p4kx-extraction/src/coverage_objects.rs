@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use p4kx_dataforge::{DataForge, Guid, RecordTree, TreeBuilder, Value};
 
-use crate::coverage::{ObjectCoverage, ReferenceItem};
-use crate::coverage_forge::{Tally, sample};
+use crate::coverage::{ObjectCoverage, ReferenceItem, SampleExport};
+use crate::coverage_forge::Tally;
 
 pub(crate) const STAR_MAP_OBJECT: &str = "StarMapObject";
 const TYPE_FIELD: &str = "type";
@@ -69,14 +69,15 @@ fn type_name<'f>(target: &RecordTree<'f>) -> &'f str {
 
 /// Returns the coverage of every listed `StarMapObjectType` name in list order.
 pub(crate) fn coverage(
-    forge: &DataForge<'_>,
     items: &[ReferenceItem<'_>],
     names: &HashMap<&str, usize>,
     tallies: &[Tally],
+    mut read_sample: impl FnMut(usize, u32) -> SampleExport,
 ) -> Vec<ObjectCoverage> {
     items
         .iter()
-        .map(|item| {
+        .enumerate()
+        .map(|(row, item)| {
             let tally = names
                 .get(item.name)
                 .and_then(|first| tallies.get(*first))
@@ -87,7 +88,7 @@ pub(crate) fn coverage(
                 type_name: item.name.to_owned(),
                 records: tally.records,
                 templates: tally.templates,
-                sample: tally.sample.map(|index| sample(forge, index)),
+                sample: tally.sample.map(|index| read_sample(row, index)),
             }
         })
         .collect()

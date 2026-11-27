@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::locations::create_private_folder;
 use crate::profile::profile_folder;
+use crate::wine_locations::WineLocations;
 use crate::{
     AssemblyExportSettings, ModelExportSettings, RecentArchives, SavedQueries, UiRenderSettings,
 };
@@ -46,6 +47,9 @@ pub struct Settings {
     pub recent: RecentArchives,
     /// The manually added Channel sources.
     pub channels: ManualChannels,
+    /// Explicit Wine prefixes and `CrossOver` bottle roots.
+    #[serde(skip_serializing_if = "WineLocations::is_empty")]
+    pub wine: WineLocations,
     /// The last position and size of the main window, or `None` for the default placement.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<WindowGeometry>,
@@ -157,11 +161,11 @@ pub enum SettingsError {
     Serialize(#[from] toml::ser::Error),
 }
 
-/// Returns `settings.toml` in the `P4KX` folder of the platform config directory,
+/// Returns `settings.toml` in the `P4KX` folder of the selected config base,
 /// `%APPDATA%\P4KX` on Windows and `$XDG_CONFIG_HOME/P4KX` on Linux.
 ///
 /// The first call migrates the old `P4K-Extractor` folder (see
-/// [`migrate_profile`](crate::migrate_profile)).
+/// [`migrate_profile`](crate::migrate_profile)); [`crate::FOLDERS_ROOT_VARIABLE`] overrides the base.
 #[must_use]
 pub fn default_settings_file() -> Option<PathBuf> {
     profile_folder().map(|dir| dir.join(FILE_NAME))

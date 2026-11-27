@@ -61,6 +61,7 @@ fn krate(entry: &Value) -> Result<Crate> {
     Ok(Crate {
         name: string(krate, "name")?,
         version: string(krate, "version")?,
+        licence_source: None,
         repository: krate
             .get("repository")
             .and_then(Value::as_str)

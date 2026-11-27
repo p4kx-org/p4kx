@@ -8,44 +8,27 @@ use p4kx_archive::{Archive, Entry};
 use crate::buffers::Buffers;
 use crate::dataforge_pick::{DataForgePick, Pick, located};
 use crate::dependent::Collisions;
+use crate::extract_outcome::summarise;
 use crate::sound_job::mark_sounds;
 use crate::sound_workers::{run_parallel, within};
 use crate::source::{EntrySource, SourceEntry};
 use crate::texture_job::{Item, group_textures};
 use crate::tracker::Tracker;
-use crate::write::{EntryWriter, Outcome};
+use crate::write::{EntryTarget, EntryWriter};
 use crate::{
     EntryFailure, ExtractOptions, ExtractionError, ExtractionReport, MAX_SOUND_LEN,
     MAX_SOUNDBANK_LEN,
 };
 
-/// The outcome of one Entry of an Extraction: its position, its path and how it ended.
-pub(crate) type EntryEnded = (usize, String, Outcome);
-
-/// How one item of an Extraction ended.
-pub(crate) enum Ended {
-    /// An Entry written on its own.
-    Entry(EntryEnded),
-    /// The Entries of a texture, and its failure by position when it was not fully converted.
-    Texture {
-        entries: Vec<EntryEnded>,
-        unconverted: Option<(usize, EntryFailure)>,
-    },
-    /// A sound or soundbank Entry, the failures of what could not be converted and the names of
-    /// the sounds of a soundbank the cancelled run left unwritten.
-    Sound {
-        entry: EntryEnded,
-        unconverted: Vec<EntryFailure>,
-        cancelled: Vec<String>,
-    },
-}
+pub(crate) use crate::extract_outcome::{Ended, EntryEnded};
 
 /// Runs an Extraction of `entries` from `archive` into the existing folder `target`.
 ///
 /// Files that already exist are handled by the [`ConflictPolicy`](crate::ConflictPolicy) of
 /// `options`. Entries are written in parallel on the current rayon pool with the same files and
 /// report as a sequential run in the order of `entries`. Entry paths that could leave `target` are
-/// rejected, and existing links below `target` are never followed. A failed or cancelled Entry
+/// rejected, the origin publication lock name is reserved, and existing links below `target`
+/// are never followed. A failed or cancelled Entry
 /// leaves no partial file and keeps an existing one; once the token of `options` is cancelled,
 /// the Entries not yet complete are reported as cancelled.
 ///
@@ -53,9 +36,9 @@ pub(crate) enum Ended {
 /// as one texture as [`TextureConversion`](crate::TextureConversion) says, its parts read from
 /// the Archive whether requested or not. A texture that cannot be converted is reported among
 /// the [`unconverted`](ExtractionReport::unconverted) ones and its raw Entries are written. The
-/// DataForge Entry, the one [`DataForgeEntry::locate`] finds, is written as one Record XML file
-/// per Record below its folder after the other Entries, each file under the Conflict policy; its
-/// Records are reported in [`records`](ExtractionReport::records).
+/// DataForge Entry, the one [`DataForgeEntry::locate`](crate::DataForgeEntry::locate) finds, is
+/// written as one Record XML file per Record below its folder after the other Entries, each file
+/// under the Conflict policy; its Records are reported in [`records`](ExtractionReport::records).
 ///
 /// With Conversion on, WEM sounds and the WEMs of soundbanks are written as
 /// [`AudioConversion`](crate::AudioConversion) says, each soundbank also unchanged; a sound that
@@ -84,6 +67,7 @@ pub fn extract(
         .collect();
     let rules = Rules {
         copy_other: true,
+        entry_target: EntryTarget::Source,
         pick: &|entries, stop| located(archive, entries, stop),
     };
     extract_files(archive, &files, target, options, &rules)
@@ -91,6 +75,8 @@ pub fn extract(
 
 /// What differs between an Extraction of an Archive and a Conversion of a folder.
 pub(crate) struct Rules<'p> {
+    /// Output naming independent of the actual source Entry identity.
+    pub(crate) entry_target: EntryTarget<'p>,
     /// Whether a file that Conversion leaves unchanged is written too; without it such a file is
     /// not written but counted in [`ExtractionReport::not_converted`].
     pub(crate) copy_other: bool,
@@ -141,9 +127,45 @@ fn run(
     if let Some(report) = not_started(entries, target, options) {
         return report;
     }
+    let owned_protection = if options.protection.is_none() {
+        source
+            .archive_path()
+            .map(|path| {
+                p4kx_guard::ArchiveWriteProtection::new(
+                    path,
+                    crate::output_file::cancel_flag(options.cancel),
+                )
+            })
+            .transpose()
+    } else {
+        Ok(None)
+    };
+    let owned_protection = match owned_protection {
+        Ok(protection) => protection,
+        Err(error) => return refused_report(entries, options, &error),
+    };
+    let protection = options.protection.or(owned_protection.as_ref());
+    if let Err(error) = crate::check_protected_output(target, protection, options.cancel) {
+        return refused_report(entries, options, &error);
+    }
+    run_guarded(source, entries, target, options, pool, rules, protection)
+}
+
+fn run_guarded(
+    source: &dyn EntrySource,
+    entries: &[SourceEntry<'_>],
+    target: &Path,
+    options: &ExtractOptions<'_>,
+    pool: Option<&rayon::ThreadPool>,
+    rules: &Rules<'_>,
+    protection: Option<&p4kx_guard::ArchiveWriteProtection>,
+) -> ExtractionReport {
     let tracker = Tracker::new(entries, options.cancel, options.watch, options.progress);
     let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
     let writer = EntryWriter {
+        entry_target: rules.entry_target,
+        protection,
+        cancel: options.cancel,
         source,
         target: &absolute,
         policy: options.policy,
@@ -161,7 +183,7 @@ fn run(
     };
     let dataforge = found.position;
     let (independent, dependent) =
-        split_dependent(within(pool, || items(source, entries, options, dataforge)));
+        split_dependent(within(pool, || items(&writer, entries, dataforge)), &writer);
     let run = |buffers: &mut Buffers, item: Item<'_>| {
         let ended = write_item(&writer, item, buffers);
         writer.record_written(entries, &ended);
@@ -183,7 +205,7 @@ fn run(
             ended.push(Ended::Entry((index, entry.path().to_owned(), outcome)));
             records
         });
-    let mut report = report(ended, options.convert);
+    let mut report = summarise(ended, options.convert, tracker);
     report.records = records;
     report.records_entry = dataforge
         .and_then(|index| entries.get(index))
@@ -196,6 +218,34 @@ fn run(
         .collect();
     report.archive_changed = options.watch.is_some_and(|watch| watch.check().is_err());
     report
+}
+
+fn refused_report(
+    entries: &[SourceEntry<'_>],
+    options: &ExtractOptions<'_>,
+    error: &p4kx_guard::WriteProtectionError,
+) -> ExtractionReport {
+    if error.is_cancelled() {
+        return ExtractionReport {
+            cancelled: entries
+                .iter()
+                .map(|entry| entry.path().to_owned())
+                .collect(),
+            converted: options.convert.then_some(0),
+            ..ExtractionReport::default()
+        };
+    }
+    ExtractionReport {
+        failures: entries
+            .iter()
+            .map(|entry| EntryFailure {
+                path: entry.path().to_owned(),
+                error: ExtractionError::Installation(error.clone()),
+            })
+            .collect(),
+        converted: options.convert.then_some(0),
+        ..ExtractionReport::default()
+    }
 }
 
 /// Writes one item of the run and returns how it ended.
@@ -228,6 +278,16 @@ fn not_started(
     options: &ExtractOptions<'_>,
 ) -> Option<ExtractionReport> {
     let converted = options.convert.then_some(0);
+    if options.cancel.is_some_and(crate::CancelToken::is_cancelled) {
+        return Some(ExtractionReport {
+            cancelled: entries
+                .iter()
+                .map(|entry| entry.path().to_owned())
+                .collect(),
+            converted,
+            ..ExtractionReport::default()
+        });
+    }
     if let Err(refused) = p4kx_guard::ensure_writable(target) {
         let failures = entries.iter().map(|entry| EntryFailure {
             path: entry.path().to_owned(),
@@ -256,86 +316,33 @@ fn not_started(
 /// Splits `entries` into the items of the run: with Conversion on, textures, sounds and
 /// soundbanks; the DataForge Entry at `dataforge` is left out.
 fn items<'a>(
-    source: &'a dyn EntrySource,
+    writer: &EntryWriter<'a>,
     entries: &'a [SourceEntry<'a>],
-    options: &ExtractOptions<'_>,
     dataforge: Option<usize>,
 ) -> Vec<Item<'a>> {
-    let mut items = if options.convert && options.textures.converts() {
-        group_textures(source, entries)
+    writer.reserve_cryxml_native_paths(entries, dataforge);
+    let mut items = if writer.convert && writer.textures.converts() {
+        group_textures(writer.source, entries)
     } else {
         entries.iter().enumerate().map(Item::Entry).collect()
     };
     items.retain(|item| !matches!(item, Item::Entry((index, _)) if Some(*index) == dataforge));
-    if options.convert {
-        mark_sounds(&mut items, options.audio);
+    if writer.convert {
+        mark_sounds(&mut items, writer.audio);
     }
     items
 }
 
-fn report(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
-    let mut outcomes = Vec::with_capacity(ended.len());
-    let mut unconverted = Vec::new();
-    let mut unwritten = Vec::new();
-    for item in ended {
-        match item {
-            Ended::Entry(outcome) => outcomes.push(outcome),
-            Ended::Texture {
-                entries,
-                unconverted: failure,
-            } => {
-                outcomes.extend(entries);
-                unconverted.extend(failure);
-            }
-            Ended::Sound {
-                entry,
-                unconverted: failures,
-                cancelled: sounds,
-            } => {
-                let index = entry.0;
-                outcomes.push(entry);
-                unconverted.extend(failures.into_iter().map(|failure| (index, failure)));
-                unwritten.extend(sounds.into_iter().map(|sound| (index, sound)));
-            }
-        }
-    }
-    outcomes.sort_unstable_by_key(|(index, _, _)| *index);
-    unwritten.sort_by_key(|(index, _)| *index);
-    unconverted.sort_by_key(|(index, _)| *index);
-    let mut report = ExtractionReport {
-        converted: convert.then_some(0),
-        unconverted: unconverted
-            .into_iter()
-            .map(|(_, failure)| failure)
-            .collect(),
-        ..ExtractionReport::default()
-    };
-    for (_, path, outcome) in outcomes {
-        match outcome {
-            Outcome::Written => report.extracted += 1,
-            Outcome::Converted => {
-                report.extracted += 1;
-                report.converted = report.converted.map(|count| count + 1);
-            }
-            Outcome::Kept => report.skipped.push(path),
-            Outcome::NotConverted => report.not_converted += 1,
-            Outcome::Cancelled => report.cancelled.push(path),
-            Outcome::Failed(error) => report.failures.push(EntryFailure { path, error }),
-        }
-    }
-    report
-        .cancelled
-        .extend(unwritten.into_iter().map(|(_, sound)| sound));
-    report
-}
-
 /// Splits `items` into those that may run in parallel and, in order, those that write a path
 /// colliding with an earlier one by name or as a file where a folder is needed.
-fn split_dependent(items: Vec<Item<'_>>) -> (Vec<Item<'_>>, Vec<Item<'_>>) {
+fn split_dependent<'item>(
+    items: Vec<Item<'item>>,
+    writer: &EntryWriter<'_>,
+) -> (Vec<Item<'item>>, Vec<Item<'item>>) {
     let mut collisions = Collisions::default();
     items.into_iter().partition(|item| {
         let mut free = true;
-        item.output_paths(|path| free &= collisions.claim(path));
+        item.output_paths(writer, |path| free &= collisions.claim(path));
         free
     })
 }

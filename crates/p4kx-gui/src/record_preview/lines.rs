@@ -8,6 +8,7 @@ use p4kx_extraction::{
     TextResolver, Value, ValueError,
 };
 
+use super::xml_provenance::PendingXml;
 use super::{FieldLine, KeyText, LineValue, RecordLink, RecordView};
 use crate::model::describe;
 use crate::shown_line::display_text;
@@ -21,7 +22,7 @@ pub(super) fn view(
     tree: &RecordTree<'_>,
     texts: Option<&dyn TextResolver>,
     tags: &dyn TagResolver,
-) -> RecordView {
+) -> (RecordView, Option<PendingXml>) {
     let mut lines = Lines {
         forge,
         texts,
@@ -31,15 +32,20 @@ pub(super) fn view(
     };
     lines.fields(tree.fields(), 0);
     let mut xml = Vec::new();
+    let mut observed = PendingXml::new();
     let xml_error = RecordXml::new()
-        .write_annotated(tree, texts.into(), &mut xml)
+        .write_observed(tree, texts.into(), &mut xml, &mut |span| {
+            observed.observe(span);
+            Ok(())
+        })
         .err()
         .map(|error| describe(&error).into_boxed_str());
     if xml_error.is_some() {
         xml.clear();
     }
     lines.out.shrink_to_fit();
-    RecordView {
+    let proof = xml_error.is_none().then_some(observed);
+    let view = RecordView {
         name: tree.name().into(),
         type_name: tree.type_name().into(),
         guid: tree.guid(),
@@ -50,7 +56,9 @@ pub(super) fn view(
         xml_error,
         language: None,
         texts_failure: None,
-    }
+        provenance: None,
+    };
+    (view, proof)
 }
 
 struct Lines<'a, 'f> {

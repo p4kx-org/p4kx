@@ -28,7 +28,7 @@ pub(crate) struct ExtractArgs {
     #[arg(long, value_name = "FILTER", conflicts_with = "entries")]
     pub(crate) exclude: Vec<String>,
     /// Target folder; created if missing, files already in it are handled by --conflict. Defaults
-    /// to a new folder SC-EXPORT-<Channel>-<Build version>-<timestamp> in the current directory.
+    /// to a new folder `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the current directory.
     #[arg(long, value_name = "FOLDER")]
     pub(crate) out: Option<PathBuf>,
     /// What to do with a file that already exists in the target.
@@ -39,10 +39,11 @@ pub(crate) struct ExtractArgs {
     /// its folder instead of the .dcb; text XML and every other Entry are written unchanged.
     #[arg(long)]
     pub(crate) convert: bool,
-    /// What --convert writes for a texture <name>.dds, its parts <name>.dds.1 … .N and any alpha
-    /// tail <name>.dds.a: `merge` one standard DDS under the header's path (and, without `png`,
-    /// the tail merged under its own path), `png` the mip --mip as <name>.png with the tail as
-    /// alpha, a high-range texture as OpenEXR <name>.exr and a cubemap as six face files, `raw`
+    /// What --convert writes for a texture `<name>.dds`, its parts `<name>.dds.1` … .N and any
+    /// alpha tail `<name>.dds.a`: `merge` one standard DDS under the header's path (and, without
+    /// `png`, the tail merged under its own path), `png` the mip --mip as `<name>.png` with the
+    /// tail as alpha, a high-range texture as OpenEXR `<name>.exr`
+    /// and a cubemap as six face files, `raw`
     /// the Entries unchanged (with `merge`, only the parts); a texture that cannot be converted
     /// is reported and written raw.
     #[arg(
@@ -59,9 +60,9 @@ pub(crate) struct ExtractArgs {
     /// fewer levels exports its smallest.
     #[arg(long, default_value_t = 0, requires = "convert", value_name = "LEVEL")]
     pub(crate) mip: u32,
-    /// What --convert writes for a WEM sound <name>.wem and for each WEM a soundbank <name>.bnk
-    /// embeds; a soundbank is also written unchanged and unpacked into the folder <name> next to
-    /// it, each WEM named <ID>. A sound whose codec cannot be decoded is reported and written
+    /// What --convert writes for a WEM sound `<name>.wem` and for each WEM a soundbank `<name>.bnk`
+    /// embeds; a soundbank is also written unchanged and unpacked into the folder `<name>` next to
+    /// it, each WEM named `<ID>`. A sound whose codec cannot be decoded is reported and written
     /// unchanged as .wem, as are plug-in media and the prefetched start of a streamed WEM.
     #[arg(
         long,

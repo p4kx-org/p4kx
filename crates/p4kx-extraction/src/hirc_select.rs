@@ -8,7 +8,11 @@ use p4kx_audio::{HircKind, HircLayout, HircObject};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::bank::Bank;
+use crate::bank_field_evidence::BankFieldEvidence;
 use crate::hirc_view::ObjectView;
+use crate::wem_payload_evidence::{EvidenceError, put};
+use crate::{FieldOrigins, SharedFieldOrigin, SourceInventory, SourceUseRole};
 
 /// How many objects of a whole bank the reader decodes, does not decode, does not support in the
 /// bank's version or finds malformed.
@@ -90,6 +94,131 @@ pub fn select(
     }
 }
 
+/// Selects one page with checked physical source fields from the owning bank.
+#[must_use]
+pub fn select_with_sources(
+    bank: &Bank,
+    kind: Option<HircKind>,
+    id: Option<u32>,
+    offset: usize,
+    limit: usize,
+) -> ObjectPage<'_> {
+    let mut page = select(bank.soundbank().objects(), kind, id, offset, limit);
+    for object in &mut page.shown {
+        object.attach_source_fields(bank);
+    }
+    page
+}
+
+/// A page and the observed origins of its bank name, header and object envelope fields.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedObjectPage<'a> {
+    /// The selected objects and pagination data.
+    pub page: ObjectPage<'a>,
+    /// The addressed source origins of the stored fields.
+    pub field_origins: FieldOrigins,
+    /// The original contributors and their use sites.
+    pub provenance: SourceInventory,
+}
+
+/// Selects one page and binds its original bank and object envelope fields.
+///
+/// # Errors
+///
+/// Returns an error if an original source range or output address cannot be bound.
+pub fn select_with_origins(
+    bank: &Bank,
+    kind: Option<HircKind>,
+    id: Option<u32>,
+    offset: usize,
+    limit: usize,
+) -> Result<ObservedObjectPage<'_>, EvidenceError> {
+    let page = select_with_sources(bank, kind, id, offset, limit);
+    let evidence = BankFieldEvidence::new(bank)?;
+    let mut field_origins = FieldOrigins::new();
+    evidence.header("", &mut field_origins)?;
+    if !page.shown.is_empty() {
+        let version = evidence.uses.shared_origin(
+            &[evidence.version(SourceUseRole::Selector)?],
+            evidence.complete,
+        );
+        for (output, view) in page.shown.iter().enumerate() {
+            let object = bank
+                .soundbank()
+                .objects()
+                .get(view.index)
+                .ok_or(EvidenceError::InvalidPrefix)?;
+            bind_envelope(
+                &evidence,
+                &version,
+                object,
+                view,
+                &format!("/objects/{output}"),
+                &mut field_origins,
+            )?;
+        }
+    }
+    Ok(ObservedObjectPage {
+        page,
+        field_origins,
+        provenance: evidence.finish()?,
+    })
+}
+
+fn bind_envelope(
+    evidence: &BankFieldEvidence<'_>,
+    version: &SharedFieldOrigin,
+    object: &HircObject,
+    view: &ObjectView<'_>,
+    address: &str,
+    fields: &mut FieldOrigins,
+) -> Result<(), EvidenceError> {
+    let id = evidence.word(
+        "bnkHircObject",
+        "objectId",
+        object.id_byte_range(),
+        SourceUseRole::Payload,
+    )?;
+    let code = evidence.word(
+        "bnkHircObject",
+        "typeCode",
+        object.kind_byte_range(),
+        SourceUseRole::Conversion,
+    )?;
+    put(
+        fields,
+        address,
+        "id",
+        evidence.uses.origin(&[id], evidence.complete),
+    )?;
+    put(
+        fields,
+        address,
+        "type",
+        evidence
+            .uses
+            .origin_with_shared(version, &[code], evidence.complete)?,
+    )?;
+    if view.type_byte.is_some() {
+        let original = evidence.word(
+            "bnkHircObject",
+            "typeCode",
+            object.kind_byte_range(),
+            SourceUseRole::Payload,
+        )?;
+        put(
+            fields,
+            address,
+            "type_byte",
+            evidence
+                .uses
+                .origin_with_shared(version, &[original], evidence.complete)?,
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use p4kx_audio::Soundbank;
@@ -104,7 +233,7 @@ mod tests {
             .object(TestHircObject::sound(10, 100, 2, 4096))
             .object(TestHircObject::event(11, &[12]))
             .object(TestHircObject::sound(12, 101, 2, 4096))
-            .object(TestHircObject::raw(7, 13, [0; 4]))
+            .object(TestHircObject::raw(0xFE, 13, [0; 4]))
             .bytes()
     }
 

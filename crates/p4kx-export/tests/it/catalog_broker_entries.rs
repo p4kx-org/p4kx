@@ -1,51 +1,86 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Mission broker entries in the Basetool catalog.
-
-use std::error::Error;
+//! Original Broker definitions and contextual projections in the catalog.
 
 use serde_json::{Value, json};
 
+use crate::broker_flow_graph as broker;
 use crate::catalog_contract_templates::build;
+use crate::health_origin_fixture::TestResult;
+use crate::loot_v3_graph as raw;
+use crate::mission_template_graph as mission;
+use crate::template_canonical_graph::{BrokerContext, Context};
+use crate::template_fixture_fields as fields;
+use crate::template_fixture_tags as tags;
+use crate::template_fixture_text as texts;
 
-type TestResult = Result<(), Box<dyn Error>>;
+#[path = "catalog_broker_checks.rs"]
+mod checks;
+#[path = "catalog_broker_entries_reputation.rs"]
+mod reputation;
+#[path = "catalog_broker_entries_context.rs"]
+mod template_context;
 
 const BROKER: &str = "b0000000-0000-4000-8000-000000000001";
 const ELSEWHERE: &str = "b0000000-0000-4000-8000-000000000002";
 const MISSION_TYPE: &str = "50000000-0000-4000-8000-000000000001";
 const OWNER: &str = "80000000-0000-4000-8000-000000000001";
 const SCOPE: &str = "80000000-0000-4000-8000-000000000002";
-
-fn entry(catalog: &Value) -> Result<&Value, String> {
-    catalog["missionBrokerEntries"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["guid"] == BROKER)
-        .ok_or_else(|| "the broker entry".to_owned())
-}
+const REWARD: &str = "b1000000-0000-4000-8000-000000000001";
 
 #[test]
 fn an_entry_outside_the_folder_is_kept_a_leftover_is_left_out_and_a_contract_links_to_its_entry()
 -> TestResult {
     let catalog = build()?;
-    let entries = catalog["missionBrokerEntries"]
-        .as_array()
-        .ok_or("entries")?;
-    let guids: Vec<&str> = entries
-        .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect();
-    assert_eq!(guids, [BROKER, ELSEWHERE], "ordered by GUID");
-    for contract in catalog["contracts"].as_array().ok_or("contracts")? {
-        assert_eq!(contract["brokerEntryGuid"], BROKER);
-    }
-    let broker = entry(&catalog)?;
-    assert_eq!(broker["className"], "Haul_A");
+    let definitions = catalog
+        .pointer("/definitions/missionBrokerEntries/rows")
+        .and_then(Value::as_array)
+        .ok_or("actual canonical Broker definitions")?;
+    let expected = [
+        crate::spawns_fixture::BROKER,
+        crate::spawns_fixture::BROKER_ELSEWHERE,
+        crate::spawns_fixture::BROKER_BAD,
+        crate::spawns_fixture::BROKER_BAD_PROPERTY,
+        crate::spawns_fixture::BROKER_BAD_LOCATION,
+    ]
+    .map(crate::commodity_v3_fixture::guid);
     assert_eq!(
-        broker["recordPath"],
-        "libs/foundry/records/missionbroker/covalex/haul_a"
+        definitions.len(),
+        expected.len(),
+        "readable original Broker owners remain in D, and the leftover is excluded"
+    );
+    for (row, identity) in definitions.iter().zip(expected) {
+        assert_eq!(
+            row.pointer("/guid/value"),
+            Some(&json!(identity)),
+            "ordered by original GUID"
+        );
+    }
+    assert_eq!(
+        broker::projections(&catalog)?.len(),
+        2,
+        "only the two successful contexts are emitted"
+    );
+    broker::projection(&catalog, broker::definition(&catalog, ELSEWHERE)?)?;
+    for contract in crate::catalog_contracts::v3::rows(&catalog)? {
+        assert_eq!(
+            contract.get("brokerEntryGuid"),
+            Some(&json!(BROKER)),
+            "the same original contract link"
+        );
+    }
+    let definition = broker::definition(&catalog, BROKER)?;
+    broker::projection(&catalog, definition)?;
+    assert_eq!(
+        definition.pointer("/className/value"),
+        Some(&json!("Haul_A")),
+        "the same original header conversion"
+    );
+    assert_eq!(
+        definition.pointer("/recordPath/value"),
+        Some(&json!("libs/foundry/records/missionbroker/covalex/haul_a")),
+        "the same original path conversion"
     );
     Ok(())
 }
@@ -53,78 +88,222 @@ fn an_entry_outside_the_folder_is_kept_a_leftover_is_left_out_and_a_contract_lin
 #[test]
 fn texts_are_game_texts_and_a_placeholder_has_no_key() -> TestResult {
     let catalog = build()?;
-    let broker = entry(&catalog)?;
-    assert_eq!(broker["title"]["key"], "@place_name");
-    assert_eq!(broker["title"]["en"], "Hijacked Ship");
-    assert_eq!(broker["hudTitle"]["key"], Value::Null);
-    assert_eq!(broker["missionGiver"]["en"], "Hijacked Ship");
-    assert_eq!(broker["finish"]["endReason"]["en"], "Hijacked Ship");
-    assert_eq!(broker["debugName"], "Haul A");
+    let graph = BrokerContext::new(&catalog, BROKER)?;
+    let title = graph.owner().follow(
+        graph
+            .projection()
+            .get("title")
+            .ok_or("actual title source link")?,
+    )?;
+    assert!(
+        std::ptr::eq(title, graph.root("title")?),
+        "context points to the actual original title"
+    );
+    let deadline = graph.root("missionDeadline")?;
+    for node in [
+        title,
+        graph.root("missionGiver")?,
+        graph.field(deadline, "missionEndReason")?,
+    ] {
+        texts::localized(
+            &catalog,
+            &graph,
+            node,
+            "@place_name",
+            Some("Hijacked Ship"),
+            None,
+        )?;
+    }
+    texts::no_lookup(
+        &graph,
+        graph.root("titleHUD")?,
+        "@LOC_UNINITIALIZED",
+        "placeholder",
+    )?;
+    assert_eq!(
+        fields::text(graph.root("playerFacingDebugName")?)?,
+        "Haul A",
+        "exact original debug name"
+    );
     Ok(())
 }
 
 #[test]
 fn links_and_the_identity_of_the_giver_are_guids() -> TestResult {
     let catalog = build()?;
-    let broker = entry(&catalog)?;
-    assert_eq!(broker["missionTypeGuid"], MISSION_TYPE);
-    assert_eq!(broker["locationGuid"], OWNER);
-    assert_eq!(broker["localityGuid"], Value::Null);
-    assert_eq!(broker["invitationMissionGuid"], ELSEWHERE);
-    assert_eq!(broker["linkedMissionGuid"], Value::Null);
-    assert_eq!(broker["associatedMissionGuids"], json!([ELSEWHERE]));
-    assert_eq!(broker["requiredMissionGuids"], json!([ELSEWHERE]));
-    assert_eq!(broker["owner"], json!({"guid": OWNER, "className": "MDT"}));
-    assert_eq!(broker["giverFragmentTags"], "Covalex");
-    assert_eq!(broker["module"], "Libs/Subsumption/Missions/Haul.xml");
+    let graph = BrokerContext::new(&catalog, BROKER)?;
+    mission::reference(graph.root("type")?, MISSION_TYPE, None)?;
+    for (name, expected) in [
+        ("locationMissionAvailable", OWNER),
+        ("invitationMission", ELSEWHERE),
+    ] {
+        fields::reference(graph.root(name)?, expected)?;
+    }
+    for name in ["localityAvailable", "linkedMission"] {
+        raw::source_null(graph.root(name)?);
+    }
+    for name in ["associatedMissions", "requiredMissions"] {
+        let values = fields::elements(&graph, graph.root(name)?)?;
+        let [value] = values.as_slice() else {
+            return Err("one actual original linked mission".into());
+        };
+        fields::reference(value, ELSEWHERE)?;
+    }
+    let owner = graph
+        .projection()
+        .get("owner")
+        .ok_or("actual selected DevOwner context")?;
+    let caller = graph
+        .owner()
+        .follow(owner.get("source").ok_or("actual original owner slot")?)?;
+    assert!(
+        std::ptr::eq(caller, graph.root("owner")?),
+        "the same original caller reference"
+    );
+    fields::reference(caller, OWNER)?;
+    assert_eq!(
+        owner.pointer("/className/value"),
+        Some(&json!("MDT")),
+        "the actual selected original owner class"
+    );
+    for (name, expected) in [
+        ("missionGiverFragmentTags", "Covalex"),
+        ("missionModule", "Libs/Subsumption/Missions/Haul.xml"),
+    ] {
+        assert_eq!(
+            fields::text(graph.root(name)?)?,
+            expected,
+            "exact original text {name}"
+        );
+    }
     Ok(())
 }
 
 #[test]
 fn terms_are_exported_as_stored() -> TestResult {
     let catalog = build()?;
-    let broker = entry(&catalog)?;
-    assert_eq!(broker["difficulty"], 3);
-    assert_eq!(broker["buyInAmount"], 500);
-    assert_eq!(broker["refundBuyInOnWithdraw"], true);
-    assert_eq!(broker["settings"]["canBeShared"], true);
-    assert_eq!(broker["settings"]["onlyOwnerCanComplete"], true);
-    assert_eq!(broker["availability"]["initiallyActive"], true);
-    assert_eq!(broker["availability"]["wantedLevelMax"], 2.0);
-    assert_eq!(broker["availability"]["requestOnly"], false);
-    assert_eq!(broker["cooldowns"]["personalCooldownTime"], 60.0);
-    assert_eq!(broker["cooldowns"]["respawnTime"], 10.0);
-    assert_eq!(broker["instances"]["maxInstances"], 4);
-    assert_eq!(broker["instances"]["lifeTime"], 120.0);
+    let graph = BrokerContext::new(&catalog, BROKER)?;
+    for (name, expected) in [
+        ("refundBuyInOnWithdraw", true),
+        ("canBeShared", true),
+        ("onlyOwnerCanComplete", true),
+        ("initiallyActive", true),
+        ("requestOnly", false),
+        ("failIfBecameCriminal", true),
+    ] {
+        assert_eq!(
+            fields::scalar(graph.root(name)?, "boolean")?,
+            &json!(expected),
+            "exact original flag {name}"
+        );
+    }
+    for (name, expected) in [
+        ("missionDifficulty", json!(3)),
+        ("missionBuyInAmount", json!(500)),
+        ("personalCooldownTime", json!(60.0)),
+        ("respawnTime", json!(10.0)),
+        ("maxInstances", json!(4)),
+        ("instanceLifeTime", json!(120.0)),
+    ] {
+        assert_eq!(
+            fields::number(graph.root(name)?)?,
+            &expected,
+            "exact original numeric field {name}"
+        );
+    }
+    let wanted = graph.field(graph.root("reputationPrerequisites")?, "wantedLevel")?;
+    fields::numeric_fields(&graph, wanted, &[("maxValue", json!(2.0))])?;
+    let reward = graph.root("missionReward")?;
     assert_eq!(
-        broker["reward"],
-        json!({
-            "currency": "UEC",
-            "reward": 12000,
-            "max": 15000,
-            "plusBonuses": true,
-            "reputationBonusGuid": SCOPE
-        })
+        fields::text(graph.field(reward, "currencyType")?)?,
+        "UEC",
+        "the complete original currency"
     );
-    let finish = &broker["finish"];
-    assert_eq!(finish["autoEnd"], true);
-    assert_eq!(finish["completionTime"], 45.5);
-    assert_eq!(finish["resultAfterTimerEnd"], "failed");
-    assert_eq!(finish["failIfBecameCriminal"], true);
+    fields::numeric_fields(
+        &graph,
+        reward,
+        &[("reward", json!(12_000)), ("max", json!(15_000))],
+    )?;
+    fields::scalar_fields(&graph, reward, &[("plusBonuses", "boolean", json!(true))])?;
+    mission::reference(graph.field(reward, "reputationBonus")?, SCOPE, None)?;
+    let finish = graph.root("missionDeadline")?;
+    fields::scalar_fields(
+        &graph,
+        finish,
+        &[("missionAutoEnd", "boolean", json!(true))],
+    )?;
+    fields::numeric_fields(&graph, finish, &[("missionCompletionTime", json!(45.5))])?;
+    let state = graph.field(finish, "missionResultAfterTimerEnd")?;
+    assert_eq!(fields::text(state)?, "Failed", "the exact stored result");
+    assert_eq!(
+        fields::vocabulary(&graph, state)?.get("value"),
+        Some(&json!("failed")),
+        "the same recognized timer result"
+    );
     Ok(())
 }
 
 #[test]
 fn the_schedule_names_its_dates_and_nulls_a_month_it_does_not_know() -> TestResult {
     let catalog = build()?;
+    let graph = BrokerContext::new(&catalog, BROKER)?;
+    let windows = fields::elements(&graph, graph.root("availableDateSchedule")?)?;
+    let [window] = windows.as_slice() else {
+        return Err("the one actual original date window".into());
+    };
+    for (name, year, month, day, hour) in [
+        ("start", 2950, ("December", "december"), 1, 8),
+        ("end", 2951, ("January", "january"), 8, 17),
+    ] {
+        let stamp = graph.field(window, name)?;
+        let date = graph.field(stamp, "date")?;
+        fields::numeric_fields(&graph, date, &[("year", json!(year)), ("day", json!(day))])?;
+        vocabulary(
+            &graph,
+            graph.field(date, "month")?,
+            month.0,
+            &json!(month.1),
+        )?;
+        let time = graph.field(stamp, "time")?;
+        fields::numeric_fields(
+            &graph,
+            time,
+            &[
+                ("hour", json!(hour)),
+                ("minute", json!(30)),
+                ("second", json!(0)),
+            ],
+        )?;
+    }
+    let repeat = graph.field(window, "repeatEnd")?;
+    fields::numeric_fields(&graph, repeat, &[("year", json!(2999)), ("day", json!(1))])?;
+    vocabulary(
+        &graph,
+        graph.field(repeat, "month")?,
+        "Smarch",
+        &Value::Null,
+    )?;
+    for name in ["hour", "minute", "second"] {
+        fields::absent_field(repeat, name)?;
+    }
+    vocabulary(
+        &graph,
+        graph.field(window, "repeatType")?,
+        "RepeatYearly",
+        &json!("repeatYearly"),
+    )
+}
+
+fn vocabulary(graph: &BrokerContext<'_>, node: &Value, text: &str, meaning: &Value) -> TestResult {
     assert_eq!(
-        entry(&catalog)?["schedule"],
-        json!([{
-            "start": {"year": 2950, "month": "december", "day": 1, "hour": 8, "minute": 30, "second": 0},
-            "end": {"year": 2951, "month": "january", "day": 8, "hour": 17, "minute": 30, "second": 0},
-            "repeatEnd": {"year": 2999, "month": null, "day": 1, "hour": null, "minute": null, "second": null},
-            "repeatType": "repeatYearly"
-        }])
+        fields::text(node)?,
+        text,
+        "the complete original vocabulary label"
+    );
+    assert_eq!(
+        fields::vocabulary(graph, node)?.get("value"),
+        Some(meaning),
+        "the established recognized or unknown meaning remains separate"
     );
     Ok(())
 }
@@ -132,175 +311,39 @@ fn the_schedule_names_its_dates_and_nulls_a_month_it_does_not_know() -> TestResu
 #[test]
 fn tags_are_paths_and_required_missions_are_terms() -> TestResult {
     let catalog = build()?;
-    let broker = entry(&catalog)?;
-    assert_eq!(broker["completionTags"], json!(["Kill"]));
-    assert_eq!(broker["missionTags"], json!(["Missions.Hijacked"]));
-    assert_eq!(broker["requiredAreaTags"], json!([]));
-    assert_eq!(
-        broker["requiredCompletedTags"],
-        json!([{"positiveTags": ["Kill"], "negativeTags": ["Missions.Hijacked"]}])
-    );
-    assert_eq!(
-        broker["journalEntriesOnComplete"].as_array().map(Vec::len),
-        Some(1)
-    );
-    Ok(())
-}
-
-#[test]
-fn the_reputation_requirements_are_an_expression_and_the_results_name_their_amounts() -> TestResult
-{
-    let catalog = build()?;
-    let broker = entry(&catalog)?;
-    let requirement = |comparison: Value| {
-        json!({
-            "type": "requirement",
-            "comparison": comparison,
-            "factionReputationGuid": OWNER,
-            "scopeGuid": SCOPE,
-            "standingGuid": MISSION_TYPE
-        })
-    };
-    assert_eq!(
-        broker["standingRequirements"],
-        json!([
-            requirement(json!("greaterThanOrEqualTo")),
-            {"type": "and"},
-            {"type": "leftParenthesis"},
-            requirement(Value::Null),
-            {"type": "rightParenthesis"}
-        ])
-    );
-    assert_eq!(
-        broker["reputationResults"],
-        json!([
-            {"index": 0, "amounts": [{
-                "factionReputationGuid": OWNER,
-                "scopeGuid": SCOPE,
-                "rewardGuid": "b1000000-0000-4000-8000-000000000001",
-                "amount": 2
-            }]},
-            {"index": 1, "amounts": []}
-        ])
-    );
-    Ok(())
-}
-
-#[test]
-fn properties_spawns_and_orders_are_read_like_those_of_a_template() -> TestResult {
-    let catalog = build()?;
-    let broker = entry(&catalog)?;
-    let properties: Vec<(&Value, &Value, &Value)> = broker["missionProperties"]
-        .as_array()
-        .ok_or("properties")?
-        .iter()
-        .map(|property| {
-            (
-                &property["variable"],
-                &property["valueType"],
-                &property["value"]["type"],
-            )
-        })
-        .collect();
-    assert_eq!(
-        properties,
-        [
-            (
-                &json!("Wave_BP"),
-                &json!("ShipSpawnDescriptions"),
-                &json!("shipSpawnDescriptions")
-            ),
-            (&json!("Place_BP"), &json!("Location"), &json!("location")),
-            (
-                &json!("Crew_BP"),
-                &json!("NPCSpawnDescriptions"),
-                &json!("npcSpawnDescriptions")
-            ),
-            (
-                &json!("Loot_BP"),
-                &json!("EntitySpawnDescriptions"),
-                &json!("entitySpawnDescriptions")
-            ),
-        ]
-    );
-    assert_eq!(broker["missionProperties"][1]["token"], "Place");
-    let level = |field: &str| broker[field][0]["level"].clone();
-    assert_eq!(level("shipSpawns"), "broker");
-    assert_eq!(level("locationQueries"), "broker");
+    let graph = BrokerContext::new(&catalog, BROKER)?;
+    tag_list(
+        &graph,
+        graph.field(graph.root("completionTags")?, "tags")?,
+        "Kill",
+    )?;
+    tag_list(&graph, graph.root("missionTags")?, "Missions.Hijacked")?;
     assert!(
-        catalog["contractShipSpawns"]
-            .as_array()
-            .ok_or("pools")?
-            .iter()
-            .any(|pool| pool["guid"] == broker["shipSpawns"][0]["poolGuid"]),
-        "the link resolves"
+        raw::elements(graph.field(graph.root("requiredAreaTags")?, "tags")?)?.is_empty(),
+        "the original area tags are empty"
     );
-    let orders = broker["haulingOrders"].as_array().ok_or("orders")?;
-    assert_eq!(orders.len(), 1);
-    assert_eq!(orders[0]["source"], "brokerObjective");
-    assert_eq!(orders[0]["requirements"][0]["options"][0][0]["maxScu"], 8);
+    let terms = fields::elements(&graph, graph.root("requiredCompletedMissionTags")?)?;
+    let [term] = terms.as_slice() else {
+        return Err("the one actual original completed-mission term".into());
+    };
+    tag_list(&graph, graph.field(term, "positiveTags")?, "Kill")?;
+    tag_list(
+        &graph,
+        graph.field(term, "negativeTags")?,
+        "Missions.Hijacked",
+    )?;
+    assert_eq!(
+        raw::elements(graph.root("journalEntriesToAddOnComplete")?)?.len(),
+        1,
+        "the original journal-entry cardinality remains exact"
+    );
     Ok(())
 }
 
-#[test]
-fn objectives_payout_flow_and_modifiers_use_the_shapes_of_the_template() -> TestResult {
-    let catalog = build()?;
-    let broker = entry(&catalog)?;
-    let objectives = broker["objectives"].as_array().ok_or("objectives")?;
-    assert_eq!(objectives.len(), 1);
-    assert_eq!(objectives[0]["debugName"], "Haul");
-    assert_eq!(
-        objectives[0]["handler"]["structName"],
-        "ObjectiveHandler_Hauling"
-    );
-    assert_eq!(
-        broker["partialPayout"]["thresholds"][0]["minPercentage"],
-        76
-    );
-    assert_eq!(
-        broker["missionFlow"][0]["condition"],
-        json!({
-            "type": "tokenState",
-            "objectiveId": objectives[0]["id"],
-            "tokenState": "completed"
-        })
-    );
-    assert_eq!(
-        broker["modifiers"],
-        json!([
-            {
-                "modifier": "factionHostility",
-                "modifierName": "Rivals",
-                "enabled": true,
-                "locationProperty": null,
-                "factionGuid": OWNER,
-                "myReaction": "hostile",
-                "theirReaction": null,
-                "ignoreCriminalHostility": true
-            },
-            {
-                "modifier": "hostileMission",
-                "modifierName": null,
-                "enabled": true,
-                "locationProperty": null,
-                "brokerEntryGuid": ELSEWHERE,
-                "legalToAttack": true
-            },
-            {
-                "modifier": "ignoreMissionPlayerCriminality",
-                "modifierName": null,
-                "enabled": true,
-                "locationProperty": null,
-                "brokerEntryGuid": ELSEWHERE
-            },
-            {
-                "modifier": "lawLicense",
-                "modifierName": null,
-                "enabled": true,
-                "locationProperty": null,
-                "licenseType": "illegalGoodsLicenseClassB"
-            }
-        ])
-    );
-    Ok(())
+fn tag_list(graph: &BrokerContext<'_>, node: &Value, path: &str) -> TestResult {
+    let original = fields::elements(graph, node)?;
+    let [tag] = original.as_slice() else {
+        return Err("the one original tag reference".into());
+    };
+    tags::path(graph, tag, Some(path))
 }

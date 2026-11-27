@@ -3,10 +3,13 @@
 
 //! Reading the files inside a container (`.socpak`).
 
-use std::io::Read;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, Entry};
+use p4kx_extraction::{
+    Archive, Entry, InputScope, SourceInput, SourceLocation, SourceUse, SourceUseRole, SourceUses,
+};
+
+use crate::{CatalogError, ExportAccountingError};
 
 /// The largest `.soc` file that is read, 64 MiB.
 pub(crate) const MAX_SOC_LEN: u64 = 64 << 20;
@@ -23,17 +26,26 @@ pub(crate) fn soc_entries(container: &Archive) -> impl Iterator<Item = &Entry> {
     })
 }
 
-/// Reads `entry` of `container` unless it is larger than `limit` bytes or cannot be read.
-pub(crate) fn read_limited(container: &Archive, entry: &Entry, limit: u64) -> Option<Vec<u8>> {
-    if entry.uncompressed_size() > limit {
-        return None;
+/// Records the complete nested list used to admit physical SOC members.
+pub(crate) fn observe_container_directory(
+    archive: &Archive,
+    sources: &SourceUses,
+) -> Result<Option<SourceUse>, CatalogError> {
+    if crate::export_archive_health::inventory(archive).is_some() {
+        return Ok(None);
     }
-    let mut bytes = Vec::new();
-    container
-        .open_entry(entry)
-        .ok()?
-        .take(limit)
-        .read_to_end(&mut bytes)
-        .ok()?;
-    Some(bytes)
+    let entry = archive
+        .container_input_origin()
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    let count = u64::try_from(archive.entries().len())
+        .map_err(|_| ExportAccountingError::CounterOverflow)?;
+    let scope = sources.observe(SourceInput::Archive(&entry), InputScope::Payload)?;
+    Ok(Some(scope.at(
+        SourceLocation::Subresource {
+            namespace: "socArchiveDirectory".to_owned(),
+            indices: vec![0, count],
+            field: "entryPaths".to_owned(),
+        },
+        SourceUseRole::Selector,
+    )?))
 }

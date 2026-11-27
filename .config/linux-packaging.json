@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "application_id": "io.github.p4kx_org.p4kx",
+  "minimum_distribution": "Ubuntu 24.04",
+  "maximum_glibc_requirement": "2.39",
+  "flatpak": {
+    "runtime": "org.freedesktop.Platform",
+    "sdk": "org.freedesktop.Sdk",
+    "runtime_branch": "25.08",
+    "application_branch": "stable",
+    "runtime_repository": "https://dl.flathub.org/repo/flathub.flatpakrepo",
+    "finish_args": [
+      "--share=ipc",
+      "--share=network",
+      "--socket=wayland",
+      "--socket=fallback-x11",
+      "--socket=pulseaudio",
+      "--device=dri",
+      "--filesystem=~/Games/star-citizen:ro"
+    ]
+  }
+}

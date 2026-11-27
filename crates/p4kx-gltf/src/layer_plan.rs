@@ -3,13 +3,17 @@
 
 use std::fmt::Write as _;
 
-use p4kx_model::{
-    DIFFUSE_SLOT, Material, MaterialLayer, TextureSlot, texture_suffix_lowercase as suffix,
-};
+use p4kx_model::{DIFFUSE_SLOT, Material, texture_suffix_lowercase as suffix};
 
 use crate::shading::{Shaded, shaded_layers};
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_report::TextureRole;
-use crate::texture_roles::{Source, canonical, sources_of};
+use crate::texture_roles::{Source, canonical, layer_gloss_sources, sources_of};
+
+#[path = "layer_plan/maps.rs"]
+mod maps;
+pub(crate) use self::maps::LayerMap;
+use self::maps::{repeats, selected_specular};
 
 /// The most layers one baked image blends; the others keep out of it.
 pub(crate) const MAX_BAKED_LAYERS: usize = 8;
@@ -19,13 +23,14 @@ pub(crate) const MAX_BAKED_LAYERS: usize = 8;
 /// and the fourth where no channel is set.
 pub(crate) const BASE_LAYERS: usize = 4;
 
-const MAX_TILING: f32 = 4096.0;
 const MASK_SUFFIX: &str = "blend";
-const TEXTURE_MODIFIER: &str = "TexMod";
 
 /// One layer of a layered material as the image bake sees it.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayerPlan {
+    pub(crate) gloss: Vec<(Source, [f32; 2])>,
+    pub(crate) finish: Option<SurfaceFinish>,
+    pub(crate) roughness: f32,
     /// The layer's position in the material's `MatLayers`.
     pub(crate) at: usize,
     /// The share the layer has without a blend mask: by its position and the wear share.
@@ -34,12 +39,21 @@ pub(crate) struct LayerPlan {
     pub(crate) diffuse: Option<(Source, [f32; 2])>,
     /// The layer's normal map and how often it repeats over the UVs.
     pub(crate) normal: Option<(Source, [f32; 2])>,
+    /// The selected child specular map and its UV repeats.
+    pub(crate) specular_map: Option<(Source, [f32; 2])>,
     /// The layer's diffuse colour times its tint, which the diffuse map multiplies.
     pub(crate) colour: [f32; 3],
     /// The layer's specular colour, which its colour moves towards by its metalness.
     pub(crate) specular: [f32; 3],
     /// How metallic the layer is: its colour moves towards its specular colour by this much.
     pub(crate) metal: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LayerMaps {
+    Diffuse,
+    Normal,
+    Finish,
 }
 
 /// What the images of a layered material are blended of.
@@ -51,35 +65,6 @@ pub(crate) struct Layered {
     pub(crate) mask: Option<Source>,
     /// The texture files of the blend mask and the layers that have no safe path, with their role.
     pub(crate) refused: Vec<(TextureRole, String)>,
-}
-
-fn number(value: &str) -> Option<f32> {
-    value
-        .trim()
-        .parse::<f32>()
-        .ok()
-        .filter(|value| value.is_finite() && *value > 0.0)
-        .map(|value| value.min(MAX_TILING))
-}
-
-fn modifier(textures: &[TextureSlot], slot: &str) -> [f32; 2] {
-    let attribute = |name: &str| {
-        textures
-            .iter()
-            .filter(|texture| texture.map == slot)
-            .flat_map(|texture| &texture.children)
-            .filter(|child| child.name.eq_ignore_ascii_case(TEXTURE_MODIFIER))
-            .flat_map(|child| &child.attributes)
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .and_then(|(_, value)| number(value))
-            .unwrap_or(1.0)
-    };
-    [attribute("TileU"), attribute("TileV")]
-}
-
-fn repeats(layer: &MaterialLayer, textures: &[TextureSlot], slot: &str) -> [f32; 2] {
-    let all = layer.attribute("UVTiling").and_then(number).unwrap_or(1.0);
-    modifier(textures, slot).map(|tile| (tile * all).min(MAX_TILING))
 }
 
 /// Returns the blend mask of `material`: its texture whose name ends in `_blend`.
@@ -125,11 +110,38 @@ fn plan_of(
                 .is_some_and(|n| n.file == texture.file)
         })
         .map_or(DIFFUSE_SLOT, |texture| texture.map.as_str());
+    let gloss = (if shaded.layer.finish.is_some() {
+        layer_gloss_sources(material, &surface.textures, refused)
+    } else {
+        Vec::new()
+    })
+    .into_iter()
+    .map(|source| {
+        let tiling = repeats(
+            layer,
+            &surface.textures,
+            surface
+                .textures
+                .iter()
+                .find(|slot| slot.file == source.file)
+                .map_or(DIFFUSE_SLOT, |slot| slot.map.as_str()),
+        );
+        (source, tiling)
+    })
+    .collect();
+    let specular_map = found
+        .diffuse
+        .as_ref()
+        .and_then(|_| selected_specular(material, layer, surface, refused));
     Some(LayerPlan {
+        gloss,
+        finish: shaded.layer.finish,
+        roughness: shaded.layer.roughness,
         at: shaded.at,
         share: shaded.share,
         diffuse: tiled(found.diffuse, DIFFUSE_SLOT),
         normal: tiled(found.normal, normal_slot),
+        specular_map,
         colour: shaded.layer.diffuse,
         specular: shaded.layer.specular,
         metal: shaded.layer.metal,
@@ -150,9 +162,11 @@ pub(crate) fn layered_of(material: &Material) -> Option<Layered> {
         .filter_map(|layer| plan_of(material, layer, &mut refused))
         .collect();
     layers.truncate(MAX_BAKED_LAYERS);
-    let mapped = layers
-        .iter()
-        .any(|layer| layer.diffuse.is_some() || layer.normal.is_some());
+    let mapped = layers.iter().any(|layer| {
+        layer.diffuse.is_some()
+            || layer.normal.is_some()
+            || layer.finish.is_some_and(|_| !layer.gloss.is_empty())
+    });
     mapped.then_some(Layered {
         layers,
         mask,
@@ -199,41 +213,97 @@ impl Layered {
         })
     }
 
-    /// Returns the sources that may give the image its size, in order: the mask, then the maps of
-    /// the layers.
-    pub(crate) fn size_sources(&self, normal: bool) -> impl Iterator<Item = &Source> {
+    pub(crate) fn size_sources(
+        &self,
+        maps: LayerMaps,
+    ) -> impl Iterator<Item = (TextureRole, &Source)> {
+        let role = match maps {
+            LayerMaps::Diffuse => TextureRole::Diffuse,
+            LayerMaps::Normal => TextureRole::Normal,
+            LayerMaps::Finish => TextureRole::Gloss,
+        };
         self.mask
             .iter()
-            .chain(self.layers.iter().filter_map(move |layer| {
-                let map = if normal {
-                    &layer.normal
-                } else {
-                    &layer.diffuse
+            .chain(self.layers.iter().flat_map(move |layer| {
+                let primary = match maps {
+                    LayerMaps::Diffuse => &layer.diffuse,
+                    _ => &layer.normal,
                 };
-                map.as_ref().map(|(source, _)| source)
+                primary
+                    .iter()
+                    .filter(move |(source, _)| {
+                        maps != LayerMaps::Finish || (source.gloss && layer.finish.is_some())
+                    })
+                    .map(|(source, _)| source)
+                    .chain(
+                        layer
+                            .gloss
+                            .iter()
+                            .filter(move |_| maps == LayerMaps::Finish)
+                            .map(|(source, _)| source),
+                    )
             }))
+            .map(move |source| (role, source))
+            .chain(
+                self.specular_sources()
+                    .filter(move |_| maps != LayerMaps::Normal)
+                    .map(|source| (TextureRole::Specular, source)),
+            )
     }
 
-    /// Returns the source that gives the image its size: the mask, else the first layer's map.
     pub(crate) fn sizing(&self, normal: bool) -> Option<&Source> {
         self.mask.as_ref().or_else(|| self.first(normal))
     }
 
-    /// Returns the paths of the textures the image of the diffuse or normal maps is blended of.
-    pub(crate) fn paths(&self, normal: bool) -> impl Iterator<Item = &str> {
-        self.mask.iter().map(|mask| mask.path.as_str()).chain(
-            self.layers
-                .iter()
-                .filter_map(move |layer| {
-                    if normal {
-                        &layer.normal
-                    } else {
-                        &layer.diffuse
-                    }
+    pub(crate) fn specular_sources(&self) -> impl Iterator<Item = &Source> {
+        self.layers
+            .iter()
+            .filter_map(|layer| layer.specular_map.as_ref().map(|(source, _)| source))
+    }
+
+    pub(crate) fn has_specular_map(&self) -> bool {
+        self.specular_sources().next().is_some()
+    }
+
+    pub(crate) fn has_sampled_finish(&self) -> bool {
+        self.layers.iter().any(|layer| layer.finish.is_some())
+            && self.layers.iter().any(|layer| {
+                layer
+                    .normal
                     .as_ref()
-                })
-                .map(|(source, _)| source.path.as_str()),
-        )
+                    .is_some_and(|(source, _)| source.gloss)
+                    || !layer.gloss.is_empty()
+            })
+    }
+
+    pub(crate) fn finish_fingerprint(&self) -> String {
+        let mut text = self.fingerprint(true);
+        let has_specular = self.has_specular_map();
+        for layer in &self.layers {
+            let _ = write!(
+                text,
+                "|finish={:?}:{:x}",
+                layer.finish,
+                layer.roughness.to_bits()
+            );
+            if has_specular {
+                layer.append_specular_fingerprint(&mut text);
+                let _ = write!(text, "|metal={:x}", layer.metal.to_bits());
+            }
+            for (source, tiling) in &layer.gloss {
+                let _ = write!(
+                    text,
+                    "|gloss={}:{:x}:{:x}",
+                    source.identity(),
+                    tiling[0].to_bits(),
+                    tiling[1].to_bits()
+                );
+            }
+        }
+        if has_specular {
+            self.append_decode_dependencies(&mut text);
+        }
+        text
     }
 
     /// Returns a text that is equal for equal blends of the diffuse or normal maps; the key of
@@ -271,7 +341,11 @@ impl Layered {
                     layer.specular.map(f32::to_bits),
                     layer.metal.to_bits(),
                 );
+                layer.append_specular_fingerprint(&mut text);
             }
+        }
+        if !normal && self.has_specular_map() {
+            self.append_decode_dependencies(&mut text);
         }
         text
     }

@@ -226,23 +226,36 @@ fn properties() -> Vec<TestStruct> {
         value("MissionPropertyValue_DeliveryOrder"),
         value("MissionPropertyValue_StringHash")
             .array("options", class("MissionPropertyValueOption_StringHash")),
+        TestStruct::new("BaseMissionPropertyValueOption")
+            .field("textId", TestType::Locale)
+            .field("weighting", TestType::Single)
+            .field("DEBUG_forceChooseThisOption", TestType::Bool)
+            .array("dependentProperties", class("DependentMissionProperty")),
+        TestStruct::new("DependentMissionProperty")
+            .field("property", weak("MissionProperty"))
+            .array("values", weak("BaseMissionPropertyValueOption")),
         TestStruct::new("MissionPropertyValueOption_StringHash")
-            .field("textId", TestType::Locale)
-            .field("value", TestType::String)
-            .field("weighting", TestType::Int32)
-            .array("dependentProperties", weak("MissionProperty")),
+            .parent("BaseMissionPropertyValueOption")
+            .field("value", TestType::String),
         value("MissionPropertyValue_Integer")
-            .array("options", class("MissionPropertyValueOption_Number")),
+            .array("options", class("MissionPropertyValueOption_Integer")),
         value("MissionPropertyValue_Float")
-            .array("options", class("MissionPropertyValueOption_Number")),
-        TestStruct::new("MissionPropertyValueOption_Number")
-            .field("textId", TestType::Locale)
+            .array("options", class("MissionPropertyValueOption_Float")),
+        TestStruct::new("MissionPropertyValueOption_Integer")
+            .parent("BaseMissionPropertyValueOption")
+            .field("value", TestType::Int32)
+            .field("variation", TestType::Int32),
+        TestStruct::new("MissionPropertyValueOption_Float")
+            .parent("BaseMissionPropertyValueOption")
             .field("value", TestType::Single)
-            .field("variation", TestType::Single)
-            .field("weighting", TestType::Int32)
-            .array("dependentProperties", weak("MissionProperty")),
-        value("MissionPropertyValue_Tags")
+            .field("variation", TestType::Single),
+        TestStruct::new("MissionPropertyValueOption_Tags")
+            .parent("BaseMissionPropertyValueOption")
             .field("tags", class("TagList"))
             .field("negativeTags", class("TagList")),
+        value("MissionPropertyValue_Tags")
+            .field("tags", class("TagList"))
+            .field("negativeTags", class("TagList"))
+            .array("options", class("MissionPropertyValueOption_Tags")),
     ]
 }

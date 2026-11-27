@@ -4,17 +4,25 @@
 #[cfg(test)]
 mod archive_change_tests;
 mod audio;
+mod audio_worker;
 mod bank_cache;
 #[cfg(test)]
 mod bank_cache_tests;
+mod bank_sound;
 mod contents;
 mod entry_bytes;
+mod entry_preview_provenance;
 mod image;
+mod image_provenance;
 mod reading;
 mod soundbank;
+mod soundbank_provenance;
+mod soundbank_worker;
 mod texture_info;
+mod wem_header_provenance;
 mod xml;
 mod xml_document;
+mod xml_preview_origin;
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -23,17 +31,25 @@ use p4kx_extraction::Texture;
 
 pub use audio::{AudioPreview, AudioStatus, SoundInfo, SoundStatus, is_wem_path};
 pub(crate) use bank_cache::BankCache;
+pub use bank_sound::BankSound;
 pub use contents::PreviewContents;
 pub(crate) use contents::{HEX_ROW_LEN, printable};
+pub use entry_preview_provenance::EntryPreviewProvenance;
 pub use image::{ImagePreview, ImageStatus, MipStatus};
+pub use image_provenance::{ImageHeaderProvenance, ImageMipProvenance};
 #[cfg(test)]
 use reading::read;
 use reading::{Spawned, spawn};
-pub use soundbank::{BankSound, SoundbankPreview, SoundbankStatus, is_bank_path};
+pub use soundbank::{SoundbankPreview, SoundbankStatus, is_bank_path};
+pub use soundbank_provenance::{
+    BankSoundIdentityProvenance, BankSoundProvenance, SoundbankSummaryProvenance,
+};
 pub use texture_info::{MAX_PREVIEW_PIXELS, TextureInfo};
+pub use wem_header_provenance::{WemHeaderEvidenceError, WemHeaderProvenance};
 use xml::is_cryxml;
 pub use xml::{XML_SIZE_LIMIT, XmlPreview, XmlStatus};
 pub use xml_document::{XML_TEXT_LIMIT, XmlDocument};
+pub use xml_preview_origin::XmlPreviewOriginError;
 
 use crate::EntryIndex;
 use crate::viewer::{ModelPreview, is_model_path};
@@ -198,7 +214,7 @@ impl Preview {
             Some(entry) if entry.uncompressed_size() > PREVIEW_SIZE_LIMIT => State::TooLarge,
             Some(_) => match spawn(index, id, move || wake()) {
                 Spawned::Running(result) => State::Loading(result),
-                Spawned::Finished(read) => preview.settle(read),
+                Spawned::Finished(read) => preview.settle(*read),
             },
         };
         preview

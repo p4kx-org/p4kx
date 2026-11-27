@@ -24,3 +24,19 @@ The real-Archive catalog tests failed on `unreadable_shop_inventories` and
 - **The real-Archive tests** accept exactly the known defect: a warning
   `unreadable_shop_inventories` whose files are `inv_shopping_test_featuretest.json` with the
   reason `the file is empty`. Any other warning or failure fails them.
+
+## Catalog v3 amendment
+
+A complete read of a declared zero-byte Shop Inventory Entry establishes a present physical
+source with no authored document. Catalog v3 retains the file definition with a sourced absent
+document. A shop that uniquely selects it records `emptySource` and its exact physical and
+payload evidence. The compatibility `inventory` and `itemGuids` fields stay null.
+
+The file and selected shop operations are complete for normal publication. The existing
+`unreadable_shop_inventories` warning, reason and legacy counters still include the empty
+source. The library summary distinguishes the exact empty cases. Export health preserves the
+aggregate warning as information and classifies each required file operation separately.
+An authored JSON inventory
+with an empty array resolves with an empty item list. A missing Entry, a failed read and
+nonzero malformed content keep their existing distinct source states. The empty source
+classification depends on the verified complete read.

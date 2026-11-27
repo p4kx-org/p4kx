@@ -1,0 +1,15 @@
+# Source layout storage
+
+The canonical Record reader, field statistics, pointer offset survey, pointer probe and Query compiler share one immutable source-layout index per opened DataForge. The index stores each demanded physical Property once and one flat summary per Struct. A summary refers to its original own range and parent index; it does not own an expanded inherited field list.
+
+A complete layout has no fixed field-count quota. Every inherited field occurrence is counted in checked `u64` arithmetic, including repeated ranges and zero-byte Classes. Original Property ranges use `u16` first/count words; the combined inherited count has no `u16` or `u32` format bound. Full Record materialization is governed separately by the optional caller budget described in [DataForge materialization](dataforge-materialization.md).
+
+Validation follows the original root ancestor first. Each ancestor's cumulative byte width must equal its declared size, even when its own field range is empty. A cycle takes precedence over the chain's field and size errors. Invalid Properties outside a requested range do not invalidate that range. Canonical type-name validation occurs after structural layout validation; Query type names remain optional inventory metadata.
+
+The index owns no source text. It retains validated Slots, byte widths, original range coordinates and flat parent summaries. Active cursors borrow the opened DataForge and validated segment slices. They produce original field positions and byte offsets without retaining a separate inherited prefix. Names are borrowed from the original String table and cursor failures propagate explicitly.
+
+For `S` original Structs, `P` physical Properties through the greatest demanded nonempty range end and active inheritance depth `D`, retained index metadata is `O(S + P)` and one active cursor uses `O(D)` metadata. Initial index construction decodes each demanded Property and summarizes each Struct once. Completion owns one physical declaration table, flat Struct ranges and interned names; it does not retain inherited membership lists. Its global field union sweeps original ranges and retains the earliest valid Struct's first original occurrence. Query plans retain only requested head fields. Statistics resolves fields through its existing path trie, without a second per-layout field cache.
+
+Successful index initialization is shared and serialized. Allocation refusal is an operational `LayoutAllocationRefused`, is not cached as a permanent source defect and can be retried. A private inconsistent index/cursor boundary is `LayoutInvariant`. These failures do not create invented source coordinates or successful partial statistics, schemas or surveys.
+
+`QuerySchema::of` and `DataForge::survey` return `Result`. The GUI's schema backend uses its existing failed-read route when schema construction fails. Malformed source layouts remain excluded from Completion fields and counted by the survey's existing unreadable-Struct reporting. Operational failures remain errors.

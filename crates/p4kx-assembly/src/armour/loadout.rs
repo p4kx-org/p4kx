@@ -18,24 +18,36 @@ enum Holder<'a> {
     /// The character: the root of the tree.
     Body,
     /// A worn piece of this name.
-    Piece(&'a str),
+    Piece(usize, &'a str),
     /// An Entity that is not worn, whose geometry is not drawn.
     Other,
 }
 
 impl Holder<'_> {
-    /// Returns where an item on `port` hangs on this holder, or `None` when the holder is not
-    /// drawn, the port is a skin or names no helper.
-    fn mount(self, port: &PortNode) -> Option<Mount> {
+    fn mount_piece(self, port: &PortNode, mut piece: Piece) -> Piece {
+        let Some(definition) = port.definition().filter(|definition| !definition.is_skin()) else {
+            return piece;
+        };
         let holder = match self {
             Self::Body => None,
-            Self::Piece(name) => Some(name.to_owned()),
-            Self::Other => return None,
+            Self::Piece(index, name) => Some((index, name.to_owned())),
+            Self::Other => return piece,
         };
-        let definition = port.definition()?;
-        let transform = definition.transform()?;
-        (!definition.is_skin() && !transform.helper().is_empty())
-            .then(|| Mount::new(holder, transform))
+        let resolved = port.placement_helper();
+        if let Some(transform) = resolved
+            .transform
+            .filter(|transform| !transform.helper().is_empty())
+        {
+            piece.mounted(Mount::new(
+                holder,
+                definition,
+                transform,
+                resolved.diagnostic,
+            ))
+        } else {
+            piece.unresolved_mount_helper = resolved.diagnostic.map(Box::new);
+            piece
+        }
     }
 }
 
@@ -99,13 +111,7 @@ impl Piece {
         let mut replaced = Vec::new();
         let mut pieces = Vec::with_capacity(base.len().saturating_add(over.len()));
         for piece in base {
-            let taken_by = piece.item_type().and_then(|item_type| {
-                over.iter().find(|other| {
-                    other
-                        .item_type()
-                        .is_some_and(|other| other.eq_ignore_ascii_case(item_type))
-                })
-            });
+            let taken_by = replacement_index(&piece, &over).and_then(|index| over.get(index));
             if let (Some(by), Some(item_type)) = (taken_by, piece.item_type()) {
                 replaced.push(Replaced {
                     name: piece.name.clone(),
@@ -121,12 +127,21 @@ impl Piece {
     }
 }
 
+pub(super) fn replacement_index(piece: &Piece, over: &[Piece]) -> Option<usize> {
+    let item_type = piece.item_type()?;
+    over.iter().position(|other| {
+        other
+            .item_type()
+            .is_some_and(|other| other.eq_ignore_ascii_case(item_type))
+    })
+}
+
 impl<'f> LoadoutResolver<'f> {
     /// Returns the paths of the XML Loadouts the default Loadout of `entity` is made of, in the
     /// order they are laid over each other: for an outfit its base Loadout, then the Loadouts of
     /// its outfits. Empty when the Entity's Loadout is not made of XML files or it has none.
     pub fn loadout_files(&mut self, entity: &p4kx_dataforge::Record<'f>) -> Vec<String> {
-        let spec = self.spec(entity.guid());
+        let spec = self.spec_record(entity);
         let mut paths = Vec::new();
         if let Ok(spec) = spec.as_ref()
             && let Some(loadout) = &spec.loadout
@@ -143,9 +158,11 @@ impl<'f> LoadoutResolver<'f> {
     ///
     /// Returns the reason when no files were given to read it from or it cannot be read.
     pub fn resolve_file(&mut self, path: &str) -> Result<EntityNode, LoadoutError> {
-        let loadout = LoadoutSpec::Xml(path.into());
+        let loadout = LoadoutSpec::Xml(crate::LoadoutPath::unbound(path));
         self.entries(Some(&loadout))?;
         let spec = EntitySpec {
+            record_index: None,
+            classification: crate::ItemClassification::unresolved(),
             guid: Guid::default(),
             record_path: path.to_owned(),
             origin: crate::spec::LoadoutOrigin::File(path.into()),
@@ -159,9 +176,9 @@ impl<'f> LoadoutResolver<'f> {
             variants: Vec::new(),
             vehicle: None,
             docked_vehicle: false,
-            attach_type: String::new(),
-            attach_sub_type: String::new(),
+
             attach_tags: Vec::new(),
+            requires_attachment_tags: false,
             material_variants: Vec::new(),
             size: None,
             container: None,
@@ -170,7 +187,11 @@ impl<'f> LoadoutResolver<'f> {
             animation_database: None,
         };
         let mut walk = Walk::new(spec.guid, None);
-        Ok(self.node(&spec, None, &mut walk))
+        let node = self.node(&spec, None, &mut walk);
+        if self.observation_stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        Ok(node)
     }
 
     /// Returns the pieces of armour and clothing a Loadout tree holds, in tree order: every
@@ -184,16 +205,30 @@ impl<'f> LoadoutResolver<'f> {
     /// an Entity that is not worn, such as a weapon, is listed as failed, and other Entities are
     /// not pieces.
     pub fn worn(&mut self, tree: &EntityNode) -> Vec<Piece> {
+        self.worn_located(tree, |_, _| {})
+    }
+
+    pub(super) fn worn_located<'node>(
+        &mut self,
+        tree: &'node EntityNode,
+        mut observe: impl FnMut(usize, &'node EntityNode),
+    ) -> Vec<Piece> {
         let mut pieces: Vec<Piece> = failures(tree.issues(), tree.record_path()).collect();
-        self.collect_worn(tree.ports(), (true, Holder::Body), &mut pieces);
+        self.collect_worn(
+            tree.ports(),
+            (true, Holder::Body),
+            &mut pieces,
+            &mut observe,
+        );
         pieces
     }
 
-    fn collect_worn(
+    fn collect_worn<'node>(
         &mut self,
-        ports: &[PortNode],
+        ports: &'node [PortNode],
         (relevant, holder): (bool, Holder<'_>),
         pieces: &mut Vec<Piece>,
+        observe: &mut impl FnMut(usize, &'node EntityNode),
     ) {
         for port in ports {
             let mut below = None;
@@ -201,8 +236,10 @@ impl<'f> LoadoutResolver<'f> {
                 Attachment::Entity(node) => {
                     let name = is_worn_type(node.attach_type())
                         .then(|| format!("{}/{}", port.name(), node.class_name()));
-                    if let Some(name) = &name {
-                        let spec = self.spec(node.guid());
+                    let mut piece_index = None;
+                    if let Some(name) = &name
+                        && let Some(spec) = self.spec_of(node)
+                    {
                         let piece = match spec.as_ref() {
                             Ok(spec) => relevant_issues(node.issues()).fold(
                                 Piece::wearable(Wearable::from_spec(spec)).named(name.clone()),
@@ -213,12 +250,11 @@ impl<'f> LoadoutResolver<'f> {
                             Err(error) => Piece::failed(name.clone(), error.to_string()),
                         };
                         let piece = piece.at_port(port.name());
-                        pieces.push(match holder.mount(port) {
-                            Some(mount) => piece.mounted(mount),
-                            None => piece,
-                        });
+                        observe(pieces.len(), node);
+                        piece_index = Some(pieces.len());
+                        pieces.push(holder.mount_piece(port, piece));
                     }
-                    below = Some((node, name));
+                    below = Some((node, name, piece_index));
                 }
                 Attachment::Unresolved(unresolved) if relevant => {
                     let named = match unresolved.target() {
@@ -231,10 +267,12 @@ impl<'f> LoadoutResolver<'f> {
                 }
                 _ => {}
             }
-            self.collect_worn(port.nested(), (relevant, holder), pieces);
-            if let Some((node, name)) = &below {
-                let inside = name.as_deref().map_or(Holder::Other, Holder::Piece);
-                self.collect_worn(node.ports(), (name.is_some(), inside), pieces);
+            self.collect_worn(port.nested(), (relevant, holder), pieces, observe);
+            if let Some((node, name, index)) = &below {
+                let inside = index
+                    .zip(name.as_deref())
+                    .map_or(Holder::Other, |(index, name)| Holder::Piece(index, name));
+                self.collect_worn(node.ports(), (name.is_some(), inside), pieces, observe);
             }
         }
     }
@@ -244,7 +282,9 @@ fn relevant_issues(issues: &[LoadoutError]) -> impl Iterator<Item = &LoadoutErro
     issues.iter().filter(|issue| {
         !matches!(
             issue,
-            LoadoutError::AmbiguousClass { .. } | LoadoutError::VehicleImplementation { .. }
+            LoadoutError::AmbiguousClass { .. }
+                | LoadoutError::VehicleImplementation { .. }
+                | LoadoutError::MissingVehicleImplementation { .. }
         )
     })
 }
@@ -255,3 +295,7 @@ fn failures<'a>(
 ) -> impl Iterator<Item = Piece> + use<'a> {
     relevant_issues(issues).map(move |issue| Piece::failed(name, issue.to_string()))
 }
+
+#[cfg(test)]
+#[path = "loadout_alias_tests.rs"]
+mod aliases;

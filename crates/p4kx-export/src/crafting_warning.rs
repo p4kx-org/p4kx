@@ -47,7 +47,7 @@ pub enum CraftingWarning {
         details: Vec<String>,
     },
     /// This many harvestable locations have no starmap object although one is recorded above
-    /// their container: it is not in the starmap objects, 64 or more mining claim markers lie
+    /// their container: it is not in the starmap objects, mining claim markers form a cycle
     /// above, or a marker has no object above it. A container with no object recorded above is
     /// the normal case and not counted. `details` gives each reason with its number, ordered.
     HarvestLocationsWithoutObject {
@@ -105,17 +105,17 @@ pub enum CraftingWarning {
     /// Shop containers name shops, but no `.soc` holds a shop component, so no shop has an item
     /// list; the component layout may have changed in this Build.
     NoShopComponents,
-    /// The radar parameters do not name the slot of the scan signature, so `scanSignature` of
-    /// `mineableEntities` is `null` everywhere; the text says why. `signatures` is still exported.
+    /// The radar parameters do not name a scan slot, so the derived value in
+    /// `definitions.mineableEntities` is absent; the original signature slots remain available.
     UnknownScanSignatureSlot(&'static str),
     /// This many stored names in the contract templates and mission broker entries (a state, a
     /// category, a comms timing or reason, a kind of objective property, a comparison, a month, a
     /// repeat type, a reaction, a licence type) are not known to the catalog, so they are `null`.
-    /// `details` gives each kind and value with its number, ordered.
+    /// `details` gives ordered counts by category and any unsupported declared type names.
     UnknownTemplateValues {
         /// The number of names.
         count: usize,
-        /// One entry per kind and value: the kind, the value and the number.
+        /// Ordered category and technical type counts.
         details: Vec<String>,
     },
 }

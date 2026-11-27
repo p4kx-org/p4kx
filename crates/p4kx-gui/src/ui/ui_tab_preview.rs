@@ -9,6 +9,7 @@ use egui::{
 };
 use fluent_bundle::FluentValue;
 
+use super::source_origin;
 use super::ui_tab::message;
 use super::ui_tab_detail;
 use crate::theme::desktop::{
@@ -117,9 +118,12 @@ fn show_image(ui: &mut Ui, texts: &Texts, rendered: &UiRendered) {
     let texture = texture(ui.ctx(), rendered);
     let room = ui.available_size();
     let (area, response) = ui.allocate_exact_size(room, Sense::hover());
+    let marker = texts.get(source_origin::label(Some(&rendered.origins().image)));
     response.widget_info(|| {
-        WidgetInfo::labeled(Role::Image, true, texts.format(UiText::Shown, &sizes))
+        let dimensions = texts.format(UiText::Shown, &sizes);
+        WidgetInfo::labeled(Role::Image, true, format!("{dimensions}. {marker}"))
     });
+    response.on_hover_text(marker);
     let native = vec2(points(width), points(height)) / ui.ctx().pixels_per_point();
     let scale = (area.width() / native.x)
         .min(area.height() / native.y)

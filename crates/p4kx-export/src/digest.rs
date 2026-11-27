@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 
-use p4kx_extraction::Value;
+use p4kx_extraction::{Value, ValueError};
 use sha2::{Digest as _, Sha256};
 
 /// A 128-bit digest of structural data (SHA-256 cut to 16 bytes), equal exactly when the data
@@ -56,17 +57,32 @@ impl Hasher for Wide {
 /// fields, arrays by length and elements, References by the GUID they link to and the location of the instance. Localisation keys
 /// and the fields `skip` names are left out.
 ///
-/// Returns `false` when the value holds an error or a kind this function does not know, so that
-/// a caller does not take the digest as proof of equality.
-#[expect(
-    clippy::match_same_arms,
-    reason = "the error arm names the case the wildcard also covers"
-)]
+/// Returns the least certain outcome across the compared values.
 pub(crate) fn hash_value<H: Hasher>(
     state: &mut H,
     value: &Value<'_>,
     skip: &dyn Fn(&str) -> bool,
-) -> bool {
+) -> ComparedValue {
+    hash_value_observed(state, value, skip, &mut |_| Ok::<_, Infallible>(()))
+        .unwrap_or_else(|never| match never {})
+}
+
+/// Comparison outcome ordered by precedence when combining operands.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ComparedValue {
+    Comparable,
+    UnresolvedLink,
+    Unavailable,
+}
+
+/// Visits each original value consumed by the comparison.
+pub(crate) fn hash_value_observed<'read, 'source, H: Hasher, E>(
+    state: &mut H,
+    value: &'read Value<'source>,
+    skip: &dyn Fn(&str) -> bool,
+    observe: &mut impl FnMut(&'read Value<'source>) -> Result<(), E>,
+) -> Result<ComparedValue, E> {
+    observe(value)?;
     match value {
         Value::Bool(v) => (0_u8, v).hash(state),
         Value::Int8(v) => (1_u8, i64::from(*v)).hash(state),
@@ -97,25 +113,27 @@ pub(crate) fn hash_value<H: Hasher>(
                 .filter(|field| !skip(field.name()))
                 .collect();
             (9_u8, inner.type_name(), fields.len()).hash(state);
-            let mut complete = true;
+            let mut outcome = ComparedValue::Comparable;
             for field in fields {
                 field.name().hash(state);
-                complete &= hash_value(state, field.value(), skip);
+                outcome = outcome.max(hash_value_observed(state, field.value(), skip, observe)?);
             }
-            return complete;
+            return Ok(outcome);
         }
         Value::Array(items) => {
             (10_u8, items.len()).hash(state);
-            let mut complete = true;
+            let mut outcome = ComparedValue::Comparable;
             for item in items {
-                complete &= hash_value(state, item, skip);
+                outcome = outcome.max(hash_value_observed(state, item, skip, observe)?);
             }
-            return complete;
+            return Ok(outcome);
         }
-        Value::Error(_) => return false,
-        _ => return false,
+        Value::Error(ValueError::DanglingReference { .. } | ValueError::OutsideRecord { .. }) => {
+            return Ok(ComparedValue::UnresolvedLink);
+        }
+        _ => return Ok(ComparedValue::Unavailable),
     }
-    true
+    Ok(ComparedValue::Comparable)
 }
 
 #[cfg(test)]
@@ -130,16 +148,14 @@ mod tests {
     fn digest_of(value: &Value<'_>) -> (Digest, bool) {
         let mut state = Wide::new();
         let complete = hash_value(&mut state, value, &|_| false);
-        (state.digest(), complete)
+        (state.digest(), complete == ComparedValue::Comparable)
     }
 
     #[test]
     fn null_and_error_differ_and_an_error_is_incomplete() {
         let (null, null_complete) = digest_of(&Value::Null);
         let (error, error_complete) =
-            digest_of(&Value::Error(p4kx_extraction::ValueError::UnknownEnum {
-                index: 0,
-            }));
+            digest_of(&Value::Error(ValueError::UnknownEnum { index: 0 }));
         assert_ne!(null, error);
         assert!(null_complete);
         assert!(!error_complete);

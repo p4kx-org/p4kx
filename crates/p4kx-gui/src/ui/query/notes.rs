@@ -13,6 +13,7 @@ use fluent_bundle::FluentValue;
 use crate::theme::palette;
 use crate::theme::tokens::{FS_SM, FS_XS, Weight, font};
 use crate::ui::search::eyebrow;
+use crate::ui::shortcuts::{RUN_QUERY, command_hint};
 use crate::widgets::pagination::PageNames;
 use crate::widgets::text::{line, plain};
 use crate::{
@@ -46,6 +47,7 @@ impl Notes {
     pub(super) fn get(ui: &Ui, texts: &Texts, query: &QueryTab) -> Arc<Self> {
         let mut hasher = DefaultHasher::new();
         texts.language().hash(&mut hasher);
+        ui.ctx().os().is_mac().hash(&mut hasher);
         status_key(query, &mut hasher);
         ui.available_width().to_bits().hash(&mut hasher);
         ui.ctx().pixels_per_point().to_bits().hash(&mut hasher);
@@ -79,6 +81,11 @@ impl Notes {
     }
 }
 
+fn query_prompt(ui: &Ui, texts: &Texts) -> String {
+    let shortcut = command_hint(ui, RUN_QUERY, || texts.get(QueryText::RunShortcut));
+    texts.format(QueryText::Prompt, &[("shortcut", shortcut.as_str().into())])
+}
+
 fn make(ui: &Ui, texts: &Texts, query: &QueryTab, key: u64) -> Notes {
     let shared = |text: QueryText| Arc::<str>::from(texts.get(text));
     let label = texts.get(QueryText::Label);
@@ -91,7 +98,7 @@ fn make(ui: &Ui, texts: &Texts, query: &QueryTab, key: u64) -> Notes {
     let alert = alert(ui, texts, query.status(), width);
     let result = query.result();
     let prompt = match (query.status(), result) {
-        (QueryStatus::Idle, _) => Some(texts.get(QueryText::Prompt)),
+        (QueryStatus::Idle, _) => Some(query_prompt(ui, texts)),
         (_, Some(result)) if result.is_empty() => Some(texts.get(QueryText::NoRows)),
         _ => None,
     }

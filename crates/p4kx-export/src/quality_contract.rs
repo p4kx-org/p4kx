@@ -1,0 +1,161 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::SourcedValue;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_number_capture::CapturedNumber;
+use crate::guid_text::CatalogGuid;
+use crate::quality_source::{
+    QualityCurveSource, QualityOverridesSource, QualityQuantizationSource, QualitySource,
+};
+use crate::schema_fields::every_field_required;
+
+/// Stable private identity captured directly from the original successful Record tree.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct QualityOwner<'source> {
+    pub(crate) guid: CatalogGuid,
+    pub(crate) record_index: u32,
+    pub(crate) record_path: &'source str,
+}
+
+/// Authored distribution and location-override declarations of one physical Record.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct QualityDistributionDefinition<'source> {
+    #[serde(skip)]
+    pub(crate) owner: QualityOwner<'source>,
+    #[serde(skip)]
+    pub(crate) numbers: Vec<CapturedNumber>,
+    #[serde(flatten)]
+    pub(crate) source: CanonicalRecordHeader<'source>,
+    pub(crate) quality_distribution: SourcedValue<QualitySource<'source, QualityCurveSource>>,
+    pub(crate) location_override:
+        SourcedValue<QualitySource<'source, QualityOverridesSource<'source>>>,
+}
+
+/// Authored quantization declarations, independent of inverse eligibility.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct QualityQuantizationDefinition<'source> {
+    #[serde(skip)]
+    pub(crate) owner: QualityOwner<'source>,
+    #[serde(skip)]
+    pub(crate) numbers: Vec<CapturedNumber>,
+    #[serde(flatten)]
+    pub(crate) source: CanonicalRecordHeader<'source>,
+    pub(crate) quality_quantization:
+        SourcedValue<QualitySource<'source, QualityQuantizationSource<'source>>>,
+}
+
+/// The narrow eligibility result used by the nominal-GUID inverse relation.
+#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[serde(tag = "status", content = "reason", rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum QuantizationEligibility {
+    /// This physical definition qualifies for inverse selection.
+    Eligible,
+    /// The definition cannot supply a member set.
+    NotEligible(QuantizationIneligibility),
+}
+
+/// Original source decisions that exclude a complete raw definition from inverse lookup.
+#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
+#[non_exhaustive]
+pub enum QuantizationIneligibility {
+    /// The selected declaration supplies no inline band array.
+    NoInlineBands,
+    /// The original band array contains no slots.
+    EmptyBands,
+    /// At least one band or its array shape does not qualify.
+    InvalidBands,
+    /// The original declaration could not be evaluated.
+    Unavailable,
+}
+
+/// A first-eligible nominal-GUID inverse without a second authored quality payload.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct QualityQuantizationResources {
+    #[serde(skip)]
+    pub(crate) physical_guid: CatalogGuid,
+    #[serde(skip)]
+    pub(crate) physical_index: u32,
+    pub(crate) guid: SourcedValue<CatalogGuid>,
+    pub(crate) record_index: SourcedValue<u32>,
+    pub(crate) eligibility: SourcedValue<QuantizationEligibility>,
+    pub(crate) resource_type_guids: SourcedValue<Vec<SourcedValue<CatalogGuid>>>,
+}
+
+impl QualityQuantizationResources {
+    /// Borrows the original quantizer GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the quantizer's physical Record identity in this DataForge.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.record_index
+    }
+
+    /// Borrows the original evidence for eligibility.
+    #[must_use]
+    pub const fn eligibility(&self) -> &SourcedValue<QuantizationEligibility> {
+        &self.eligibility
+    }
+
+    /// Borrows ordered resource members and the observed membership survey.
+    #[must_use]
+    pub const fn resource_type_guids(&self) -> &SourcedValue<Vec<SourcedValue<CatalogGuid>>> {
+        &self.resource_type_guids
+    }
+}
+
+impl<'source> QualityDistributionDefinition<'source> {
+    /// Borrows the independently sourced physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored distribution without reading any referenced target body.
+    #[must_use]
+    pub const fn quality_distribution(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityCurveSource>> {
+        &self.quality_distribution
+    }
+
+    /// Borrows the authored location overrides in their original slot order.
+    #[must_use]
+    pub const fn location_override(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityOverridesSource<'source>>> {
+        &self.location_override
+    }
+}
+
+impl<'source> QualityQuantizationDefinition<'source> {
+    /// Borrows the independently sourced physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows original quantization values independently of inverse resource membership.
+    #[must_use]
+    pub const fn quality_quantization(
+        &self,
+    ) -> &SourcedValue<QualitySource<'source, QualityQuantizationSource<'source>>> {
+        &self.quality_quantization
+    }
+}

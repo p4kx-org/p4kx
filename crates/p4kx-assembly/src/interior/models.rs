@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_model::{Lod, MaterialStatus, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -18,11 +19,12 @@ use crate::{ArchiveModels, AssemblyError, Issue, IssueKind, ModelFailure, ModelP
 const WAVE: usize = 256;
 
 type Key = (usize, String);
-type Read = Result<(String, Model), ModelFailure>;
+type Read = Result<crate::ProvidedModel, ModelFailure>;
 
 struct Loaded {
     entry: String,
     model: Arc<Model>,
+    archive_sources: Arc<[ModelArchiveSource]>,
 }
 
 enum Outcome {
@@ -45,7 +47,7 @@ pub(super) fn attach(
     watch: &InteriorWatch<'_>,
     classes: Option<&dyn ClassLookup>,
     shared: Option<&dyn ModelProvider>,
-) -> Result<(), AssemblyError> {
+) -> Result<Option<Arc<ArchiveDefaultMaterial>>, AssemblyError> {
     let providers: Vec<ArchiveModels<'_>> = (0..walked.layers.len())
         .filter_map(|layer| walked.layers.get(layer))
         .map(ArchiveModels::new)
@@ -64,7 +66,7 @@ pub(super) fn attach(
     let mut fill = Fill {
         outcomes,
         libraries,
-        unnamed: Arc::new(MaterialStatus::Unnamed),
+        unnamed: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palettes: Palettes::new(classes.map(ClassLookup::palettes)),
         max_vertices: options.max_vertices,
         reported: HashSet::new(),
@@ -79,14 +81,21 @@ pub(super) fn attach(
         }
     }
     walked.issues.extend(fill.issues);
-    Ok(())
+    let root = providers
+        .first()
+        .map(|provider| provider as &dyn ModelProvider);
+    let Some(root) = root else { return Ok(None) };
+    Ok(super::default_material::resolve(
+        &walked.parts,
+        shared.unwrap_or(root),
+    ))
 }
 
 /// The models and libraries that were read, and the issues found while handing them to parts.
 struct Fill<'p> {
     outcomes: HashMap<Key, Outcome>,
-    libraries: HashMap<Key, Arc<MaterialStatus>>,
-    unnamed: Arc<MaterialStatus>,
+    libraries: HashMap<Key, Arc<ArchiveMaterialRead>>,
+    unnamed: Arc<ArchiveMaterialRead>,
     palettes: Palettes<'p>,
     max_vertices: usize,
     reported: HashSet<(String, String)>,
@@ -118,22 +127,22 @@ impl Fill<'_> {
         let kind = match self.outcomes.get(key) {
             Some(Outcome::Loaded(loaded)) => {
                 part.model = Some(Arc::clone(&loaded.model));
+                part.model_archive_sources = Arc::clone(&loaded.archive_sources);
                 let library = library_key(key.0, loaded, placement.library.as_deref());
                 part.materials = library
                     .as_ref()
                     .and_then(|key| self.libraries.get(key))
                     .map_or_else(|| Arc::clone(&self.unnamed), Arc::clone);
-                let (palette, palette_issues) = self
-                    .palettes
-                    .of_named(placement.palette.as_ref(), &part.materials);
+                let (palette, palette_issues) = self.palettes.of_named_observed(
+                    placement.palette.as_ref(),
+                    (&part.materials.status, part.materials.origins.library()),
+                );
                 part.palette = palette;
                 for kind in palette_issues {
                     self.note(container, &name, kind);
                 }
-                let problem = part
-                    .materials
-                    .problem()
-                    .or_else(|| part.materials.layer_problem());
+                let materials = part.materials();
+                let problem = materials.problem().or_else(|| materials.layer_problem());
                 match (library, problem) {
                     (Some(_), Some(reason)) => IssueKind::MaterialLibrary { reason },
                     _ => return,
@@ -209,8 +218,7 @@ fn read_wave(
                     .ok_or(ModelFailure::Missing)
                     .and_then(|provider| provider.model(path, options.lod)),
             };
-            let result = read.map(|provided| (provided.entry, provided.model));
-            (key.clone(), result)
+            (key.clone(), read)
         })
         .collect()
 }
@@ -236,7 +244,12 @@ fn read_models(
         }
         for (key, result) in read_wave(wave, providers, (options, watch), shared) {
             let outcome = match result {
-                Ok((entry, model)) => {
+                Ok(crate::ProvidedModel {
+                    entry,
+                    model,
+                    archive_sources,
+                    ..
+                }) => {
                     let count = vertices(&model);
                     if total.saturating_add(count) > options.max_vertices {
                         Outcome::NotRead
@@ -245,6 +258,7 @@ fn read_models(
                         Outcome::Loaded(Loaded {
                             entry,
                             model: Arc::new(model),
+                            archive_sources,
                         })
                     }
                 }
@@ -307,7 +321,7 @@ fn read_libraries(
     chosen: &[(Key, &str, &str)],
     providers: &[ArchiveModels<'_>],
     watch: &InteriorWatch<'_>,
-) -> Result<HashMap<Key, Arc<MaterialStatus>>, AssemblyError> {
+) -> Result<HashMap<Key, Arc<ArchiveMaterialRead>>, AssemblyError> {
     let mut seen = HashSet::new();
     let named = outcomes.iter().filter_map(|(key, outcome)| match outcome {
         Outcome::Loaded(loaded) => {
@@ -332,7 +346,10 @@ fn read_libraries(
                 return None;
             }
             let provider = providers.get(key.0)?;
-            Some((key.clone(), Arc::new(provider.library(entry, name))))
+            Some((
+                key.clone(),
+                Arc::new(provider.library_observed(entry, name)),
+            ))
         })
         .collect();
     if watch.is_cancelled() {

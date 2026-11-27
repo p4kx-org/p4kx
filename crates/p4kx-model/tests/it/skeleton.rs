@@ -7,10 +7,10 @@ use std::error::Error;
 
 use p4kx_chunks::ChunkFile;
 use p4kx_model::{
-    BoneTransform, ChunkUsage, CompanionError, CompanionPath, CorruptChunk, Model, ModelError,
-    ModelFile, chained_world_poses,
+    Animation, BoneTransform, ChunkUsage, CompanionError, CompanionPath, ControllerEligibility,
+    CorruptChunk, Model, ModelError, ModelFile, SkeletonSource, chained_world_poses,
 };
-use p4kx_testkit::{TestBone, TestModel, TestSkeleton};
+use p4kx_testkit::{TestAnimation, TestBone, TestChunkFile, TestModel, TestSkeleton, TestTrack};
 use proptest::prelude::*;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -304,6 +304,95 @@ fn chained_poses_treat_a_missing_parent_and_a_cycle_as_roots() -> TestResult {
         &missing[0].translation,
         &model.bones[0].relative.translation,
         "the bone is a root",
+    );
+    Ok(())
+}
+
+#[test]
+fn admitted_skeleton_spans_and_original_ordinals_agree_with_the_model_binder() -> TestResult {
+    let skeleton = TestSkeleton::two_bones();
+    for (kind, mut encoded, second_id_at) in [
+        (COMPILED_BONES, skeleton.compiled_bones(), 64),
+        (COMPILED_BONES_2, skeleton.compiled_bones_2(), 72),
+    ] {
+        let id = TestSkeleton::controller_id(0);
+        encoded
+            .get_mut(second_id_at..second_id_at + 4)
+            .ok_or("second ID field")?
+            .copy_from_slice(&id.to_le_bytes());
+        let bytes = TestChunkFile::ivo()
+            .chunk(kind, 1, encoded.as_slice())
+            .bytes();
+        let file = ChunkFile::parse(&bytes)?;
+        let source = SkeletonSource::read("source.chr", &file)?.ok_or("original skeleton")?;
+        assert_eq!(source.bone_count(), 2, "both physical bones are retained");
+        let chunk = file.chunks().first().ok_or("original table entry")?;
+        let first_id_at = if kind == COMPILED_BONES { 48 } else { 4 };
+        for index in 0..source.bone_count() {
+            let range = source
+                .controller_id_range(index)
+                .ok_or("actual controller bytes")?;
+            let relative = if index == 0 {
+                first_id_at
+            } else {
+                second_id_at
+            };
+            assert_eq!(
+                range.start,
+                chunk.offset() + u64::try_from(relative)?,
+                "the physically distinct bone ID position",
+            );
+            let range = usize::try_from(range.start)?..usize::try_from(range.end)?;
+            assert_eq!(
+                bytes.get(range),
+                Some(id.to_le_bytes().as_slice()),
+                "original ID bytes"
+            );
+        }
+        assert_binding_parity(&source, kind, encoded, id)?;
+    }
+    Ok(())
+}
+
+fn assert_binding_parity(
+    source: &SkeletonSource,
+    kind: u32,
+    encoded: Vec<u8>,
+    id: u32,
+) -> TestResult {
+    let animation = TestAnimation::new("track.caf", 30)
+        .track(TestTrack::new(id))
+        .track(TestTrack::new(id).positions(&[(0, [0.0; 3])]))
+        .track(TestTrack::new(id).positions(&[(0, [1.0; 3])]));
+    let decoded = Animation::read_caf("track.caf", &ChunkFile::parse(animation.caf())?)?;
+    let model = read(&TestModel::cube().with_chunk(kind, encoded))?;
+    let known = decoded.bind(&model.bones);
+    let mut binder = source.binder();
+    let empty = binder.observe(0, id, ControllerEligibility::Empty);
+    let first = binder.observe(1, id, ControllerEligibility::Track);
+    let duplicate = binder.observe(2, id, ControllerEligibility::Track);
+    assert_eq!(empty.bound_bone(), None, "the empty occurrence cannot bind");
+    assert_eq!(
+        first.first_controller(),
+        0,
+        "the empty occurrence is still first authored"
+    );
+    assert_eq!(
+        first.first_eligible(),
+        Some(1),
+        "first key-bearing source ordinal"
+    );
+    assert_eq!(first.matching_bones(), 2, "original skeleton collision");
+    assert_eq!(
+        first.bound_bone(),
+        known.bound.first().map(|&(bone, _)| bone),
+        "same first bone"
+    );
+    assert_eq!(duplicate.bound_bone(), None, "only the first track binds");
+    assert_eq!(
+        known.unbound,
+        [id],
+        "the legacy result reports the duplicate track"
     );
     Ok(())
 }

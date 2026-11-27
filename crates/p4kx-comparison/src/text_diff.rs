@@ -53,6 +53,13 @@ impl<'a> DiffLine<'a> {
     }
 }
 
+pub(crate) fn rendered_range(decoded: &[u8], line: &[u8]) -> Option<Range<usize>> {
+    let start = line.as_ptr().addr().checked_sub(decoded.as_ptr().addr())?;
+    let end = start.checked_add(line.len())?;
+    decoded.get(start..end)?;
+    Some(start..end)
+}
+
 /// One side of a text diff split into lines.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Lines {

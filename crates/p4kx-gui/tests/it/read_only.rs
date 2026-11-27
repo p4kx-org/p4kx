@@ -106,19 +106,31 @@ fn a_folder_elsewhere_is_fine() -> TestResult {
 }
 
 #[test]
-fn warns_while_the_game_runs_and_keeps_the_window_usable() -> TestResult {
-    let (_dir, mut harness) = opened(Language::BritishEnglish, |dir, _| dir.join("elsewhere"))?;
+fn warns_while_the_game_may_run_and_keeps_the_window_usable() -> TestResult {
+    for (language, notice, extract) in [
+        (
+            Language::BritishEnglish,
+            "Star Citizen may be running",
+            "Extract all…",
+        ),
+        (
+            Language::German,
+            "Star Citizen läuft möglicherweise",
+            "Alle extrahieren …",
+        ),
+    ] {
+        let (_dir, mut harness) = opened(language, |dir, _| dir.join("elsewhere"))?;
+        harness.state_mut().probe_game_with(|| true);
+        harness.state_mut().watch_game(true);
+        wait_until(&mut harness, Model::game_running)?;
 
-    harness.state_mut().probe_game_with(|| true);
-    harness.state_mut().watch_game(true);
-    wait_until(&mut harness, Model::game_running)?;
-
-    harness.get_by_label_contains("Star Citizen is running");
-    harness.get_by_label("Extract all…");
-    assert!(
-        harness.state().browser().is_some(),
-        "the Archive stays open and readable"
-    );
+        harness.get_by_label_contains(notice);
+        harness.get_by_label(extract);
+        assert!(
+            harness.state().browser().is_some(),
+            "the Archive stays open and readable"
+        );
+    }
     Ok(())
 }
 
@@ -136,7 +148,7 @@ fn stays_quiet_while_the_game_is_closed() -> TestResult {
 
     assert!(
         harness
-            .query_by_label_contains("Star Citizen is running")
+            .query_by_label_contains("Star Citizen may be running")
             .is_none(),
         "no warning without the game"
     );

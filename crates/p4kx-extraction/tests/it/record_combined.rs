@@ -5,9 +5,12 @@
 
 use std::error::Error;
 use std::fs;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_extraction::{
-    CancelToken, ConflictPolicy, DataForge, RecordExportError, RecordExportOptions, export_combined,
+    CancelToken, ConflictPolicy, DataForge, DataForgeSource, RecordExportError,
+    RecordExportOptions, RecordExportSources, export_annotated_combined_with_receipt,
+    export_combined,
 };
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
@@ -150,13 +153,16 @@ fn a_cancelled_run_leaves_no_file_and_keeps_an_existing_one() -> TestResult {
     let dir = tempfile::tempdir()?;
     let file = dir.path().join("all.xml");
     let cancel = CancelToken::new();
+    let source_root = tempfile::tempdir()?;
+    let source = source_root.path().join("source.dcb");
+    fs::write(&source, &bytes)?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(&source, cancel.flag())?;
     cancel.cancel();
     let options = RecordExportOptions {
+        protection: Some(&protection),
         policy: ConflictPolicy::Overwrite,
         cancel: Some(&cancel),
-        progress: None,
-        texts: None,
-        tags: None,
+        ..RecordExportOptions::default()
     };
 
     let fresh = export_combined(&forge, &records, &file, &options)?;
@@ -176,6 +182,49 @@ fn a_cancelled_run_leaves_no_file_and_keeps_an_existing_one() -> TestResult {
         .map(|entry| entry.map(|entry| entry.file_name()))
         .collect::<Result<_, _>>()?;
     assert_eq!(names, ["all.xml"], "no temporary file remains");
+    Ok(())
+}
+
+#[test]
+fn cancelling_combined_xml_discards_its_staged_definition_indices() -> TestResult {
+    const RECORDS: u32 = 1_500;
+    const CANCEL_AFTER: usize = 1_100;
+    let dir = tempfile::tempdir()?;
+    let source = dir.path().join("source.dcb");
+    let file = dir.path().join("all.xml");
+    fs::write(&source, many(RECORDS))?;
+    fs::write(&file, "existing XML")?;
+    let entry = DataForgeSource::File(&source).read()?;
+    let forge = entry.open()?;
+    let records: Vec<_> = forge.records().collect();
+    let cancel = CancelToken::new();
+    let completed = AtomicUsize::new(0);
+    let progress = || {
+        if completed.fetch_add(1, Ordering::Relaxed) + 1 == CANCEL_AFTER {
+            cancel.cancel();
+        }
+    };
+    let options = RecordExportOptions {
+        policy: ConflictPolicy::Overwrite,
+        cancel: Some(&cancel),
+        progress: Some(&progress),
+        ..RecordExportOptions::default()
+    };
+    let mut report = export_annotated_combined_with_receipt(
+        RecordExportSources::new(&entry, None, None),
+        &forge,
+        &records,
+        &file,
+        &options,
+    )?;
+    assert_eq!(report.cancelled(), RECORDS as usize, "whole XML cancelled");
+    assert_eq!(report.written(), 0, "no definition was committed");
+    assert_eq!(
+        report.take_written_record_indices(),
+        Some(Vec::new()),
+        "staged definition indices cannot escape cancellation"
+    );
+    assert_eq!(fs::read(&file)?, b"existing XML", "previous XML stays");
     Ok(())
 }
 
@@ -236,9 +285,9 @@ fn every_record_of_a_combined_export_is_reported_as_it_ends() -> TestResult {
     let forge = DataForge::open(&bytes)?;
     let records: Vec<_> = forge.records().collect();
     let dir = tempfile::tempdir()?;
-    let ended = std::sync::atomic::AtomicUsize::new(0);
+    let ended = AtomicUsize::new(0);
     let progress = || {
-        ended.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        ended.fetch_add(1, Ordering::Relaxed);
     };
     let options = RecordExportOptions {
         progress: Some(&progress),
@@ -247,10 +296,6 @@ fn every_record_of_a_combined_export_is_reported_as_it_ends() -> TestResult {
 
     export_combined(&forge, &records, &dir.path().join("all.xml"), &options)?;
 
-    assert_eq!(
-        ended.load(std::sync::atomic::Ordering::Relaxed),
-        1500,
-        "once per Record"
-    );
+    assert_eq!(ended.load(Ordering::Relaxed), 1500, "once per Record");
     Ok(())
 }

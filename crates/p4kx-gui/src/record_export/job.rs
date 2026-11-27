@@ -11,9 +11,13 @@ use std::thread;
 use std::time::SystemTime;
 
 use p4kx_export::{
-    CancelToken, ConflictPolicy, RecordExportOptions, RecordForm, write_planned_record_export,
+    CancelToken, ConflictPolicy, RecordExportOptions, RecordForm,
+    write_planned_record_export_with_origins,
 };
-use p4kx_extraction::{Filter, Record, TagResolver, create_default_target};
+use p4kx_extraction::{
+    ArchiveWriteProtection, DataForge, Filter, ObservedTagTree, Record, RecordExportSources,
+    create_default_target_protected,
+};
 use rayon::prelude::*;
 
 use super::RecordExportSummary;
@@ -60,7 +64,7 @@ type RunResult = Result<RecordExportSummary, String>;
 #[derive(Debug)]
 enum State {
     Running(Receiver<RunResult>),
-    Finished(RecordExportSummary),
+    Finished(Box<RecordExportSummary>),
     Failed(Option<String>),
 }
 
@@ -146,14 +150,16 @@ impl RecordExport {
         if !matches!(self.state, State::Running(_)) || !self.shared.give_up() {
             return false;
         }
-        self.state = State::Finished(RecordExportSummary::nothing_written(self.form, 0, true));
+        self.state = State::Finished(Box::new(RecordExportSummary::nothing_written(
+            self.form, 0, true,
+        )));
         true
     }
 }
 
 fn ended(outcome: Option<RunResult>) -> State {
     match outcome {
-        Some(Ok(summary)) => State::Finished(summary),
+        Some(Ok(summary)) => State::Finished(Box::new(summary)),
         Some(Err(reason)) => State::Failed(Some(reason)),
         None => State::Failed(None),
     }
@@ -166,6 +172,7 @@ pub(crate) fn start(
     index: &Arc<EntryIndex>,
     request: Request,
     wake: impl Fn() + Send + 'static,
+    #[cfg(feature = "test-hooks")] pause: crate::hold::Pause,
 ) -> RecordExport {
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -185,6 +192,8 @@ pub(crate) fn start(
                 request: &request,
                 cancel: &thread_cancel,
                 shared: &thread_shared,
+                #[cfg(feature = "test-hooks")]
+                pause,
             };
             if sender.send(job.run()).is_ok() {
                 wake();
@@ -209,6 +218,8 @@ struct Job<'a> {
     request: &'a Request,
     cancel: &'a CancelToken,
     shared: &'a Shared,
+    #[cfg(feature = "test-hooks")]
+    pause: crate::hold::Pause,
 }
 
 impl Job<'_> {
@@ -223,7 +234,7 @@ impl Job<'_> {
         let records = select(&all, &self.request.selection);
         let stop = || self.cancel.is_cancelled();
         let tags = (self.request.tags && !records.is_empty())
-            .then(|| source.tags(&stop))
+            .then(|| source.observed_tags(&stop))
             .transpose()
             .map_err(ReadFailure::into_reason)?;
         let stopped = matches!(tags, Some(None));
@@ -235,9 +246,41 @@ impl Job<'_> {
             ));
         }
         let tags = tags.flatten();
-        let target = prepare_target(self.index, self.request).map_err(|error| describe(&error))?;
+        let cancelled =
+            || RecordExportSummary::nothing_written(self.request.form, records.len(), true);
+        let protection = match ArchiveWriteProtection::new(self.index.path(), self.cancel.flag()) {
+            Ok(protection) => protection,
+            Err(error) if error.is_cancelled() => return Ok(cancelled()),
+            Err(error) => return Err(describe(&error)),
+        };
+        let target = match prepare_target(self.index, self.request, &protection, self.cancel) {
+            Ok(target) => target,
+            Err(error) if crate::installation::guard_cancelled(&error) => return Ok(cancelled()),
+            Err(error) => return Err(describe(&error)),
+        };
+        Ok(self.write(
+            &source,
+            &forge,
+            &records,
+            target,
+            &protection,
+            tags.as_deref(),
+        ))
+    }
+
+    fn write(
+        &self,
+        source: &ForgeSource,
+        forge: &DataForge<'_>,
+        records: &[Record<'_>],
+        target: PathBuf,
+        protection: &ArchiveWriteProtection,
+        tags: Option<&ObservedTagTree>,
+    ) -> RecordExportSummary {
         self.shared.total.store(records.len(), Ordering::Relaxed);
         self.shared.enter(RecordExportStage::Writing);
+        #[cfg(feature = "test-hooks")]
+        self.pause.wait(|| self.cancel.is_cancelled());
         let progress = || {
             self.shared.done.fetch_add(1, Ordering::Relaxed);
         };
@@ -246,17 +289,20 @@ impl Job<'_> {
             cancel: Some(self.cancel),
             progress: Some(&progress),
             texts: None,
-            tags: tags.as_deref().map(|tags| tags as &dyn TagResolver),
+            tags: None,
+            protection: Some(protection),
         };
-        let summary = write_planned_record_export(
-            &forge,
+        let summary = write_planned_record_export_with_origins(
+            RecordExportSources::new(source.entry.as_ref(), None, tags),
+            forge,
             &source.plans,
-            &records,
+            records,
             self.request.form,
             &target,
             &options,
         );
-        Ok(RecordExportSummary::new(target, records.len(), &summary))
+        let actual = source.entry.origin_of(forge);
+        RecordExportSummary::new(target, records.len(), summary, actual)
     }
 
     /// Returns DataForge from the cache of the Archive, reading it first when the cache is empty.
@@ -292,20 +338,32 @@ fn select<'f>(all: &[Record<'f>], selection: &Selection) -> Vec<Record<'f>> {
     }
 }
 
-fn prepare_target(index: &EntryIndex, request: &Request) -> io::Result<PathBuf> {
-    crate::installation::refuse(&request.folder)?;
+fn prepare_target(
+    index: &EntryIndex,
+    request: &Request,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
+) -> io::Result<PathBuf> {
+    protection
+        .ensure_writable(&request.folder, cancel.flag())
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
     match request.kind {
         TargetKind::ExistingFolder => {
             fs::create_dir_all(&request.folder)?;
+            protection
+                .ensure_writable(&request.folder, cancel.flag())
+                .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
             Ok(request.folder.clone())
         }
         TargetKind::NewFolder => {
             let (channel, build) = target_naming(index.path(), index.build_of_archive());
-            create_default_target(
+            create_default_target_protected(
                 &request.folder,
                 channel.as_deref(),
                 build,
                 SystemTime::now(),
+                protection,
+                cancel,
             )
         }
     }

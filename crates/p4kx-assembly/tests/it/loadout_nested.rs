@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutResolver,
-    MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS, PortNode,
+    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutOrigin,
+    LoadoutResolver, MAX_LOADOUT_DEPTH, PortNode, PortSource,
 };
 use p4kx_dataforge::DataForge;
 use p4kx_testkit::{DataForgeBuilder, TestEntity, TestLoadout, TestLoadoutEntry, entity_schema};
@@ -145,8 +145,9 @@ fn the_issues_of_a_nested_xml_loadout_are_reported_and_its_items_kept() -> TestR
 }
 
 #[test]
-fn nested_ports_count_towards_the_port_limit() -> TestResult {
-    let nested = (0..MAX_LOADOUT_PORTS + 10)
+fn a_wide_empty_port_retains_all_nested_loadout_entries() -> TestResult {
+    const NESTED_PORTS: usize = 65_537;
+    let nested = (0..NESTED_PORTS)
         .map(|index| TestLoadoutEntry::empty(format!("p{index}")))
         .collect();
     let entities = [
@@ -158,8 +159,24 @@ fn nested_ports_count_towards_the_port_limit() -> TestResult {
 
     let tree = resolve(&entities, None, "Door")?;
 
-    assert_eq!(tree.walk().len(), MAX_LOADOUT_PORTS, "exactly the limit");
-    assert_eq!(tree.issues(), [LoadoutError::TooManyPorts], "reported");
+    assert!(tree.issues().is_empty(), "the nested loadout is complete");
+    let port = tree.ports().first().ok_or("the original parent port")?;
+    assert_eq!(
+        port.nested().len(),
+        NESTED_PORTS,
+        "all nested ports survive"
+    );
+    let last = port.nested().last().ok_or("the last nested port")?;
+    assert_eq!(last.name(), "p65536", "the last original nested slot");
+    assert_eq!(
+        last.source(),
+        PortSource::Override,
+        "original nested source"
+    );
+    assert!(
+        matches!(last.origin(), Some(LoadoutOrigin::Record(path)) if path.as_ref() == tree.record_path()),
+        "the last nested port keeps the original owner Record",
+    );
     Ok(())
 }
 

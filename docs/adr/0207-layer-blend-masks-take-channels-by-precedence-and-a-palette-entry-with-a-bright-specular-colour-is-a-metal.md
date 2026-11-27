@@ -1,5 +1,8 @@
 # Layer blend masks take channels by precedence, and a palette entry with a bright specular colour is a metal
 
+Amended by ADR-0400: explicitly selected HardSurface palette finish multiplies sampled
+smoothness before its linear inverse; GLB layer roughness uses the same finish controls.
+
 Decided for issues #730 and #733. It amends ADR-0147 (the share of the blend mask), ADR-0100 (the
 add-on's surface mapping) and ADR-0195 (painted materials). Evidence: the LIVE Archive, imported
 into Blender 5.2 with the add-on and compared against in-game screenshots and the in-game item
@@ -78,3 +81,37 @@ The base colour images of `LayerBlend_V2` materials change, also in the viewer, 
 bake. Clothing whose masks are pure red, green and blue now takes the layers one place earlier
 than before: red the first (it took the second), green the second, blue the third, and the
 texels with no channel the fourth (they took the first).
+
+## Corbel worn geometry reference
+
+A bounded LIVE 13220821 check followed the original worn geometry root and its level-0 companion.
+The directory and payload checks bound both entries independently. The stock model reader
+consumed each entry once through the verified end of the stream. Together they held 545,441
+stored bytes and 1,036,960 decoded bytes.
+
+The normal geometry-only GLB writer emitted one mesh, three primitives and 23,399 triangles.
+One nondegenerate triangle was traced from its original IVO index and UV streams to the emitted
+accessors. It retained all three indices in order and all six UV0 components exactly after
+half-float expansion. The check establishes a source-to-GLB geometry reference.
+
+A follow-up on the same Build bound all three emitted draws to their original material
+slots. It used two verified geometry payloads and six verified material payloads,
+totalling 1,048,292 decoded bytes. The three draws retained eight, eight and one ordered
+material-layer occurrences. Two occurrences contain explicitly blank paths. The probe
+took 9.4 seconds and peaked at 960,950,272 bytes of working set.
+
+A private colour-ID replay of the same GLB checked frontal and opposing elevated
+35-degree views. Slot 0 contains the upper exterior shell and the circular side-mount
+centres. Slot 1 contains their surrounds and the lower front panel and neck skirt.
+Both slots contribute to the front. Slot 2 forms a separate angular insert in isolation
+and is occluded in all three combined views with opaque ID materials.
+
+These landmarks identify physical regions of the worn model. All fifteen resolved
+wrapper occurrences omit `TintMode`. Two layers from physical slot 0 select the same
+palette entry and their child materials declare modes 1 and 2.
+
+Release 0.5.0 requires a verified renderer witness for this pair. Bind the two child
+modes to the same selected layer occurrences in a matching Build and follow the
+actual upload into `LayerDefinition.Padding_TintIdx`. Read both shader flags, `0x04`
+for diffuse and `0x08` for specular, for each occurrence. The existing native trace
+comes from an older Build and ends before the upload.

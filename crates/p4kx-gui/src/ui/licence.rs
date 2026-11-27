@@ -49,7 +49,10 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
 /// Returns the height left for the text: the window less the canvas gap above and below, the head
 /// and the foot of the modal.
 fn text_height(ui: &Ui) -> f32 {
-    const CHROME: f32 = 2.0 * SPACE_8 + BUTTON_XS_HEIGHT + TOUCH_TARGET + 2.0 * (SPACE_3 + SPACE_4);
+    const CHROME: f32 = 2.0f32.mul_add(
+        SPACE_3 + SPACE_4,
+        2.0f32.mul_add(SPACE_8, BUTTON_XS_HEIGHT) + TOUCH_TARGET,
+    );
     (ui.ctx().content_rect().height() - CHROME).max(3.0 * ROW_HEIGHT)
 }
 

@@ -192,6 +192,59 @@ fn a_cancelled_export_writes_nothing() -> TestResult {
 }
 
 #[test]
+fn cancellation_during_record_serialization_counts_the_active_record_as_cancelled() -> TestResult {
+    struct CancelOnText<'a>(&'a CancelToken);
+    impl p4kx_extraction::TextResolver for CancelOnText<'_> {
+        fn resolve<'a>(&'a self, _key: &str) -> p4kx_extraction::Resolution<'a> {
+            self.0.cancel();
+            p4kx_extraction::Resolution::Keep
+        }
+    }
+    let bytes = DataForgeBuilder::new()
+        .structure(TestStruct::new("Item").field("label", TestType::Locale))
+        .record(
+            TestRecord::new(1, "Item", "Item.A", "a.xml")
+                .value("label", TestValue::text("@cancel")),
+        )
+        .build();
+    let root = tempfile::tempdir()?;
+    let source = root.path().join("source.dcb");
+    fs::write(&source, &bytes)?;
+    let target = root.path().join("out");
+    fs::create_dir(&target)?;
+    let cancel = CancelToken::new();
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(&source, cancel.flag())?;
+    let texts = CancelOnText(&cancel);
+    let report = export_all(
+        &bytes,
+        &target,
+        &RecordExportOptions {
+            protection: Some(&protection),
+            cancel: Some(&cancel),
+            texts: Some(&texts),
+            ..RecordExportOptions::default()
+        },
+    )?;
+    assert!(
+        cancel.is_cancelled(),
+        "serialization reached the cancellation callback"
+    );
+    assert_eq!(report.cancelled(), 1, "the active Record remains counted");
+    assert_eq!(report.written(), 0);
+    assert_eq!(
+        report.failures().len(),
+        0,
+        "a Guard cancellation is not a failed Record"
+    );
+    assert_eq!(
+        files(&target)?,
+        Vec::<String>::new(),
+        "cancelled output leaves no files"
+    );
+    Ok(())
+}
+
+#[test]
 fn error_values_are_counted() -> TestResult {
     let bytes = DataForgeBuilder::new()
         .structure(

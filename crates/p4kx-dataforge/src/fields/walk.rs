@@ -1,163 +1,272 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::build::{element_bytes, pointer, reference_guid, words};
+use super::walk_frame::{Action, Array, Frame, Owner, Site, Structure};
 use crate::fields::FieldKind;
-use crate::fields::part::{Part, Walk};
+use crate::fields::observation::FieldStatisticsInput;
+use crate::fields::part::{Part, Stop, Walk};
 use crate::fields::seen::Seen;
+use crate::fields::{FieldStatisticsGap, FieldStatisticsScalarRead, FieldStatisticsUse};
 use crate::layout::{FieldSlot, Layout};
-use crate::scalar::read_scalar;
-use crate::{DataForge, DataType, MAX_NESTING_DEPTH, ValueKind};
+use crate::source_layout_index;
+use crate::{DataForge, DataType, Value, ValueKind};
+use crate::{build, scalar};
+use std::collections::HashSet;
 
-impl<'f> Part<'_, 'f> {
+impl<'source> Part<'_, 'source> {
     pub(super) fn structure(
         &mut self,
-        forge: &'f DataForge<'f>,
+        forge: &'source DataForge<'source>,
         struct_index: u32,
-        layout: &Layout<'f>,
-        bytes: &[u8],
+        layout: &Layout<'source>,
+        bytes: &'source [u8],
         node: u32,
-        depth: usize,
+        instance: u32,
     ) -> Walk {
-        self.spend(layout.fields.len())?;
-        let pool = self.pool_of(node, struct_index, layout.fields.len());
-        for (position, slot) in layout.fields.iter().enumerate() {
-            let field = self.field_node(pool, position, node, slot.name)?;
-            let value = bytes.get(slot.start..slot.end).unwrap_or_default();
-            self.field(forge, slot, value, field, depth)?;
-        }
-        Ok(())
-    }
-
-    fn field(
-        &mut self,
-        forge: &'f DataForge<'f>,
-        slot: &FieldSlot<'f>,
-        bytes: &[u8],
-        node: u32,
-        depth: usize,
-    ) -> Walk {
-        if slot.array {
-            return self.array(forge, slot, bytes, node, depth);
-        }
-        if slot.data_type == DataType::Class {
-            self.leaf(
-                node,
-                FieldKind::new(DataType::Class, false),
-                Seen::Empty,
-                false,
-            );
-            return self.inline(forge, u32::from(slot.target), bytes, node, depth + 1);
-        }
-        self.single(forge, slot, bytes, node, false, depth)
-    }
-
-    /// Walks the fields of an inline struct below `node`.
-    fn inline(
-        &mut self,
-        forge: &'f DataForge<'f>,
-        struct_index: u32,
-        bytes: &[u8],
-        node: u32,
-        depth: usize,
-    ) -> Walk {
-        if depth > MAX_NESTING_DEPTH {
-            self.skipped += 1;
-            return Ok(());
-        }
-        let layouts = self.layouts;
-        let Ok(layout) = layouts.get(forge, struct_index) else {
-            self.skipped += 1;
-            return Ok(());
+        let owner = Owner {
+            structure: struct_index,
+            instance,
         };
-        self.structure(forge, struct_index, &layout, bytes, node, depth)
-    }
-
-    fn single(
-        &mut self,
-        forge: &'f DataForge<'f>,
-        slot: &FieldSlot<'f>,
-        bytes: &[u8],
-        node: u32,
-        array: bool,
-        depth: usize,
-    ) -> Walk {
-        self.spend(1)?;
-        let kind = FieldKind::new(slot.data_type, array);
-        match slot.data_type {
-            DataType::StrongPointer => match pointer(bytes) {
-                None => self.leaf(node, kind, Seen::Empty, true),
-                Some((struct_index, instance)) => {
-                    self.leaf(node, kind, Seen::Empty, false);
-                    return self.owned(forge, struct_index, instance, node, depth + 1);
+        let mut inline = HashSet::from([(owner, struct_index)]);
+        let root = Structure::new(*layout, bytes, node, owner, struct_index)?;
+        let mut pending = vec![Frame::Structure(root)];
+        while let Some(frame) = pending.last_mut() {
+            if let Some(action) = frame.next(forge, self)? {
+                let source = action.selector();
+                if let Some(next) = self.action(forge, action, &mut inline)? {
+                    if let Some(source) = source {
+                        self.routes.enter(source, next.source_target());
+                    }
+                    pending.push(next);
                 }
-            },
-            DataType::WeakPointer => match pointer(bytes) {
-                None => self.leaf(node, kind, Seen::Empty, true),
-                Some((struct_index, instance)) => {
-                    let seen = if forge.instance(struct_index, instance).is_some() {
-                        Seen::Empty
-                    } else {
-                        Seen::Unreadable
-                    };
-                    self.leaf(node, kind, seen, false);
+            } else {
+                if let Some(identity) = frame.inline() {
+                    inline.remove(&identity);
                 }
-            },
-            DataType::Reference => match reference_guid(bytes) {
-                None => self.leaf(node, kind, Seen::Empty, true),
-                Some(guid) => self.leaf(node, kind, Seen::reference(&guid), false),
-            },
-            data_type => {
-                let seen = read_scalar(forge, data_type, slot.target, bytes)
-                    .map_or(Seen::Unreadable, |value| Seen::of(data_type, &value));
-                let empty = matches!(seen, Seen::Empty);
-                self.leaf(node, kind, seen, empty);
+                pending.pop();
+                self.routes.leave();
             }
         }
         Ok(())
     }
 
-    /// Walks the instance a strong pointer owns, below the node of its struct's name.
+    fn action(
+        &mut self,
+        forge: &'source DataForge<'source>,
+        action: Action<'source>,
+        inline: &mut HashSet<(Owner, u32)>,
+    ) -> Result<Option<Frame<'source>>, Stop> {
+        match action {
+            Action::Field {
+                slot,
+                bytes,
+                site,
+                owner,
+            } => {
+                if slot.array {
+                    return Ok(self.array(forge, slot, bytes, site));
+                }
+                if slot.data_type == DataType::Class {
+                    self.leaf(
+                        &site,
+                        FieldKind::new(DataType::Class, false),
+                        Seen::Empty,
+                        false,
+                        None,
+                    );
+                    return self.inline(forge, u32::from(slot.target), bytes, &site, owner, inline);
+                }
+                self.single(forge, slot, bytes, &site, false, inline)
+            }
+            Action::Single { slot, bytes, site } => {
+                self.single(forge, slot, bytes, &site, true, inline)
+            }
+            Action::Class {
+                slot,
+                element,
+                site,
+            } => self.class_element(forge, slot, element, &site, inline),
+        }
+    }
+
+    fn inline(
+        &mut self,
+        forge: &'source DataForge<'source>,
+        structure: u32,
+        bytes: &'source [u8],
+        site: &Site,
+        owner: Owner,
+        inline: &mut HashSet<(Owner, u32)>,
+    ) -> Result<Option<Frame<'source>>, Stop> {
+        if !inline.insert((owner, structure)) {
+            self.skip(site, FieldStatisticsGap::RevisitedInstance);
+            return Ok(None);
+        }
+        let layout = match self.layouts.get(forge, structure) {
+            Ok(layout) => layout,
+            Err(error) if source_layout_index::is_operational(&error) => return Err(error.into()),
+            Err(_) => {
+                self.skip(site, FieldStatisticsGap::UnreadableLayout);
+                inline.remove(&(owner, structure));
+                return Ok(None);
+            }
+        };
+        self.observe_instance(forge, site, structure, owner.instance, bytes, None);
+        Ok(Some(Frame::Structure(Structure::new(
+            layout, bytes, site.node, owner, structure,
+        )?)))
+    }
+
+    fn single(
+        &mut self,
+        forge: &'source DataForge<'source>,
+        slot: FieldSlot<'source>,
+        bytes: &'source [u8],
+        site: &Site,
+        array: bool,
+        inline: &mut HashSet<(Owner, u32)>,
+    ) -> Result<Option<Frame<'source>>, Stop> {
+        let kind = FieldKind::new(slot.data_type, array);
+        match slot.data_type {
+            DataType::StrongPointer => match build::pointer(bytes) {
+                None => self.leaf(site, kind, Seen::Empty, true, None),
+                Some((structure, instance)) => {
+                    self.leaf(site, kind, Seen::Empty, false, None);
+                    return self.owned(forge, structure, instance, site, inline);
+                }
+            },
+            DataType::WeakPointer => match build::pointer(bytes) {
+                None => self.leaf(site, kind, Seen::Empty, true, None),
+                Some((structure, instance)) => {
+                    let seen =
+                        forge
+                            .instance(structure, instance)
+                            .map_or(Seen::Unreadable, |bytes| {
+                                self.observe_instance(
+                                    forge, site, structure, instance, bytes, None,
+                                );
+                                Seen::Empty
+                            });
+                    self.leaf(site, kind, seen, false, None);
+                }
+            },
+            DataType::Reference => match build::reference_guid(bytes) {
+                None => self.leaf(site, kind, Seen::Empty, true, None),
+                Some(guid) => self.leaf(site, kind, Seen::reference(&guid), false, None),
+            },
+            data_type => {
+                let mut scalar_read = FieldStatisticsScalarRead::default();
+                let value = if site.input.is_some() {
+                    scalar::read_scalar_with(
+                        forge,
+                        data_type,
+                        slot.target,
+                        bytes,
+                        Some(&mut |source| scalar_read.observe(source)),
+                    )
+                } else {
+                    scalar::read_scalar(forge, data_type, slot.target, bytes)
+                };
+                let seen = value
+                    .as_ref()
+                    .map_or(Seen::Unreadable, |value| Seen::of(data_type, value));
+                let empty = matches!(seen, Seen::Empty);
+                let text = match (site.input.is_some(), value) {
+                    (true, Some(Value::String(text) | Value::Locale(text) | Value::Enum(text))) => {
+                        forge.original_text_span(text)
+                    }
+                    _ => None,
+                };
+                self.leaf_with_sources(site, kind, seen, empty, text, scalar_read);
+            }
+        }
+        Ok(None)
+    }
+
     fn owned(
         &mut self,
-        forge: &'f DataForge<'f>,
-        struct_index: u32,
+        forge: &'source DataForge<'source>,
+        structure: u32,
         instance: u32,
-        parent: u32,
-        depth: usize,
-    ) -> Walk {
-        let Some(bytes) = forge.instance(struct_index, instance) else {
-            self.skipped += 1;
-            return Ok(());
+        site: &Site,
+        inline: &mut HashSet<(Owner, u32)>,
+    ) -> Result<Option<Frame<'source>>, Stop> {
+        let Some(bytes) = forge.instance(structure, instance) else {
+            self.skip(site, FieldStatisticsGap::MissingInstance);
+            return Ok(None);
         };
-        if depth > MAX_NESTING_DEPTH || !self.visited.insert((struct_index, instance)) {
-            self.skipped += 1;
-            return Ok(());
+        if !self.visited.insert((structure, instance)) {
+            self.skip(site, FieldStatisticsGap::RevisitedInstance);
+            return Ok(None);
         }
-        let layouts = self.layouts;
-        let Ok(layout) = layouts.get(forge, struct_index) else {
-            self.skipped += 1;
-            return Ok(());
+        let layout = match self.layouts.get(forge, structure) {
+            Ok(layout) => layout,
+            Err(error) if source_layout_index::is_operational(&error) => return Err(error.into()),
+            Err(_) => {
+                self.skip(site, FieldStatisticsGap::UnreadableLayout);
+                return Ok(None);
+            }
         };
-        let node = self.type_node(parent, struct_index, layout.type_name)?;
-        self.leaf(
+        let node = self.type_node(site.node, structure, layout.type_name)?;
+        let target = Site {
             node,
+            input: site.input.clone(),
+        };
+        self.observe_instance(
+            forge,
+            &target,
+            structure,
+            instance,
+            bytes,
+            Some(layout.type_name),
+        );
+        self.leaf(
+            &target,
             FieldKind::new(DataType::Class, false),
             Seen::Empty,
             false,
+            None,
         );
-        self.structure(forge, struct_index, &layout, bytes, node, depth)
+        let owner = Owner {
+            structure,
+            instance,
+        };
+        inline.insert((owner, structure));
+        Ok(Some(Frame::Structure(Structure::new(
+            layout, bytes, node, owner, structure,
+        )?)))
+    }
+
+    fn observe_instance(
+        &self,
+        forge: &DataForge<'_>,
+        site: &Site,
+        structure: u32,
+        instance: u32,
+        bytes: &[u8],
+        name: Option<&str>,
+    ) {
+        if site.input.is_some() {
+            self.observe_site(
+                site,
+                FieldStatisticsUse::Instance {
+                    structure,
+                    instance,
+                    bytes: forge.byte_span(bytes),
+                    path_name: name.and_then(|name| forge.original_text_span(name)),
+                },
+            );
+        }
     }
 
     fn array(
         &mut self,
-        forge: &'f DataForge<'f>,
-        slot: &FieldSlot<'f>,
+        forge: &DataForge<'source>,
+        slot: FieldSlot<'source>,
         bytes: &[u8],
-        node: u32,
-        depth: usize,
-    ) -> Walk {
-        let [count, first] = words(bytes);
+        site: Site,
+    ) -> Option<Frame<'source>> {
+        let [count, first] = build::words(bytes);
         let kind = ValueKind::of(slot.data_type);
         let len = kind.map_or_else(
             || {
@@ -169,46 +278,58 @@ impl<'f> Part<'_, 'f> {
             |kind| forge.value_count(kind) as u64,
         );
         if u64::from(first) + u64::from(count) > len {
-            self.skipped += 1;
-            return Ok(());
+            self.skip(&site, FieldStatisticsGap::InvalidArrayExtent);
+            return None;
         }
-        for index in 0..count {
-            let element = first.saturating_add(index);
-            match kind {
-                Some(kind) => {
-                    let value = element_bytes(forge, kind, element);
-                    self.single(forge, slot, value, node, true, depth + 1)?;
-                }
-                None => self.class_element(forge, slot, element, node, depth + 1)?,
-            }
-        }
-        Ok(())
+        let header = match site.input {
+            Some(FieldStatisticsInput::Slot(header)) => Some(header),
+            _ => None,
+        };
+        Some(Frame::Array(Array {
+            slot,
+            kind,
+            count,
+            first,
+            node: site.node,
+            next: 0,
+            header,
+        }))
     }
 
     fn class_element(
         &mut self,
-        forge: &'f DataForge<'f>,
-        slot: &FieldSlot<'f>,
-        element: u32,
-        node: u32,
-        depth: usize,
-    ) -> Walk {
-        self.spend(1)?;
-        let struct_index = u32::from(slot.target);
-        let Some(bytes) = forge.instance(struct_index, element) else {
-            self.skipped += 1;
-            return Ok(());
+        forge: &'source DataForge<'source>,
+        slot: FieldSlot<'source>,
+        instance: u32,
+        site: &Site,
+        inline: &mut HashSet<(Owner, u32)>,
+    ) -> Result<Option<Frame<'source>>, Stop> {
+        let structure = u32::from(slot.target);
+        let Some(bytes) = forge.instance(structure, instance) else {
+            self.skip(site, FieldStatisticsGap::MissingInstance);
+            return Ok(None);
         };
-        if !self.visited.insert((struct_index, element)) {
-            self.skipped += 1;
-            return Ok(());
+        if !self.visited.insert((structure, instance)) {
+            self.skip(site, FieldStatisticsGap::RevisitedInstance);
+            return Ok(None);
         }
         self.leaf(
-            node,
+            site,
             FieldKind::new(DataType::Class, true),
             Seen::Empty,
             false,
+            None,
         );
-        self.inline(forge, struct_index, bytes, node, depth)
+        self.inline(
+            forge,
+            structure,
+            bytes,
+            site,
+            Owner {
+                structure,
+                instance,
+            },
+            inline,
+        )
     }
 }

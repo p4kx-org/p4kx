@@ -5,7 +5,7 @@
 //! geometry of the Entity.
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, LoadoutResolver};
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
 use p4kx_testkit::{DataForgeBuilder, TestEntity, TestEntry, TestModel, TestPort, entity_schema};
 
 use crate::assembly_support::{TestResult, fixture};
@@ -78,7 +78,25 @@ fn a_missing_sub_geometry_falls_back_to_the_main_geometry_with_a_note() -> TestR
     let left = assembly
         .part_at("skid_left")
         .ok_or("the part of the left port")?;
-    assert!(left.model().is_some());
+    assert!(left.model().is_some(), "the selected variant is drawn");
+    assert_eq!(
+        right.geometry(),
+        left.geometry(),
+        "the same path has two source routes"
+    );
+    for (part, field) in [
+        (right, "Components[0].Geometry.Geometry.Geometry.path"),
+        (
+            left,
+            "Components[0].Geometry.SubGeometry[1].Geometry.Geometry.path",
+        ),
+    ] {
+        assert!(
+            matches!(part.geometry_selector(),
+                Some(SourceLocation::DataForge { field: observed, .. }) if observed == field),
+            "the selected geometry retains its own authored route: {part:?}"
+        );
+    }
     assert_eq!(
         codes
             .iter()

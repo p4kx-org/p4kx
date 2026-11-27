@@ -9,14 +9,15 @@ use std::thread;
 use p4kx_extraction::Entry;
 
 use super::{
-    Loaded, PREVIEW_READ_LIMIT, PreviewContents, ReadResult, Unread, XmlPreview, is_cryxml,
+    EntryPreviewProvenance, Loaded, PREVIEW_READ_LIMIT, PreviewContents, ReadResult, Unread,
+    XmlPreview, is_cryxml,
 };
 use crate::EntryIndex;
 use crate::model::describe;
 
 pub(super) enum Spawned {
     Running(Receiver<ReadResult>),
-    Finished(ReadResult),
+    Finished(Box<ReadResult>),
 }
 
 pub(super) fn spawn(index: &Arc<EntryIndex>, id: u32, wake: impl Fn() + Send + 'static) -> Spawned {
@@ -45,7 +46,7 @@ pub(super) fn spawn(index: &Arc<EntryIndex>, id: u32, wake: impl Fn() + Send + '
                 },
                 &|| {},
             );
-            Spawned::Finished(finished.unwrap_or(Err(Unread::Failed(None))))
+            Spawned::Finished(Box::new(finished.unwrap_or(Err(Unread::Failed(None)))))
         }
     }
 }
@@ -92,7 +93,9 @@ pub(super) fn read(
         Ok(bytes) => {
             let (xml, job) = is_cryxml(&bytes).then(XmlPreview::pending).unzip();
             let start = job.as_ref().map(|_| bytes.clone());
-            let contents = PreviewContents::new(bytes, entry.uncompressed_size());
+            let provenance =
+                EntryPreviewProvenance::capture(archive.observed_entry(entry), bytes.len() as u64);
+            let contents = PreviewContents::new(bytes, entry.uncompressed_size(), provenance);
             (Ok(Loaded { contents, xml }), job.zip(start))
         }
         Err(unread) => (Err(unread), None),
@@ -104,7 +107,11 @@ pub(super) fn read(
     if let Some((job, start)) = job {
         job.run(
             index,
-            (&start, entry.uncompressed_size()),
+            (
+                &start,
+                entry.uncompressed_size(),
+                archive.observed_entry(entry),
+            ),
             &mut reader,
             wake,
         );

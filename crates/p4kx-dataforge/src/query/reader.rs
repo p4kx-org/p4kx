@@ -4,11 +4,12 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use crate::query::sink::Recording;
+use crate::query::sink::{Reached, Recording};
+use crate::query::source::CellTrace;
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
-use crate::scalar::read_scalar;
-use crate::{DataForge, DataType, Value, ValueKind};
+use crate::scalar::{ScalarSource, read_scalar_with};
+use crate::{DataForge, DataType, Value, ValueError, ValueKind};
 
 /// Where a scalar lies in the bytes a path has reached, and how it is read.
 #[derive(Debug, Clone, Copy)]
@@ -22,14 +23,28 @@ pub(crate) struct Column {
 impl Column {
     /// Reads the value from `place`, or the error that its bytes end before the column does.
     pub(crate) fn read<'f>(&self, forge: &'f DataForge<'f>, place: Place<'f>) -> Value<'f> {
-        let bytes = usize::try_from(self.start)
-            .ok()
-            .zip(usize::try_from(self.end).ok())
-            .and_then(|(start, end)| place.bytes().get(start..end));
-        bytes.map_or_else(
+        self.read_observed(forge, place, None)
+    }
+
+    pub(super) fn read_observed<'f>(
+        &self,
+        forge: &'f DataForge<'f>,
+        place: Place<'f>,
+        observe: Option<&mut dyn FnMut(ScalarSource)>,
+    ) -> Value<'f> {
+        self.bytes(place).map_or_else(
             || Value::Error(place.too_short(forge, self.end)),
-            |bytes| read_scalar(forge, self.data_type, self.target, bytes).unwrap_or(Value::Null),
+            |bytes| {
+                read_scalar_with(forge, self.data_type, self.target, bytes, observe)
+                    .unwrap_or(Value::Null)
+            },
         )
+    }
+
+    pub(super) fn bytes<'source>(&self, place: Place<'source>) -> Option<&'source [u8]> {
+        let start = usize::try_from(self.start).ok()?;
+        let end = usize::try_from(self.end).ok()?;
+        place.bytes().get(start..end)
     }
 }
 
@@ -132,68 +147,50 @@ impl Reader {
     ///
     /// With `prefix`, the recording of the first steps the path shares with other columns and
     /// their number, the walk takes those steps from the recording; the cell is the same.
-    pub(crate) fn cell<'f>(
+    pub(super) fn cell<'f>(
         &self,
         forge: &'f DataForge<'f>,
         place: Place<'f>,
         state: &mut WalkState,
         prefix: Option<(&Recording<'f>, usize)>,
+        mut trace: Option<&mut CellTrace>,
     ) -> Value<'f> {
         let walk = match self {
-            Self::Column(column) => return column.read(forge, place),
+            Self::Column(column) => {
+                return Reached::Place(place).read_projected(forge, column, trace);
+            }
             Self::Walk(walk) => walk,
         };
-        let drive = |state: &mut WalkState, emit: &mut dyn FnMut(Value<'f>) -> ControlFlow<()>| {
-            match prefix {
-                Some((recording, steps)) => walk.replay(forge, recording, steps, state, emit),
-                None => walk.visit(forge, place, state, emit),
-            }
-        };
-        if !walk.multi {
+        let mut drive =
+            |state: &mut WalkState, emit: &mut dyn FnMut(Value<'f>) -> ControlFlow<()>| {
+                let trace = trace.as_deref_mut();
+                match prefix {
+                    Some((recording, steps)) => {
+                        walk.replay(forge, recording, steps, state, emit, trace)
+                    }
+                    None => walk.visit(forge, place, state, emit, trace),
+                }
+            };
+        let value = if walk.multi {
+            let mut values = Vec::new();
+            let reached = drive(state, &mut |value| {
+                values.push(value);
+                ControlFlow::Continue(())
+            });
+            reached.map_or_else(Value::Error, |()| Value::Array(values.into_boxed_slice()))
+        } else {
             let mut single = Value::Null;
             let reached = drive(state, &mut |value| {
                 single = value;
                 ControlFlow::Break(())
             });
-            return reached.map_or_else(Value::Error, |()| single);
-        }
-        let mut values = Vec::new();
-        let reached = drive(state, &mut |value| {
-            values.push(value);
-            ControlFlow::Continue(())
-        });
-        reached.map_or_else(Value::Error, |()| Value::Array(values.into_boxed_slice()))
-    }
-
-    /// Returns whether some value of the path holds `test`: `Some(true)` when one does, `None`
-    /// when none does but one is unknown, `Some(false)` otherwise, also when there is none.
-    pub(crate) fn any<'f>(
-        &self,
-        forge: &'f DataForge<'f>,
-        place: Place<'f>,
-        state: &mut WalkState,
-        test: impl Fn(&Value<'f>) -> Option<bool>,
-    ) -> Option<bool> {
-        let walk = match self {
-            Self::Column(column) => return test(&column.read(forge, place)),
-            Self::Walk(walk) => walk,
+            reached.map_or_else(Value::Error, |()| single)
         };
-        let mut result = Some(false);
-        let reached = walk.visit(forge, place, state, &mut |value| match test(&value) {
-            Some(true) => {
-                result = Some(true);
-                ControlFlow::Break(())
-            }
-            Some(false) => ControlFlow::Continue(()),
-            None => {
-                result = None;
-                ControlFlow::Continue(())
-            }
-        });
-        match (reached, result) {
-            (_, Some(true)) => Some(true),
-            (Err(_), _) => None,
-            (Ok(()), result) => result,
+        if let Some(trace) = trace
+            && let Value::Error(ValueError::PathTooWide { limit }) = &value
+        {
+            trace.row_budget_exhausted(*limit);
         }
+        value
     }
 }

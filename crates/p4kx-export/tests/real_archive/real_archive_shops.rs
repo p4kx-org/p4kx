@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Shops in the Basetool catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K`
+//! Shops in the P4KX catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K`
 //! names one. The diagnostics print before any assertion.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -22,14 +22,10 @@ const INVENTORY_FOLDER: &str = "data\\scripts\\shopinventories\\";
 const MAX_INVENTORY_LEN: u64 = 64 << 20;
 const LISTED: usize = 150;
 
-fn text<'v>(shop: &'v Value, field: &str) -> &'v str {
-    shop[field].as_str().unwrap_or("(none)")
-}
-
-fn count_by<'v>(shops: &'v [Value], field: &str) -> BTreeMap<&'v str, usize> {
+fn count_by(shops: &[Value], text: impl Fn(&Value) -> Option<&str>) -> BTreeMap<&str, usize> {
     let mut counts = BTreeMap::new();
     for shop in shops {
-        *counts.entry(text(shop, field)).or_default() += 1;
+        *counts.entry(text(shop).unwrap_or("(none)")).or_default() += 1;
     }
     counts
 }
@@ -42,6 +38,9 @@ struct InventoryLink {
     last_matches: usize,
 }
 
+fn registry_text<'shop>(shop: &'shop Value, pointer: &str) -> Option<&'shop str> {
+    shop.pointer(pointer).and_then(Value::as_str)
+}
 #[expect(
     clippy::print_stdout,
     reason = "the diagnostics are the result of the verification"
@@ -52,11 +51,13 @@ fn inventories(
 ) -> Result<(usize, Vec<InventoryLink>), Box<dyn Error>> {
     let keys: HashSet<&str> = shops
         .iter()
-        .filter_map(|shop| shop["key"].as_str())
+        .filter_map(|shop| registry_text(shop, "/key/value"))
         .collect();
     let mut by_entity: HashMap<&str, usize> = HashMap::new();
     for shop in shops {
-        *by_entity.entry(text(shop, "entityGuid")).or_default() += 1;
+        *by_entity
+            .entry(registry_text(shop, "/entityGuid/value").unwrap_or("(none)"))
+            .or_default() += 1;
     }
     let mut without_shop_id = 0;
     let mut links = Vec::new();
@@ -139,7 +140,7 @@ fn print_default_values(archive: &Archive, shops: &[Value]) -> Result<(), Box<dy
     let forge = entry.open()?;
     let defaults: HashSet<&str> = shops
         .iter()
-        .filter_map(|shop| shop["defaultValue"].as_str())
+        .filter_map(|shop| registry_text(shop, "/defaultValue/value"))
         .collect();
     let mut by_type: BTreeMap<String, usize> = BTreeMap::new();
     let mut resolved = 0;
@@ -169,27 +170,55 @@ fn print_default_values(archive: &Archive, shops: &[Value]) -> Result<(), Box<dy
 fn report(archive: &Archive, built: &p4kx_export::BuiltCatalog, shops: &[Value]) -> TestResult {
     let summary = built.summary().shops();
     println!("== summary {summary:#?}");
-    println!("== shops per system {:?}", count_by(shops, "system"));
-    println!("== shops per kind {:?}", count_by(shops, "kind"));
-    println!("== shops per brand {:?}", count_by(shops, "brand"));
+    println!(
+        "== shops per system {:?}",
+        count_by(shops, |shop| registry_text(shop, "/system/value"))
+    );
+    println!(
+        "== shops per kind {:?}",
+        count_by(shops, |shop| shop
+            .pointer("/kind/value")
+            .and_then(Value::as_str))
+    );
+    println!(
+        "== shops per brand {:?}",
+        count_by(shops, |shop| shop
+            .pointer("/brand/value")
+            .and_then(Value::as_str))
+    );
     let linked = shops
         .iter()
-        .filter(|shop| !shop["starmapObjectGuid"].is_null())
+        .filter(|shop| {
+            shop.pointer("/starmapObjectGuid/value")
+                .is_some_and(|guid| !guid.is_null())
+        })
         .count();
     println!(
         "== linked to a starmap object {linked}, unlinked {}",
         shops.len() - linked
     );
-    let pyro = shops.iter().filter(|shop| shop["system"] == "pyro").count();
+    let pyro = shops
+        .iter()
+        .filter(|shop| registry_text(shop, "/system/value") == Some("pyro"))
+        .count();
     let pyro_linked = shops
         .iter()
-        .filter(|shop| shop["system"] == "pyro" && !shop["starmapObjectGuid"].is_null())
+        .filter(|shop| {
+            registry_text(shop, "/system/value") == Some("pyro")
+                && shop
+                    .pointer("/starmapObjectGuid/value")
+                    .is_some_and(|guid| !guid.is_null())
+        })
         .count();
     println!("== Pyro shops {pyro}, linked {pyro_linked}");
     let exchanges: Vec<&str> = shops
         .iter()
-        .filter(|shop| shop["commodityExchange"] == true)
-        .map(|shop| text(shop, "entityName"))
+        .filter(|shop| {
+            shop.pointer("/commodityExchange/value")
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
+        .map(|shop| registry_text(shop, "/entityName/value").unwrap_or("(none)"))
         .collect();
     println!("== commodity exchanges {}: {exchanges:?}", exchanges.len());
     println!(
@@ -204,7 +233,10 @@ fn report(archive: &Archive, built: &p4kx_export::BuiltCatalog, shops: &[Value])
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_shops_of_a_real_archive_have_a_kind_and_a_link() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let shops = catalog["shops"].as_array().ok_or("shops")?;
     report(&archive, &built, shops)?;
@@ -221,7 +253,7 @@ fn the_shops_of_a_real_archive_have_a_kind_and_a_link() -> TestResult {
     assert_eq!(summary.containers_unreadable, 0, "{summary:?}");
     let keys: Vec<&str> = shops
         .iter()
-        .filter_map(|shop| shop["key"].as_str())
+        .filter_map(|shop| registry_text(shop, "/key/value"))
         .collect();
     assert!(keys.is_sorted(), "ordered by key");
     assert_eq!(

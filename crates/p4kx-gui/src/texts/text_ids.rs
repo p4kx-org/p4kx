@@ -5,15 +5,15 @@ use super::{
     AboutText, ArchiveKeyText, AssemblyExportText, AudioText, CatalogText, ChangeExtractionText,
     CharacterText, ComparisonText, ContainerText, ContentSearchText, DataForgeText, DiffText,
     EntityText, ExtractionText, FolderConversionText, GroupText, ImageText, IncomingText,
-    LocalizationText, ModelExportText, ModelInfoText, ModelText, QueryText, RecordChangeText,
-    RecordExportText, RecordLanguageText, RecordText, RenameText, SchemaText, ScrollText,
-    SoundsText, TagsText, Text, UiText, XmlText,
+    LocalizationText, ModelExportText, ModelInfoText, ModelText, OutputTargetText, ProtectionText,
+    QueryText, RecordChangeText, RecordExportText, RecordLanguageText, RecordText, RenameText,
+    SchemaText, ScrollText, SoundsText, TagsText, Text, UiText, XmlText,
 };
 use crate::Language;
 
 impl Text {
     /// Every text outside the Extraction windows.
-    const BASE: [Self; 73] = [
+    const BASE: [Self; 75] = [
         Self::AppTitle,
         Self::MenuArchive,
         Self::ActionOpen,
@@ -24,6 +24,8 @@ impl Text {
         Self::RecentNone,
         Self::ChannelsHeading,
         Self::ChannelsNone,
+        Self::ChannelsDiscoveryIncomplete,
+        Self::ChannelsDiscoveryStopped,
         Self::SidebarShow,
         Self::SidebarHide,
         Self::MenuLanguage,
@@ -94,6 +96,8 @@ impl Text {
         Self::BASE
             .into_iter()
             .chain(ExtractionText::ALL.map(Self::Extraction))
+            .chain(ProtectionText::ALL.map(Self::Protection))
+            .chain(OutputTargetText::ALL.map(Self::OutputTarget))
             .chain(ComparisonText::ALL.map(Self::Comparison))
             .chain(DataForgeText::ALL.map(Self::DataForge))
             .chain(ChangeExtractionText::ALL.map(Self::ChangeExtraction))
@@ -144,6 +148,8 @@ impl Text {
             Self::RecentNone => "recent-none",
             Self::ChannelsHeading => "channels-heading",
             Self::ChannelsNone => "channels-none",
+            Self::ChannelsDiscoveryIncomplete => "channels-discovery-incomplete",
+            Self::ChannelsDiscoveryStopped => "channels-discovery-stopped",
             Self::SidebarShow => "sidebar-show",
             Self::SidebarHide => "sidebar-hide",
             Self::MenuLanguage => "menu-language",
@@ -208,6 +214,8 @@ impl Text {
             Self::PreviewKeyRequired => "preview-key-required",
             Self::PreviewKeyRejected => "preview-key-rejected",
             Self::Extraction(text) => text.id(),
+            Self::Protection(text) => text.id(),
+            Self::OutputTarget(text) => text.id(),
             Self::Comparison(text) => text.id(),
             Self::DataForge(text) => text.id(),
             Self::ChangeExtraction(text) => text.id(),

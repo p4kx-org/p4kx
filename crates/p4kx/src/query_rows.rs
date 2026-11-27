@@ -47,9 +47,14 @@ impl Counts {
 pub(crate) fn for_each_row(
     run: &QueryRun<'_, '_>,
     counts: &mut Counts,
+    mode: RowMode,
     mut write: impl FnMut(&Row<'_>, &[Option<Value<'_>>]) -> io::Result<()>,
 ) -> io::Result<()> {
-    for page in run.pages(QUERY_PAGE_SIZE) {
+    let pages = match mode {
+        RowMode::Raw => run.pages(QUERY_PAGE_SIZE),
+        RowMode::Observed => run.pages_observed(QUERY_PAGE_SIZE),
+    };
+    for page in pages {
         for row in &page {
             if let Ok(cells) = row.cells() {
                 write(row, cells)?;
@@ -64,6 +69,12 @@ pub(crate) fn for_each_row(
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum RowMode {
+    Raw,
+    Observed,
 }
 
 /// Reports on stderr that the values of `row`'s Record cannot be read; a report that cannot be

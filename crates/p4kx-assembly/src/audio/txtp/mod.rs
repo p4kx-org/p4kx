@@ -10,28 +10,36 @@
 //! file settles on the first child. Names in a TXTP are file names of the export folder, so they
 //! follow the portable rule of ADR-0248.
 
+mod approximation;
+mod diagnostic;
+mod loop_origin;
+mod origins;
+mod output;
 mod render;
+mod selection;
+mod skip_source;
 mod tree;
+mod wem_origin;
+mod write;
 
-use std::collections::HashMap;
+pub use self::approximation::TxtpApproximation;
+pub use self::origins::TxtpOrigins;
+pub use self::skip_source::{TxtpReportWithOrigins, TxtpSkipSource};
+
+use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{
-    ConflictPolicy, ConversionError, check_path_length, write_replacing_counted,
-};
+use p4kx_audio::Loop;
+use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken, ConflictPolicy};
 
-use self::render::{SoundFile, comment_text, render};
-use super::export::name::{StemSet, portable_stem};
-use super::{ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds};
-
-/// The extension of a TXTP file, without the dot.
-const EXTENSION: &str = "txtp";
-
-/// The stem of a TXTP whose event name is too long for a file name.
-const FALLBACK_STEM: &str = "event";
+use self::render::comment_text;
+use self::write::Destination;
+use super::export_preflight;
+use super::{ExportLoopOrigins, ExportReport, ExportState, TriggerSounds};
 
 /// A TXTP file of an export.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TxtpFile {
     /// The audio trigger the Wwise event belongs to.
     pub trigger: String,
@@ -46,6 +54,14 @@ pub struct TxtpFile {
     /// How many broken links the walk met in the event; above 0 the file is incomplete, as its
     /// header says, because the objects behind a broken link are not played.
     pub breaks: usize,
+    /// Approximation codes for written or byte-verified content, or `None` when unchecked.
+    pub approximations: Option<Vec<TxtpApproximation>>,
+    /// Loop frames of the rendered sound commands, in file-line order, when any loop exists.
+    pub command_loops: Option<Vec<Option<Loop>>>,
+    /// Field-addressed origin of the diagnosed and rendered values when reported.
+    pub origins: Option<TxtpOrigins>,
+    /// Companion path for a file committed by this export.
+    pub origin_receipt: Option<PathBuf>,
 }
 
 /// A Wwise event that got no TXTP.
@@ -99,11 +115,13 @@ impl TxtpReport {
 /// in [`TxtpReport::skipped`] with the reason. Objects the walk does not tell apart are combined
 /// as follows: an Event's actions, blend containers, music segments and music tracks as layers;
 /// sequence containers and music playlists as segments; random and switch containers and music
-/// switches as a choice. Music timing, transitions and container loop counts are not reproduced.
+/// switches as a choice. The report identifies observed timing, conditions, authored
+/// container loops, Blend curves and `MusicTrack` automation omitted by the generated commands.
 ///
 /// An event with broken links is written with a header comment that says it is incomplete, and
 /// [`TxtpFile::breaks`] counts them. A file that cannot be written, e.g. because its path is too
 /// long, is listed in [`TxtpReport::skipped`] with the error; the other events are still written.
+/// A traversal limit skips the export before writing and reports the blocking event.
 #[must_use]
 pub fn write_txtp(
     triggers: &[&TriggerSounds<'_>],
@@ -111,123 +129,155 @@ pub fn write_txtp(
     folder: &Path,
     policy: ConflictPolicy,
 ) -> TxtpReport {
-    let sounds: HashMap<(&str, u32), &ExportedSound> = exported
-        .sounds
-        .iter()
-        .map(|sound| ((sound.trigger.as_str(), sound.wem_id), sound))
-        .collect();
-    let mut report = TxtpReport::default();
-    let mut stems = StemSet::default();
-    for trigger in triggers {
-        let name = trigger.trigger().name();
-        for variants in trigger
-            .variants()
-            .chunk_by(|a, b| std::ptr::eq(a.event(), b.event()))
-        {
-            let Some(first) = variants.first() else {
-                continue;
-            };
-            let event = first.event();
-            let breaks = trigger
-                .breaks()
-                .iter()
-                .filter(|broken| std::ptr::eq(broken.event(), event))
-                .count();
-            let files = files_of(name, variants, &sounds);
-            let written =
-                event_text(name, event.name(), variants, &files, breaks).and_then(|text| {
-                    let path = folder.join(format!(
-                        "{}.{EXTENSION}",
-                        stems.unique(&portable_stem(event.name(), FALLBACK_STEM))
-                    ));
-                    write_file(&path, &text, policy).map(|(size, state)| (path, size, state))
-                });
-            match written {
-                Ok((path, size, state)) => report.files.push(TxtpFile {
-                    trigger: name.to_owned(),
-                    event: event.name().to_owned(),
-                    path,
-                    size,
-                    state,
-                    breaks,
-                }),
-                Err(reason) => report.skipped.push(TxtpSkip {
-                    trigger: name.to_owned(),
-                    event: comment_text(event.name()),
-                    reason,
-                }),
-            }
-        }
+    if let Some(cut) = export_preflight::traversal_cut(triggers) {
+        return TxtpReport {
+            files: Vec::new(),
+            skipped: vec![TxtpSkip {
+                trigger: cut.trigger.to_owned(),
+                event: comment_text(cut.event),
+                reason: format!("audio resolution incomplete ({})", cut.reason),
+            }],
+        };
     }
-    report
+    write::files(
+        triggers,
+        exported,
+        &Destination {
+            folder,
+            policy,
+            origins: None,
+        },
+        |_| {},
+    )
 }
 
-/// Returns the TXTP text of one event, or why it cannot be written.
-fn event_text(
-    trigger: &str,
-    event: &str,
-    variants: &[SoundVariant<'_>],
-    files: &HashMap<u32, SoundFile<'_>>,
-    breaks: usize,
-) -> Result<String, String> {
-    let tree = tree::build(variants).ok_or_else(|| "the event has no object path".to_owned())?;
-    let mut header = vec![format!("P4KX: event {event} of trigger {trigger}")];
-    if breaks > 0 {
-        header.push(format!(
-            "incomplete: {breaks} broken links; the objects behind them are not played here"
-        ));
-    }
-    render(&tree, &header, files)
-}
-
-/// Returns the usable files of the WEMs the variants play: those written whole.
-fn files_of<'a>(
-    trigger: &str,
-    variants: &[SoundVariant<'_>],
-    sounds: &HashMap<(&str, u32), &'a ExportedSound>,
-) -> HashMap<u32, SoundFile<'a>> {
-    variants
-        .iter()
-        .filter_map(SoundVariant::wem_id)
-        .filter_map(|wem_id| {
-            let sound = sounds.get(&(trigger, wem_id))?;
-            let name = sound.path.file_name()?.to_str()?;
-            Some((
-                wem_id,
-                SoundFile {
-                    name,
-                    loop_points: sound.loop_points,
-                    prefetch_only: sound.prefetch_only,
-                },
-            ))
-        })
-        .collect()
-}
-
-fn write_file(
-    path: &Path,
-    text: &str,
+/// Writes TXTP and binds its field-origin companion to each newly published file.
+///
+/// Pass triggers resolved with physical path sources from the same archive.
+///
+/// # Errors
+/// Returns an error when resolution was truncated, the archive changed or write protection fails.
+#[must_use = "the report carries the write outcomes"]
+pub fn write_txtp_with_origins(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
     policy: ConflictPolicy,
-) -> Result<(u64, ExportState), String> {
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    check_path_length(&absolute).map_err(|limit| limit.to_string())?;
-    if policy == ConflictPolicy::Skip
-        && let Ok(existing) = std::fs::symlink_metadata(path)
-    {
-        return Ok((existing.len(), ExportState::Kept));
-    }
-    let replaced = write_replacing_counted(path, policy == ConflictPolicy::IfChanged, |out| {
-        out.write_all(text.as_bytes())
-            .map_err(|source| ConversionError::Write {
-                path: path.to_path_buf(),
-                source,
-            })
+    cancel: &CancelToken,
+) -> io::Result<TxtpReport> {
+    write_with_evidence(
+        archive,
+        triggers,
+        exported,
+        folder,
+        policy,
+        cancel,
+        ReportCapture::default(),
+    )
+}
+
+/// Writes TXTP origins using loop evidence from the same sound export.
+///
+/// # Errors
+/// Returns the same output errors as [`write_txtp_with_origins`].
+pub fn write_txtp_with_loop_origins(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+    loop_origins: &ExportLoopOrigins,
+) -> io::Result<TxtpReport> {
+    write_with_evidence(
+        archive,
+        triggers,
+        exported,
+        folder,
+        policy,
+        cancel,
+        ReportCapture {
+            loops: Some(loop_origins),
+            skips: None,
+        },
+    )
+}
+
+/// Writes TXTP and retains the physical input positions of the skipped events.
+///
+/// # Errors
+/// Returns the same output errors as [`write_txtp_with_loop_origins`].
+#[must_use = "the report carries the write outcomes"]
+pub fn write_txtp_with_report_origins(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+    loop_origins: &ExportLoopOrigins,
+) -> io::Result<TxtpReportWithOrigins> {
+    let mut skipped_sources = Vec::new();
+    let report = write_with_evidence(
+        archive,
+        triggers,
+        exported,
+        folder,
+        policy,
+        cancel,
+        ReportCapture {
+            loops: Some(loop_origins),
+            skips: Some(&mut skipped_sources),
+        },
+    )?;
+    Ok(TxtpReportWithOrigins {
+        report,
+        skipped_sources,
     })
-    .map_err(|error| error.to_string())?;
-    let state = if replaced.changed {
-        ExportState::Written
-    } else {
-        ExportState::Kept
+}
+
+#[derive(Default)]
+struct ReportCapture<'a> {
+    loops: Option<&'a ExportLoopOrigins>,
+    skips: Option<&'a mut Vec<TxtpSkipSource>>,
+}
+
+fn write_with_evidence(
+    archive: &Archive,
+    triggers: &[&TriggerSounds<'_>],
+    exported: &ExportReport,
+    folder: &Path,
+    policy: ConflictPolicy,
+    cancel: &CancelToken,
+    mut capture: ReportCapture<'_>,
+) -> io::Result<TxtpReport> {
+    if let Some(cut) = export_preflight::traversal_cut(triggers) {
+        return Err(io::Error::other(cut.into_error()));
+    }
+    ArchiveWatch::new(archive)
+        .check()
+        .map_err(io::Error::other)?;
+    let protection =
+        ArchiveWriteProtection::new(archive.path(), cancel.flag()).map_err(io::Error::other)?;
+    let origins = output::OriginContext {
+        archive,
+        protection: &protection,
+        cancel,
+        loop_origins: capture.loops,
     };
-    Ok((replaced.len, state))
+    Ok(write::files(
+        triggers,
+        exported,
+        &Destination {
+            folder,
+            policy,
+            origins: Some(origins),
+        },
+        |source| {
+            if let Some(skips) = &mut capture.skips {
+                skips.push(source);
+            }
+        },
+    ))
 }

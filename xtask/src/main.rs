@@ -3,7 +3,7 @@
 
 //! Repository checks run by CI: `cargo xtask layers`, `cargo xtask lints`,
 //! `cargo xtask file-size`, `cargo xtask changelog`, `cargo xtask keys`, `cargo xtask spdx`,
-//! `cargo xtask addon` (the Blender add-on manifest version equals the workspace version),
+//! `cargo xtask toolchain` (exact compiler/test-runner pins), `cargo xtask addon` (the Blender add-on manifest version equals the workspace version),
 //! `cargo xtask licences` (`LICENSE-MIT.md` and `LICENSE-APACHE.md` hold the words of the plain
 //! licence files), or all of them with `cargo xtask`.
 //!
@@ -29,6 +29,7 @@ mod lints;
 mod metadata;
 mod notices;
 mod spdx;
+mod toolchain;
 
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -59,6 +60,7 @@ fn run() -> Result<Vec<String>> {
         Some("addon") => addon::check(&root),
         Some("layers") => layers::check(&root),
         Some("lints") => lints::check(&root),
+        Some("toolchain") => toolchain::check(&root),
         Some("file-size") => file_size::check(&root),
         Some("changelog") => {
             let mut args = std::env::args().skip(2);
@@ -102,7 +104,7 @@ fn run() -> Result<Vec<String>> {
             Ok(Vec::new())
         }
         Some(other) => bail!(
-            "unknown check `{other}`; use `layers`, `lints`, `file-size`, `changelog`, `keys`, `spdx`, `addon`, `licences`, `notices` or `release-notes`"
+            "unknown check `{other}`; use `layers`, `lints`, `toolchain`, `file-size`, `changelog`, `keys`, `spdx`, `addon`, `licences`, `notices` or `release-notes`"
         ),
     }
 }
@@ -110,6 +112,7 @@ fn run() -> Result<Vec<String>> {
 fn check_all(root: &Path) -> Result<Vec<String>> {
     let mut violations = layers::check(root)?;
     violations.extend(lints::check(root)?);
+    violations.extend(toolchain::check(root)?);
     violations.extend(file_size::check(root)?);
     violations.extend(changelog::check(root)?);
     violations.extend(keys::check(root)?);

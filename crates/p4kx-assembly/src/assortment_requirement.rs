@@ -4,6 +4,8 @@
 //! The `Requirement` of a loadout assortment or of one of its groups: decided where the Archive
 //! decides it.
 
+use std::slice::Iter;
+
 use p4kx_dataforge::{StructValue, Value};
 
 use crate::read::has_items;
@@ -11,9 +13,6 @@ use crate::read::has_items;
 const TAGS: &str = "SLoadoutRequirementTags";
 const ANY_OF: &str = "SLoadoutRequirementOR";
 const INVERT: &str = "SLoadoutRequirementNOT";
-
-/// Requirements nested deeper than this are undecided, so the recursion is bounded.
-const MAX_DEPTH: usize = 16;
 
 /// What the Archive says about a Requirement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,52 +44,111 @@ impl Verdict {
 pub(crate) fn evaluate(requirement: Option<&Value<'_>>) -> Verdict {
     match requirement {
         None | Some(Value::Null) => Verdict::Met,
-        Some(value) => evaluate_value(value, 0),
+        Some(value) => evaluate_value(value),
     }
 }
 
-fn evaluate_value(value: &Value<'_>, depth: usize) -> Verdict {
-    match value {
-        Value::Struct(structure) if depth < MAX_DEPTH => evaluate_struct(structure, depth),
-        _ => Verdict::Undecided,
+enum Frame<'value, 'source> {
+    Invert,
+    AnyOf {
+        remaining: Iter<'value, Value<'source>>,
+        verdict: Verdict,
+    },
+}
+
+enum Step<'value, 'source> {
+    Visit(&'value Value<'source>),
+    Complete(Verdict),
+}
+
+fn evaluate_value(value: &Value<'_>) -> Verdict {
+    let mut frames = Vec::new();
+    let mut current = value;
+    loop {
+        match descend(current, &mut frames) {
+            Step::Visit(next) => current = next,
+            Step::Complete(verdict) => match resume(verdict, &mut frames) {
+                Step::Visit(next) => current = next,
+                Step::Complete(verdict) => return verdict,
+            },
+        }
     }
 }
 
-fn evaluate_struct(structure: &StructValue<'_>, depth: usize) -> Verdict {
+fn descend<'value, 'source>(
+    value: &'value Value<'source>,
+    frames: &mut Vec<Frame<'value, 'source>>,
+) -> Step<'value, 'source> {
+    let Value::Struct(structure) = value else {
+        return Step::Complete(Verdict::Undecided);
+    };
     match structure.type_name() {
-        TAGS => {
+        TAGS => Step::Complete(
             if has_items(structure, "RequiredTags") || has_items(structure, "BannedTags") {
                 Verdict::Undecided
             } else {
                 Verdict::Met
-            }
-        }
-        ANY_OF => any_of(structure, depth),
-        INVERT => structure
-            .field("RequirementToInvert")
-            .map_or(Verdict::Undecided, |inner| {
-                evaluate_value(inner, depth + 1).not()
-            }),
-        _ => Verdict::Undecided,
+            },
+        ),
+        ANY_OF => any_of(structure, frames),
+        INVERT => structure.field("RequirementToInvert").map_or(
+            Step::Complete(Verdict::Undecided),
+            |inner| {
+                frames.push(Frame::Invert);
+                Step::Visit(inner)
+            },
+        ),
+        _ => Step::Complete(Verdict::Undecided),
     }
 }
 
-fn any_of(structure: &StructValue<'_>, depth: usize) -> Verdict {
+fn any_of<'value, 'source>(
+    structure: &'value StructValue<'source>,
+    frames: &mut Vec<Frame<'value, 'source>>,
+) -> Step<'value, 'source> {
     let Some(Value::Array(parts)) = structure.field("Requirements") else {
-        return Verdict::Undecided;
+        return Step::Complete(Verdict::Undecided);
     };
-    if parts.is_empty() {
-        return Verdict::Undecided;
-    }
-    let mut verdict = Verdict::Unmet;
-    for part in parts {
-        match evaluate_value(part, depth + 1) {
-            Verdict::Met => return Verdict::Met,
-            Verdict::Undecided => verdict = Verdict::Undecided,
-            Verdict::Unmet => {}
+    let mut remaining = parts.iter();
+    let Some(first) = remaining.next() else {
+        return Step::Complete(Verdict::Undecided);
+    };
+    frames.push(Frame::AnyOf {
+        remaining,
+        verdict: Verdict::Unmet,
+    });
+    Step::Visit(first)
+}
+
+fn resume<'value, 'source>(
+    mut verdict: Verdict,
+    frames: &mut Vec<Frame<'value, 'source>>,
+) -> Step<'value, 'source> {
+    while let Some(frame) = frames.pop() {
+        match frame {
+            Frame::Invert => verdict = verdict.not(),
+            Frame::AnyOf {
+                mut remaining,
+                verdict: mut combined,
+            } => {
+                if verdict == Verdict::Met {
+                    continue;
+                }
+                if verdict == Verdict::Undecided {
+                    combined = Verdict::Undecided;
+                }
+                if let Some(next) = remaining.next() {
+                    frames.push(Frame::AnyOf {
+                        remaining,
+                        verdict: combined,
+                    });
+                    return Step::Visit(next);
+                }
+                verdict = combined;
+            }
         }
     }
-    verdict
+    Step::Complete(verdict)
 }
 
 #[cfg(test)]
@@ -102,7 +160,7 @@ mod tests {
         DataForgeBuilder, TestInstance, TestRecord, TestRequirement, TestValue, entity_schema,
     };
 
-    use super::{MAX_DEPTH, Verdict, evaluate};
+    use super::{Verdict, evaluate};
 
     type TestResult = Result<(), Box<dyn Error>>;
 
@@ -173,15 +231,15 @@ mod tests {
     }
 
     #[test]
-    fn nesting_beyond_the_limit_is_undecided() -> TestResult {
+    fn nested_not_preserves_its_decidable_parity() -> TestResult {
         let nest = |depth: usize| {
             (0..depth).fold(TestRequirement::unrestricted(), |part, _| {
                 TestRequirement::Not(Box::new(part))
             })
         };
-        let within = MAX_DEPTH - 1;
-        assert_ne!(verdict_of(nest(within).value())?, Verdict::Undecided);
-        assert_eq!(verdict_of(nest(MAX_DEPTH + 1).value())?, Verdict::Undecided);
+        assert_ne!(verdict_of(nest(15).value())?, Verdict::Undecided);
+        assert_eq!(verdict_of(nest(17).value())?, Verdict::Unmet);
+        assert_eq!(verdict_of(nest(18).value())?, Verdict::Met);
         Ok(())
     }
 }

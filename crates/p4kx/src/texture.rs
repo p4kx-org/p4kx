@@ -5,12 +5,16 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::Result;
-use p4kx_extraction::{ConversionError, CubemapLayout, Texture, TextureError};
+use p4kx_extraction::{
+    ConversionError, CubemapLayout, DdsSourceInfo, FieldOrigins, SourceInventory, Texture,
+    TextureError,
+};
 use serde::Serialize;
 
 use crate::cli::{TextureAction, TextureArgs, TextureSource};
 use crate::json;
 use crate::texture_image::{ImageOptions, export_image};
+use crate::texture_info_origin;
 
 const UNKNOWN: &str = "unknown";
 const NONE: &str = "none";
@@ -28,6 +32,9 @@ struct InfoJson<'a> {
     cubemap: bool,
     parts: Option<u32>,
     alpha_tail: Option<AlphaTailJson>,
+    source_metadata: DdsSourceInfo,
+    #[serde(flatten)]
+    origins: Option<texture_info_origin::Origins>,
 }
 
 #[derive(Serialize)]
@@ -35,20 +42,24 @@ struct AlphaTailJson {
     format: Option<String>,
     parts: Option<u32>,
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source_metadata: Option<DdsSourceInfo>,
 }
 
 impl AlphaTailJson {
-    fn of(tail: Result<Texture<'_>, ConversionError>) -> Self {
+    fn of(tail: &Result<Texture<'_>, ConversionError>) -> Self {
         match tail {
             Ok(tail) => Self {
                 format: Some(tail.header().format().to_string()),
                 parts: tail.part_count().ok(),
                 error: None,
+                source_metadata: Some(tail.source_metadata()),
             },
             Err(error) => Self {
                 format: None,
                 parts: None,
-                error: Some(error_chain(&error)),
+                error: Some(error_chain(error)),
+                source_metadata: None,
             },
         }
     }
@@ -79,6 +90,9 @@ struct MergeJson<'a> {
     output: String,
     parts: u32,
     size: u64,
+    origin_receipt: String,
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 /// Runs `p4kx texture info`, `merge` or `png`.
@@ -126,6 +140,21 @@ fn with_texture(
 
 fn info(texture: &Texture<'_>, as_json: bool) -> Result<()> {
     let header = texture.header();
+    let source_metadata = texture.source_metadata();
+    let tail = texture.alpha_tail();
+    let alpha_tail = tail.as_ref().map(AlphaTailJson::of);
+    let origins = if as_json {
+        Some(texture_info_origin::capture(
+            texture,
+            &source_metadata,
+            tail.as_ref(),
+            alpha_tail
+                .as_ref()
+                .and_then(|tail| tail.source_metadata.as_ref()),
+        )?)
+    } else {
+        None
+    };
     let info = InfoJson {
         texture: texture.name(),
         format: header.format().to_string(),
@@ -137,7 +166,9 @@ fn info(texture: &Texture<'_>, as_json: bool) -> Result<()> {
         faces: header.faces(),
         cubemap: header.is_cubemap(),
         parts: texture.part_count().ok(),
-        alpha_tail: texture.alpha_tail().map(AlphaTailJson::of),
+        alpha_tail,
+        source_metadata,
+        origins,
     };
     if as_json {
         json::print(&info)?;
@@ -167,13 +198,16 @@ fn info(texture: &Texture<'_>, as_json: bool) -> Result<()> {
 }
 
 fn merge(texture: &Texture<'_>, out: &Path, as_json: bool) -> Result<()> {
-    let report = texture.merge_to_file(out)?;
+    let (report, origins) = texture.merge_to_file_with_origins(out)?;
     if as_json {
         json::print(&MergeJson {
             texture: texture.name(),
             output: json::path(out),
             parts: report.parts,
             size: report.size,
+            origin_receipt: json::path(&origins.receipt),
+            field_origins: origins.fields,
+            provenance: origins.inventory,
         })?;
     } else {
         writeln!(

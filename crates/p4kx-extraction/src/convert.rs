@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 
 use p4kx_archive::Checksum;
 use p4kx_cryxml::{self as cryxml, Format};
 
-use crate::ExtractionError;
 use crate::buffers::Buffers;
-use crate::source::SourceEntry;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::source::{SourceEntry, SourceReader};
+use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
+use crate::{ExtractionError, InputScope, SourceInput, SourceUses, XmlReceipt};
 
 /// The number of bytes read from the start of an Entry to recognise `CryXml`.
 pub(crate) const PEEK_LEN: usize = 16;
@@ -56,7 +56,7 @@ impl EntryWriter<'_> {
     pub(crate) fn convert(
         &self,
         entry: &SourceEntry<'_>,
-        reader: &mut impl Read,
+        reader: &mut SourceReader<'_>,
         start: &[u8],
         buffers: &mut Buffers,
         destination: &Destination,
@@ -83,9 +83,19 @@ impl EntryWriter<'_> {
         let document = cryxml::parse(data).map_err(ExtractionError::Convert)?;
         let xml = &mut buffers.output;
         xml.clear();
-        document
-            .write_xml(&mut *xml)
-            .map_err(|source| write_error(destination.file.clone(), source))?;
+        let file = reader.file_origin();
+        let input = entry
+            .observed_entry()
+            .map(SourceInput::ArchiveView)
+            .or_else(|| file.as_ref().map(SourceInput::File))
+            .unwrap_or(SourceInput::Unknown);
+        let complete = !matches!(input, SourceInput::Unknown);
+        let uses = SourceUses::new();
+        let scope = uses
+            .observe(input, InputScope::Payload)
+            .map_err(|error| write_error(destination.file.clone(), io::Error::other(error)))?;
+        let evidence = XmlReceipt::document(&document, &mut *xml, (&uses, &scope), complete, None)
+            .map_err(|error| write_error(destination.file.clone(), error))?;
         let expected = || (xml.len() as u64, Checksum::Crc32c(crc32c::crc32c(xml)));
         if let Some(outcome) = self.decide(destination, expected, &mut buffers.chunk)? {
             return Ok(outcome);
@@ -93,13 +103,7 @@ impl EntryWriter<'_> {
         if self.tracker.should_stop() {
             return Ok(Outcome::Cancelled);
         }
-        let (temporary, mut file) = create_temporary(&destination.folder)?;
-        let copied = file
-            .write_all(xml)
-            .map(|()| Chunk::End)
-            .map_err(|source| write_error(destination.file.clone(), source));
-        drop(file);
-        self.put_in_place(&temporary, &destination.file, copied, Outcome::Converted)
+        self.write_observed_cryxml(entry, destination, xml, &evidence)
     }
 
     /// Appends the Entry data after what `data` holds until the end, reading straight into

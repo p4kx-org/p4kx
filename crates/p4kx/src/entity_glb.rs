@@ -10,8 +10,8 @@ use p4kx_assembly::{
     ForgePalettes, LoadoutResolver, creature_animations,
 };
 use p4kx_extraction::{
-    ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode, is_same_file,
-    write_replacing,
+    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeEntry, FileReceipt,
+    GlbMeshOrigins, GlbOptions, GlbSummary, GltfError, MaterialMode, TextureLoader, is_same_file,
 };
 use thiserror::Error;
 
@@ -33,10 +33,15 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     }
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&entry)
+        .with_files(&files)
+        .with_vehicle_appearance();
     if !args.expand_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }
@@ -46,11 +51,11 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     let tree = applied.node();
     let models = ArchiveModels::new(&archive);
     let options = AssemblyOptions::default().with_lod(args.lod);
-    let palettes = ForgePalettes::new(&forge);
+    let palettes = ForgePalettes::new(&forge).with_entry(&entry);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
     crate::entity_root::check(&assembly)?;
     let assembly = if args.interior {
-        crate::interior_forge::with_interior(assembly, (&archive, &forge), tree, args.lod)?
+        crate::interior_forge::with_interior(assembly, (&archive, &entry, &forge), tree, args.lod)?
     } else {
         assembly
     };
@@ -60,7 +65,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
         CreatureClips::default()
     };
     let animated = assembly.animate(&found.set.animations);
-    let summary = write(&assembly, &animated, &models, args)?;
+    let summary = write(&assembly, &animated, &models, args, &protection, &cancel)?;
     if as_json {
         return GlbReport {
             archive: archive.path(),
@@ -72,7 +77,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
             changes: &changes,
             animations: (&found, &animated),
         }
-        .print();
+        .print(&forge, &record, entry.origin());
     }
     let printed = print_report(&assembly, &summary, &args.out, tree, &changes)
         .and_then(|()| print_animations(&summary, &found, &animated));
@@ -87,6 +92,8 @@ fn write(
     animated: &CreatureAnimations<'_>,
     models: &ArchiveModels<'_>,
     args: &EntityGlbArgs,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
 ) -> Result<GlbSummary> {
     let mode = match args.materials {
         EntityMaterialsArg::Colours => MaterialMode::Colours,
@@ -104,15 +111,58 @@ fn write(
         .map_or_else(String::new, |root| root.class_name().to_owned());
     let out: &Path = &args.out;
     let textures = models.textures();
-    Ok(write_replacing(out, |writer| {
-        assembly
-            .write_glb_animated_with(animated, &options, &textures, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: out.to_path_buf(),
-                    source,
-                },
-                source => ConversionError::Glb { file: name, source },
-            })
-    })?)
+    publish_mesh_origins(
+        assembly,
+        animated,
+        &options,
+        &textures,
+        out,
+        name,
+        (protection, cancel),
+    )
+}
+
+fn publish_mesh_origins(
+    assembly: &Assembly,
+    animated: &CreatureAnimations<'_>,
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &Path,
+    name: String,
+    (protection, cancel): (&ArchiveWriteProtection, &CancelToken),
+) -> Result<GlbSummary> {
+    let write_error = |source| ConversionError::Write {
+        path: out.to_path_buf(),
+        source,
+    };
+    let mut origins = GlbMeshOrigins::new();
+    let paint = assembly.observe_glb_paint(&mut origins)?;
+    let receipt = if paint.is_some() {
+        FileReceipt::new_with_cancel(out, Some(protection), Some(protection), cancel.clone())?
+    } else {
+        FileReceipt::for_staged_replacement(out, Some(protection), cancel.clone())
+            .map_err(write_error)?
+    };
+    let (summary, _) = receipt
+        .publish(
+            |mut writer| {
+                let summary = assembly
+                    .write_glb_animated_with_mesh_origins(
+                        animated,
+                        options,
+                        textures,
+                        &mut writer,
+                        paint.as_ref(),
+                        &mut origins,
+                    )
+                    .map_err(io::Error::other)?;
+                Ok((summary, origins.finish()?))
+            },
+            |writer, binding, (_, origins)| origins.write_companion(writer, binding),
+        )
+        .map_err(|error| match error.downcast::<GltfError>() {
+            Ok(GltfError::Write(source)) | Err(source) => write_error(source),
+            Ok(source) => ConversionError::Glb { file: name, source },
+        })?;
+    Ok(summary)
 }

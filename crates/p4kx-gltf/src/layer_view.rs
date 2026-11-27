@@ -7,7 +7,9 @@ use rayon::prelude::*;
 use crate::layer_jobs::layer_job;
 use crate::layer_make::bake_base;
 use crate::layer_plan::diffuse_layers;
-use crate::texture_cache::{MAX_DECODE_PIXELS, MAX_HELD_PIXELS, SourceStore, paths};
+use crate::texture_cache::{
+    MAX_DECODE_PIXELS, MAX_HELD_PIXELS, PreparedTextureJob, SourceStore, paths,
+};
 use crate::texture_loader::{LoadedTexture, TextureLoader};
 use crate::texture_pixels::Tints;
 use crate::texture_plan::Job;
@@ -49,8 +51,8 @@ pub fn layered_base_texture(
 /// Blends the base colour image of each of the layered `materials` at mip `mip`, with `loader`;
 /// the result has one entry per material.
 ///
-/// An image is made of the diffuse maps of the layers and the blend map; the material's colours
-/// are in it, so a viewer draws it without a factor. The images are made a few at a time: the
+/// An image uses the layers' diffuse and selected specular maps and the blend map. Its colours
+/// are baked in, so a viewer draws it without a factor. The images are made a few at a time: the
 /// distinct textures of those are decoded once, in parallel and without waiting on one another,
 /// and those the next ones need stay in memory up to a pixel cap, so the memory held stays within
 /// the decode limit of 2^27 pixels plus that cap, however many materials are asked for. An entry
@@ -70,20 +72,25 @@ pub fn layered_base_textures(
         .filter_map(|(at, material)| Some((at, job_of(material)?)))
         .unzip();
     let mut store = SourceStore::new(loader, mip, MAX_HELD_PIXELS);
+    let jobs: Vec<_> = jobs
+        .iter()
+        .map(|job| store.admit_layer_specular(job))
+        .collect();
     let mut done = 0;
     while let Some(rest) = jobs.get(done..).filter(|rest| !rest.is_empty()) {
-        let (chunk, after) = rest.split_at(store.group_len(rest, PARALLEL_IMAGES).max(1));
+        let wave = store.group_len(rest.iter().map(PreparedTextureJob::job), PARALLEL_IMAGES);
+        let (chunk, after) = rest.split_at(wave.max(1));
         let next = after.get(..PARALLEL_IMAGES).unwrap_or(after);
         let fits: Vec<bool> = chunk
             .iter()
-            .map(|job| store.header_pixels(paths(job)) <= MAX_DECODE_PIXELS)
+            .map(|job| store.header_pixels(paths(job.job())) <= MAX_DECODE_PIXELS)
             .collect();
         let decoded = store.prepare(
             chunk
                 .iter()
                 .zip(&fits)
                 .filter(|(_, fits)| **fits)
-                .map(|(job, _)| job),
+                .map(|(job, _)| job.job()),
         );
         let made: Vec<Option<LoadedTexture>> = chunk
             .par_iter()
@@ -92,11 +99,11 @@ pub fn layered_base_textures(
                 if !*fits {
                     return None;
                 }
-                let image = bake_base(job, &decoded, &mut Vec::new())?.ok()?;
+                let image = bake_base(job.job(), &decoded, &mut Vec::new())?.ok()?.image;
                 Some(LoadedTexture::new(image, false))
             })
             .collect();
-        store.keep(decoded, next);
+        store.keep(decoded, next.iter().map(PreparedTextureJob::job));
         for (offset, texture) in made.into_iter().enumerate() {
             if let Some(slot) = positions
                 .get(done + offset)

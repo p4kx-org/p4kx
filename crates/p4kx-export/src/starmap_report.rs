@@ -5,13 +5,16 @@ use std::sync::Arc;
 
 use p4kx_extraction::Guid;
 
+use crate::starmap_containers::proof::PlacementProof;
+
 /// Where one Starmap Record is placed: the first Child element that names it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub(crate) struct Placement {
     pub(crate) system: Arc<str>,
     pub(crate) position: [f64; 3],
     pub(crate) entity_name: String,
     pub(crate) placed_under: Option<Guid>,
+    pub(crate) proof: PlacementProof,
 }
 
 /// What reading the system containers found, besides the placements.
@@ -20,6 +23,7 @@ pub(crate) struct ContainerCounts {
     pub(crate) systems: usize,
     pub(crate) unreadable: usize,
     pub(crate) missing: usize,
+    pub(crate) verified_missing: usize,
     pub(crate) malformed: usize,
     pub(crate) ambiguous: usize,
 }
@@ -47,9 +51,8 @@ impl StarmapReport {
     }
 
     /// One line per container, placement or limit that left objects without a position, with
-    /// the reason, up to 300 per star system; also the containers read from a fallback XML and
-    /// the elements with a second child list. A missing or unreadable container is counted once
-    /// per Child that names it, not once per distinct container.
+    /// the reason, up to 300 per star system, and the containers read from a fallback XML.
+    /// A missing or unreadable container is counted once per Child that names it.
     #[must_use]
     pub fn issues(&self) -> &[String] {
         &self.issues
@@ -68,8 +71,7 @@ impl StarmapReport {
         &self.unreferenced
     }
 
-    /// The longest chain of external containers the walk followed, counted from the system
-    /// container (0); the limit is 32.
+    /// The longest chain of external containers the walk followed, counting the system container as zero.
     #[must_use]
     pub const fn deepest_external(&self) -> usize {
         self.deepest_external

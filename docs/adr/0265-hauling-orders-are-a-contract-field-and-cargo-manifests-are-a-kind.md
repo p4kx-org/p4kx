@@ -48,6 +48,13 @@ field statistics of the hauling types.
   therefore standalone; a consumer reaches it through the ship encounters.
 - **Additive.** Schema version 2 keeps its number: the kind and the field are additions.
 
+## Catalog v3
+
+`definitions.cargoManifests` carries the physical definitions, sourced values and ordered original
+fill and spawn inputs. The Kind remains `cargoManifests`. Original tag and description text
+and keys in the authored values use the protected game-text domain. See the
+[cargo-manifest field map](../catalog.md#cargo-manifests).
+
 ## Consequences
 
 - The contract reader gains one small module for the orders (`mission_hauling.rs`); the entry has

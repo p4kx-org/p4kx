@@ -13,11 +13,16 @@ mod backends;
 mod browser;
 mod catalog_export;
 mod channel_list;
+mod channel_refresh;
 mod characters;
 mod checks;
 mod comparison;
 mod containers;
 mod content_search;
+mod dataforge_summary_provenance;
+mod dialog;
+#[cfg(test)]
+mod discovery_test_support;
 #[cfg(windows)]
 pub mod dwm;
 mod entities;
@@ -37,7 +42,10 @@ mod mismatch;
 mod model;
 mod model_export;
 mod model_info;
+mod output_target;
+mod prerequisite_notice;
 mod preview;
+mod protected_open;
 mod public_patches;
 mod query;
 mod read_gate;
@@ -75,8 +83,8 @@ pub use audio::{
 };
 pub use browser::{Browser, EntryRow, EntryRowKind, HitLine, TreeNode, TreeRow};
 pub use catalog_export::{
-    CATALOG_FILE, CatalogExport, CatalogExportProgress, CatalogExportStage, CatalogExportStatus,
-    CatalogExportSummary,
+    CATALOG_FILE, CatalogExport, CatalogExportOptions, CatalogExportProgress, CatalogExportStage,
+    CatalogExportStatus, CatalogExportSummary, DIAGNOSTIC_CATALOG_FILE,
 };
 pub use channel_list::ChannelList;
 pub use characters::{
@@ -96,6 +104,9 @@ pub use containers::{
     ContainerFailure, ContainerId, ContainerStatus, OPEN_CONTAINERS_BUDGET, Place,
 };
 pub use content_search::{ContentResult, ContentSearchStatus, ContentSearchTab};
+pub use dataforge_summary_provenance::{
+    DataForgeSummaryProvenance, DataForgeSummaryRecordProvenance,
+};
 pub use entities::{AssemblyView, VIEW_LOD, ViewFailure, ViewProgress, ViewStage};
 pub use entities::{
     EntitiesStatus, EntitiesTab, EntityFilter, EntityList, EntityRole, EntityRow, LoadoutRow,
@@ -127,20 +138,24 @@ pub use p4kx_export::RecordForm;
 pub use p4kx_extraction::Language as TextLanguage;
 pub use p4kx_extraction::{ArchiveKey, Folder, FolderId};
 pub use p4kx_update::{Release, ReleaseCheck};
+pub use prerequisite_notice::PrerequisiteNotice;
 pub use preview::{
-    AudioPreview, AudioStatus, BankSound, ImagePreview, ImageStatus, MAX_PREVIEW_PIXELS, MipStatus,
-    PREVIEW_READ_LIMIT, PREVIEW_SIZE_LIMIT, Preview, PreviewContents, PreviewStatus, PreviewTab,
-    SoundInfo, SoundStatus, SoundbankPreview, SoundbankStatus, TextureInfo, XML_SIZE_LIMIT,
-    XML_TEXT_LIMIT, XmlDocument, XmlPreview, XmlStatus, is_bank_path, is_wem_path,
+    AudioPreview, AudioStatus, BankSound, BankSoundIdentityProvenance, BankSoundProvenance,
+    EntryPreviewProvenance, ImageHeaderProvenance, ImageMipProvenance, ImagePreview, ImageStatus,
+    MAX_PREVIEW_PIXELS, MipStatus, PREVIEW_READ_LIMIT, PREVIEW_SIZE_LIMIT, Preview,
+    PreviewContents, PreviewStatus, PreviewTab, SoundInfo, SoundStatus, SoundbankPreview,
+    SoundbankStatus, SoundbankSummaryProvenance, TextureInfo, WemHeaderEvidenceError,
+    WemHeaderProvenance, XML_SIZE_LIMIT, XML_TEXT_LIMIT, XmlDocument, XmlPreview,
+    XmlPreviewOriginError, XmlStatus, is_bank_path, is_wem_path,
 };
 pub use query::{
     CellLook, NameNote, QUERY_PAGE_ROWS, QueryExportFormat, QueryExportStatus, QueryInvalid,
     QueryResult, QueryStage, QueryStatus, QueryTab, ResultColumn, SavedDialog,
 };
 pub use record_export::{
-    FailedRecord, RECORD_FORMS, RecordExport, RecordExportProgress, RecordExportSetup,
-    RecordExportStage, RecordExportStatus, RecordExportSummary, RecordScope, RenamedRecord,
-    TreeSelection, form_annotates_tags,
+    FailedRecord, RECORD_FORMS, RecordExport, RecordExportProgress, RecordExportProvenance,
+    RecordExportSetup, RecordExportStage, RecordExportStatus, RecordExportSummary, RecordScope,
+    RenamedRecord, TreeSelection, form_annotates_tags,
 };
 pub use record_index::{
     DataForgeSummary, RecordId, RecordInfo, RecordNodeId, RecordNodeKind, SUMMARY_RECORDS,
@@ -148,39 +163,44 @@ pub use record_index::{
 pub use record_language::RecordTextChoice;
 pub use record_preview::{
     FieldLine, IncomingPreview, IncomingStatus, IncomingView, KeyText, LineValue,
-    MAX_INCOMING_LINES, RecordLink, RecordPreview, RecordPreviewStatus, RecordView,
+    MAX_INCOMING_LINES, RecordFieldProvenance, RecordHeaderProvenance, RecordLink, RecordPreview,
+    RecordPreviewProvenance, RecordPreviewStatus, RecordReferenceProvenance, RecordView,
+    RecordXmlFieldProvenance,
 };
 pub use record_tree::{DataForgeFailure, RecordNode, RecordRow, RecordTree, RecordTreeStatus};
 pub use sort::{Sort, SortColumn, SortDirection};
 pub use sounds::{
     BreakLine, EntityInfo, EventLine, IndexInfo, ListSource, ListStatus, MAX_SOUND_HITS, Playable,
-    SoundList, SoundsExport, SoundsExportSetup, SoundsExportStatus, SoundsListStatus, SoundsScope,
-    SoundsStatus, SoundsTab, TriggerList, TriggerRow, Variant,
+    SoundBreakProvenance, SoundList, SoundListProvenance, SoundVariantProvenance, SoundsExport,
+    SoundsExportSetup, SoundsExportStatus, SoundsListStatus, SoundsScope, SoundsStatus, SoundsTab,
+    TriggerList, TriggerRow, Variant,
 };
 pub use tags::{TagRow, TagsStatus, TagsTab, TagsView};
 pub use texts::{
     AboutText, ArchiveKeyText, AssemblyExportText, AudioText, CatalogText, ChangeExtractionText,
     CharacterText, ComparisonText, ContainerText, ContentSearchText, DataForgeText, DiffText,
     EntityText, ExtractionText, FolderConversionText, GroupText, ImageText, IncomingText,
-    LocalizationText, ModelExportText, ModelInfoText, ModelText, QueryText, RecordChangeText,
-    RecordExportText, RecordLanguageText, RecordSearchText, RecordText, RenameText, SchemaText,
-    ScrollText, SoundsText, TagsText, Text, Texts, UiText, XmlText,
+    LocalizationText, ModelExportText, ModelInfoText, ModelText, OutputTargetText, ProtectionText,
+    QueryText, RecordChangeText, RecordExportText, RecordLanguageText, RecordSearchText,
+    RecordText, RenameText, SchemaText, ScrollText, SoundsText, TagsText, Text, Texts, UiText,
+    XmlText,
 };
 pub use ui_tab::{
     ContentRow, Fact, FileList, MAX_CONTENT_ROWS, Note, ReportLine, RowDetail, ShipList, ShipPick,
-    UiBackground, UiContents, UiDetail, UiExport, UiExportStatus, UiExportSummary, UiFilesStatus,
-    UiFormat, UiMode, UiPower, UiRenderFailure, UiRendered, UiReport, UiScreensStatus, UiSettings,
-    UiSize, UiSource, UiTab,
+    UiBackground, UiContents, UiDetail, UiExport, UiExportOrigins, UiExportStatus, UiExportSummary,
+    UiFilesStatus, UiFormat, UiMode, UiPower, UiPreviewOrigins, UiRenderFailure, UiRendered,
+    UiReport, UiScreensStatus, UiSettings, UiSize, UiSource, UiTab,
+};
+pub use viewer::{
+    AnimationCountProvenance, Bounds, Camera, Control, GpuReport, MAX_SCENE_TRIANGLES,
+    MAX_SCENE_VERTICES, MAX_SKELETON_BONES, MAX_TEXTURE_SIDE, MODEL_FILE_LIMIT, Matrix,
+    ModelInfoProvenance, ModelPreview, ModelStatus, MorphSpan, PREVIEW_ANIMATION_BOUNDS, Playback,
+    Pose, Problem, Rejected, SKIN_STRIDE, Scene, SceneError, Skeleton, SkinVertex, Step,
+    Unavailable, Uniforms, Vertex, ViewerSupport, check_buffer, check_texture,
+    install as install_viewer, is_model_path, target_extent,
 };
 pub use viewer::{
     AssemblyScene, BuildError, BuildOptions, DrawList, GroupDraw, Hooks, Instance, Left,
     MAX_VIEW_ITEMS, MAX_VIEW_TEXTURE_BYTES, MAX_VIEW_TRIANGLES, MAX_VIEW_VERTICES, MIN_PART_PIXELS,
     PartInfo, Progress, VIEW_TEXTURE_MIP,
-};
-pub use viewer::{
-    Bounds, Camera, Control, GpuReport, MAX_SCENE_TRIANGLES, MAX_SCENE_VERTICES,
-    MAX_SKELETON_BONES, MAX_TEXTURE_SIDE, MODEL_FILE_LIMIT, Matrix, ModelPreview, ModelStatus,
-    MorphSpan, PREVIEW_ANIMATION_BOUNDS, Playback, Pose, Problem, Rejected, SKIN_STRIDE, Scene,
-    SceneError, Skeleton, SkinVertex, Step, Unavailable, Uniforms, Vertex, ViewerSupport,
-    check_buffer, check_texture, install as install_viewer, is_model_path, target_extent,
 };

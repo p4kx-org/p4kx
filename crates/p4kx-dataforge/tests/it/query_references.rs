@@ -5,10 +5,13 @@
 //! `select` and in `where`, chained and behind array elements.
 
 use std::error::Error;
+use std::sync::Mutex;
 
 use crate::fleet::{database, rows};
 use p4kx_dataforge::DataForge;
-use p4kx_dataforge::query::{MAX_PATH_REFERENCES, Query, QueryError, QueryErrorKind, Segment};
+use p4kx_dataforge::query::{
+    MAX_PATH_REFERENCES, Query, QueryByteUse, QueryError, QueryErrorKind, QuerySource, Segment,
+};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -142,6 +145,68 @@ fn an_arrow_works_in_where_and_a_missing_target_is_unknown() -> TestResult {
         "from Ship select name where maker->name = \"Aegis\" or escorts[*]->name = \"Alpha\"",
         &["alpha: Alpha (0 unresolved)", "beta: Beta (0 unresolved)"],
     )
+}
+
+#[test]
+fn where_reference_lookup_is_observed_only_with_record_admissions() -> TestResult {
+    let bytes = database();
+    let forge = DataForge::open(&bytes)?;
+    let query = Query::parse("from Ship where maker->home->mass = 5.5")?;
+    let compiled = query.compile(&forge)?;
+    let ordinary = Mutex::new(Vec::new());
+    let detailed = Mutex::new(Vec::new());
+    let ordinary_run = compiled
+        .run_observed(
+            || true,
+            |event| {
+                ordinary
+                    .lock()
+                    .expect("ordinary fixture events")
+                    .push(event);
+            },
+        )?
+        .ok_or("ordinary selection stopped")?;
+    let detailed_run = compiled
+        .run_observing_records(
+            || true,
+            |event| {
+                detailed
+                    .lock()
+                    .expect("detailed fixture events")
+                    .push(event);
+            },
+            |_| {},
+        )?
+        .ok_or("detailed selection stopped")?;
+    assert_eq!(ordinary_run.indexes(), detailed_run.indexes());
+    assert_eq!(ordinary_run.indexes().len(), 1);
+
+    let ordinary = ordinary.into_inner()?;
+    assert!(ordinary.iter().any(|event| matches!(
+        event,
+        QuerySource::Bytes {
+            kind: QueryByteUse::Value,
+            ..
+        }
+    )));
+    assert!(!ordinary.iter().any(|event| matches!(
+        event,
+        QuerySource::ReferenceTarget { .. }
+            | QuerySource::RecordLookup { .. }
+            | QuerySource::RecordType { .. }
+            | QuerySource::InstanceExtent { .. }
+    )));
+    let detailed = detailed.into_inner()?;
+    let target = detailed
+        .iter()
+        .find_map(|event| match *event {
+            QuerySource::ReferenceTarget { index, .. } => Some(index),
+            _ => None,
+        })
+        .ok_or("detailed traversal records the GUID lookup target")?;
+    assert!(detailed.contains(&QuerySource::RecordType { index: target }));
+    assert!(ordinary.contains(&QuerySource::Record { index: target }));
+    Ok(())
 }
 
 #[test]

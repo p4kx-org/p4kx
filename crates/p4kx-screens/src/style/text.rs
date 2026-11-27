@@ -3,6 +3,7 @@
 
 use p4kx_dataforge::{Guid, StructValue};
 
+use super::preset::PresetFill;
 use crate::reader::{reference, text};
 use crate::text::{Case, Horizontal, Vertical};
 
@@ -21,6 +22,7 @@ pub(crate) struct TextModifiers {
     pub(crate) vertical: Option<Vertical>,
     pub(crate) case: Option<Case>,
     pub(crate) text: Option<String>,
+    pub(crate) preset_fill: Option<PresetFill>,
 }
 
 impl TextModifiers {
@@ -88,5 +90,6 @@ impl TextModifiers {
         set(&mut self.vertical, from.vertical.as_ref());
         set(&mut self.case, from.case.as_ref());
         set(&mut self.text, from.text.as_ref());
+        set(&mut self.preset_fill, from.preset_fill.as_ref());
     }
 }

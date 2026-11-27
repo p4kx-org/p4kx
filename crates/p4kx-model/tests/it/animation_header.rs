@@ -7,7 +7,9 @@ use std::error::Error;
 
 use p4kx_chunks::ChunkFile;
 use p4kx_model::{
-    Animation, AnimationHeader, Bone, CompanionError, CompanionPath, Dba, DbaHeaders, Model,
+    Animation, AnimationError, AnimationHeader, Bone, CompanionError, CompanionPath,
+    CorruptAnimation, Dba, DbaAnimationSources, DbaHeaderDeclarations, DbaHeaders,
+    MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS, Model,
 };
 use p4kx_testkit::{TestAnimation, TestDba, TestModel, TestSkeleton, TestTrack};
 
@@ -131,6 +133,115 @@ fn a_header_refuses_what_the_decoder_refuses_before_the_keys() -> TestResult {
     assert!(
         AnimationHeader::read_caf("zero.caf", &file).is_err(),
         "a frame rate of zero"
+    );
+    Ok(())
+}
+
+struct OversizedDba {
+    bytes: Vec<u8>,
+    suffix_at: usize,
+    dense_clip_count: u64,
+    dense_key_count: u64,
+}
+
+fn oversized_dba() -> Result<OversizedDba, Box<dyn Error>> {
+    let keys_per_controller = 2 * u64::from(u16::MAX);
+    let controllers_per_clip = MAX_ANIMATION_KEYS / keys_per_controller;
+    let keys_per_clip = controllers_per_clip * keys_per_controller;
+    let dense_clip_count = MAX_DATABASE_KEYS / keys_per_clip + 1;
+    let dense_clip = (0..u32::try_from(controllers_per_clip)?)
+        .fold(TestAnimation::new("dense.caf", 30), |clip, id| {
+            clip.track(TestTrack::new(id))
+        });
+    let suffix =
+        TestAnimation::new("suffix.caf", 30).track(TestTrack::new(1).rotations(&[(0, IDENTITY)]));
+    let mut bytes = (0..dense_clip_count)
+        .fold(TestDba::new(), |dba, _| dba.animation(dense_clip.clone()))
+        .animation(suffix)
+        .bytes();
+    let (count_words, suffix_at) = declaration_offsets(&bytes)?;
+    for offset in count_words {
+        bytes
+            .get_mut(offset..offset + size_of::<u16>())
+            .ok_or("channel key count")?
+            .copy_from_slice(&u16::MAX.to_le_bytes());
+    }
+    Ok(OversizedDba {
+        bytes,
+        suffix_at,
+        dense_clip_count,
+        dense_key_count: dense_clip_count * keys_per_clip,
+    })
+}
+
+fn declaration_offsets(bytes: &[u8]) -> Result<(Vec<usize>, usize), Box<dyn Error>> {
+    let file = ChunkFile::parse(bytes)?;
+    let clips = DbaAnimationSources::read("fixture.dba", &file)?.collect::<Result<Vec<_>, _>>()?;
+    let (suffix, dense) = clips.split_last().ok_or("suffix clip")?;
+    let mut count_words = Vec::new();
+    for clip in dense {
+        for controller in clip.controllers()? {
+            let table = controller.table_range();
+            let translation = table.start + (table.end - table.start) / 2;
+            count_words.extend([usize::try_from(table.start)?, usize::try_from(translation)?]);
+        }
+    }
+    Ok((
+        count_words,
+        usize::try_from(suffix.controller_block_range().start)?,
+    ))
+}
+
+#[test]
+fn dba_declarations_count_and_validate_blocks_beyond_the_preview_budget() -> TestResult {
+    let mut fixture = oversized_dba()?;
+    let file = ChunkFile::parse(fixture.bytes.as_slice())?;
+    for refusal in [
+        DbaHeaders::read("fixture.dba", &file).err(),
+        Dba::read("fixture.dba", &file).err(),
+    ] {
+        assert!(
+            matches!(
+                refusal,
+                Some(AnimationError::Corrupt {
+                    source: CorruptAnimation::TooManyKeys { keys, limit: MAX_DATABASE_KEYS },
+                    ..
+                }) if keys == fixture.dense_key_count
+            ),
+            "the ordinary reader stops before the suffix"
+        );
+    }
+    let complete = DbaHeaderDeclarations::read("fixture.dba", &file)?;
+    assert_eq!(
+        complete.clips,
+        fixture.dense_clip_count + 1,
+        "includes the suffix clip"
+    );
+    assert_eq!(
+        complete.keys,
+        fixture.dense_key_count + 1,
+        "includes the suffix key"
+    );
+    assert_eq!(
+        complete.preview_budget_refusals(),
+        1,
+        "aggregate preview refusal"
+    );
+
+    *fixture
+        .bytes
+        .get_mut(fixture.suffix_at)
+        .ok_or("suffix block")? = 0;
+    let broken = ChunkFile::parse(fixture.bytes.as_slice())?;
+    assert!(
+        matches!(
+            DbaHeaderDeclarations::read("fixture.dba", &broken),
+            Err(AnimationError::Corrupt {
+                source: CorruptAnimation::Signature { .. },
+                ..
+            })
+        ),
+        "a bad block after the preview refusal still fails validation"
     );
     Ok(())
 }

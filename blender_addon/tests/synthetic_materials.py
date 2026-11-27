@@ -138,4 +138,5 @@ def manifest_11() -> dict[str, Any]:
     second["materials"].append(
         {"index": 1, "name": "Box_mat2", "textures": {}, "material": "x0001"}
     )
+    second["triangles"] = 2
     return base

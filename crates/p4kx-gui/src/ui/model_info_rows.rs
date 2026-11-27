@@ -3,7 +3,7 @@
 
 use egui::Ui;
 
-use super::model_info::{Labelled, Table};
+use super::model_info::{Fact, Labelled, Table, TableKind};
 use crate::theme::desktop::{
     CELL_PADDING_X, DETAIL_COLUMN_GAP, DETAIL_KEY_MIN_WIDTH, DETAIL_KEY_TRACKING,
     DETAIL_VALUE_SIZE, PANEL_TITLE_SIZE, ROW_FONT, TABLE_HEAD_SIZE, TABLE_HEAD_TRACKING,
@@ -14,8 +14,6 @@ use crate::{
     AnimationCount, ChunkFile, ChunkNote, MaterialsInfo, ModelInfo, ModelInfoText as T, Texts,
     format,
 };
-
-const LISTED_IDS: usize = 24;
 
 /// What the rows of the Info tab are laid out with.
 pub(super) struct Rows<'a> {
@@ -64,7 +62,7 @@ impl Rows<'_> {
 
 /// Returns the width of the key column and the key and value of every fact of `info`, the values
 /// cut with an ellipsis at the column they are drawn in.
-pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<(Labelled, Labelled)>) {
+pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<Fact>) {
     let texts = rows.texts;
     let geometry = info
         .geometry
@@ -112,10 +110,14 @@ pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<(Labelled, L
     let facts = keys
         .into_iter()
         .zip(facts)
-        .map(|(key, (_, value))| {
+        .map(|(key, (name, value))| {
             let value_text = plain(&value, DETAIL_VALUE_SIZE, Weight::Light);
             let galley = line(rows.ui, value_text, value_width);
-            (key, (value, galley))
+            Fact {
+                name,
+                key,
+                value: (value, galley),
+            }
         })
         .collect();
     (key_width, facts)
@@ -151,13 +153,9 @@ fn material_ids(rows: &Rows<'_>, info: &ModelInfo) -> String {
     if info.material_ids.is_empty() {
         return rows.texts.get(T::MaterialIdsNone);
     }
-    let mut ids: Vec<String> = info
-        .material_ids
-        .iter()
-        .take(LISTED_IDS)
-        .map(u16::to_string)
-        .collect();
-    if info.material_ids.len() > LISTED_IDS {
+    let listed = info.listed_material_ids();
+    let mut ids: Vec<String> = listed.iter().map(u16::to_string).collect();
+    if info.material_ids.len() > listed.len() {
         ids.push("…".to_owned());
     }
     ids.join(", ")
@@ -192,6 +190,7 @@ pub(super) fn tables(rows: &Rows<'_>, info: &ModelInfo) -> Vec<Table> {
         heading: rows.heading(texts.get(T::LodsHeading)),
         head: rows.head(&columns),
         rows: lods,
+        kind: TableKind::Lods,
     }];
     if !info.unread.is_empty() {
         tables.push(unread(rows, info));
@@ -234,6 +233,7 @@ fn unread(rows: &Rows<'_>, info: &ModelInfo) -> Table {
             .heading(texts.format(T::ChunksHeading, &[("number", rows.number(number).into())])),
         head: rows.head(&columns),
         rows: cells,
+        kind: TableKind::UnreadChunks,
     }
 }
 
@@ -244,6 +244,51 @@ pub(crate) fn file_name(texts: &Texts, chunk: &ChunkNote) -> String {
         ChunkFile::Geometry => texts.get(T::FileGeometry),
         ChunkFile::LodGeometry(level) => {
             texts.format(T::FileLod, &[("level", level.to_string().into())])
+        }
+        ChunkFile::LodModel(level) => {
+            texts.format(T::FileLodModel, &[("level", level.to_string().into())])
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_name;
+    use crate::{ChunkFile, ChunkNote, Language, Texts};
+
+    #[test]
+    fn level_model_and_geometry_files_have_distinct_localised_names() {
+        for (language, model, geometry) in [
+            (
+                Language::BritishEnglish,
+                "LOD 3 model file",
+                "LOD 3 geometry",
+            ),
+            (
+                Language::German,
+                "Modelldatei von LOD 3",
+                "Geometrie von LOD 3",
+            ),
+        ] {
+            let texts = Texts::new(language);
+            let mut note = ChunkNote {
+                file: ChunkFile::LodModel(3),
+                index: 0,
+                name: None,
+                type_id: "0xDEADBEEF".to_owned(),
+                unknown: true,
+            };
+            assert_eq!(
+                file_name(&texts, &note),
+                model,
+                "level model label resolves its Fluent argument"
+            );
+            note.file = ChunkFile::LodGeometry(3);
+            assert_eq!(
+                file_name(&texts, &note),
+                geometry,
+                "existing level geometry label is unchanged"
+            );
         }
     }
 }

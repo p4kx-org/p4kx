@@ -105,6 +105,42 @@ fn raw_flat_csv_and_flat_ndjson_have_their_own_shapes() -> TestResult {
 }
 
 #[test]
+fn strict_flat_csv_rejects_invalid_fields_without_publishing_a_partial_export() -> TestResult {
+    let bytes = items(1)
+        .record(
+            TestRecord::new(2, "Item", "Item.invalid", "items/99999.xml")
+                .value("n", TestValue::UInt32(2))
+                .value("name", TestValue::text("text\twith tab")),
+        )
+        .build();
+    let forge = DataForge::open(&bytes)?;
+    let records: Vec<_> = forge.records().collect();
+    let dir = tempfile::tempdir()?;
+    let file = dir.path().join(FLAT_CSV_FILE);
+    fs::write(&file, "old")?;
+
+    let summary = write_record_export(
+        &forge,
+        &records,
+        RecordForm::FlatCsvStrict,
+        dir.path(),
+        &RecordExportOptions {
+            policy: ConflictPolicy::Overwrite,
+            ..RecordExportOptions::default()
+        },
+    );
+
+    assert!(
+        matches!(summary.error(), Some(ExtractionError::Write { source, .. })
+            if source.kind() == std::io::ErrorKind::InvalidData),
+        "the illegal field becomes a file-level format error"
+    );
+    assert_eq!(summary.written(), 0, "no partial output is counted");
+    assert_eq!(fs::read_to_string(file)?, "old", "the prior CSV survives");
+    Ok(())
+}
+
+#[test]
 fn a_kept_file_is_skipped_by_the_conflict_policy() -> TestResult {
     let bytes = items(3).build();
     let forge = DataForge::open(&bytes)?;

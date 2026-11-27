@@ -3,8 +3,11 @@
 
 use std::sync::LazyLock;
 
-use p4kx_texture::{RgbaImage, TextureError};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 use rayon::prelude::*;
+
+use crate::surface_finish::SurfaceFinish;
+use crate::texture_loader::LoadedTexture;
 
 pub(crate) const RGBA: usize = 4;
 pub(crate) const OPAQUE: u8 = u8::MAX;
@@ -63,6 +66,18 @@ pub(crate) fn linear(value: u8) -> f32 {
     LINEAR.get(usize::from(value)).copied().unwrap_or_default()
 }
 
+pub(crate) fn unit(value: u8) -> f32 {
+    f32::from(value) / f32::from(OPAQUE)
+}
+
+pub(crate) const fn colour_decoder(transfer: DdsTransfer) -> fn(u8) -> f32 {
+    if matches!(transfer, DdsTransfer::Linear) {
+        unit
+    } else {
+        linear
+    }
+}
+
 pub(crate) fn encode(value: f32) -> u8 {
     #[expect(
         clippy::cast_possible_truncation,
@@ -73,7 +88,7 @@ pub(crate) fn encode(value: f32) -> u8 {
     ENCODED.get(step).copied().unwrap_or(OPAQUE)
 }
 
-fn luminance([red, green, blue]: [f32; 3]) -> f32 {
+pub(crate) fn luminance([red, green, blue]: [f32; 3]) -> f32 {
     0.0722_f32.mul_add(blue, 0.2126_f32.mul_add(red, 0.7152 * green))
 }
 
@@ -85,9 +100,9 @@ pub(crate) fn metal_share(specular: [f32; 3]) -> f32 {
 }
 
 /// Returns the linear specular colour of a texel of the specular map, tinted.
-fn specular_of([red, green, blue]: [u8; 3], tint: [f32; 3]) -> [f32; 3] {
+fn specular_of([red, green, blue]: [u8; 3], tint: [f32; 3], decode: fn(u8) -> f32) -> [f32; 3] {
     let [tr, tg, tb] = tint;
-    [linear(red) * tr, linear(green) * tg, linear(blue) * tb]
+    [decode(red) * tr, decode(green) * tg, decode(blue) * tb]
 }
 
 /// Returns the position in a row or column of `from` texels that covers position `at` of one of
@@ -107,7 +122,7 @@ pub(crate) fn texel(image: &RgbaImage, x: usize, y: usize) -> [u8; RGBA] {
 }
 
 /// Returns the texel of `image` at the position of texel (`x`, `y`) of an image of
-/// `width` × `height` texels.
+/// `width` Ãƒâ€” `height` texels.
 pub(crate) fn sampled(
     image: &RgbaImage,
     (x, y): (usize, usize),
@@ -139,10 +154,8 @@ pub(crate) fn fill(
 /// Returns the colour of a texel with the diffuse texel `diffuse` and the specular texel
 /// `specular`, both as the maps store them: the tinted diffuse colour moved towards the tinted
 /// specular colour by its metalness, encoded.
-fn metal_mix(diffuse: [u8; 3], specular: [u8; 3], tints: Tints) -> [u8; 3] {
-    let reflected = specular_of(specular, tints.specular);
+fn metal_mix([red, green, blue]: [f32; 3], reflected: [f32; 3], tints: Tints) -> [u8; 3] {
     let metal = metal_share(reflected);
-    let [red, green, blue] = diffuse.map(linear);
     let [tr, tg, tb] = tints.diffuse;
     let own = [red * tr, green * tg, blue * tb];
     let mix = |channel: usize| {
@@ -160,19 +173,36 @@ fn metal_mix(diffuse: [u8; 3], specular: [u8; 3], tints: Tints) -> [u8; 3] {
 /// map; without, the material's diffuse colour multiplies the texture as a factor. The alpha
 /// channel is kept only when `keep_alpha` is set, otherwise opaque.
 pub(crate) fn base_colour(
-    diffuse: &RgbaImage,
-    specular: Option<&RgbaImage>,
+    diffuse: &LoadedTexture,
+    specular: Option<&LoadedTexture>,
     tints: Tints,
     keep_alpha: bool,
 ) -> Result<RgbaImage, TextureError> {
-    let size = (diffuse.width() as usize, diffuse.height() as usize);
-    fill(diffuse.width(), diffuse.height(), |y, out| {
+    let diffuse_transfer = diffuse.decoded_transfer();
+    let diffuse_decode = colour_decoder(diffuse_transfer);
+    let keep_alpha = keep_alpha && diffuse.uses_opacity();
+    let image = &diffuse.image;
+    let size = (image.width() as usize, image.height() as usize);
+    fill(image.width(), image.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-            let [red, green, blue, alpha] = texel(diffuse, x, y);
-            let [red, green, blue] = specular.map_or([red, green, blue], |specular| {
-                let [sr, sg, sb, _] = sampled(specular, (x, y), size);
-                metal_mix([red, green, blue], [sr, sg, sb], tints)
-            });
+            let [red, green, blue, alpha] =
+                diffuse.straight_texel(texel(image, x, y), y * size.0 + x);
+            let rgb = [red, green, blue];
+            let [red, green, blue] = match specular {
+                Some(specular) => {
+                    let [sr, sg, sb, _] = sampled_colour(specular, (x, y), size);
+                    let reflected = specular_of(
+                        [sr, sg, sb],
+                        tints.specular,
+                        colour_decoder(specular.decoded_transfer()),
+                    );
+                    metal_mix(rgb.map(diffuse_decode), reflected, tints)
+                }
+                None if diffuse_transfer == DdsTransfer::Linear => {
+                    rgb.map(|value| encode(unit(value)))
+                }
+                None => rgb,
+            };
             *target = [red, green, blue, if keep_alpha { alpha } else { OPAQUE }];
         }
     })
@@ -181,9 +211,7 @@ pub(crate) fn base_colour(
 /// Returns the base colour image of the opacity map `opacity`: white, with the red channel of the
 /// map as the alpha channel, so that the material's diffuse colour is the colour of the surface.
 ///
-/// With `decal`, the colours of the red, green and blue masks, the image is painted instead: the
-/// red colour, with the green and the blue colour blended over it by their masks, and the
-/// strongest mask as the alpha channel.
+/// With `decal`, blends the three decal colours by their masks and uses the strongest mask as alpha.
 pub(crate) fn opacity_colour(
     opacity: &RgbaImage,
     decal: Option<[[f32; 3]; 3]>,
@@ -198,19 +226,18 @@ pub(crate) fn opacity_colour(
     })
 }
 
-/// Returns the texel of a stencil decal with the masks `masks` painted in the linear `colours`.
-///
-/// The masks are layers whose alpha is the mask, red below green below blue. A colour counts by
-/// its mask and by what the masks above it leave of it, and the texel is the weighted mean of the
-/// colours, so a texel that one mask covers only partly takes none of the colours of the masks that
-/// are 0 there. The alpha is the strongest mask.
+/// Blends the decal colours using red above blue for a clear green mask (ADR-0310).
 fn decal_texel(colours: [[f32; 3]; 3], masks: [u8; 3]) -> [u8; RGBA] {
     let [red, green, blue] = masks.map(|mask| f32::from(mask) / f32::from(OPAQUE));
-    let weights = [
-        red * (1.0 - green) * (1.0 - blue),
-        green * (1.0 - blue),
-        blue,
-    ];
+    let weights = if green == 0.0 {
+        [red, 0.0, blue * (1.0 - red)]
+    } else {
+        [
+            red * (1.0 - green) * (1.0 - blue),
+            green * (1.0 - blue),
+            blue,
+        ]
+    };
     let [r, g, b] = mix(weights, colours).map(encode);
     let [mask_red, mask_green, mask_blue] = masks;
     [r, g, b, mask_red.max(mask_green).max(mask_blue)]
@@ -244,28 +271,75 @@ pub(crate) struct MetallicRoughness {
     pub(crate) metallic: bool,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum Smoothness<'a> {
+    NormalAlpha(&'a RgbaImage),
+    ExplicitRgb(&'a RgbaImage),
+    ExplicitRed(&'a RgbaImage),
+}
+
+impl Smoothness<'_> {
+    fn finished_roughness(
+        self,
+        at: (usize, usize),
+        size: (usize, usize),
+        finish: Option<SurfaceFinish>,
+    ) -> u8 {
+        let Some(finish) = finish.filter(|finish| !finish.is_neutral()) else {
+            return self.roughness(at, size);
+        };
+        let smoothness = match self {
+            Self::NormalAlpha(image) => unit(sampled(image, at, size)[3]),
+            Self::ExplicitRed(image) => unit(sampled(image, at, size)[0]),
+            Self::ExplicitRgb(image) => {
+                let [red, green, blue, _] = sampled(image, at, size);
+                luminance([red, green, blue].map(unit))
+            }
+        };
+        encode_share(finish.sampled_roughness(smoothness))
+    }
+
+    fn roughness(self, at: (usize, usize), size: (usize, usize)) -> u8 {
+        match self {
+            Self::NormalAlpha(image) => OPAQUE - sampled(image, at, size)[3],
+            Self::ExplicitRed(image) => OPAQUE - sampled(image, at, size)[0],
+            Self::ExplicitRgb(image) => {
+                let [red, green, blue, _] = sampled(image, at, size);
+                OPAQUE - encode_share(luminance([red, green, blue].map(unit)))
+            }
+        }
+    }
+}
+
 /// Returns the metallic-roughness image, glTF's roughness in green and metalness in blue, from the
-/// smoothness in the alpha channel of `gloss` (roughness is its inverse) and the metalness of the
-/// specular map `specular` tinted with `tint`; a channel without source is full, for the
-/// material's factor to scale. The image has the size of `gloss`, or of `specular` without it;
-/// `None` when both are absent.
+/// inverse of selected smoothness and the tinted specular map. An unused channel stays full for
+/// the material factor. The size comes from normal-derived smoothness, specular or explicit gloss
+/// in that order; returns `None` when both inputs are absent.
 pub(crate) fn metallic_roughness(
-    gloss: Option<&RgbaImage>,
-    specular: Option<&RgbaImage>,
+    gloss: Option<Smoothness<'_>>,
+    specular: Option<&LoadedTexture>,
     tint: [f32; 3],
+    finish: Option<SurfaceFinish>,
 ) -> Result<Option<MetallicRoughness>, TextureError> {
-    let Some(size) = gloss.or(specular) else {
-        return Ok(None);
+    let size = match (gloss, specular) {
+        (Some(Smoothness::NormalAlpha(image)), _)
+        | (Some(Smoothness::ExplicitRgb(image) | Smoothness::ExplicitRed(image)), None) => image,
+        (_, Some(texture)) => &texture.image,
+        (None, None) => return Ok(None),
     };
     let dimensions = (size.width() as usize, size.height() as usize);
     let image = fill(size.width(), size.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let roughness = gloss.map_or(OPAQUE, |gloss| {
-                OPAQUE - sampled(gloss, (x, y), dimensions)[3]
+                gloss.finished_roughness((x, y), dimensions, finish)
             });
             let metallic = specular.map_or(OPAQUE, |specular| {
-                let [red, green, blue, _] = sampled(specular, (x, y), dimensions);
-                encode_share(metal_share(specular_of([red, green, blue], tint)))
+                let [red, green, blue, _] = sampled_colour(specular, (x, y), dimensions);
+                encode_share(metal_share(specular_of(
+                    [red, green, blue],
+                    tint,
+                    colour_decoder(specular.decoded_transfer()),
+                )))
             });
             *target = [OPAQUE, roughness, metallic, OPAQUE];
         }
@@ -277,7 +351,15 @@ pub(crate) fn metallic_roughness(
     }))
 }
 
-fn encode_share(share: f32) -> u8 {
+fn sampled_colour(texture: &LoadedTexture, at: (usize, usize), size: (usize, usize)) -> [u8; RGBA] {
+    let image = &texture.image;
+    let width = image.width() as usize;
+    let x = nearest(at.0, width, size.0);
+    let y = nearest(at.1, image.height() as usize, size.1);
+    texture.straight_texel(texel(image, x, y), y * width + x)
+}
+
+pub(crate) fn encode_share(share: f32) -> u8 {
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,

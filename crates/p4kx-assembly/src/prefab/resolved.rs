@@ -3,9 +3,12 @@
 
 use std::sync::Arc;
 
-use p4kx_model::{PrefabObject, PrefabRef, Transform};
+use p4kx_model::{PrefabEntityLinkGroup, PrefabObject, PrefabRef, Transform};
 
-use super::{PrefabFile, PrefabIssue};
+use super::{
+    PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource, PrefabIssue, PrefabLinkSource,
+    PrefabLocation, PrefabObjectLocation, PrefabResolutionSource,
+};
 
 /// An object of a resolved prefab with its transform to the resolved prefab's space.
 #[derive(Debug, Clone)]
@@ -16,9 +19,35 @@ pub struct ResolvedObject {
     pub(super) world: Transform,
     pub(super) container: Arc<str>,
     pub(super) depth: usize,
+    pub(super) route: Option<Arc<PrefabInstanceSource>>,
+    pub(super) unexpanded_source: Option<Arc<PrefabLinkSource>>,
 }
 
 impl ResolvedObject {
+    /// Returns the original file, Prefab row and flattened object ordinal.
+    #[must_use]
+    pub fn location(&self) -> PrefabObjectLocation<'_> {
+        PrefabObjectLocation {
+            prefab: PrefabLocation {
+                file: &self.file,
+                prefab_index: self.prefab,
+            },
+            object_index: self.object,
+        }
+    }
+
+    /// Returns the innermost entered Prefab instance containing this object.
+    #[must_use]
+    pub fn instance_route(&self) -> Option<&PrefabInstanceSource> {
+        self.route.as_deref()
+    }
+
+    /// Returns the evaluated target of a nested reference that stayed unexpanded.
+    #[must_use]
+    pub fn unexpanded_source(&self) -> Option<&PrefabLinkSource> {
+        self.unexpanded_source.as_deref()
+    }
+
     fn source(&self) -> Option<&PrefabObject> {
         self.file
             .library()
@@ -61,6 +90,13 @@ impl ResolvedObject {
     #[must_use]
     pub fn unexpanded(&self) -> Option<&PrefabRef> {
         self.source().and_then(|object| object.nested.as_ref())
+    }
+
+    /// Borrows the original `EntityLinks` declarations of this object.
+    #[must_use]
+    pub fn entity_links(&self) -> &[PrefabEntityLinkGroup] {
+        self.source()
+            .map_or(&[], |object| object.entity_links.as_ref())
     }
 
     /// Returns whether the object is attached to another one, so that its transform is not
@@ -134,4 +170,20 @@ pub struct ResolvedPrefab {
     pub prefabs: usize,
     /// What could not be resolved.
     pub issues: Vec<PrefabIssue>,
+    pub(super) source: Option<PrefabResolutionSource>,
+    pub(super) guid_remapping_instances: Vec<PrefabGuidRemappingInstance>,
+}
+
+impl ResolvedPrefab {
+    /// Returns the distinct occurrences that author GUID remapping blocks.
+    #[must_use]
+    pub fn guid_remapping_instances(&self) -> &[PrefabGuidRemappingInstance] {
+        &self.guid_remapping_instances
+    }
+
+    /// Returns original resolution evidence when the set was created with object sources.
+    #[must_use]
+    pub const fn source(&self) -> Option<&PrefabResolutionSource> {
+        self.source.as_ref()
+    }
 }

@@ -60,7 +60,7 @@ pub const CONTENT_MAX: f32 = 1200.0;
 
 /// `radius-none`: table cells, accent bars and gauges stay square.
 pub const RADIUS_NONE: f32 = 0.0;
-/// `radius-sm`: buttons, inputs, segments, panels, modals, alerts, chips and dropdowns.
+/// `radius-sm`: inner elements such as chips and facts bars.
 pub const RADIUS_SM: f32 = 4.0;
 /// `radius-pill`: pill badges and the drag handle only.
 pub const RADIUS_PILL: f32 = 999.0;
@@ -69,6 +69,18 @@ pub const RADIUS_PILL: f32 = 999.0;
 pub const RADIUS_SM_POINTS: u8 = 4;
 /// The `radius-sm` corner as egui stores it.
 pub const CORNER_SM: CornerRadius = CornerRadius::same(RADIUS_SM_POINTS);
+/// The control radius, in points.
+pub const RADIUS_CONTROL_POINTS: u8 = 6;
+/// The tile radius, in points.
+pub const RADIUS_TILE_POINTS: u8 = 8;
+/// The panel and dialog radius, in points.
+pub const RADIUS_BOX_POINTS: u8 = 10;
+/// The `radius-control` corner as egui stores it.
+pub const CORNER_CONTROL: CornerRadius = CornerRadius::same(RADIUS_CONTROL_POINTS);
+/// The `radius-tile` corner as egui stores it.
+pub const CORNER_TILE: CornerRadius = CornerRadius::same(RADIUS_TILE_POINTS);
+/// The `radius-box` corner as egui stores it.
+pub const CORNER_BOX: CornerRadius = CornerRadius::same(RADIUS_BOX_POINTS);
 /// The `radius-none` corner as egui stores it.
 pub const CORNER_NONE: CornerRadius = CornerRadius::ZERO;
 

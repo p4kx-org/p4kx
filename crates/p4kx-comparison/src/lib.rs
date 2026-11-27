@@ -9,12 +9,21 @@
 mod changed_value;
 mod compare;
 mod comparison;
+mod cryxml_lines;
 mod decode;
 mod entry_change;
+mod entry_incomparable;
+mod entry_summary_provenance;
 mod error;
+mod field_change_evidence;
 mod field_diff;
+mod field_diff_inputs;
+mod field_reference_evidence;
 mod line_diff;
+mod line_diff_hunks;
+mod line_diff_origins;
 mod line_diff_report;
+mod line_diff_side;
 mod line_match;
 mod options;
 mod owned;
@@ -23,18 +32,27 @@ mod record_change;
 mod record_compare;
 mod record_report;
 mod report;
+mod report_entry_aggregates;
+mod report_origins;
+mod report_record_body;
 mod schema_diff;
+mod schema_origin_aggregates;
+mod schema_record_origins;
 mod schema_report;
+mod schema_report_origins;
 mod schema_side;
 mod schema_types;
+mod schema_witness;
 mod text_diff;
 mod value_report;
 
 pub use changed_value::ChangedValue;
-pub use compare::compare;
+pub use compare::{compare, compare_with_dataforge_entries};
 pub use comparison::{Comparison, Side};
 pub use decode::{Encoding, MAX_DIFF_LEN, MAX_DIFF_LINES};
 pub use entry_change::{ChangeKind, DirectoryCounts, EntryChange, EntryCounts};
+pub use entry_incomparable::{IncomparableEntry, IncomparableReason};
+pub use entry_summary_provenance::{EntrySummaryProvenance, EntrySummaryProvenanceError};
 pub use error::{ComparisonError, LineDiffError};
 pub use line_diff::{DiffBody, LineDiff, NotText, line_diff, line_diff_cancellable};
 pub use options::{CompareOptions, ComparisonProgress, DataForges, Level, Levels};
@@ -54,6 +72,7 @@ pub use report::{REPORT_FORMAT_VERSION, Report, report_schema};
 pub use schema_diff::compare_schema;
 pub use schema_report::{
     SCHEMA_REPORT_FORMAT_VERSION, SchemaReport, schema_report, schema_report_schema,
+    schema_report_with_dataforge_entries,
 };
 pub use schema_types::{
     EnumChange, KindCounts, OptionChange, OptionChangeKind, ParentChange, PropertyAspect,

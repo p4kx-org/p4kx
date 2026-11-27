@@ -149,7 +149,7 @@ fn spacing() -> Spacing {
     Spacing {
         item_spacing: vec2(SPACE_2, SPACE_1),
         button_padding: vec2(d::MENU_LINK_PADDING_X, SPACE_1),
-        menu_margin: Margin::symmetric(0, 4),
+        menu_margin: Margin::from(SPACE_1),
         interact_size: vec2(d::ROW_HEIGHT, d::ROW_HEIGHT),
         icon_width: d::TOGGLE_SIZE,
         icon_width_inner: d::RADIO_DOT,
@@ -186,11 +186,11 @@ fn visuals() -> Visuals {
         code_bg_color: palette::SURFACE_INPUT,
         warn_fg_color: palette::WARNING,
         error_fg_color: palette::DANGER_TEXT,
-        window_corner_radius: tokens::CORNER_SM,
+        window_corner_radius: tokens::CORNER_BOX,
         window_shadow: tokens::GLOW_PRIMARY_LG,
         window_fill: palette::GRAY_4,
         window_stroke: Stroke::new(1.0, palette::PRIMARY),
-        menu_corner_radius: tokens::CORNER_SM,
+        menu_corner_radius: tokens::CORNER_TILE,
         panel_fill: palette::GRAY_4,
         popup_shadow: tokens::SHADOW_DROPDOWN,
         text_cursor: TextCursorStyle {
@@ -204,7 +204,7 @@ fn visuals() -> Visuals {
 /// The egui widget states; `bg_fill` carries the scrollbar thumb, `weak_bg_fill` the control fill.
 ///
 /// The corner stays square because egui rounds the scrollbar with it; the drawn controls and the
-/// text fields set `radius-sm` themselves.
+/// text fields set the control radius themselves.
 fn widgets() -> Widgets {
     let widget = |thumb: Color32, fill: Color32, border: Color32, text: Color32| WidgetVisuals {
         bg_fill: thumb,

@@ -48,9 +48,32 @@ fn export(class: &str) -> Result<Exported, Box<dyn std::error::Error>> {
         .iter()
         .map(|issue| issue.kind().to_string())
         .collect();
+    let options = GlbOptions::default();
+    let textures = models.textures();
     let mut bytes = Vec::new();
-    assembly.write_glb_animated(&fitted, &GlbOptions::default(), &mut bytes)?;
+    assembly.write_glb_animated_with(&fitted, &options, &textures, &mut bytes)?;
+    let mut observed = Vec::new();
+    let mut meshes = 0;
+    assembly.write_glb_animated_with_vertex_origins(
+        &fitted,
+        &options,
+        &textures,
+        &mut observed,
+        &mut |_, _, _| {
+            meshes += 1;
+            Ok(())
+        },
+    )?;
+    assert_eq!(
+        observed, bytes,
+        "observing mesh sources preserves the GLB bytes"
+    );
     let glb = check_glb(&bytes)?;
+    assert_eq!(
+        meshes,
+        glb.document.meshes().len(),
+        "one observation per emitted mesh"
+    );
     let targets = glb
         .document
         .animations()
@@ -196,6 +219,12 @@ fn a_nested_database_that_cannot_be_read_is_listed_and_the_rest_is_still_written
 
     assert_eq!(names(&exported.clips), ["wave"]);
     assert_eq!(exported.written, 1);
+    let sources = exported.clips.sources.as_ref().ok_or("animation sources")?;
+    assert!(
+        !sources.selection_complete,
+        "the failed nested read makes the scan incomplete"
+    );
+    assert_eq!(sources.clips.len(), 1, "the observed clip is retained");
     let [issue] = exported.clips.issues.as_slice() else {
         return Err(format!("one issue, got {:?}", exported.clips.issues).into());
     };

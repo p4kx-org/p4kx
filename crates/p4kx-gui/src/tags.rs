@@ -8,6 +8,10 @@ use p4kx_extraction::{Guid, Tag};
 mod load;
 mod view;
 
+#[cfg(test)]
+#[path = "tags_metadata_tests.rs"]
+mod metadata_tests;
+
 pub use view::{TagRow, TagsView};
 
 use crate::EntryIndex;
@@ -64,7 +68,9 @@ impl TagsTab {
             State::Loading(_) => TagsStatus::Loading,
             State::Failed(reason) => TagsStatus::Failed(reason.as_deref()),
             State::ArchiveChanged => TagsStatus::ArchiveChanged,
-            State::Ready(view) if view.tree().is_empty() => TagsStatus::NoTags,
+            State::Ready(view) if view.tree().is_empty() && view.tree().issues().is_clean() => {
+                TagsStatus::NoTags
+            }
             State::Ready(view) => TagsStatus::Ready(view),
         }
     }

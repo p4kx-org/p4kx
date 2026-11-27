@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+/// Physical CAF and DBA headers independent of rendering choices.
+#[path = "animation_catalogue_headers.rs"]
+pub mod headers;
+
 use std::path::{Path, PathBuf};
 
 use p4kx_model::AnimationHeader;
@@ -9,7 +13,10 @@ use crate::animation_load::load_listed;
 use crate::animation_select::{Gathered, read};
 use crate::animation_set::{folder_entries, source_of};
 use crate::animation_sources::{disk_sources, open_entry, with_extras};
-use crate::{AnimationChoice, ChunkSource, ConversionError, PathIndex, UnreadAnimation};
+use crate::{
+    AnimationChoice, ChunkSource, ConversionError, PathIndex, PositionedUnreadAnimation,
+    UnreadAnimation,
+};
 
 /// The animations found for a model, described by their headers: names, durations, frame rates,
 /// the additive flag, tracks and key counts, with no key decoded.
@@ -35,7 +42,11 @@ impl From<Gathered<AnimationHeader>> for AnimationListing {
         Self {
             animations: gathered.animations,
             origins: gathered.origins,
-            unread: gathered.unread,
+            unread: gathered
+                .unread
+                .into_iter()
+                .map(PositionedUnreadAnimation::into_unread)
+                .collect(),
             files: gathered.files,
         }
     }

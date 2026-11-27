@@ -4,13 +4,20 @@
 //! A WEM reached through several variants is exported once, from its full copy.
 
 use std::error::Error;
+use std::fs;
 
-use p4kx_assembly::audio::{ArchiveAudio, ExportOptions, SoundFormat, TriggerSounds};
-use p4kx_extraction::{Archive, ConflictPolicy};
+use p4kx_assembly::audio::{
+    ArchiveAudio, ExportOptions, ExportReportCapture, ExportWatch, ExportedSound, SoundFormat,
+    TriggerSounds,
+};
+use p4kx_audio::Wem;
+use p4kx_extraction::{Archive, Checksum, ConflictPolicy, SourceUses};
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestCodec, TestEntry, TestHircObject, TestWem, test_signal,
     wwise_short_id,
 };
+use serde_json::{Value, json};
+use sha2::{Digest as _, Sha256};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -35,9 +42,13 @@ fn bank(name: &str, event: &str, wem: Vec<u8>, storage: u8) -> Vec<u8> {
 }
 
 fn export_mix(first: (&str, Vec<u8>, u8), second: (&str, Vec<u8>, u8)) -> TestResult {
+    let full_in_second = second.2 == 0;
+    let full = if full_in_second { &second.1 } else { &first.1 };
+    let mut expected = Vec::new();
+    Wem::parse(full.as_slice())?.write_wav(&mut expected)?;
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    ArchiveBuilder::new()
+    ArchiveBuilder::v2()
         .entry(TestEntry::zstd(
             "Data\\Libs\\GameAudio\\SC.xml",
             TestAtl::new("SC")
@@ -48,10 +59,13 @@ fn export_mix(first: (&str, Vec<u8>, u8), second: (&str, Vec<u8>, u8)) -> TestRe
             "Data\\Sounds\\wwise\\First.bnk",
             bank("First", "Play_First", first.1, first.2),
         ))
-        .entry(TestEntry::stored(
-            "Data\\Sounds\\wwise\\Second.bnk",
-            bank("Second", "Play_Second", second.1, second.2),
-        ))
+        .entry(
+            TestEntry::zstd(
+                "Data\\Sounds\\wwise\\Second.bnk",
+                bank("Second", "Play_Second", second.1, second.2),
+            )
+            .encrypted(),
+        )
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let audio = ArchiveAudio::new(&archive);
@@ -60,13 +74,108 @@ fn export_mix(first: (&str, Vec<u8>, u8), second: (&str, Vec<u8>, u8)) -> TestRe
     let out = tempfile::tempdir()?;
     let triggers: Vec<&TriggerSounds<'_>> = vec![&sounds];
 
-    let report = audio.export_sounds(&triggers, out.path(), OPTIONS)?;
+    let (report, _) = audio.export_sounds_watched_with_report_origins(
+        &triggers,
+        out.path(),
+        OPTIONS,
+        &ExportWatch::default(),
+        ExportReportCapture::FileSizes,
+    )?;
     let [sound] = report.sounds.as_slice() else {
         return Err("one file for the WEM".into());
     };
+    assert_reported_selection(sound, &archive, full_in_second)?;
     assert_eq!(sound.format, SoundFormat::Wav, "the full copy converts");
     assert_eq!(sound.unconverted, None, "nothing is left unconverted");
     assert!(report.failures.is_empty(), "{:?}", report.failures);
+    assert_bound_pcm(sound, &expected, full_in_second)
+}
+
+fn assert_reported_selection(
+    sound: &ExportedSound,
+    archive: &Archive,
+    full_in_second: bool,
+) -> TestResult {
+    assert_eq!(
+        sound.selection.trigger_ordinal, 0,
+        "the only trigger plans the file"
+    );
+    assert_eq!(
+        sound.selection.variant_ordinal, 0,
+        "the first route plans the file"
+    );
+    assert_eq!(
+        sound.selection.media_variant_ordinal,
+        usize::from(full_in_second),
+        "the full WEM has its own input ordinal"
+    );
+    let uses = SourceUses::new();
+    let size = sound.written_size_origin(archive, &uses)?;
+    assert_eq!(
+        size.contains_encrypted_source(),
+        Some(full_in_second),
+        "only the donor supplies the measured size"
+    );
+    assert!(
+        size.source_set_complete(),
+        "the written size cites the complete donor inputs"
+    );
+    Ok(())
+}
+
+fn assert_bound_pcm(sound: &ExportedSound, expected: &[u8], encrypted: bool) -> TestResult {
+    assert!(
+        sound.origin_receipt_failure.is_none(),
+        "companion publication succeeded"
+    );
+    let companion = sound
+        .origin_receipt
+        .as_deref()
+        .ok_or("published companion")?;
+    let installed = fs::read(&sound.path)?;
+    assert_eq!(installed, expected, "the standard converter's PCM bytes");
+    let content = fs::read_to_string(companion)?;
+    let rows: Vec<Value> = content
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    let binding = rows.first().ok_or("artifact byte binding")?;
+    let sha = Checksum::Sha256(Sha256::digest(&installed).into()).hex();
+    assert_eq!(
+        binding.pointer("/binding/sha256"),
+        Some(&json!(sha)),
+        "the companion binds the installed bytes"
+    );
+    let samples = rows
+        .iter()
+        .find(|row| row.pointer("/address/field") == Some(&json!("pcmSamples")))
+        .ok_or("the WAV sample field")?;
+    assert_eq!(
+        samples.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "the sample input is known"
+    );
+    assert_eq!(
+        samples.get("containsEncryptedSource"),
+        Some(&json!(encrypted)),
+        "the chosen complete member supplies the bytes"
+    );
+    let references = samples
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("sample uses")?;
+    assert!(
+        rows.iter()
+            .filter_map(|row| row.get("sourceUse"))
+            .any(|used| {
+                used.get("id").is_some_and(|id| references.contains(id))
+                    && used.pointer("/location/namespace").and_then(Value::as_str)
+                        == Some("bnkDidx")
+                    && used.pointer("/location/field").and_then(Value::as_str) == Some("dataOffset")
+                    && used.get("role").and_then(Value::as_str) == Some("selector")
+            }),
+        "sample dependencies contain the original bank member selection"
+    );
     Ok(())
 }
 

@@ -24,6 +24,24 @@ pub fn entity_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
         .fold(builder, DataForgeBuilder::structure)
 }
 
+pub(crate) fn add_port_subhelper_fields(mut builder: DataForgeBuilder) -> DataForgeBuilder {
+    const NODE_TYPE: &str = "SItemPortDefHelperNode";
+    builder.structs = builder
+        .structs
+        .into_iter()
+        .map(|structure| {
+            if structure.name == NODE_TYPE {
+                structure
+                    .field("Tags", TestType::String)
+                    .array("SubHelpers", TestType::StrongPointer(NODE_TYPE.to_owned()))
+            } else {
+                structure
+            }
+        })
+        .collect();
+    builder
+}
+
 fn attachable_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("SAttachableComponentParams")
@@ -46,7 +64,8 @@ fn geometry_structs() -> Vec<TestStruct> {
         TestStruct::new("SMaterialNodeParams")
             .field("Tags", TestType::String)
             .field("Material", class("GlobalResourceMaterial"))
-            .array("materialVariants", class("SMaterialNodeParams")),
+            .array("materialVariants", class("SMaterialNodeParams"))
+            .field("Palette", class("TintPaletteRef")),
         TestStruct::new("SGeometryNodeParams")
             .field("Tags", TestType::String)
             .field("Geometry", class("SGeometryDataParams"))
@@ -112,6 +131,39 @@ pub fn tint_palette_record_with_decal(
     glossiness: [u8; 3],
     decal: [[u8; 3]; 3],
 ) -> TestRecord {
+    palette_record(guid, name, tints, glass, glossiness, decal, [[59; 3]; 3])
+}
+
+/// Returns a tint palette Record with explicit sRGB specular bytes for entries A to C.
+#[must_use]
+pub fn tint_palette_record_with_specular(
+    guid: u128,
+    name: &str,
+    tints: [[u8; 3]; 3],
+    glass: [u8; 3],
+    glossiness: [u8; 3],
+    specular: [[u8; 3]; 3],
+) -> TestRecord {
+    palette_record(
+        guid,
+        name,
+        tints,
+        glass,
+        glossiness,
+        [[255; 3]; 3],
+        specular,
+    )
+}
+
+fn palette_record(
+    guid: u128,
+    name: &str,
+    tints: [[u8; 3]; 3],
+    glass: [u8; 3],
+    glossiness: [u8; 3],
+    decal: [[u8; 3]; 3],
+    specular: [[u8; 3]; 3],
+) -> TestRecord {
     let colour = |[r, g, b]: [u8; 3]| {
         TestValue::Struct(
             TestInstance::new("SRGB8")
@@ -120,19 +172,19 @@ pub fn tint_palette_record_with_decal(
                 .value("b", TestValue::UInt8(b)),
         )
     };
-    let entry = |tint: [u8; 3], glossiness: u8| {
+    let entry = |tint: [u8; 3], glossiness: u8, specular: [u8; 3]| {
         TestValue::Struct(
             TestInstance::new("TintEntry")
                 .value("glossiness", TestValue::UInt8(glossiness))
                 .value("tintColor", colour(tint))
-                .value("specColor", colour([59; 3])),
+                .value("specColor", colour(specular)),
         )
     };
     let root = TestInstance::new("TintPalette")
         .value("name", TestValue::text(name))
-        .value("entryA", entry(tints[0], glossiness[0]))
-        .value("entryB", entry(tints[1], glossiness[1]))
-        .value("entryC", entry(tints[2], glossiness[2]))
+        .value("entryA", entry(tints[0], glossiness[0], specular[0]))
+        .value("entryB", entry(tints[1], glossiness[1], specular[1]))
+        .value("entryC", entry(tints[2], glossiness[2], specular[2]))
         .value("glassColor", colour(glass))
         .value("decalColorR", colour(decal[0]))
         .value("decalColorG", colour(decal[1]))

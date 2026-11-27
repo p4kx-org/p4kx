@@ -1,30 +1,41 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::error::Error;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_export::{
-    Language, NDJSON_FILE, RecordExportOptions, RecordExportSummary, RecordFailure, RecordForm,
-    write_record_export,
+    Language, RecordExportOptions, RecordExportReceipt, RecordExportSummary, RecordFailure,
+    RecordForm,
 };
 use p4kx_extraction::{
-    Archive, DataForge, Filter, LanguageTexts, LocalizationSet, Record, RecordExportReport,
-    RecordRenamed, TagResolver, TagTree, TextResolver, export_combined,
+    Archive, ArchiveWriteProtection, DataForge, Filter, LocalizationSet, Record,
+    RecordExportReport, RecordLocalization, TextResolver,
 };
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::cli::{Conflict, DcbExportArgs, RecordFormat};
-use crate::exit;
-use crate::extract::{cancel_on_interrupt, policy, prepare_target};
+use crate::cli::{DcbExportArgs, RecordFormat};
+use crate::extract::{cancel_on_interrupt, policy, prepare_target_protected};
 use crate::forge_input::ForgeInput;
 use crate::json;
 use crate::loc::{LanguageNotInArchive, print_notes};
-use crate::renamed_report::{RenamedJson, renamed_json, write_renamed};
+use crate::renamed_report::{RenamedJson, renamed_json};
+
+#[path = "dcb_export_count_origins.rs"]
+mod count_origins;
+#[path = "dcb_export_publication.rs"]
+mod publication;
+#[path = "dcb_export_report.rs"]
+mod report;
+#[path = "dcb_export_tags.rs"]
+mod tags;
+pub(crate) use count_origins::CountOrigin;
+pub(crate) use report::print_report;
+use report::{Outcome, reason};
+use tags::RecordExportTags;
 
 /// `--combined` with another format than Record XML.
 #[derive(Debug, Error)]
@@ -63,6 +74,7 @@ const fn record_form(args: &DcbExportArgs) -> Result<RecordForm, FlatConflict> {
             Some(RecordFormat::Json) => Ok(RecordForm::Json),
             Some(RecordFormat::Ndjson) => Ok(RecordForm::Ndjson),
             Some(RecordFormat::Csv) => Err(FlatConflict("--format csv needs --flat")),
+            Some(RecordFormat::CsvStrict) => Err(FlatConflict("--format csv-strict needs --flat")),
         };
     }
     if args.combined {
@@ -74,12 +86,13 @@ const fn record_form(args: &DcbExportArgs) -> Result<RecordForm, FlatConflict> {
     match args.format {
         None | Some(RecordFormat::Csv) if args.csv_raw => Ok(RecordForm::FlatCsvRaw),
         None | Some(RecordFormat::Csv) => Ok(RecordForm::FlatCsv),
-        Some(RecordFormat::Ndjson) if args.csv_raw => {
+        Some(RecordFormat::CsvStrict | RecordFormat::Ndjson) if args.csv_raw => {
             Err(FlatConflict("--csv-raw needs --flat --format csv"))
         }
+        Some(RecordFormat::CsvStrict) => Ok(RecordForm::FlatCsvStrict),
         Some(RecordFormat::Ndjson) => Ok(RecordForm::FlatNdjson),
         Some(RecordFormat::Xml | RecordFormat::Json) => Err(FlatConflict(
-            "--flat writes --format csv or --format ndjson",
+            "--flat writes --format csv, csv-strict or ndjson",
         )),
     }
 }
@@ -105,6 +118,12 @@ struct ReportJson<'a> {
     error_values: usize,
     records_with_errors: usize,
     error: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_receipts: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_failures: Vec<String>,
+    #[serde(flatten)]
+    count_origin: Option<&'a CountOrigin>,
 }
 
 #[derive(Serialize)]
@@ -124,7 +143,10 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
     let input = ForgeInput::open(&args.archive)?;
     let forge = input.entry().open()?;
     let records = select_records(&forge, args.filter.as_deref())?;
-    let tags = args.tags.then(|| TagTree::build(&forge));
+    let tags = args
+        .tags
+        .then(|| RecordExportTags::read(&input, &forge, form))
+        .transpose()?;
     let job = Job {
         args,
         as_json,
@@ -135,7 +157,7 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
         tags: tags.as_ref(),
     };
     let Some(language) = args.lang else {
-        return job.write(None);
+        return job.write(None, None);
     };
     let given = given_text_archive(&input, args.text_archive.as_deref())?;
     let text_archive = given
@@ -143,12 +165,14 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
         .or_else(|| input.archive())
         .ok_or(TextsNeedArchive)?;
     let set = LocalizationSet::read(text_archive, &[language])?;
-    if set.entry(language).is_none() {
-        return Err(LanguageNotInArchive { language }.into());
+    let entry = set
+        .entry(language)
+        .ok_or(LanguageNotInArchive { language })?;
+    let localization = RecordLocalization::try_new(entry)?;
+    if let Some(note) = localization.note() {
+        print_notes(&[note]);
     }
-    let texts = set.index()?;
-    print_notes(&set.notes(&texts));
-    job.write(Some(&LanguageTexts::new(&texts, language)))
+    job.write(Some(&localization), given.as_ref().map(Archive::path))
 }
 
 /// Opens the Archive `--archive` names, which supplies the localisation texts of a DataForge
@@ -171,48 +195,85 @@ struct Job<'a, 'f> {
     input: &'a ForgeInput,
     forge: &'a DataForge<'f>,
     records: &'a [Record<'f>],
-    tags: Option<&'a TagTree>,
+    tags: Option<&'a RecordExportTags>,
 }
 
 impl Job<'_, '_> {
-    /// Writes the Records with `texts` resolved and prints the report.
-    fn write(&self, texts: Option<&dyn TextResolver>) -> Result<ExitCode> {
+    /// Writes the Records with their selected annotations and prints the report.
+    fn write(
+        &self,
+        localization: Option<&RecordLocalization<'_>>,
+        additional_source: Option<&Path>,
+    ) -> Result<ExitCode> {
         let Self {
-            args,
-            as_json,
-            form,
-            input,
-            forge,
-            records,
-            tags,
+            args, input, tags, ..
         } = *self;
-        let entry = input.entry();
-        let target = prepare_target(args.out.as_deref(), input.archive())?;
         let cancel = cancel_on_interrupt()?;
+        let protection = match additional_source {
+            Some(source) => {
+                ArchiveWriteProtection::for_sources(&[input.path(), source], cancel.flag())?
+            }
+            None => ArchiveWriteProtection::new(input.path(), cancel.flag())?,
+        };
+        let target =
+            prepare_target_protected(args.out.as_deref(), input.archive(), &protection, &cancel)?;
         let options = RecordExportOptions {
+            protection: Some(&protection),
             policy: policy(args.conflict),
             cancel: Some(&cancel),
             progress: None,
-            texts,
-            tags: tags.map(|tags| tags as &dyn TagResolver),
+            texts: localization.map(|source| source as &dyn TextResolver),
+            tags: tags.map(RecordExportTags::resolver),
         };
-        let combined = args.combined.then(|| combined_name(entry.path()));
-        let combined_report;
-        let summary;
-        let report: Outcome<'_> = if let Some(name) = &combined {
-            combined_report = export_combined(forge, records, &target.join(name), &options)?;
-            (&combined_report).into()
-        } else {
-            summary = write_record_export(forge, records, form, &target, &options);
-            (&summary).into()
-        };
-        let printed = if as_json {
+        let combined = args.combined.then(|| combined_name(input.entry().path()));
+        let mut exported = self.publish(&options, &target, combined.as_deref(), localization)?;
+        let count_origin = self
+            .as_json
+            .then(|| {
+                let indices = exported.take_committed_definitions();
+                let report = exported.outcome();
+                count_origins::capture(
+                    input.entry().origin_of(self.forge),
+                    indices,
+                    report.written,
+                    report.error.is_some(),
+                )
+            })
+            .flatten();
+        let report = exported.outcome();
+        if let Err(error) =
+            self.print_outcome(&report, &target, combined.as_deref(), count_origin.as_ref())
+            && error.kind() != io::ErrorKind::BrokenPipe
+        {
+            return Err(error.into());
+        }
+        if count_origin.as_ref().is_some_and(CountOrigin::failed) {
+            return Ok(ExitCode::from(crate::exit::PARTIAL_FAILURE));
+        }
+        Ok(report.exit_code())
+    }
+
+    fn print_outcome(
+        &self,
+        report: &Outcome<'_>,
+        target: &Path,
+        combined: Option<&str>,
+        count_origin: Option<&CountOrigin>,
+    ) -> io::Result<()> {
+        let Self {
+            args,
+            form,
+            input,
+            tags,
+            ..
+        } = *self;
+        if self.as_json {
             json::print(&ReportJson {
                 archive: json::path(input.path()),
-                entry: entry.path(),
+                entry: input.entry().path(),
                 format: form.name(),
-                target: json::path(&target),
-                file: combined.as_deref(),
+                target: json::path(target),
+                file: combined,
                 language: args.lang.map(Language::code),
                 tags: tags.is_some(),
                 exported: report.written,
@@ -223,17 +284,50 @@ impl Job<'_, '_> {
                 error_values: report.error_values,
                 records_with_errors: report.records_with_errors,
                 error: report.error.map(reason),
+                origin_receipts: report
+                    .origin_receipts
+                    .iter()
+                    .map(|path| json::path(path))
+                    .collect(),
+                origin_failures: report
+                    .origin_failures
+                    .iter()
+                    .map(|error| reason(error))
+                    .collect(),
+                count_origin,
             })
         } else {
-            let into = combined.map_or_else(|| target.clone(), |name| target.join(name));
-            print_report(&report, &into, args.conflict, form)
-        };
-        if let Err(error) = printed
-            && error.kind() != io::ErrorKind::BrokenPipe
-        {
-            return Err(error.into());
+            let into = combined.map(|name| target.join(name));
+            print_report(
+                report,
+                into.as_deref().unwrap_or(target),
+                args.conflict,
+                form,
+            )
         }
-        Ok(report.exit_code())
+    }
+}
+
+enum ExportedRecords {
+    Files(RecordExportReport),
+    Summary(RecordExportSummary),
+}
+
+impl ExportedRecords {
+    fn take_committed_definitions(&mut self) -> Option<Vec<u32>> {
+        match self {
+            Self::Files(report) => report.take_written_record_indices(),
+            Self::Summary(summary) => summary
+                .take_receipt()
+                .map(RecordExportReceipt::into_indices),
+        }
+    }
+
+    fn outcome(&self) -> Outcome<'_> {
+        match self {
+            Self::Files(report) => report.into(),
+            Self::Summary(summary) => summary.into(),
+        }
     }
 }
 
@@ -267,115 +361,4 @@ pub(crate) fn failure_json(failure: &RecordFailure) -> FailureJson<'_> {
         path: failure.record_path(),
         error: reason(failure.error()),
     }
-}
-
-/// What a Record export did, from a per-Record or NDJSON export or a combined file.
-pub(crate) struct Outcome<'a> {
-    written: usize,
-    skipped: &'a [String],
-    failures: &'a [RecordFailure],
-    renamed: &'a [RecordRenamed],
-    cancelled: usize,
-    error_values: usize,
-    records_with_errors: usize,
-    error: Option<&'a dyn Error>,
-}
-
-impl Outcome<'_> {
-    const fn is_complete(&self) -> bool {
-        self.failures.is_empty() && self.cancelled == 0 && self.error.is_none()
-    }
-
-    fn exit_code(&self) -> ExitCode {
-        ExitCode::from(if self.is_complete() {
-            exit::SUCCESS
-        } else {
-            exit::PARTIAL_FAILURE
-        })
-    }
-}
-
-impl<'a> From<&'a RecordExportSummary> for Outcome<'a> {
-    fn from(summary: &'a RecordExportSummary) -> Self {
-        Self {
-            written: summary.written(),
-            skipped: summary.skipped(),
-            failures: summary.failures(),
-            renamed: summary.renamed(),
-            cancelled: summary.cancelled(),
-            error_values: summary.error_values(),
-            records_with_errors: summary.records_with_errors(),
-            error: summary.error().map(|error| error as &dyn Error),
-        }
-    }
-}
-
-impl<'a> From<&'a RecordExportReport> for Outcome<'a> {
-    fn from(report: &'a RecordExportReport) -> Self {
-        Self {
-            written: report.written(),
-            skipped: report.skipped(),
-            failures: report.failures(),
-            renamed: report.renamed(),
-            cancelled: report.cancelled(),
-            error_values: report.error_values(),
-            records_with_errors: report.records_with_errors(),
-            error: None,
-        }
-    }
-}
-
-fn reason(error: &dyn Error) -> String {
-    let mut reason = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        reason.push_str(": ");
-        reason.push_str(&cause.to_string());
-        source = cause.source();
-    }
-    reason
-}
-
-/// Prints the failed Records to stderr and the kept files and a summary to stdout.
-pub(crate) fn print_report(
-    report: &Outcome<'_>,
-    target: &Path,
-    conflict: Conflict,
-    form: RecordForm,
-) -> io::Result<()> {
-    let file = form.file().unwrap_or(NDJSON_FILE);
-    let mut err = io::stderr().lock();
-    for failure in report.failures {
-        writeln!(
-            err,
-            "failed {} ({}): {}",
-            failure.record_path(),
-            failure.guid(),
-            reason(failure.error())
-        )?;
-    }
-    write_renamed(&mut err, report.renamed)?;
-    if let Some(error) = report.error {
-        writeln!(err, "failed {file}: {}", reason(error))?;
-    }
-    let mut out = io::stdout().lock();
-    let kept = if conflict == Conflict::IfChanged {
-        "unchanged"
-    } else {
-        "already exists"
-    };
-    for file in report.skipped {
-        writeln!(out, "skipped {file}: {kept}")?;
-    }
-    writeln!(
-        out,
-        "exported {} Records, skipped {}, failed {}, cancelled {} into {}; {} error values in {} Records",
-        report.written,
-        report.skipped.len(),
-        report.failures.len(),
-        report.cancelled,
-        target.display(),
-        report.error_values,
-        report.records_with_errors
-    )
 }

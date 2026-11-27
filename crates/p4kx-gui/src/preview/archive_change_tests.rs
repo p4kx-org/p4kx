@@ -71,7 +71,7 @@ fn a_read_error_while_converting_in_a_changed_archive_reports_the_change() -> Te
     let (mut preview, job) = XmlPreview::pending();
     emptied(&path)?;
 
-    job.run(&index, (b"CryXmlB\0", 4096), &mut Failing, &|| {});
+    job.run(&index, (b"CryXmlB\0", 4096, None), &mut Failing, &|| {});
     preview.poll();
 
     assert!(
@@ -87,7 +87,7 @@ fn a_read_error_while_converting_in_an_unchanged_archive_names_the_error() -> Te
     let (_folder, _path, index) = opened()?;
     let (mut preview, job) = XmlPreview::pending();
 
-    job.run(&index, (b"CryXmlB\0", 4096), &mut Failing, &|| {});
+    job.run(&index, (b"CryXmlB\0", 4096, None), &mut Failing, &|| {});
     preview.poll();
 
     assert!(

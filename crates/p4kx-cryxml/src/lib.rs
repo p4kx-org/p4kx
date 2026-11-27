@@ -8,6 +8,7 @@
 //! turns a `CryXml` byte slice of either byte order into a [`Document`] that borrows its strings
 //! from the input; [`read`] does both and passes text XML through unchanged.
 
+pub mod animation_database;
 mod comparison;
 mod depth;
 mod document;
@@ -18,8 +19,21 @@ mod format;
 mod header;
 mod names;
 mod read;
+mod render_source;
+mod source_attribute;
+mod source_content;
+mod source_declaration;
+mod source_document;
+mod source_element;
+mod source_position;
+mod source_start_tag;
+mod source_syntax;
 mod strings;
+pub mod tag_definition;
 mod write;
+mod write_observation;
+mod xml_render_span;
+mod xml_write_field;
 
 pub use comparison::{TreeComparison, compare_trees};
 pub use depth::{MAX_TEXT_DEPTH, TextTooDeep, check_text_depth};
@@ -28,3 +42,14 @@ pub use element::{Attribute, Attributes, Children, Element};
 pub use error::{CryXmlError, Table};
 pub use format::{ByteOrder, Format, Signature, detect};
 pub use read::{Xml, read};
+pub use source_attribute::SourceAttribute;
+pub use source_content::{SourceContent, SourceContentPosition, SourceContents, SourceText};
+pub use source_declaration::{SourceDeclaration, SourceDeclarationKind};
+pub use source_document::{SourceDocument, SourceReadError, SourceReadOptions};
+pub use source_element::SourceElement;
+pub use source_position::{SourceAttributePosition, SourceElementPosition};
+pub use source_syntax::{SourceSpanError, SourceSyntax};
+pub use xml_render_span::{
+    XmlChildAbsence, XmlParentWords, XmlRawKind, XmlRawSpan, XmlRenderKind, XmlRenderSpan,
+};
+pub use xml_write_field::{XmlFieldKind, XmlWriteField};

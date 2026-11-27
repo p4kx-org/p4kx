@@ -4,9 +4,9 @@
 //! Extracting the added and changed Entries of one side of a Comparison, without drawing.
 
 use crate::comparing;
+use crate::extraction_outputs::assert_receipted_outputs;
 use crate::waiting::wait_polling_described;
 
-use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -83,21 +83,17 @@ fn at(out: &Path, path: &str) -> PathBuf {
         .fold(out.to_path_buf(), |dir, part| dir.join(part))
 }
 
-pub(crate) fn written(out: &Path) -> Result<BTreeMap<String, usize>, Box<dyn Error>> {
-    let mut files = BTreeMap::new();
-    let mut folders = vec![out.to_path_buf()];
-    while let Some(folder) = folders.pop() {
-        for item in fs::read_dir(&folder)? {
-            let path = item?.path();
-            if path.is_dir() {
-                folders.push(path);
-            } else {
-                let name = path.strip_prefix(out)?.to_string_lossy().replace('/', "\\");
-                files.insert(name, fs::read(&path)?.len());
-            }
-        }
+fn assert_outputs_with_lengths(out: &Path, files: &[(&str, u64)]) -> TestResult {
+    let names: Vec<_> = files.iter().map(|&(name, _)| name).collect();
+    assert_receipted_outputs(out, &names)?;
+    for &(name, length) in files {
+        assert_eq!(
+            fs::metadata(at(out, name))?.len(),
+            length,
+            "the selected Archive supplies the expected length for {name}"
+        );
     }
-    Ok(files)
+    Ok(())
 }
 
 #[test]
@@ -119,15 +115,14 @@ fn the_new_side_yields_its_added_and_changed_entries() -> TestResult {
     )?;
 
     assert_eq!(summary.extracted(), 3, "every selected Entry written");
-    assert_eq!(
-        written(&out)?,
-        BTreeMap::from([
-            ("Data\\Libs\\crc.xml".to_owned(), 40),
-            ("Data\\Libs\\size.xml".to_owned(), 3000),
-            ("Engine\\added.cfg".to_owned(), 60),
-        ]),
-        "the new versions, nothing unchanged or removed"
-    );
+    assert_outputs_with_lengths(
+        &out,
+        &[
+            ("Data\\Libs\\crc.xml", 40),
+            ("Data\\Libs\\size.xml", 3000),
+            ("Engine\\added.cfg", 60),
+        ],
+    )?;
     assert_eq!(
         fs::read(at(&out, "Data\\Libs\\crc.xml"))?,
         vec![9; 40],
@@ -154,14 +149,10 @@ fn the_old_side_yields_its_changed_entries_but_never_the_removed_ones() -> TestR
         (ConflictPolicy::Skip, false),
     )?;
 
-    assert_eq!(
-        written(&out)?,
-        BTreeMap::from([
-            ("Data\\Libs\\crc.xml".to_owned(), 40),
-            ("Data\\Libs\\size.xml".to_owned(), 30),
-        ]),
-        "the old versions, the removed Entry left out"
-    );
+    assert_outputs_with_lengths(
+        &out,
+        &[("Data\\Libs\\crc.xml", 40), ("Data\\Libs\\size.xml", 30)],
+    )?;
     assert_eq!(
         fs::read(at(&out, "Data\\Libs\\crc.xml"))?,
         vec![4; 40],
@@ -188,12 +179,7 @@ fn the_current_filter_narrows_the_selection() -> TestResult {
         (ConflictPolicy::Skip, false),
     )?;
 
-    assert_eq!(
-        written(&out)?.into_keys().collect::<Vec<_>>(),
-        ["Data\\Libs\\crc.xml", "Data\\Libs\\size.xml"],
-        "only what the Filter selects"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Libs\\crc.xml", "Data\\Libs\\size.xml"])
 }
 
 #[test]
@@ -342,8 +328,7 @@ fn a_new_folder_is_named_after_the_chosen_side() -> TestResult {
     let name = summary
         .target()
         .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .map_or_default(|name| name.to_string_lossy().into_owned());
     assert!(
         name.starts_with("SC-EXPORT-LIVE-4.3.1.10203-"),
         "named after the old side: {name}"

@@ -12,6 +12,11 @@ use p4kx_testkit::{
     TestValue,
 };
 
+#[path = "dcb_export_ndjson_origins.rs"]
+mod ndjson_origins;
+#[path = "dcb_export_json_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
@@ -115,7 +120,7 @@ fn export(archive: &Path, out: &Path, args: &[&str], code: i32) -> Result<String
         .replace('\\', "/"))
 }
 
-/// Returns every file below `root` with its content, in path order.
+/// Returns every payload file below `root` with its content, in path order.
 fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
     let mut files = Vec::new();
     let mut folders = vec![root.to_path_buf()];
@@ -124,7 +129,10 @@ fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
             let path = entry?.path();
             if path.is_dir() {
                 folders.push(path);
-            } else {
+            } else if !path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().ends_with(".p4kx-origin.jsonl"))
+            {
                 files.push(path);
             }
         }
@@ -262,7 +270,8 @@ fn ndjson_prints_one_line_of_json() -> TestResult {
     )?;
 
     assert_eq!(stdout.lines().count(), 1, "one line: {stdout}");
-    let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
+    crate::dcb_export_count_origins::remove_count_origin(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

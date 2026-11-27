@@ -1,0 +1,4 @@
+### Added
+
+- Query original medical item tier definitions through the Catalog SDK by GUID or
+  physical Record index, with source evidence.

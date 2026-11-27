@@ -10,7 +10,9 @@ use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use p4kx_comparison::{Archive, CompareOptions, DataForgeEntry, DataForges, Levels, compare};
+use p4kx_comparison::{
+    Archive, CompareOptions, DataForgeEntry, DataForges, Levels, compare_with_dataforge_entries,
+};
 use p4kx_gui::{
     ComparisonLevels, ComparisonSide, ComparisonStatus, ComparisonTab, Language, Model,
     ReportStatus, WorkTab, ui,
@@ -86,8 +88,8 @@ fn cli_report(old: &Path, new: &Path, levels: Levels, out: &Path) -> TestResult 
         Archive::open_with_key(old, Some(p4kx_testkit::test_key()))?,
         Archive::open_with_key(new, Some(p4kx_testkit::test_key()))?,
     );
-    let (old_forge, new_forge) = (DataForgeEntry::read(&old)?, DataForgeEntry::read(&new)?);
-    let (old_forge, new_forge) = (old_forge.open()?, new_forge.open()?);
+    let (old_entry, new_entry) = (DataForgeEntry::read(&old)?, DataForgeEntry::read(&new)?);
+    let (old_forge, new_forge) = (old_entry.open()?, new_entry.open()?);
     let forges = DataForges {
         old: &old_forge,
         new: &new_forge,
@@ -96,7 +98,8 @@ fn cli_report(old: &Path, new: &Path, levels: Levels, out: &Path) -> TestResult 
         levels,
         ..CompareOptions::default()
     };
-    compare(&old, &new, Some(forges), &options)?.save_report(out)?;
+    compare_with_dataforge_entries(&old, &new, forges, [&old_entry, &new_entry], &options)?
+        .save_report(out)?;
     Ok(())
 }
 
@@ -128,9 +131,16 @@ fn the_saved_report_holds_the_record_level_like_the_cli() -> TestResult {
     );
     let written = fs::read_to_string(&saved)?;
     assert_eq!(written, fs::read_to_string(&expected)?, "byte for byte");
-    assert!(
-        written.contains("\"records\""),
-        "the Record level is in the report"
+    let report: serde_json::Value = serde_json::from_str(&written)?;
+    let name_marker = report
+        .pointer("/records/fieldOrigins")
+        .and_then(|origins| origins.get("/records/changes/0/new/name"))
+        .and_then(|origin| origin.get("containsEncryptedSource"))
+        .and_then(serde_json::Value::as_bool);
+    assert_eq!(
+        name_marker,
+        Some(false),
+        "the saved Record name has bound clear input evidence"
     );
     Ok(())
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog written as plain JSON or as a zstd frame, through the public API.
+//! The P4KX catalog written as plain JSON or as a zstd frame, through the public API.
 
 use std::error::Error;
 use std::fs;
@@ -10,14 +10,16 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 use p4kx_export::{
-    CancelToken, CatalogError, CatalogOptions, Compression, SizeWarning, ZSTD_LEVEL,
-    ZSTD_WINDOW_LOG, build_catalog, write_catalog_from,
+    CancelToken, CatalogError, CatalogOptions, Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG,
+    build_catalog, write_catalog_from,
 };
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, ProvenanceMode};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
     TestValue,
 };
+
+mod size_warning;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -80,7 +82,7 @@ pub(crate) fn options() -> CatalogOptions<'static> {
 
 #[test]
 fn a_path_ending_in_zst_selects_zstd_and_any_other_path_plain_json() {
-    let zstd = Compression::for_path(Path::new("out/basetool-catalog.json.zst"));
+    let zstd = Compression::for_path(Path::new("out/p4kx-catalog.json.zst"));
     let upper = Compression::for_path(Path::new("CATALOG.JSON.ZST"));
     assert_eq!(zstd, Compression::ZSTD, "json.zst");
     assert_eq!(upper, Compression::ZSTD, "case is ignored");
@@ -99,12 +101,15 @@ fn a_zstd_catalog_decodes_to_the_bytes_of_the_plain_catalog() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
-    let plain = build_catalog(&archive, &options())?;
+    let plain = build_catalog(&archive, options().with_full_provenance())?;
 
-    let (summary, packed) =
-        write_catalog_from(&archive, &entry, &options(), Compression::ZSTD, || {
-            Ok(Vec::new())
-        })?;
+    let (summary, packed) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
 
     assert!(
         packed.len() < plain.json().len() / 2,
@@ -188,10 +193,13 @@ fn the_frame_declares_its_content_size_a_matching_window_and_a_checksum() -> Tes
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
 
-    let (summary, packed) =
-        write_catalog_from(&archive, &entry, &options(), Compression::ZSTD, || {
-            Ok(Vec::new())
-        })?;
+    let (summary, packed) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
 
     let header = header(&packed)?;
     assert!(header.checksum, "content checksum flag");
@@ -221,17 +229,54 @@ fn a_plain_write_equals_the_built_json_and_has_no_compressed_size() -> TestResul
     let dir = tempfile::tempdir()?;
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog(&archive, &options())?;
+    let built = build_catalog(&archive, options().with_full_provenance())?;
 
-    let (summary, bytes) =
-        write_catalog_from(&archive, &entry, &options(), Compression::None, || {
-            Ok(Vec::new())
-        })?;
+    let (summary, bytes) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::None,
+        || Ok(Vec::new()),
+    )?;
 
     assert!(bytes == built.json(), "identical bytes");
     assert_eq!(summary.compressed_size(), None, "not compressed");
     assert_eq!(summary.upload_size(), summary.size(), "upload size");
     assert_eq!(summary, *built.summary(), "identical summary");
+    Ok(())
+}
+
+#[test]
+fn counting_a_catalog_to_a_sink_matches_the_complete_file_frame() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let options = options();
+    let (counted, _) = write_catalog_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(io::sink()),
+    )?;
+    let (buffered, frame) = write_catalog_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
+    let decoded = io::copy(&mut zstd::Decoder::new(frame.as_slice())?, &mut io::sink())?;
+    assert_eq!(
+        counted, buffered,
+        "discarding output leaves the writer summary unchanged"
+    );
+    assert_eq!(
+        counted.compressed_size(),
+        Some(u64::try_from(frame.len())?),
+        "exact encoded bytes"
+    );
+    assert_eq!(counted.size(), decoded, "exact decoded bytes");
     Ok(())
 }
 
@@ -251,10 +296,13 @@ fn the_catalog_is_streamed_in_pieces_not_in_one_write() -> TestResult {
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
 
-    let (summary, chunks) =
-        write_catalog_from(&archive, &entry, &options(), Compression::None, || {
-            Ok(Chunks(Vec::new()))
-        })?;
+    let (summary, chunks) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::None,
+        || Ok(Chunks(Vec::new())),
+    )?;
 
     let largest = chunks.0.iter().copied().max().unwrap_or(0);
     assert!(chunks.0.len() > 1, "several writes");
@@ -291,15 +339,23 @@ fn a_writer_that_fails_gives_a_write_error() -> TestResult {
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
 
-    let created = write_catalog_from(&archive, &entry, &options(), Compression::ZSTD, || {
-        Err::<Vec<u8>, _>(io::Error::other("no space"))
-    });
-    let broken = write_catalog_from(&archive, &entry, &options(), Compression::None, || {
-        Ok(Broken)
-    });
+    let options = options();
+    for mode in [ProvenanceMode::MarkersOnly, ProvenanceMode::Full] {
+        let output = options.with_provenance_mode(mode);
+        let created = write_catalog_from(&archive, &entry, output, Compression::ZSTD, || {
+            Err::<Vec<u8>, _>(io::Error::other("no space"))
+        });
+        let broken = write_catalog_from(&archive, &entry, output, Compression::None, || Ok(Broken));
 
-    assert!(matches!(created, Err(CatalogError::Write(_))), "create");
-    assert!(matches!(broken, Err(CatalogError::Write(_))), "write");
+        assert!(
+            matches!(created, Err(CatalogError::Write(_))),
+            "{mode:?} create"
+        );
+        assert!(
+            matches!(broken, Err(CatalogError::Write(_))),
+            "{mode:?} write"
+        );
+    }
     Ok(())
 }
 
@@ -315,35 +371,23 @@ impl Write for Broken {
 }
 
 #[test]
-fn the_decompressed_size_is_checked_against_1_gb_and_the_file_against_64_mb() {
-    assert_eq!(SizeWarning::for_decompressed_size(26_500_000), None, "now");
-    assert_eq!(
-        SizeWarning::for_decompressed_size(900_000_000),
-        Some(SizeWarning::NearLimit),
-        "from 90 %"
-    );
-    assert_eq!(
-        SizeWarning::for_decompressed_size(1_000_000_001),
-        Some(SizeWarning::OverLimit),
-        "over 1 GB"
-    );
-    assert_eq!(SizeWarning::for_size(1_700_000), None, "compressed LIVE");
-}
-
-#[test]
 fn a_file_is_written_to_a_path() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(dir.path())?;
     let entry = DataForgeEntry::read(&archive)?;
     let out: PathBuf = dir.path().join("catalog.json.zst");
 
-    let (_, file) = write_catalog_from(&archive, &entry, &options(), Compression::ZSTD, || {
-        fs::File::create(&out)
-    })?;
+    let (_, file) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::ZSTD,
+        || fs::File::create(&out),
+    )?;
     file.sync_all()?;
 
     let mut decoded = Vec::new();
     zstd::Decoder::new(fs::File::open(&out)?)?.read_to_end(&mut decoded)?;
-    assert!(decoded.starts_with(b"{\"schemaVersion\":2"), "JSON");
+    assert!(decoded.starts_with(b"{\"schemaVersion\":3"), "JSON");
     Ok(())
 }

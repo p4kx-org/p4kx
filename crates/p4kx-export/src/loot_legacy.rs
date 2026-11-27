@@ -1,107 +1,230 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The older loot Records: `LootTable` and `LootArchetype`.
+use p4kx_extraction::{
+    CancelToken, Record, RecordTree, SourceUseRole, SourceValue, SourcedValue, Value,
+};
 
-use p4kx_extraction::{RecordTree, StructValue};
-
-use crate::contract_loot::QuantityRange;
+use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_v3::loot_definition_catalog::read_projected;
 use crate::contract_loot_legacy::{
-    LegacyLootArchetype, LegacyLootEntry, LegacyLootTable, LegacyLootTableEntry,
-    LegacySecondaryEntry, LegacySecondaryGroup, LegacySpawnWith,
-};
-use crate::guid_text::CatalogGuid;
-use crate::record_fields::{
-    class_name, integer, number, reference, references, structs, structure, text,
+    LegacyLootArchetype, LegacyLootEntry, LegacyLootQuantity, LegacyLootTable,
+    LegacyLootTableEntry, LegacySecondaryEntry, LegacySecondaryGroup, LegacySpawnWith,
 };
 
-/// Returns the older loot table the Record tree `tree` describes.
-pub(crate) fn legacy_table<'f>(tree: &RecordTree<'f>) -> LegacyLootTable<'f> {
-    let root = Some(tree.root());
-    LegacyLootTable {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        entries: structs(root, "lootArchetypes")
-            .map(|entry| {
-                let constraints = structure(Some(entry), "numberOfResultsConstraints");
-                LegacyLootTableEntry {
-                    weight: number(Some(entry), "weight"),
-                    archetype_guid: reference(Some(entry), "archetype"),
-                    min_results: integer(constraints, "minResults"),
-                    max_results: integer(constraints, "maxResults"),
+#[path = "legacy_loot_fields.rs"]
+mod legacy_loot_fields;
+
+use legacy_loot_fields::{Fact, Fields, Slots};
+
+const STACK_SIZE: &str = "EntryOptionalData_StackSize";
+const SPAWN_WITH: &str = "EntryOptionalData_SpawnWith";
+
+pub(crate) fn legacy_table<'source>(
+    record: &Record<'source>,
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<LegacyLootTable<'source>, CatalogError> {
+    let (original, entries) = read_projected(record, tree, input, cancel, |facts| {
+        let read = Fields { facts };
+        read.slots(None, "lootArchetypes", |slot| {
+            read.cell(slot, |slot| {
+                if !matches!(slot.value(), Value::Struct(_)) {
+                    return Ok(None);
                 }
+                read.table_entry(slot).map(Some)
             })
-            .collect(),
+        })
+    })?;
+    Ok(LegacyLootTable { original, entries })
+}
+
+pub(crate) fn legacy_archetype<'source>(
+    record: &Record<'source>,
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<LegacyLootArchetype<'source>, CatalogError> {
+    let (original, (excluded_tag_guids, entries, secondary_groups)) =
+        read_projected(record, tree, input, cancel, |facts| {
+            let read = Fields { facts };
+            let excluded =
+                read.nested(None, "excludedTags", |tags| read.references(tags, "tags"))?;
+            let primary = read.nested(None, "primaryOrGroup", |group| {
+                read.slots(Some(group), "entries", |slot| {
+                    read.cell(slot, |slot| read.primary_entry(slot))
+                })
+            })?;
+            let secondary = read.slots(None, "secondaryOrGroups", |slot| {
+                read.cell(slot, |slot| read.secondary_group(slot))
+            })?;
+            Ok((excluded, primary, secondary))
+        })?;
+    Ok(LegacyLootArchetype {
+        original,
+        excluded_tag_guids,
+        entries,
+        secondary_groups,
+    })
+}
+
+impl<'scope, 'read, 'source> Fields<'_, 'scope, 'read, 'source> {
+    fn nested<T>(
+        &self,
+        owner: Option<&Fact<'scope, 'read, 'source>>,
+        field: &str,
+        project: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<SourcedValue<T>, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let Some((_, nested)) = self.facts.field(owner, field)? else {
+            return self.absent(owner);
+        };
+        if let Value::Struct(_) = nested.value() {
+            project(nested)
+        } else {
+            self.cell(nested, |_| Ok(None))
+        }
     }
-}
 
-/// Returns the older loot archetype the Record tree `tree` describes.
-pub(crate) fn legacy_archetype<'f>(tree: &RecordTree<'f>) -> LegacyLootArchetype<'f> {
-    let root = Some(tree.root());
-    LegacyLootArchetype {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        excluded_tag_guids: references(structure(root, "excludedTags"), "tags"),
-        entries: structs(structure(root, "primaryOrGroup"), "entries")
-            .map(primary_entry)
-            .collect(),
-        secondary_groups: structs(root, "secondaryOrGroups")
-            .map(secondary_group)
-            .collect(),
-    }
-}
-
-fn primary_entry<'f>(entry: &StructValue<'f>) -> LegacyLootEntry<'f> {
-    let value = Some(entry);
-    let additional = structure(value, "additionalTags");
-    let optional: Vec<&StructValue<'f>> = structs(value, "optionalData").collect();
-    LegacyLootEntry {
-        name: text(value, "name"),
-        weight: number(value, "weight"),
-        tag_guid: reference(value, "tag"),
-        additional_positive_tag_guids: references(additional, "positiveTags"),
-        additional_negative_tag_guids: references(additional, "negativeTags"),
-        stack_size: optional
-            .iter()
-            .filter(|data| data.type_name() == "EntryOptionalData_StackSize")
-            .find_map(|data| range(Some(data))),
-        spawn_with: optional
-            .iter()
-            .filter(|data| data.type_name() == "EntryOptionalData_SpawnWith")
-            .map(|data| spawn_with(data))
-            .collect(),
-    }
-}
-
-fn spawn_with<'f>(data: &StructValue<'f>) -> LegacySpawnWith<'f> {
-    let value = Some(data);
-    let term = structure(value, "tagsToMatch");
-    LegacySpawnWith {
-        name: text(value, "name"),
-        mode: text(value, "mode"),
-        min: number(value, "min"),
-        max: number(value, "max"),
-        positive_tag_guids: references(term, "positiveTags"),
-        negative_tag_guids: references(term, "negativeTags"),
-    }
-}
-
-fn range(data: Option<&StructValue<'_>>) -> Option<QuantityRange> {
-    let min = number(data, "min");
-    let max = number(data, "max");
-    (min.is_some() || max.is_some()).then_some(QuantityRange { min, max })
-}
-
-fn secondary_group<'f>(group: &StructValue<'f>) -> LegacySecondaryGroup<'f> {
-    LegacySecondaryGroup {
-        group_name: text(Some(group), "groupName"),
-        entries: structs(Some(group), "entries")
-            .map(|entry| LegacySecondaryEntry {
-                weight: number(Some(entry), "weight"),
-                tag_guid: reference(Some(entry), "tag"),
+    fn table_entry(
+        &self,
+        entry: &Fact<'scope, 'read, 'source>,
+    ) -> Result<LegacyLootTableEntry, CatalogError> {
+        let limit = |name| {
+            self.nested(Some(entry), "numberOfResultsConstraints", |constraints| {
+                self.integer(constraints, name)
             })
-            .collect(),
+        };
+        Ok(LegacyLootTableEntry {
+            weight: self.number(entry, "weight")?,
+            archetype_guid: self.reference(entry, "archetype")?,
+            min_results: limit("minResults")?,
+            max_results: limit("maxResults")?,
+        })
+    }
+
+    fn primary_entry(
+        &self,
+        entry: &Fact<'scope, 'read, 'source>,
+    ) -> Result<Option<LegacyLootEntry<'source>>, CatalogError> {
+        if !matches!(entry.value(), Value::Struct(_)) {
+            return Ok(None);
+        }
+        let additional = |name| {
+            self.nested(Some(entry), "additionalTags", |tags| {
+                self.references(tags, name)
+            })
+        };
+        Ok(Some(LegacyLootEntry {
+            name: self.label(entry, "name")?,
+            weight: self.number(entry, "weight")?,
+            tag_guid: self.reference(entry, "tag")?,
+            additional_positive_tag_guids: additional("positiveTags")?,
+            additional_negative_tag_guids: additional("negativeTags")?,
+            stack_size: self.stack_size(entry)?,
+            spawn_with: self.spawn_entries(entry)?,
+        }))
+    }
+
+    fn stack_size(
+        &self,
+        entry: &Fact<'scope, 'read, 'source>,
+    ) -> Result<SourcedValue<LegacyLootQuantity>, CatalogError> {
+        let Some((_, array)) = self.facts.field(Some(entry), "optionalData")? else {
+            return self.absent(Some(entry));
+        };
+        if !matches!(array.value(), Value::Array(_)) {
+            return self.cell(array, |_| Ok(None));
+        }
+        let mut selectors = vec![Fields::selection_use(array)?];
+        for slot in self.facts.elements(array)? {
+            selectors.push(Fields::selection_use(slot)?);
+            if matches!(slot.value(), Value::Struct(fields) if fields.type_name() == STACK_SIZE) {
+                self.inspect_selector(slot, "min", &mut selectors)?;
+                self.inspect_selector(slot, "max", &mut selectors)?;
+                let min = self.number(slot, "min")?;
+                let max = self.number(slot, "max")?;
+                if min.value().is_some() || max.value().is_some() {
+                    return self.bind_selected(
+                        slot,
+                        SourceValue::Present(LegacyLootQuantity { min, max }),
+                        selectors,
+                    );
+                }
+            }
+        }
+        let state = if selectors
+            .iter()
+            .any(|used| used.role() == SourceUseRole::Attempted)
+        {
+            SourceValue::Unreadable
+        } else {
+            SourceValue::Absent
+        };
+        self.bind_selected(array, state, selectors)
+    }
+
+    fn spawn_entries(
+        &self,
+        entry: &Fact<'scope, 'read, 'source>,
+    ) -> Result<Slots<LegacySpawnWith<'source>>, CatalogError> {
+        let Some((_, array)) = self.facts.field(Some(entry), "optionalData")? else {
+            return self.absent(Some(entry));
+        };
+        if !matches!(array.value(), Value::Array(_)) {
+            return self.cell(array, |_| Ok(None));
+        }
+        let mut rows = Vec::new();
+        let mut selectors = Vec::new();
+        for slot in self.facts.elements(array)? {
+            selectors.push(Fields::selection_use(slot)?);
+            if matches!(slot.value(), Value::Struct(fields) if fields.type_name() == SPAWN_WITH) {
+                rows.push(self.bind(slot, SourceValue::Present(self.spawn_with(slot)?))?);
+            }
+        }
+        self.bind_selected(array, SourceValue::Present(rows), selectors)
+    }
+    fn spawn_with(
+        &self,
+        entry: &Fact<'scope, 'read, 'source>,
+    ) -> Result<LegacySpawnWith<'source>, CatalogError> {
+        let tags = |name| {
+            self.nested(Some(entry), "tagsToMatch", |tags| {
+                self.references(tags, name)
+            })
+        };
+        Ok(LegacySpawnWith {
+            name: self.label(entry, "name")?,
+            mode: self.label(entry, "mode")?,
+            min: self.number(entry, "min")?,
+            max: self.number(entry, "max")?,
+            positive_tag_guids: tags("positiveTags")?,
+            negative_tag_guids: tags("negativeTags")?,
+        })
+    }
+
+    fn secondary_group(
+        &self,
+        group: &Fact<'scope, 'read, 'source>,
+    ) -> Result<Option<LegacySecondaryGroup<'source>>, CatalogError> {
+        if !matches!(group.value(), Value::Struct(_)) {
+            return Ok(None);
+        }
+        let entries = self.slots(Some(group), "entries", |entry| {
+            self.cell(entry, |entry| {
+                if !matches!(entry.value(), Value::Struct(_)) {
+                    return Ok(None);
+                }
+                Ok(Some(LegacySecondaryEntry {
+                    weight: self.number(entry, "weight")?,
+                    tag_guid: self.reference(entry, "tag")?,
+                }))
+            })
+        })?;
+        Ok(Some(LegacySecondaryGroup {
+            group_name: self.label(group, "groupName")?,
+            entries,
+        }))
     }
 }

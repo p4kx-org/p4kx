@@ -2,15 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
-use std::path::Path;
 
-use p4kx_extraction::{
-    CSV_BYTE_ORDER_MARK, FieldStat, MAX_DISTINCT_VALUES, Number, write_csv_cell,
-};
-use serde::Serialize;
+use p4kx_extraction::{CSV_BYTE_ORDER_MARK, CsvCellMode, FieldStat, write_csv_cell_with_mode};
 
 use crate::dcb_fields::Listing;
-use crate::json;
 use crate::query_table::one_line;
 
 const GAP: &str = "  ";
@@ -45,115 +40,20 @@ pub(crate) fn table(out: &mut impl Write, listing: &Listing<'_>) -> io::Result<(
     )
 }
 
-/// Writes the listing as CSV after RFC 4180 with a header row; with `neutralise`, it starts with
-/// a byte order mark and a path or kind that a spreadsheet would run as a formula starts with `'`.
-pub(crate) fn csv(out: &mut impl Write, listing: &Listing<'_>, neutralise: bool) -> io::Result<()> {
-    if neutralise {
+/// Writes the listing as CSV using the selected character and spreadsheet policy.
+pub(crate) fn csv(
+    out: &mut impl Write,
+    listing: &Listing<'_>,
+    mode: CsvCellMode,
+) -> io::Result<()> {
+    if mode == CsvCellMode::Spreadsheet {
         out.write_all(CSV_BYTE_ORDER_MARK)?;
     }
-    write_csv_row(out, &HEADER.map(str::to_owned), neutralise)?;
+    write_csv_row(out, &HEADER.map(str::to_owned), mode)?;
     for field in &listing.fields {
-        write_csv_row(out, &cells(field), neutralise)?;
+        write_csv_row(out, &cells(field), mode)?;
     }
     Ok(())
-}
-
-/// Writes the listing as one line of JSON, defined in docs/cli-json.md.
-pub(crate) fn json(out: &mut impl Write, archive: &Path, listing: &Listing<'_>) -> io::Result<()> {
-    let result = ResultJson {
-        archive: json::path(archive),
-        records: listing.statistics.records(),
-        unreadable_records: listing.statistics.unreadable_records(),
-        unreadable_values: listing.statistics.unreadable_values(),
-        max_distinct: MAX_DISTINCT_VALUES,
-        field_count: listing.fields.len(),
-        fields: listing
-            .fields
-            .iter()
-            .map(|field| FieldJson::of(field))
-            .collect(),
-    };
-    serde_json::to_writer(&mut *out, &result)?;
-    writeln!(out)
-}
-
-#[derive(Serialize)]
-struct ResultJson<'a> {
-    archive: String,
-    records: u64,
-    unreadable_records: u64,
-    unreadable_values: u64,
-    max_distinct: usize,
-    field_count: usize,
-    fields: Vec<FieldJson<'a>>,
-}
-
-#[derive(Serialize)]
-struct FieldJson<'a> {
-    path: &'a str,
-    occurrences: u64,
-    records: u64,
-    empty: u64,
-    kinds: Vec<KindJson>,
-    distinct: usize,
-    distinct_capped: bool,
-    min: Option<NumberJson>,
-    max: Option<NumberJson>,
-}
-
-#[derive(Serialize)]
-struct KindJson {
-    kind: String,
-    count: u64,
-}
-
-#[derive(Serialize)]
-#[serde(untagged)]
-enum NumberJson {
-    Signed(i64),
-    Unsigned(u64),
-    Float(f64),
-}
-
-impl<'a> FieldJson<'a> {
-    fn of(field: &'a FieldStat) -> Self {
-        Self {
-            path: field.path(),
-            occurrences: field.occurrences(),
-            records: field.records(),
-            empty: field.empty(),
-            kinds: field
-                .kinds()
-                .iter()
-                .map(|(kind, count)| KindJson {
-                    kind: kind.to_string(),
-                    count: *count,
-                })
-                .collect(),
-            distinct: field.distinct(),
-            distinct_capped: field.distinct_capped(),
-            min: field.min().and_then(NumberJson::of),
-            max: field.max().and_then(NumberJson::of),
-        }
-    }
-}
-
-impl NumberJson {
-    /// Returns the number as JSON, or `None` for an infinite float, which JSON cannot hold.
-    fn of(number: Number) -> Option<Self> {
-        match number {
-            Number::Integer(value) => i64::try_from(value)
-                .map(Self::Signed)
-                .or_else(|_| u64::try_from(value).map(Self::Unsigned))
-                .ok(),
-            other => other
-                .to_string()
-                .parse::<f64>()
-                .ok()
-                .filter(|value| value.is_finite())
-                .map(Self::Float),
-        }
-    }
 }
 
 fn cells(field: &FieldStat) -> [String; COLUMNS] {
@@ -174,14 +74,8 @@ fn cells(field: &FieldStat) -> [String; COLUMNS] {
         field.records().to_string(),
         field.empty().to_string(),
         distinct,
-        field
-            .min()
-            .map(|number| number.to_string())
-            .unwrap_or_default(),
-        field
-            .max()
-            .map(|number| number.to_string())
-            .unwrap_or_default(),
+        field.min().map_or_default(|number| number.to_string()),
+        field.max().map_or_default(|number| number.to_string()),
     ]
 }
 
@@ -207,14 +101,19 @@ fn line(
 fn write_csv_row(
     out: &mut impl Write,
     cells: &[String; COLUMNS],
-    neutralise: bool,
+    mode: CsvCellMode,
 ) -> io::Result<()> {
     for (index, cell) in cells.iter().enumerate() {
         if index > 0 {
             out.write_all(b",")?;
         }
-        let text = matches!(index, PATH_COLUMN | KINDS_COLUMN);
-        write_csv_cell(out, cell, neutralise && text)?;
+        let field_mode =
+            if mode == CsvCellMode::Spreadsheet && !matches!(index, PATH_COLUMN | KINDS_COLUMN) {
+                CsvCellMode::Raw
+            } else {
+                mode
+            };
+        write_csv_cell_with_mode(out, cell, field_mode)?;
     }
     out.write_all(b"\r\n")
 }

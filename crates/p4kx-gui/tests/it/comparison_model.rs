@@ -3,6 +3,9 @@
 
 //! The Comparison tab's state over a pair of synthetic Archives, without drawing.
 
+#[path = "comparison_summary_provenance.rs"]
+mod summary_provenance;
+
 use crate::comparing;
 use crate::waiting::wait_polling_described;
 

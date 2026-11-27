@@ -1,0 +1,79 @@
+# Localisation verification reads source lines and keeps per-kind baselines
+
+Decided for #1041. Builds on ADR-0270 and its per-key/per-kind contract.
+
+## Evidence
+
+The unchanged product code at `72259124` reproduces the reported failure against the installed
+LIVE Archive: German summary counters are 31,780 resolved, 74,411 unresolved and 23,717
+placeholders. The old `resolved > unresolved` assertion fails.
+
+A separate test executable built from the same product code compares every exported keyed text
+directly with decoded source INI lines. All 18 text-bearing kinds pass their existing baselines
+and have no source contradictions. The largest German source gaps occur in contracts, mission
+broker entries, items, contract templates and mission location templates. These are keys missing
+or empty in the German source file, rather than values silently lost by the resolver.
+
+Per-kind figures count serialized keyed-field occurrences, which can repeat through contract
+fanout. Summary counters count resolver calls and therefore need not sum to the serialized
+occurrences. Neither count measures unique source Records or unique localisation keys.
+
+## Decision
+
+- The primary real-Archive catalog test checks source texts per key and kind instead of demanding
+  a majority of resolved texts over the entire catalog. Existing baselines, German floors and
+  manufacturer-name checks remain. No translation-gap threshold is lowered.
+- The test oracle parses decoded source lines without using `GlobalIni`, `TextSet::lookup` or
+  the exporter's display normalizer. Keys ignore ASCII case and an input lookup's leading `@`.
+  The last plain and last suffixed declarations are retained; a non-empty plain declaration
+  takes precedence. Display normalization decodes literal `\n` and trims the result.
+- A missing or empty source value requires an explicit JSON null. A contradictory, malformed
+  or invented translation fails independently of every other resolved count. Placeholder keys
+  stay separate, and missing-language behavior remains covered by synthetic catalog tests.
+- The existing mission-token rewrite allowance checks for a present, non-empty result. Its
+  transformation-specific tests remain separate from translation completeness.
+- Synthetic oracle mutations run without a game Archive. Real-source tests remain ignored and
+  private. Future language-map expansion must retain this independent regression check.
+
+## Verification scope
+
+The baseline reproduction and source-line concordance establish the cause of #1041 on LIVE.
+They do not establish completeness of unrelated domain projections or validate a PTU Build.
+The final milestone gate still runs the full current real-Archive suite after the remaining
+catalog adaptations land.
+
+## Canonical text verification
+
+The ResourceGroup, gameplay-property, reputation scope and reputation standing name references
+contribute to the same per-kind denominators. The new group and scope descriptions, standing perk
+description, gameplay-property unit formats and name overrides have independent contradiction
+checks. A source translation gap in an added field leaves the existing denominator unchanged.
+
+The ignored LIVE text check compares the current Build identity and English and German source
+lines with an unfiltered catalog.
+
+~~~powershell
+cargo test --locked -p p4kx-export --test real_archive -- installed_live_catalog_texts_match_the_independent_source_oracle --ignored --nocapture
+~~~
+
+Set the installed LIVE Archive through `P4KX_DATA_P4K` and use the configured testkit key source
+and task-local `TMP` and `TEMP`. By default a catalog writer sends JSON through an anonymous
+pipe to the text verification reader. The reader keeps the schema-v3 sections needed by the
+existing per-kind comparisons, including original mission graphs and the shared language tables.
+It discards unrelated sections as it consumes the stream and checks the exact written byte count.
+For Entry-backed families it keeps the physical source IDs, kinds, indices and source paths used
+by the catalog consumer. It discards the provenance use inventory.
+For canonical Item definitions it retains the physical record and component positions, source
+carriers and text references used by the oracle. The decoder still checks the syntax of discarded
+Item fields, and synthetic cases compare the results with a fully decoded document.
+The test logs elapsed time for Record progress, opening the output sink and finishing JSON
+decoding. These milestones let a process-memory sample be assigned to preparation or output.
+This check writes no catalog file. By default it requires complete reads and projections for
+the text families with baselines and allows unrelated diagnostic partial publication.
+
+To reuse a [completed normal measurement](../catalog-partitioning.md#reconciling-an-existing-measurement)
+set `P4KX_CATALOG_MEASUREMENT_DIR` for the same test. The reader streams the compressed file
+in place. It checks receipt lengths, schema version, unfiltered selection, normal export health
+and the catalog's Build and Archive stamp before comparing the original translations.
+
+The full installed-Archive suite verifies publication size and schema separately.

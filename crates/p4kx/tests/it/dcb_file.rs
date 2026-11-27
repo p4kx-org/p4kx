@@ -3,6 +3,11 @@
 
 //! Every `p4kx dcb` command over a DataForge file on disk in place of an Archive.
 
+#[path = "dcb_file_origin_guard.rs"]
+mod origin_guard;
+#[path = "dcb_file_parity.rs"]
+mod parity;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
@@ -17,9 +22,6 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
 const TRUCK: u128 = 0x50e8_a9f6_f956_4000_8ace_7c0c_a9a9_1f5d;
-
-/// The size limit of a DataForge file, 2 GiB.
-const LIMIT: u64 = 2 << 30;
 
 fn database() -> DataForgeBuilder {
     DataForgeBuilder::new()
@@ -178,10 +180,7 @@ fn the_export_of_a_file_and_of_its_archive_are_byte_identical() -> TestResult {
         0,
     )?;
 
-    let exported = files(&from_file)?;
-    assert_eq!(exported.len(), 2, "one file per Record");
-    assert_eq!(exported, files(&from_archive)?);
-    Ok(())
+    parity::assert_record_export_parity(&from_file, &from_archive, None)
 }
 
 #[test]
@@ -266,15 +265,7 @@ fn lang_on_a_file_takes_the_texts_from_the_given_archive() -> TestResult {
         0,
     )?;
 
-    let exported = files(&from_file)?;
-    assert!(
-        exported
-            .values()
-            .any(|bytes| String::from_utf8_lossy(bytes).contains("Cart")),
-        "the text is resolved"
-    );
-    assert_eq!(exported, files(&from_archive)?);
-    Ok(())
+    parity::assert_record_export_parity(&from_file, &from_archive, Some("en"))
 }
 
 #[test]
@@ -328,20 +319,24 @@ fn a_file_of_an_unsupported_version_exits_with_code_5() -> TestResult {
     Ok(())
 }
 
+#[cfg(target_pointer_width = "64")]
 #[test]
-fn a_dataforge_over_the_size_limit_exits_with_code_5() -> TestResult {
+fn a_large_declaration_with_short_data_exits_as_a_read_error() -> TestResult {
     let fixture = fixture()?;
     let oversize = fixture.root.join("Oversize.p4k");
     ArchiveBuilder::new()
         .entry(
             TestEntry::stored("Data\\Game2.dcb", database().build())
-                .with_uncompressed_size(LIMIT + 1),
+                .with_uncompressed_size((2 << 30) + 1),
         )
         .write_to(&oversize)?;
 
-    let message = run(&["info"], &oversize, &[], 5)?;
+    let message = run(&["info"], &oversize, &[], 3)?;
 
-    assert!(message.contains("more than the limit"), "{message}");
+    assert!(
+        message.contains("cannot read the DataForge Entry"),
+        "{message}"
+    );
     Ok(())
 }
 

@@ -12,7 +12,7 @@ use std::rc::Rc;
 use egui_kittest::Harness;
 use egui_kittest::wgpu::WgpuTestRenderer;
 use p4kx_gui::ui::Dialog;
-use p4kx_gui::{Language, Model, UiExportStatus, WorkTab, ui};
+use p4kx_gui::{Language, Model, UiExportStatus, UiPreviewOrigins, WorkTab, ui};
 use p4kx_testkit::{
     GlobalIniBuilder, TestEntry, TestFill, TestMovie, TestPlace, TestShape, TestShapeRecord,
     TestSignature, external_image_body, screens_font_movie, screens_sample,
@@ -179,6 +179,24 @@ pub(crate) fn listed_with(
 pub(crate) const fn drawn(model: &Model) -> bool {
     let tab = model.ui();
     !tab.is_rendering() && (tab.rendered().is_some() || tab.render_failure().is_some())
+}
+
+/// Asserts that each preview dimension uses the clear source stage.
+pub(crate) fn assert_clear_stage_origins(origins: &UiPreviewOrigins) {
+    for dimension in [&origins.width, &origins.height] {
+        assert_eq!(
+            dimension.contains_encrypted_source(),
+            Some(false),
+            "clear movie stage"
+        );
+        assert!(
+            origins
+                .inventory
+                .iter_uses()
+                .any(|usage| dimension.source_uses_refs().contains(usage.id())),
+            "the stage dimension resolves in this preview's inventory"
+        );
+    }
 }
 
 /// Returns whether the export ended.

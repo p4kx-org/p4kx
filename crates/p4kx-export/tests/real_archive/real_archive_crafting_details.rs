@@ -8,7 +8,8 @@ use std::error::Error;
 use std::time::{Instant, SystemTime};
 
 use p4kx_export::{
-    BlueprintTiers, CatalogOptions, Cost, Crafting, ModifierKind, build_catalog, read_crafting,
+    BlueprintTiers, CatalogOptions, Cost, Crafting, ModifierKind, Tier, build_catalog,
+    read_crafting,
 };
 use p4kx_extraction::{Archive, DataForge, DataForgeEntry, Guid, is_placeholder_key};
 use p4kx_testkit::real_archive_path;
@@ -30,42 +31,14 @@ fn guid(text: &str) -> Result<Guid, Box<dyn Error>> {
     Ok(text.parse()?)
 }
 
-fn selections<'c, 'f>(cost: &'c Cost<'f>, out: &mut Vec<&'c p4kx_export::Selection<'f>>) {
-    if let Cost::Select(selection) = cost {
-        out.push(selection);
-        for option in &selection.options {
-            selections(option, out);
-        }
-    }
-}
-
-fn costs<'c, 'f>(blueprint: &'c BlueprintTiers<'f>) -> Vec<&'c Cost<'f>> {
-    blueprint
-        .tiers
-        .iter()
-        .flat_map(|tier| tier.mandatory.iter().chain(&tier.optional))
-        .collect()
-}
-
-fn leaves<'c, 'f>(cost: &'c Cost<'f>, out: &mut Vec<&'c Cost<'f>>) {
-    match cost {
-        Cost::Select(selection) => {
-            for option in &selection.options {
-                leaves(option, out);
-            }
-        }
-        other => out.push(other),
-    }
+fn costs<'c, 'f>(blueprint: &'c BlueprintTiers<'f>) -> impl Iterator<Item = &'c Cost<'f>> {
+    blueprint.tiers.iter().flat_map(Tier::costs)
 }
 
 fn multipliers<'f>(crafting: &Crafting<'f>) -> Vec<(&'f str, f32)> {
     let mut found = Vec::new();
     for blueprint in &crafting.blueprints {
-        let mut all = Vec::new();
-        for cost in costs(blueprint) {
-            leaves(cost, &mut all);
-        }
-        for leaf in all {
+        for leaf in costs(blueprint) {
             let multiplier = match leaf {
                 Cost::Resource(line) => line.context.quantity_multiplier,
                 Cost::Item(line) => line.context.quantity_multiplier,
@@ -113,7 +86,10 @@ fn times_the_crafting_phase_of_a_real_archive() -> TestResult {
         crafting.warnings
     );
     let started = Instant::now();
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     println!(
         "build_catalog: {:?}, {} bytes",
         started.elapsed(),
@@ -186,7 +162,7 @@ fn check_selections(crafting: &Crafting<'_>) -> TestResult {
         .ok_or("the LMG magazine blueprint")?;
     let tier = magazine.tiers.first().ok_or("a tier")?;
     assert_eq!(tier.craft_time_seconds, Some(10), "craft time");
-    let Some(Cost::Select(outer)) = &tier.mandatory else {
+    let Some(Cost::Select(outer)) = tier.mandatory_cost() else {
         return Err("a selection as mandatory cost".into());
     };
     assert_eq!(outer.count, Some(2), "choose 2 of 2");
@@ -195,11 +171,8 @@ fn check_selections(crafting: &Crafting<'_>) -> TestResult {
         .blueprints
         .iter()
         .filter(|bp| {
-            let mut found = Vec::new();
-            for cost in costs(bp) {
-                selections(cost, &mut found);
-            }
-            found.iter().any(|selection| selection.chooses_fewer())
+            costs(bp)
+                .any(|cost| matches!(cost, Cost::Select(selection) if selection.chooses_fewer()))
         })
         .count();
     assert!(fewer >= 1, "blueprints that let the player choose fewer");
@@ -218,9 +191,7 @@ fn check_modifiers(crafting: &Crafting<'_>) {
     let mut ranges = Vec::new();
     for blueprint in &crafting.blueprints {
         for cost in costs(blueprint) {
-            let mut found = Vec::new();
-            selections(cost, &mut found);
-            for selection in found {
+            if let Cost::Select(selection) = cost {
                 for modifier in &selection.context.modifiers {
                     ranges.extend(modifier.ranges.iter().copied());
                 }
@@ -257,7 +228,7 @@ fn check_distributions(crafting: &Crafting<'_>) -> TestResult {
     assert_eq!(curve.kind, "CraftingQualityDistributionNormal", "kind");
     assert_eq!(
         (curve.min, curve.max, curve.mean, curve.stddev),
-        (Some(1.0), Some(1000.0), Some(269.0), Some(254.0)),
+        (Some(1), Some(1000), Some(269.0), Some(254.0)),
         "the curve"
     );
     let pyro = guid(PYRO)?;

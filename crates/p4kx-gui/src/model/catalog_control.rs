@@ -4,15 +4,15 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use p4kx_extraction::is_same_file;
+use p4kx_extraction::{ProvenanceMode, is_same_file};
 
 use super::Model;
 use crate::catalog_export::{is_gzip, normalised_catalog_file, refused, refused_gzip, start};
 #[cfg(feature = "test-hooks")]
 use crate::hold::Pause;
-use crate::{CatalogExport, RecordTreeStatus};
+use crate::{CatalogExport, CatalogExportOptions, RecordTreeStatus};
 
-/// The Basetool catalog of the window: the running or finished catalog.
+/// The P4KX catalog of the window: the running or finished catalog.
 #[derive(Debug, Default)]
 pub(crate) struct CatalogState {
     run: Option<CatalogExport>,
@@ -21,7 +21,7 @@ pub(crate) struct CatalogState {
 }
 
 impl Model {
-    /// Returns whether a Basetool catalog can be created: the open Archive has a DataForge that
+    /// Returns whether a P4KX catalog can be created: the open Archive has a DataForge that
     /// did not fail to load, no catalog is being created, and the DataForge is not a file on
     /// its own, since the catalog reads Entries too.
     #[must_use]
@@ -35,17 +35,31 @@ impl Model {
                 .is_some_and(CatalogExport::is_running)
     }
 
-    /// Starts creating the Basetool catalog of the open Archive into `file` on a background
-    /// thread, calling `wake` from it once it ended; returns whether it started.
-    ///
-    /// Nothing starts while no catalog is available or once the Archive changed on disk. A
-    /// finished catalog is dismissed. When `file` is the open Archive nothing starts either, and
-    /// the catalog shows [`CatalogExportStatus::IsArchive`](crate::CatalogExportStatus::IsArchive),
-    /// and when it ends in `.gz` the catalog shows
-    /// [`CatalogExportStatus::GzipNotSupported`](crate::CatalogExportStatus::GzipNotSupported).
-    /// The file name is normalised first: `foo.zst` becomes `foo.json.zst` and a doubled `.json`
-    /// is collapsed, whatever the save dialog appended.
+    /// Starts a normal catalog job for the open Archive and calls `wake` when it ends.
+    /// Normalizes the filename and refuses invalid targets or incomplete publication.
     pub fn start_catalog(&mut self, file: PathBuf, wake: impl Fn() + Send + 'static) -> bool {
+        self.start_catalog_with_options(file, CatalogExportOptions::default(), wake)
+    }
+
+    /// Starts a catalog job with explicit source selection and publication policy.
+    /// Refusals write nothing; diagnostic permission applies only to this job.
+    pub fn start_catalog_with_options(
+        &mut self,
+        file: PathBuf,
+        options: CatalogExportOptions,
+        wake: impl Fn() + Send + 'static,
+    ) -> bool {
+        self.start_catalog_with_provenance_mode(file, options, ProvenanceMode::MarkersOnly, wake)
+    }
+
+    /// Starts a catalog job with an explicit provenance profile.
+    pub fn start_catalog_with_provenance_mode(
+        &mut self,
+        file: PathBuf,
+        options: CatalogExportOptions,
+        provenance_mode: ProvenanceMode,
+        wake: impl Fn() + Send + 'static,
+    ) -> bool {
         if self.check_archive() || !self.catalog_available() {
             return false;
         }
@@ -54,11 +68,11 @@ impl Model {
         };
         let file = normalised_catalog_file(file);
         if is_gzip(&file) {
-            self.catalog.run = Some(refused_gzip(file));
+            self.catalog.run = Some(refused_gzip(file, options.publication_mode));
             return false;
         }
         if is_same_file(&file, browser.archive_index().path()) {
-            self.catalog.run = Some(refused(file));
+            self.catalog.run = Some(refused(file, options.publication_mode));
             return false;
         }
         let index = Arc::clone(browser.shared_index());
@@ -66,6 +80,8 @@ impl Model {
         let run = start(
             &index,
             file,
+            options,
+            provenance_mode,
             wake,
             self.catalog
                 .gate
@@ -73,12 +89,12 @@ impl Model {
                 .map_or_else(Pause::default, Pause::at),
         );
         #[cfg(not(feature = "test-hooks"))]
-        let run = start(&index, file, wake);
+        let run = start(&index, file, options, provenance_mode, wake);
         self.catalog.run = Some(run);
         true
     }
 
-    /// Makes the next Basetool catalog wait once it started building, until the returned hold is
+    /// Makes the next P4KX catalog wait once it started building, until the returned hold is
     /// dropped or the catalog is cancelled.
     #[cfg(feature = "test-hooks")]
     pub fn hold_catalog(&mut self) -> crate::Hold {
@@ -100,32 +116,32 @@ impl Model {
             })
     }
 
-    /// Returns the running or finished Basetool catalog, or `None` when there is none.
+    /// Returns the running or finished P4KX catalog, or `None` when there is none.
     #[must_use]
     pub const fn catalog(&self) -> Option<&CatalogExport> {
         self.catalog.run.as_ref()
     }
 
-    /// Takes the outcome of a Basetool catalog that ended; returns whether one ended.
+    /// Takes the outcome of a P4KX catalog that ended; returns whether one ended.
     pub fn poll_catalog(&mut self) -> bool {
         self.catalog.run.as_mut().is_some_and(CatalogExport::poll)
     }
 
-    /// Asks the running Basetool catalog to stop.
+    /// Asks the running P4KX catalog to stop.
     pub fn cancel_catalog(&self) {
         if let Some(run) = &self.catalog.run {
             run.cancel();
         }
     }
 
-    /// Cancels the running Basetool catalog and waits until it ended.
+    /// Cancels the running P4KX catalog and waits until it ended.
     pub fn stop_catalog(&mut self) {
         if let Some(run) = &mut self.catalog.run {
             run.stop();
         }
     }
 
-    /// Dismisses the outcome of a Basetool catalog that ended.
+    /// Dismisses the outcome of a P4KX catalog that ended.
     pub fn close_catalog(&mut self) {
         if !self
             .catalog

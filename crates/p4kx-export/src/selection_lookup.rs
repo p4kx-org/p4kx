@@ -3,15 +3,19 @@
 
 use std::fmt;
 
-use crate::selection::{Kind, KindRule};
+#[cfg(test)]
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+#[cfg(test)]
+use crate::harvest_config::is_slotpreset_path;
+use crate::selection::{Exosuit, Kind, KindRule};
 
 impl Kind {
-    /// Returns whether the kind is read by [`read_crafting`](crate::read_crafting) or by the
-    /// contract reader rather than by the generic selection of the catalog build.
-    pub(crate) const fn is_crafting(self) -> bool {
+    /// Returns whether a dedicated reader owns this kind instead of the generic Record scan.
+    pub(crate) const fn has_dedicated_reader(self) -> bool {
         matches!(
             self,
-            Self::Blueprints
+            Self::Tags
+                | Self::Blueprints
                 | Self::GameplayProperties
                 | Self::QualityDistributions
                 | Self::QualityQuantizations
@@ -36,14 +40,19 @@ impl Kind {
         }
     }
 
-    /// Returns the first kind in [`Kind::ALL`] one of whose prefixes `record_path` starts with,
+    /// Returns the first kind in [`Kind::ALL`] matching `record_path`,
     /// and never a derived kind. The prefixes of [`Kind::Crafters`] overlap those of the entity
     /// kinds; only the order of [`Kind::ALL`] resolves it. Kinds that share a folder are told
-    /// apart by [`Self::by_record`].
+    /// apart by [`Self::by_record`]. Multi configs retain slot-preset path lookup.
+    /// Other type-wide Loot definitions require a Record type.
+    #[cfg(test)]
     pub(crate) fn by_path(record_path: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| {
-            kind.rule()
-                .is_some_and(|rule| rule.matches_path(record_path))
+            if *kind == Self::SubHarvestableMultiConfigs {
+                return is_slotpreset_path(record_path);
+            }
+            !LootDefinitionKind::of(*kind).is_some_and(LootDefinitionKind::is_type_wide)
+                && kind.matches_record_path(record_path)
         })
     }
 
@@ -51,9 +60,15 @@ impl Kind {
     /// kinds that share a folder (the V3 and the older loot Records) differ by the struct.
     pub(crate) fn by_record(record_path: &str, type_name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| {
-            kind.rule()
-                .is_some_and(|rule| rule.selects(record_path, type_name))
+            kind.rule().is_some_and(|rule| rule.type_name == type_name)
+                && kind.matches_record_path(record_path)
         })
+    }
+
+    pub(crate) fn matches_record_path(self, record_path: &str) -> bool {
+        self.rule()
+            .is_some_and(|rule| rule.matches_path(record_path))
+            || (self == Self::Ships && Exosuit::by_path(record_path).is_some())
     }
 
     /// Returns whether the kind is derived from the entities of other kinds and selects no Records
@@ -66,11 +81,28 @@ impl Kind {
                 | Self::Loadouts
                 | Self::HarvestableLocations
                 | Self::Shops
+                | Self::ShopInventories
+                | Self::ParticleLibraries
+                | Self::FlareLibraries
+                | Self::SubsumptionEvents
+                | Self::ClientProfileSettings
+                | Self::RadarAudio
+                | Self::PlanetResources
+                | Self::Creatures
+                | Self::ClimateAssets
+                | Self::GeologyAssets
+                | Self::Ecosystems
+                | Self::GeologySets
+                | Self::GeologyTextureSets
+                | Self::Soils
+                | Self::SoilTextureSets
+                | Self::ShadingClasses
                 | Self::LootContainers
                 | Self::ContractShipSpawns
                 | Self::ContractLocationQueries
                 | Self::ContractNpcSpawns
                 | Self::ContractEntitySpawns
+                | Self::MissionPropertySets
         )
     }
 }

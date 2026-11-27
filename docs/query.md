@@ -60,7 +60,7 @@ filter.
 
 ## Output formats
 
-`p4kx dcb query <archive> "<query>" [--format table|csv|json] [--csv-raw] [--out <file>]` writes
+`p4kx dcb query <archive> "<query>" [--format table|csv|csv-strict|json] [--csv-raw] [--out <file>]` writes
 the result in one of three formats; the default is `table`, or `json` with `--json`. All three have the
 same columns and rows in the same order. No heading of a `select` path is `record path`,
 because a name with a space is written in backticks.
@@ -73,9 +73,12 @@ and replaces an existing file; stdout then gets one summary line such as
 References that link to no Record ([Following References](#following-references)), or a JSON summary with `--json` (see
 [cli-json.md](cli-json.md)). A Record whose layout cannot be read gives no row in any format;
 it is reported on stderr and the exit code is 1. An `--out` that is the Archive itself is
-rejected with exit code 2, and so is `--json` with another format and without `--out`. A run
-that is killed, e.g. by Ctrl+C, can leave the temporary file `<file>.p4kx-<process id>.part`
-behind; the target itself is never half written.
+rejected with exit code 2, and so is `--json` with another format and without `--out`. An
+interrupted run can leave its staging file behind.
+
+For field origins, add `--origin-receipt` to a file export. With stdout, use
+`--origin-out <file>` or `--origin-stderr`. These flags publish the
+[DataForge Query companion](source-origin.md#dataforge-query-results) for the emitted rows.
 
 ### Table
 
@@ -91,7 +94,7 @@ use CSV or JSON.
 
 ### CSV
 
-CSV after [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180):
+UTF-8 CSV uses the row and quoting conventions of [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180).
 
 - UTF-8 with a byte order mark, so that a spreadsheet reads the encoding right; every row, the
   header row included, ends with CRLF.
@@ -112,7 +115,14 @@ CSV after [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180):
   Numbers, booleans and GUIDs are never changed, so `-0.25` stays a number.
 - `--csv-raw` (with `--format csv`) writes the exact values: no byte order mark and no leading
   `'`. Use it for scripts that read the file. `p4kx dcb fields` follows the same rules;
-  `p4kx loc export` too, except that its file always starts with the byte order mark.
+  `p4kx loc export --format csv` also accepts `--csv-raw` and retains its byte order mark.
+
+Use `--format csv-strict` for the exact field grammar in RFC 4180 §2. The same mode is
+available for `dcb fields`, `dcb export --flat`, `loc export` and `actionmap export`.
+It writes ASCII without a byte order mark, quotes empty fields, and rejects tabs,
+ASCII control characters other than quoted CR/LF, and non-ASCII characters. Use
+ordinary CSV or JSON when those characters need to be exported. Strict CSV preserves
+field values and does not apply the spreadsheet formula prefix.
 
 ```text
 record path,name,crew,mass
@@ -235,10 +245,9 @@ of them, and the Query selects the Records that refer to any of them. A Record t
 itself is not selected for that. A weak pointer to a nested instance of another Record, not to
 that Record itself, is not a Reference and selects nothing. It combines with `from` and `at`:
 both keep only the Records that also meet them. The clauses stand in the order `from`, `at`,
-`referencing`, `select`, `where`; `at "…"` behind `referencing` is an error that says so. An
-Archive with more than 8,388,608 References is indexed up to that many, the first ones in Record
-order. The first Query with `referencing` of an Archive reads every Record once to
-index the References ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
+`referencing`, `select`, `where`. An `at "…"` behind `referencing` is an error. The first
+Query with `referencing` of an Archive reads every Record once and indexes the readable
+References without a fixed count limit ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
 the window keeps that index for the Archive, and `p4kx dcb refs` lists the References themselves
 with their fields.
 
@@ -322,18 +331,16 @@ writes that same JSON array in its field. The table writes the values in their t
 separated by `, ` in brackets, e.g. `[250.5, 1200]` or `[]`, shortened after 8 values; the
 values are not quoted there, so a string holding `, ` or `]` reads ambiguously in the table only.
 
-Paths reach at most 4,096 array elements (`MAX_PATH_VALUES`). The `select` paths of one row share
-this budget, as their cells hold their values: it bounds the memory of a page to at most 4,096
-values per row. Each comparison of `where` has a budget of its own, as it holds none of the values
-it compares, so `tags[*] = -1 or tags[*] = 1` checks both comparisons in full. `[n]` counts one
-element, `[*]` and `[TypeName]` every element of their array, also those `[TypeName]` skips, and
-nested brackets count on every level: `Components[*].modes[*]` counts the components and then
-the modes of each.
+The `select` paths of one row share a budget of 4,096 array elements (`MAX_PATH_VALUES`), as
+cells retain their values. `[n]` counts one element, `[*]` and `[TypeName]` every element of their
+array, including those a type selector skips; nested brackets count at every level. A bracket
+that would exceed the remaining budget produces the error value `error: the paths of the Record
+reach more than 4096 array elements` in its cell. The cells after it can use the remaining budget.
 
-A bracket that would go beyond the budget of the row gives the error value `error: the paths of
-the Record reach more than 4096 array elements` in its cell, and the cells after it can still
-read what remains. A comparison that would go beyond its budget is unknown, unless a value it
-reached before already holds.
+Comparisons in `where` stream values without retaining a list or imposing an element-count cap.
+An existential comparison stops when a value proves it true. Cancellable selection checks its
+callback at Records, path steps and array elements, including elements skipped by `[TypeName]`.
+An observed stop is latched and drops the entire selection.
 
 ## Conditions
 
@@ -394,19 +401,35 @@ damage, ships without weapons included.
 
 A comparison is unknown when the Record has no value for its path: its type does not resolve the
 path (without `from`), the path ends at a type the value cannot be compared with, reaches `null`
-through a null pointer or an index out of range, or the value cannot be read. An unknown
+through a null pointer or an index out of range. An unknown
 comparison never matches, and the conditions combine as in SQL:
 `not` of unknown is unknown, `false and unknown` is false, `true or unknown` is true, and any
 other combination with unknown is unknown. A Record is kept only when the whole condition is
 true, so `x = 1` and `not x = 1` together never select a Record without a value for `x`.
 
-A Record whose layout or instance cannot be read is different: no value of it can be read, so
-the condition cannot be decided, and the Record is reported as failed rather than silently
-dropped, as for `select`.
+A demanded value that cannot be read is a selection failure, carrying the Record definition
+index, record path, comparison index and original value-reading error. It does not become unknown
+or a successful empty result. A true existential witness, `true or ...`, or `false and ...` proves
+the result without demanding irrelevant read failures, including failures reached before that
+proof. Without such a proof, a reached read failure is reported even alongside ordinary unknowns.
+A stop remains authoritative over a proof or read failure.
+
+`CompiledQuery::run` returns `Result<QueryRun, SelectionError>`; `run_while` returns
+`Result<Option<QueryRun>, SelectionError>`, with `Ok(None)` for a stop. Successful indexes alone
+may be cached or resumed. CLI query and field statistics return DataForge error status 5 on a
+selection failure before writing output; MCP returns a tool error and the GUI reports a failed
+Query. Existing atomic exports remain intact when selection fails or is stopped.
+
+A Record whose entire layout or instance cannot be read retains its visible failed row. This is
+separate from an unreadable value reached while deciding a condition. For candidates with readable
+whole-Record layouts and instances, successful selection completes demanded condition evaluation
+under SQL/Kleene semantics. Whole-Record failures remain explicit failed rows; successful selection
+does not certify global source completeness.
+The contract is recorded in [ADR-0358](adr/0358-query-selection-is-complete-or-explicitly-failed.md).
 
 ## Field statistics
 
-`p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|json]
+`p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|csv-strict|json]
 [--csv-raw]` and `FieldStatistics` in `p4kx-dataforge` list the **field paths** the Records have, to find the field
 a Query needs. They read every selected Record once, in parallel
 ([ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md)).
@@ -445,14 +468,23 @@ otherwise text anywhere in it, ignoring case), e.g. `--path "*/fireRate"`. The p
 segment by segment ignoring ASCII case, so a path is followed by the paths below it. The result
 is the same for every number of threads.
 
-A Record whose layout or instance cannot be read, or that has more than 1,048,576 values, is not
-counted at all, not even the values found before the limit (the paths it walked still count
-towards the path limit below), and is reported on stderr with exit
-code 1. A value that cannot be read (a bad array
-range, a pointer to no instance, an instance owned twice, a struct nested deeper than 64) is not
-counted and is reported as a number on stderr and in the JSON. An Archive whose Records have more
-than 1,048,576 distinct paths is an error (exit code 5), which bounds the memory
-([ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md)).
+A requested Record whose root layout or instance cannot be read adds to the unreadable Record
+count and contributes no field counts; stderr reports it with exit code 1. Statistics traverse
+owned values iteratively without a depth or mixed value/work cutoff.
+
+An unreadable scalar occurrence retains its declared occurrence and kind count but adds no
+distinct value or numeric extremum. Invalid array ranges, missing instances, unreadable nested
+layouts, repeated ownership and cyclic inline declarations add to the unreadable-value count.
+Only observations retained before a rejected source edge contribute field counts; unread
+descendant occurrences are not invented. The unreadable counts appear on stderr and in JSON.
+JSON adds field-addressed origin and coverage for its metrics and summary counts. Failed reads
+and unresolved traversal positions have separate evidence. See [CLI JSON](cli-json.md#p4kx-dcb-fields-archive-type-or-query---path-glob---format-tablecsvcsv-strictjson---json).
+
+The existing path policy allows 1,048,576 trie nodes including the empty root. Requiring another
+node during discovery or merge is an error (exit code 5), not a successful prefix. This bounds
+trie-node cardinality, not all retained observations, path spelling, scratch or process memory.
+See [ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md) and
+[canonical owned values](canonical-owned-values.md) for exact policies and cost boundaries.
 
 ## Errors
 

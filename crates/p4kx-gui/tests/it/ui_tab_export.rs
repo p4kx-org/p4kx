@@ -19,11 +19,17 @@ use p4kx_gui::{Language, UiExportStatus, UiFormat};
 use p4kx_screens::{
     ImageSources, MAX_SVG_BYTES, ScreenComposer, Still, StillFormat, StillRequest, TextSources,
 };
+use serde_json::Value;
 
 use crate::tagging::wait_until;
 use crate::ui_tabbing::{
     PANEL, TestResult, Window, exported, listed, opened, pick_file, pick_ship,
 };
+
+#[path = "ui_tab_export_origins.rs"]
+mod origins;
+
+use origins::{assert_receipt, assert_screen_sources};
 
 const WINDOW: [f32; 2] = [1280.0, 800.0];
 const MFD: &str = "libs/foundry/records/ui/buildingblocks/test/test_mfd";
@@ -121,6 +127,7 @@ fn a_screen_is_exported_as_the_png_the_cli_writes() -> TestResult {
         "the same bytes as the library writes for the CLI"
     );
     let done = summary(&window)?;
+    assert_screen_sources(&assert_receipt(&out, done)?)?;
     assert_eq!((done.width, done.height), (200, 100), "the size");
     assert!(
         done.left_out > 0,
@@ -152,7 +159,7 @@ fn a_screen_is_exported_as_the_svg_the_cli_writes() -> TestResult {
         screen_by_library(&window.archive, StillFormat::Svg)?,
         "the same document as the library writes for the CLI"
     );
-    Ok(())
+    assert_screen_sources(&assert_receipt(&out, summary(&window)?)?)
 }
 
 #[test]
@@ -173,7 +180,16 @@ fn a_movie_is_exported_as_the_png_and_the_svg_the_cli_writes() -> TestResult {
         }
 
         assert_eq!(fs::read(&out)?, fs::read(&expected)?, "{name}");
-        assert_eq!(summary(&window)?.left_out, 2, "{name}: as the report lists");
+        let done = summary(&window)?;
+        let rows = assert_receipt(&out, done)?;
+        assert!(
+            rows.iter()
+                .filter_map(|row| row.pointer("/source/path/value"))
+                .filter_map(Value::as_str)
+                .any(|path| path.replace('/', "\\").eq_ignore_ascii_case(PANEL)),
+            "{name}: the actual Movie Entry is present"
+        );
+        assert_eq!(done.left_out, 2, "{name}: as the report lists");
         window.harness.state_mut().ui_mut().dismiss_export();
     }
     Ok(())

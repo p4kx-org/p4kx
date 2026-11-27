@@ -3,21 +3,23 @@
 
 use std::sync::Arc;
 
-use egui::{Id, Key, KeyboardShortcut, Modifiers, PointerButton, Ui};
+use egui::{Id, Key, KeyboardShortcut, Modifiers, PointerButton, Rect, Response, Sense, Ui};
 use fluent_bundle::FluentValue;
 use p4kx_extraction::Guid;
 
 use super::preview::path_line;
-use super::{record_lines, xml_view};
+use super::{record_lines, source_origin, xml_view};
 use crate::texts::language_name;
 use crate::theme::desktop::SPINNER_INLINE;
 use crate::theme::palette;
 use crate::widgets::frames;
 use crate::widgets::indicator::spinner;
 use crate::widgets::summary::{Fact, FactsStrip};
+use crate::widgets::tooltip;
 use crate::{
-    Browser, Language, Model, PreviewTab, RecordLanguageText, RecordLink, RecordPreview,
-    RecordPreviewStatus, RecordText, RecordView, Texts, WorkTab,
+    Browser, DataForgeText, FieldLine, KeyText, Language, LineValue, Model, PreviewTab,
+    RecordChangeText, RecordLanguageText, RecordLink, RecordPreview, RecordPreviewProvenance,
+    RecordPreviewStatus, RecordText, RecordView, TagsText, Text, Texts, WorkTab,
 };
 
 /// Selects the Record before the current one on the way taken: Alt+Left.
@@ -92,7 +94,7 @@ pub(super) fn handle_shortcuts(ui: &Ui, model: &mut Model) {
 /// on a followed dangling Reference and the field lines; returns the step a link asks for.
 pub(super) fn show(ui: &mut Ui, texts: &Texts, browser: &Browser) -> Option<RecordStep> {
     let (path, name) = heading(browser);
-    path_line(ui, path, name);
+    let path_row = path_line(ui, path, name);
     let ready = status_body(ui, texts, browser, path)?;
     let generation = browser
         .record_preview()
@@ -118,7 +120,8 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, browser: &Browser) -> Option<Reco
             );
         });
     }
-    facts(ui, texts, generation, ready).show(ui);
+    let header = facts(ui, texts, generation, ready).show(ui);
+    header_origins(ui, texts, ready, (path_row, header));
     if ready.lines().is_empty() {
         frames::preview_body().show(ui, |ui| {
             ui.colored_label(palette::GRAY_2_TEXT, texts.get(RecordText::NoFields));
@@ -128,19 +131,95 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, browser: &Browser) -> Option<Reco
     record_lines::show(ui, texts, ready, generation)
 }
 
+fn header_origins(ui: &Ui, texts: &Texts, view: &RecordView, (path_row, header): (Response, Rect)) {
+    let origin = view
+        .provenance()
+        .and_then(Result::ok)
+        .map(RecordPreviewProvenance::header);
+    tooltip::hover(path_row, |ui| {
+        source_origin::row(
+            ui,
+            texts,
+            DataForgeText::ColumnRecordPath,
+            origin.map(|proof| &proof.record_path),
+        );
+        source_origin::row(ui, texts, RecordText::Name, origin.map(|proof| &proof.name));
+    });
+    let response = ui.interact(
+        header,
+        ui.scope_id().with("record-heading-origins"),
+        Sense::hover(),
+    );
+    tooltip::hover(response, |ui| {
+        source_origin::row(
+            ui,
+            texts,
+            RecordText::Type,
+            origin.map(|proof| &proof.type_name),
+        );
+        source_origin::row(ui, texts, RecordText::Guid, origin.map(|proof| &proof.guid));
+    });
+}
+
+pub(super) fn line_origins(
+    ui: &mut Ui,
+    texts: &Texts,
+    view: &RecordView,
+    (index, field): (usize, &FieldLine),
+) {
+    let proof = view
+        .provenance()
+        .and_then(Result::ok)
+        .and_then(|proof| proof.lines().get(index));
+    source_origin::row(
+        ui,
+        texts,
+        RecordChangeText::HeadField,
+        proof.map(|proof| &proof.name),
+    );
+    source_origin::row(
+        ui,
+        texts,
+        RecordText::HeadValue,
+        proof.map(|proof| &proof.value),
+    );
+    let annotation: Option<Text> = match field.value() {
+        LineValue::Key { text, .. } if !matches!(text, KeyText::None) => {
+            Some(RecordLanguageText::Menu.into())
+        }
+        LineValue::Reference(link) if link.tag().is_some() => Some(TagsText::ColumnTag.into()),
+        LineValue::Reference(_) => Some(RecordText::Type.into()),
+        _ => None,
+    };
+    if let Some(label) = annotation {
+        source_origin::row(
+            ui,
+            texts,
+            label,
+            proof.and_then(|proof| proof.annotation.as_ref()),
+        );
+    }
+}
+
 /// Shows the XML tab for the selected Record: its Record XML, or where reading it stands.
 pub(super) fn show_xml(ui: &mut Ui, texts: &Texts, browser: &Browser) {
     let (path, name) = heading(browser);
     path_line(ui, path, name);
     if let Some(view) = status_body(ui, texts, browser, path) {
-        frames::preview_body().show(ui, |ui| match view.xml_error() {
-            Some(reason) => {
+        frames::preview_body().show(ui, |ui| {
+            if let Some(reason) = view.xml_error() {
                 let reason = ("reason", FluentValue::from(reason.to_owned()));
                 let path = ("path", FluentValue::from(path.to_owned()));
                 let text = texts.format(RecordText::XmlFailed, &[path, reason]);
                 ui.colored_label(palette::DANGER_TEXT, text);
+            } else {
+                let origins = view
+                    .provenance()
+                    .and_then(Result::ok)
+                    .and_then(RecordPreviewProvenance::xml_fields)
+                    .and_then(Result::ok);
+                xml_view::show_record(ui, texts, view.xml(), origins);
             }
-            None => xml_view::show(ui, texts, view.xml(), None),
         });
     }
 }

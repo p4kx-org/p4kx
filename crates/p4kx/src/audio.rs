@@ -12,6 +12,9 @@ use serde::Serialize;
 use crate::cli::{AudioAction, AudioArgs, AudioSource};
 use crate::json;
 
+#[path = "audio_info_origins.rs"]
+mod info_origins;
+
 const UNKNOWN: &str = "unknown";
 const NONE: &str = "none";
 
@@ -40,6 +43,8 @@ struct InfoJson<'a> {
 struct WavJson<'a> {
     sound: &'a str,
     output: String,
+    #[serde(rename = "originReceipt", skip_serializing_if = "Option::is_none")]
+    origin_receipt: Option<String>,
     channels: u16,
     sample_rate: u32,
     sample_count: u64,
@@ -52,6 +57,8 @@ struct WavJson<'a> {
 struct OggJson<'a> {
     sound: &'a str,
     output: String,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: String,
     codec: &'static str,
     channels: u16,
     sample_rate: u32,
@@ -66,16 +73,27 @@ struct OggJson<'a> {
 /// Runs `p4kx audio info`, `p4kx audio wav` or `p4kx audio ogg`.
 pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
     match &args.action {
-        AudioAction::Info(source) => info(&open(source)?, as_json),
-        AudioAction::Wav { source, out } => wav(&open(source)?, out, as_json),
-        AudioAction::Ogg { source, out } => ogg(&open(source)?, out, as_json),
+        AudioAction::Info(source) => info(&open(source, as_json)?, as_json),
+        AudioAction::Wav { source, out } => {
+            let sound = if as_json || source.entry.is_some() {
+                open(source, true)?
+            } else {
+                Sound::from_file_observed_for_wav(&source.path)?
+            };
+            wav(&sound, out, as_json)
+        }
+        AudioAction::Ogg { source, out } => ogg(&open(source, true)?, out, as_json),
     }
 }
 
-fn open(source: &AudioSource) -> Result<Sound> {
-    Ok(match &source.entry {
-        Some(entry) => Sound::from_archive(&crate::key::open(&source.path)?, entry)?,
-        None => Sound::from_file(&source.path)?,
+fn open(source: &AudioSource, observe: bool) -> Result<Sound> {
+    Ok(match (&source.entry, observe) {
+        (Some(entry), true) => {
+            Sound::from_archive_observed(&crate::key::open(&source.path)?, entry)?
+        }
+        (Some(entry), false) => Sound::from_archive(&crate::key::open(&source.path)?, entry)?,
+        (None, true) => Sound::from_file_observed(&source.path)?,
+        (None, false) => Sound::from_file(&source.path)?,
     })
 }
 
@@ -96,7 +114,7 @@ fn info(sound: &Sound, as_json: bool) -> Result<()> {
             .map(|points| loop_json(points.start, points.end)),
     };
     if as_json {
-        json::print(&info)?;
+        json::print(&info_origins::report(sound, info)?)?;
         return Ok(());
     }
     let lines = [
@@ -141,12 +159,29 @@ fn format_duration(duration: Duration) -> String {
     format!("{}.{:03} s", millis / 1000, millis % 1000)
 }
 
+fn companion_basename(path: &Path) -> Result<String> {
+    let basename = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("missing origin companion basename"))?;
+    Ok(json::path(Path::new(basename)))
+}
+
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
-    let report = sound.write_wav_to_file(out)?;
+    let observed = sound
+        .supports_wav_receipt()
+        .then(|| sound.write_wav_with_receipt(out))
+        .transpose()?;
+    let report = match &observed {
+        Some(receipt) => receipt.report,
+        None => sound.write_wav_to_file(out)?,
+    };
+    let companion = observed.as_ref().map(|receipt| receipt.companion.as_path());
     if as_json {
-        json::print(&WavJson {
+        let origin_receipt = companion.map(companion_basename).transpose()?;
+        let summary = WavJson {
             sound: sound.name(),
             output: json::path(out),
+            origin_receipt,
             channels: report.channels,
             sample_rate: report.sample_rate,
             sample_count: report.sample_count,
@@ -154,7 +189,16 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             loop_points: report
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
-        })?;
+        };
+        if let Some(receipt) = &observed {
+            json::print(&info_origins::converted_report(
+                summary,
+                receipt.summary_origins(),
+                receipt.summary_provenance()?,
+            ))?;
+        } else {
+            json::print(&info_origins::conversion_report(sound, summary)?)?;
+        }
     } else {
         writeln!(
             io::stdout().lock(),
@@ -163,17 +207,26 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             out.display(),
             report.size
         )?;
+        if let Some(companion) = companion {
+            writeln!(
+                io::stdout().lock(),
+                "source origins: {}",
+                companion.display()
+            )?;
+        }
     }
     Ok(())
 }
 
 fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
-    let report = sound.write_ogg_to_file(out)?;
+    let receipt = sound.write_ogg_with_receipt(out)?;
+    let report = receipt.report;
     let duration = report.duration();
     if as_json {
-        json::print(&OggJson {
+        let summary = OggJson {
             sound: sound.name(),
             output: json::path(out),
+            origin_receipt: companion_basename(&receipt.companion)?,
             codec: report.codec.id(),
             channels: report.channels,
             sample_rate: report.sample_rate,
@@ -184,10 +237,16 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             loop_points: report
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
-        })?;
+        };
+        json::print(&info_origins::converted_report(
+            summary,
+            receipt.summary_origins(),
+            receipt.summary_provenance()?,
+        ))?;
     } else {
+        let mut stdout = io::stdout().lock();
         writeln!(
-            io::stdout().lock(),
+            stdout,
             "wrote {} as Ogg {} to {}, {}, {} bytes",
             sound.name(),
             if report.codec == Codec::Opus {
@@ -199,6 +258,7 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             format_duration(duration),
             report.size
         )?;
+        writeln!(stdout, "source origins: {}", receipt.companion.display())?;
     }
     Ok(())
 }

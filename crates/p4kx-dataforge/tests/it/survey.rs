@@ -50,7 +50,7 @@ fn pointers_beyond_16_bits_are_wide() -> TestResult {
         .build();
     let forge = DataForge::open(&bytes)?;
 
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert_eq!(survey.pointers.wide, 1);
     assert_eq!(survey.pointers.narrow, 0);
@@ -73,7 +73,7 @@ fn pointers_inside_an_inline_struct_are_counted() -> TestResult {
         .build();
     let forge = DataForge::open(&bytes)?;
 
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert_eq!(survey.pointers.null, 2);
     assert_eq!(survey.unreadable_structs, 0);
@@ -90,7 +90,7 @@ fn the_pointer_pools_are_counted() -> TestResult {
         .build();
     let forge = DataForge::open(&bytes)?;
 
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert_eq!(survey.pointers.narrow, 3, "zeroed pointers name instance 0");
     assert_eq!(survey.pointers.null, 0);
@@ -116,7 +116,7 @@ fn nested_zero_size_structs_do_not_blow_up_the_survey() -> TestResult {
     let forge = DataForge::open(&bytes)?;
 
     let started = Instant::now();
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert!(started.elapsed() < DEADLINE, "took {:?}", started.elapsed());
     assert_eq!(survey.pointers.null, 0);
@@ -141,7 +141,7 @@ fn a_struct_with_too_many_pointers_is_unreadable_not_slow() -> TestResult {
     let forge = DataForge::open(&bytes)?;
 
     let started = Instant::now();
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert!(started.elapsed() < DEADLINE, "took {:?}", started.elapsed());
     assert_eq!(survey.unreadable_structs, 1);
@@ -161,7 +161,7 @@ fn a_zero_size_struct_with_a_huge_instance_count_costs_nothing() -> TestResult {
     let forge = DataForge::open(&bytes)?;
 
     let started = Instant::now();
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert!(started.elapsed() < DEADLINE, "took {:?}", started.elapsed());
     assert_eq!(survey.pointers.null, 0);

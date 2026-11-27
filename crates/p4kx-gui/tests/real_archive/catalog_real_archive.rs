@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog of the window over a real Archive; runs with `--ignored` when
+//! The P4KX catalog of the window over a real Archive; runs with `--ignored` when
 //! `P4KX_DATA_P4K` names one.
 
 use std::error::Error;
@@ -9,7 +9,8 @@ use std::fs;
 use std::time::{Duration, Instant};
 
 use p4kx_export::{Kind, SizeWarning};
-use p4kx_gui::{CatalogExport, CatalogExportStatus, Language, Model};
+use p4kx_extraction::ProvenanceMode;
+use p4kx_gui::{CatalogExport, CatalogExportOptions, CatalogExportStatus, Language, Model};
 use p4kx_testkit::real_archive_path;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -31,13 +32,18 @@ fn wait_until(model: &mut Model, done: impl Fn(&Model) -> bool) -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_catalog_of_a_real_archive_is_written_with_its_summary() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let file = dir.path().join("basetool-catalog.json");
+    let file = dir.path().join("p4kx-catalog.json");
     let mut model = Model::new(Language::BritishEnglish);
     model.set_archive_key(Some(p4kx_testkit::real_archive_key()?));
     model.open(real_archive_path()?, || {});
     wait_until(&mut model, |model| model.browser().is_some())?;
 
-    if !model.start_catalog(file.clone(), || {}) {
+    if !model.start_catalog_with_provenance_mode(
+        file.clone(),
+        CatalogExportOptions::default(),
+        ProvenanceMode::Full,
+        || {},
+    ) {
         return Err("the catalog did not start".into());
     }
     wait_until(&mut model, |model| {

@@ -60,7 +60,7 @@ pub(crate) fn parse_entries(values: &[Value<'_>]) -> Vec<Entry> {
         .collect()
 }
 
-fn parse_entry(entry: &StructValue<'_>) -> Entry {
+pub(super) fn parse_entry(entry: &StructValue<'_>) -> Entry {
     let lists: Vec<Vec<Condition>> = items(entry, "conditionsList")
         .iter()
         .filter_map(as_struct)
@@ -103,6 +103,7 @@ pub(crate) fn modifiers<'a, 'f: 'a>(
             if let Some(inner) = child(modifier, "field") {
                 found.text.typed(inner);
                 found.geometry.typed(inner);
+                found.picture.typed(inner);
                 if inner.type_name() == CANVAS_REFERENCE {
                     found.canvas = reference(inner, "value").map(Reference::guid);
                 }
@@ -169,6 +170,7 @@ fn number_field(found: &mut Modifiers, field: &str, value: Option<f32>) {
         return;
     }
     found.text.number(field, value);
+    found.picture.number(field, value);
     if let Some(side) = field
         .strip_prefix("Border")
         .and_then(|rest| rest.strip_suffix("Width"))

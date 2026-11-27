@@ -17,6 +17,8 @@ pub struct DirectorySummary {
 pub struct Summary {
     /// The counts per change kind.
     pub counts: EntryCounts,
+    /// Matched Entry pairs whose declared checksum algorithms differ.
+    pub incomparables: usize,
     /// The counts per top-level directory, ordered by directory ignoring case.
     pub directories: Vec<DirectorySummary>,
 }
@@ -26,6 +28,7 @@ impl Summary {
     pub(crate) fn of(comparison: &Comparison<'_>) -> Self {
         Self {
             counts: comparison.entry_counts(),
+            incomparables: comparison.incomparable_entries().len(),
             directories: comparison
                 .directory_counts()
                 .into_iter()

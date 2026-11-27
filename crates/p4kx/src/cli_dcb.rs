@@ -143,6 +143,15 @@ pub(crate) struct DcbQueryArgs {
     /// replaced.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
+    /// Writes a field-origin companion beside the output file.
+    #[arg(long, requires = "out")]
+    pub(crate) origin_receipt: bool,
+    /// Writes the stdout result's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the stdout result's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The values of `p4kx dcb query --format`.
@@ -150,8 +159,10 @@ pub(crate) struct DcbQueryArgs {
 pub(crate) enum QueryFormat {
     /// A table with aligned columns, for reading.
     Table,
-    /// CSV after RFC 4180 with a header row and a UTF-8 byte order mark.
+    /// UTF-8 CSV with a header row and a byte order mark.
     Csv,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
     /// One line of JSON: an array of objects keyed by column.
     Json,
 }
@@ -162,6 +173,7 @@ impl QueryFormat {
         match self {
             Self::Table => "table",
             Self::Csv => "csv",
+            Self::CsvStrict => "csv-strict",
             Self::Json => "json",
         }
     }
@@ -213,7 +225,7 @@ pub(crate) struct DcbExportArgs {
     #[arg(long)]
     pub(crate) tags: bool,
     /// Target folder; created if missing, files already in it are handled by --conflict. Defaults
-    /// to a new folder SC-EXPORT-<Channel>-<Build version>-<timestamp> in the current directory.
+    /// to a new folder `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the current directory.
     #[arg(long, value_name = "FOLDER")]
     pub(crate) out: Option<PathBuf>,
     /// What to do with a file that already exists in the target.
@@ -232,6 +244,8 @@ pub(crate) enum RecordFormat {
     Ndjson,
     /// With --flat: the file values.csv with one CSV row per leaf value.
     Csv,
+    /// With --flat: CSV with strict RFC 4180 field characters.
+    CsvStrict,
 }
 
 /// Arguments of `p4kx dcb info`.

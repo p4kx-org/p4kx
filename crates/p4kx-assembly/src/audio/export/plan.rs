@@ -1,105 +1,68 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::ExportFailure;
-use super::name::{StemSet, portable_stem};
-use crate::audio::{SoundVariant, SourceKind, TriggerSounds, WemLocation};
+use std::collections::HashSet;
 
-/// The stem of a sound whose trigger name is too long for a file name.
+use super::name::{StemSet, portable_stem};
+use super::report_origins::FailedSound;
+use super::source::{ResolvedMedia, SelectedMedia, WemExportSource};
+use super::{ExportFailureKind, ExportFailureOrigin, ExportSoundSelection};
+use crate::audio::TriggerSounds;
+
 const FALLBACK_STEM: &str = "sound";
 
-/// Where the bytes of a WEM are: an Entry of the Archive, by position in `Archive::entries`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum Origin {
-    Soundbank(usize),
-    Loose(usize),
-}
-
-/// One sound to write.
 #[derive(Debug)]
 pub(super) struct Job {
     pub(super) trigger: String,
     pub(super) stem: String,
     pub(super) wem_id: u32,
-    pub(super) origin: Origin,
+    pub(super) source: WemExportSource,
+    pub(super) selection: ExportSoundSelection,
 }
 
-/// The sounds to write, with their file names fixed, and the sounds that have no WEM to write.
 #[derive(Debug, Default)]
 pub(super) struct Plan {
     pub(super) jobs: Vec<Job>,
-    pub(super) failures: Vec<ExportFailure>,
+    pub(super) failures: Vec<FailedSound>,
 }
 
-fn origin(location: &WemLocation<'_>) -> Option<Origin> {
-    match *location {
-        WemLocation::Soundbank { soundbank, .. } => Some(Origin::Soundbank(soundbank.entry)),
-        WemLocation::Entry { entry, .. } => usize::try_from(entry).ok().map(Origin::Loose),
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Found {
-    origin: Origin,
-    prefetch_only: bool,
-}
-
-fn prefetch_only(variant: &SoundVariant<'_>) -> bool {
-    variant.source_kind() == SourceKind::PrefetchStreamed
-        && matches!(variant.location(), Some(WemLocation::Soundbank { .. }))
-}
-
-const fn better(candidate: Option<Found>, current: Option<Found>) -> bool {
-    match (candidate, current) {
-        (Some(_), None) => true,
-        (Some(candidate), Some(current)) => current.prefetch_only && !candidate.prefetch_only,
-        (None, _) => false,
-    }
-}
-
-/// Plans the files of `triggers` in order: one per distinct WEM of a trigger, named after the
-/// trigger and, where it has several, the WEM ID.
 pub(super) fn build(triggers: &[&TriggerSounds<'_>]) -> Plan {
     let mut plan = Plan::default();
     let mut stems = StemSet::default();
-    for sounds in triggers {
+    for (trigger_ordinal, sounds) in triggers.iter().enumerate() {
+        plan.add_trigger(trigger_ordinal, sounds, &mut stems);
+    }
+    plan
+}
+
+impl Plan {
+    fn add_trigger(
+        &mut self,
+        trigger_ordinal: usize,
+        sounds: &TriggerSounds<'_>,
+        stems: &mut StemSet,
+    ) {
         let trigger = sounds.trigger().name();
-        let mut media: Vec<(u32, Option<Found>)> = Vec::new();
-        for variant in sounds.variants() {
-            let Some(wem_id) = variant.wem_id() else {
-                plan.failures.push(ExportFailure {
-                    trigger: trigger.to_owned(),
-                    wem_id: None,
-                    reason: format!(
-                        "{} {} has no file to write",
-                        variant.source_kind().label(),
-                        variant.source().source_id
-                    ),
-                });
-                continue;
-            };
-            let found = variant.location().and_then(origin).map(|origin| Found {
-                origin,
-                prefetch_only: prefetch_only(variant),
-            });
-            match media.iter_mut().find(|(id, _)| *id == wem_id) {
-                Some((_, slot)) => {
-                    if better(found, *slot) {
-                        *slot = found;
-                    }
-                }
-                None => media.push((wem_id, found)),
-            }
-        }
+        let media = self.collect_media(trigger_ordinal, sounds);
         let several = media.len() > 1;
         let base = portable_stem(trigger, FALLBACK_STEM);
-        for (wem_id, found) in media {
-            let Some(Found { origin, .. }) = found else {
-                plan.failures.push(ExportFailure {
-                    trigger: trigger.to_owned(),
-                    wem_id: Some(wem_id),
-                    reason: "no soundbank or loose WEM Entry holds the WEM".to_owned(),
-                });
+        for PlannedMedia {
+            variant_ordinal,
+            wem_id,
+            selected,
+        } in media
+        {
+            let Some(selected) = selected else {
+                self.failures.push(FailedSound::new(
+                    trigger,
+                    Some(wem_id),
+                    "no soundbank or loose WEM Entry holds the WEM".to_owned(),
+                    ExportFailureOrigin {
+                        trigger_ordinal,
+                        variant_ordinal,
+                        kind: ExportFailureKind::UnresolvedMedia,
+                    },
+                ));
                 continue;
             };
             let stem = if several {
@@ -107,13 +70,62 @@ pub(super) fn build(triggers: &[&TriggerSounds<'_>]) -> Plan {
             } else {
                 base.clone()
             };
-            plan.jobs.push(Job {
+            self.jobs.push(Job {
                 trigger: trigger.to_owned(),
                 stem: stems.unique(&stem),
                 wem_id,
-                origin,
+                source: selected.source,
+                selection: ExportSoundSelection {
+                    trigger_ordinal,
+                    variant_ordinal,
+                    media_variant_ordinal: selected.donor_ordinal.unwrap_or(variant_ordinal),
+                },
             });
         }
     }
-    plan
+
+    fn collect_media(
+        &mut self,
+        trigger_ordinal: usize,
+        sounds: &TriggerSounds<'_>,
+    ) -> Vec<PlannedMedia> {
+        let trigger = sounds.trigger().name();
+        let resolved = ResolvedMedia::new(sounds.variants());
+        let mut media = Vec::new();
+        let mut seen = HashSet::new();
+        for (variant_ordinal, variant) in sounds.variants().iter().enumerate() {
+            let Some(wem_id) = variant.wem_id() else {
+                self.failures.push(FailedSound::new(
+                    trigger,
+                    None,
+                    format!(
+                        "{} {} has no file to write",
+                        variant.source_kind().label(),
+                        variant.source().source_id
+                    ),
+                    ExportFailureOrigin {
+                        trigger_ordinal,
+                        variant_ordinal,
+                        kind: ExportFailureKind::FilelessSource,
+                    },
+                ));
+                continue;
+            };
+            let selected = resolved.select(variant, wem_id);
+            if seen.insert((wem_id, selected.as_ref().map(|media| media.source))) {
+                media.push(PlannedMedia {
+                    variant_ordinal,
+                    wem_id,
+                    selected,
+                });
+            }
+        }
+        media
+    }
+}
+
+struct PlannedMedia {
+    variant_ordinal: usize,
+    wem_id: u32,
+    selected: Option<SelectedMedia>,
 }

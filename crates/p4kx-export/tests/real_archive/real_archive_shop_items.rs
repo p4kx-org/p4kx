@@ -8,23 +8,32 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, Guid};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
-const KINDS_WITH_ITEMS: [&str; 5] = ["items", "ships", "commodities", "paints", "loadouts"];
+const KINDS_WITH_ITEMS: [Kind; 5] = [
+    Kind::Items,
+    Kind::Ships,
+    Kind::Commodities,
+    Kind::Paints,
+    Kind::Loadouts,
+];
 const PLACEHOLDERS: [&str; 2] = ["temp_outpost_shopinventory", "inv_cryastro_dummy"];
 
-fn guids_of(catalog: &Value) -> HashSet<&str> {
-    KINDS_WITH_ITEMS
-        .iter()
-        .filter_map(|kind| catalog[*kind].as_array())
-        .flatten()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect()
+pub(crate) fn guids_of(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
+    let mut result = HashSet::new();
+    for kind in KINDS_WITH_ITEMS {
+        for row in catalog_v3_consumer::rows(catalog, kind)? {
+            result.insert(catalog_v3_consumer::identity(row, kind)?);
+        }
+    }
+    Ok(result)
 }
 
 #[test]
@@ -36,21 +45,24 @@ fn guids_of(catalog: &Value) -> HashSet<&str> {
 )]
 fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let shops = catalog["shops"].as_array().ok_or("shops")?;
     let summary = built.summary().shops();
     println!("== summary {summary:#?}");
     let with: Vec<&Value> = shops
         .iter()
-        .filter(|shop| !shop["itemGuids"].is_null())
+        .filter(|shop| !shop["itemGuids"]["value"].is_null())
         .collect();
     let mut by_inventory: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for shop in &with {
         by_inventory
-            .entry(shop["inventory"].as_str().unwrap_or("(none)"))
+            .entry(shop["inventory"]["value"].as_str().unwrap_or("(none)"))
             .or_default()
-            .push(shop["entityName"].as_str().unwrap_or_default());
+            .push(shop["entityName"]["value"].as_str().unwrap_or_default());
     }
     println!(
         "== shops with an item list {} of {}; distinct inventories {} of {} files in the Archive ({} named by containers or prefabs, placeholders included)",
@@ -67,9 +79,9 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
         .iter()
         .map(|shop| {
             (
-                shop["entityName"].as_str().unwrap_or_default(),
-                shop["location"].as_str().unwrap_or_default(),
-                shop["inventory"].as_str().unwrap_or_default(),
+                shop["entityName"]["value"].as_str().unwrap_or_default(),
+                shop["location"]["value"].as_str().unwrap_or_default(),
+                shop["inventory"]["value"].as_str().unwrap_or_default(),
             )
         })
         .collect();
@@ -94,19 +106,19 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
         summary.inventory_missing,
         summary.inventory_unreadable
     );
-    let known = guids_of(&catalog);
+    let known = guids_of(&catalog)?;
     let mut total = 0_usize;
     let mut resolved = 0_usize;
     let mut unresolved: BTreeSet<&str> = BTreeSet::new();
     let mut empty = 0_usize;
     let mut inventories_seen: HashSet<&str> = HashSet::new();
     for shop in &with {
-        let items = shop["itemGuids"].as_array().ok_or("itemGuids")?;
+        let items = shop["itemGuids"]["value"].as_array().ok_or("itemGuids")?;
         empty += usize::from(items.is_empty());
-        if !inventories_seen.insert(shop["inventory"].as_str().unwrap_or_default()) {
+        if !inventories_seen.insert(shop["inventory"]["value"].as_str().unwrap_or_default()) {
             continue;
         }
-        for item in items.iter().filter_map(Value::as_str) {
+        for item in items.iter().filter_map(|item| item["value"].as_str()) {
             total += 1;
             if known.contains(item) {
                 resolved += 1;
@@ -145,7 +157,7 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
     );
     let by_system: BTreeMap<&str, usize> = with.iter().fold(BTreeMap::new(), |mut counts, shop| {
         *counts
-            .entry(shop["system"].as_str().unwrap_or("(none)"))
+            .entry(shop["system"]["value"].as_str().unwrap_or("(none)"))
             .or_default() += 1;
         counts
     });

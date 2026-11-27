@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use egui::{Key, KeyboardShortcut, Modifiers, Ui};
+use egui::{Key, KeyboardShortcut, ModifierNames, Modifiers, Ui};
 
 use crate::{Extraction, ExtractionScope, Model};
 
@@ -10,6 +10,22 @@ pub(super) const RELOAD: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NON
 /// Opens the Extraction setup for the selected Entries: Ctrl+E, Cmd+E on macOS.
 pub(super) const EXTRACT_SELECTED: KeyboardShortcut =
     KeyboardShortcut::new(Modifiers::COMMAND, Key::E);
+/// Runs the current Query.
+pub(super) const RUN_QUERY: KeyboardShortcut =
+    KeyboardShortcut::new(Modifiers::COMMAND, Key::Enter);
+
+/// Formats a Command shortcut for the current window and language.
+pub(super) fn command_hint(
+    ui: &Ui,
+    shortcut: KeyboardShortcut,
+    localized: impl FnOnce() -> String,
+) -> String {
+    if ui.ctx().os().is_mac() {
+        shortcut.format(&ModifierNames::NAMES, true)
+    } else {
+        localized()
+    }
+}
 
 /// Returns whether the open Archive may be opened again: one is open, none is opening, no
 /// Extraction runs and no Extraction setup is open.

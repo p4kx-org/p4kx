@@ -7,6 +7,7 @@ use std::error::Error;
 use std::path::Path;
 
 use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
+use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -106,6 +107,40 @@ fn diff(dir: &Path, entry: &str, json: bool, code: i32) -> Result<String, Box<dy
     Ok(String::from_utf8(output.stdout)?)
 }
 
+fn compatible_json(dir: &Path, entry: &str) -> Result<String, Box<dyn Error>> {
+    let stdout = diff(dir, entry, true, 1)?;
+    let mut report: Value = serde_json::from_str(&stdout)?;
+    let fields = report.as_object_mut().ok_or("line diff report object")?;
+    let origins = fields
+        .remove("fieldOrigins")
+        .ok_or("line diff per-field origins")?;
+    let provenance = fields
+        .remove("provenance")
+        .ok_or("line diff source inventory")?;
+    for key in [
+        "/path", "/change", "/differs", "/content", "/old", "/new", "/hunks",
+    ] {
+        assert!(origins.get(key).is_some(), "missing {key} origin");
+    }
+    assert!(
+        provenance
+            .get("uses")
+            .and_then(Value::as_array)
+            .is_some_and(|rows| !rows.is_empty()),
+        "physical origin uses"
+    );
+    let (prefix, _) = stdout
+        .split_once(",\"fieldOrigins\":")
+        .ok_or("additive origin envelope")?;
+    let original = format!("{prefix}}}\n");
+    assert_eq!(
+        serde_json::from_str::<Value>(&original)?,
+        report,
+        "the frozen payload includes every original output field"
+    );
+    Ok(original)
+}
+
 #[test]
 fn a_text_entry_prints_a_unified_diff() -> TestResult {
     let dir = pair()?;
@@ -194,7 +229,7 @@ fn a_cryxml_entry_with_the_same_xml_says_so_and_exits_with_code_1() -> TestResul
 fn json_of_a_removed_entry_has_no_new_side() -> TestResult {
     let dir = pair()?;
 
-    insta::assert_snapshot!(diff(dir.path(), "Data\\removed.txt", true, 1)?);
+    insta::assert_snapshot!(compatible_json(dir.path(), "Data\\removed.txt")?);
     Ok(())
 }
 
@@ -202,7 +237,7 @@ fn json_of_a_removed_entry_has_no_new_side() -> TestResult {
 fn json_gives_structured_hunks() -> TestResult {
     let dir = pair()?;
 
-    insta::assert_snapshot!(diff(dir.path(), "Data\\Libs\\text.xml", true, 1)?);
+    insta::assert_snapshot!(compatible_json(dir.path(), "Data\\Libs\\text.xml")?);
     Ok(())
 }
 
@@ -210,7 +245,7 @@ fn json_gives_structured_hunks() -> TestResult {
 fn json_of_a_binary_entry_has_no_hunks() -> TestResult {
     let dir = pair()?;
 
-    insta::assert_snapshot!(diff(dir.path(), "Data\\icon.dds", true, 1)?);
+    insta::assert_snapshot!(compatible_json(dir.path(), "Data\\icon.dds")?);
     Ok(())
 }
 
@@ -233,7 +268,7 @@ fn json_of_an_added_cryxml_entry_names_its_encoding() -> TestResult {
         )),
     )?;
 
-    insta::assert_snapshot!(diff(dir.path(), "v.xml", true, 1)?);
+    insta::assert_snapshot!(compatible_json(dir.path(), "v.xml")?);
     Ok(())
 }
 

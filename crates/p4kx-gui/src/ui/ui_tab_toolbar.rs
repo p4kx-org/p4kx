@@ -6,6 +6,7 @@ use fluent_bundle::FluentValue;
 
 use super::regions;
 use super::search::eyebrow;
+use super::source_origin;
 use super::ui_tab_variables;
 use super::{Dialog, Requests};
 use crate::theme::desktop::{SEGMENT_PADDING_X, SPINNER_INLINE, TOOLBAR_PADDING};
@@ -16,9 +17,10 @@ use crate::widgets::button::{self, Kind, Size};
 use crate::widgets::indicator;
 use crate::widgets::tab;
 use crate::widgets::text::{line, plain};
+use crate::widgets::tooltip;
 use crate::{
-    ExtractionText, Model, Texts, UiBackground, UiExport, UiExportStatus, UiExportSummary,
-    UiFormat, UiMode, UiPower, UiSettings, UiSize, UiText, format,
+    Model, Texts, UiBackground, UiExport, UiExportStatus, UiExportSummary, UiFormat, UiMode,
+    UiPower, UiSettings, UiSize, UiText, format,
 };
 
 /// A labelled group of segments.
@@ -269,7 +271,28 @@ fn outcome(ui: &mut Ui, model: &mut Model) {
         if running {
             indicator::spinner(ui, SPINNER_INLINE);
         }
-        ui.add(Label::new(plain(text, FS_SM, Weight::Regular).color(tone)).selectable(true));
+        let label =
+            ui.add(Label::new(plain(text, FS_SM, Weight::Regular).color(tone)).selectable(true));
+        if let UiExportStatus::Done(summary) | UiExportStatus::DoneArchiveChanged(summary) =
+            export.status()
+        {
+            tooltip::hover(label, |ui| {
+                tooltip::line(
+                    ui,
+                    texts.get(source_origin::label(Some(&summary.origins().artifact))),
+                );
+                tooltip::line(
+                    ui,
+                    texts.format(
+                        UiText::ExportOriginReceipt,
+                        &[(
+                            "file",
+                            summary.origin_receipt().display().to_string().into(),
+                        )],
+                    ),
+                );
+            });
+        }
         if !running {
             dismissed = button::button(ui, Kind::Ghost, Size::Compact, &dismiss, true).clicked();
         }
@@ -320,14 +343,8 @@ fn status_line(texts: &Texts, export: &UiExport) -> (String, Color32, bool) {
             palette::WARNING,
             false,
         ),
-        UiExportStatus::Refused(installation) => (
-            texts.format(
-                ExtractionText::TargetInInstallation,
-                &[(
-                    "installation",
-                    FluentValue::from(installation.display().to_string()),
-                )],
-            ),
+        UiExportStatus::Refused(refused) => (
+            crate::installation::message(texts, refused),
             palette::DANGER_TEXT,
             false,
         ),

@@ -11,6 +11,11 @@ use p4kx_dataforge::{
 };
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
+#[path = "record_flat_observed.rs"]
+mod observed;
+#[path = "record_flat_strict.rs"]
+mod strict;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const THING: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;

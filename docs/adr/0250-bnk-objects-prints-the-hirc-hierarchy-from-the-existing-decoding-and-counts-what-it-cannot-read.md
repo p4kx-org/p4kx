@@ -46,3 +46,20 @@ ADR-0133 (unsupported is not corrupt).
   an object is listed with type, ID and status but no parent, children or detail.
 - `Decoded` means the fields of the type were read. Containers and music objects must also use
   their whole body; a sound, action or event is not checked for bytes after its fields.
+
+## Attenuation
+
+Version 154 HIRC type 14 uses the height-spread flag followed by the cone flag.
+The second flag's low bit controls the presence of five words. The source
+layout then carries 19 signed selectors, ordered conversion curves and initial
+RTPCs. Independent span checks against installed LIVE and PTU distinguish this
+layout from the pinned StarBreaker layout, which starts at the cone flag.
+[wwiser layout](https://github.com/bnnm/wwiser/blob/24eb88f3b2a99d54c1062d8438a7bd04be88335d/wwiser/parser/wparser.py),
+StarBreaker layout (`crates/starbreaker-wwise/src/hirc/attenuation.rs` at `7d3f01e76307354bbc56a64a70eb5167b1189b64`)
+
+The slice reader uses the shared attenuation scanner for whole-body coverage.
+ObjectView, CLI, MCP and Media replay the checked byte ranges through the
+same graph-point and initial RTPC readers. They retain source bits, signed
+selectors and ordered unknown codes. An incomplete supported body reports
+its checked prefix and original remaining bytes. Other versions stay opaque.
+[Attenuation data contract](../audio-attenuation.md)

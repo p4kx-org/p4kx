@@ -12,6 +12,16 @@ use thiserror::Error;
 /// A failure to open or read an Archive.
 #[derive(Debug, Error)]
 pub enum ArchiveError {
+    /// The directory explicitly declares that installation is incomplete.
+    #[error(
+        "{path}: installation is incomplete (status {flags:#04x}); wait for the launcher to finish installing"
+    )]
+    IncompleteInstallation {
+        /// Path of the Archive.
+        path: PathBuf,
+        /// The unmodified source installation-status byte.
+        flags: u8,
+    },
     /// The Archive file could not be read.
     #[error("cannot read {path}")]
     Io {

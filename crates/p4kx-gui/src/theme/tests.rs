@@ -3,7 +3,7 @@
 
 use egui::{Context, CornerRadius, FontFamily, TextStyle, Theme};
 
-use super::tokens::{CORNER_SM, RADIUS_SM, RADIUS_SM_POINTS};
+use super::tokens::{CORNER_BOX, CORNER_TILE, RADIUS_SM, RADIUS_SM_POINTS};
 use super::{BOLD_FAMILY, LATO_BOLD, LATO_REGULAR, apply, fonts, palette, style};
 
 #[test]
@@ -57,16 +57,12 @@ fn errors_and_warnings_use_the_accessible_text_tints() {
 }
 
 #[test]
-fn windows_and_menus_take_the_small_radius_and_the_scrollbar_stays_square() {
+fn windows_and_menus_take_their_role_radius_and_the_scrollbar_stays_square() {
     let visuals = style().visuals;
     let widgets = &visuals.widgets;
 
-    for (name, corner) in [
-        ("window", visuals.window_corner_radius),
-        ("menu", visuals.menu_corner_radius),
-    ] {
-        assert_eq!(corner, CORNER_SM, "{name} corners");
-    }
+    assert_eq!(visuals.window_corner_radius, CORNER_BOX, "window corners");
+    assert_eq!(visuals.menu_corner_radius, CORNER_TILE, "menu corners");
     for (name, corner) in [
         ("noninteractive", widgets.noninteractive.corner_radius),
         ("inactive", widgets.inactive.corner_radius),
@@ -76,6 +72,62 @@ fn windows_and_menus_take_the_small_radius_and_the_scrollbar_stays_square() {
     ] {
         assert_eq!(corner, CornerRadius::ZERO, "{name} corners");
     }
+}
+
+#[test]
+fn control_boundaries_and_foregrounds_have_accessible_contrast() {
+    let panel = palette::SURFACE_PANEL;
+    let resting = palette::CONTROL_BG;
+    let hovered = palette::CONTROL_BG_HOVER;
+    for background in [panel, resting, hovered] {
+        assert!(
+            contrast(palette::CONTROL_BORDER, background) >= 3.0,
+            "control border against {background:?}"
+        );
+    }
+    let tint = egui::Rgba::from(palette::CONTROL_SELECTED_BG);
+    let selected = egui::Color32::from(tint + egui::Rgba::from(resting) * (1.0 - tint.a()));
+    assert!(
+        contrast(palette::CONTROL_SELECTED_BORDER, resting) >= 3.0,
+        "selected boundary against the neighbouring control"
+    );
+    assert!(
+        contrast(palette::CONTROL_SELECTED_FG, selected) >= 4.5,
+        "selected text and focus ring against the composited selection tint"
+    );
+    for (foreground, background) in [
+        (palette::PRIMARY, panel),
+        (palette::CONTROL_FG, resting),
+        (palette::GRAY_2_TEXT, resting),
+        (palette::WHITE, hovered),
+        (palette::ACCENT_LIGHT, hovered),
+        (palette::BLACK, palette::PRIMARY),
+    ] {
+        assert!(
+            contrast(foreground, background) >= 4.5,
+            "small text {foreground:?} against {background:?}"
+        );
+    }
+}
+
+fn contrast(first: egui::Color32, second: egui::Color32) -> f32 {
+    let linear = |channel: u8| {
+        let value = f32::from(channel) / 255.0;
+        if value <= 0.040_45 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let luminance = |colour: egui::Color32| {
+        0.2126_f32.mul_add(
+            linear(colour.r()),
+            0.7152_f32.mul_add(linear(colour.g()), 0.0722 * linear(colour.b())),
+        ) + 0.05
+    };
+    let first = luminance(first);
+    let second = luminance(second);
+    first.max(second) / first.min(second)
 }
 
 #[test]

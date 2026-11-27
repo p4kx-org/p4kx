@@ -6,11 +6,15 @@
 
 use crate::exporting;
 
+#[path = "record_export_model_origins.rs"]
+mod origins;
+
 use std::fs;
 use std::time::{Duration, Instant};
 
 use exporting::{
-    TestResult, database, ended, files_below, many, opened, opened_with, select_node, wait_until,
+    TestResult, database, ended, files_below, many, opened, opened_with, select_node,
+    wait_for_writing, wait_until,
 };
 use p4kx_extraction::ConflictPolicy;
 use p4kx_gui::{RecordExportStatus, RecordForm, RecordScope, TargetKind};
@@ -66,9 +70,11 @@ fn the_selected_record_folder_is_exported_as_json_files() -> TestResult {
         files_below(&out)?,
         [
             "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json.p4kx-origin.jsonl",
             "libs/foundry/records/weapons/AmmoParams.Laser_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json.p4kx-origin.jsonl",
         ],
-        "one file per Record under its record path"
+        "one payload and companion per Record under its record path"
     );
     Ok(())
 }
@@ -166,7 +172,7 @@ fn a_new_folder_is_created_inside_the_chosen_folder() -> TestResult {
     let target = summary.target().ok_or("no target")?;
     let created = target.strip_prefix(&out)?.to_string_lossy().into_owned();
     assert!(created.starts_with("SC-EXPORT-"), "a new folder: {created}");
-    assert_eq!(files_below(target)?.len(), 2, "both weapons in it");
+    assert_eq!(files_below(target)?.len(), 4, "two payloads and two proofs");
     assert_eq!(model.extraction_folder(), Some(out.as_path()), "remembered");
     Ok(())
 }
@@ -260,7 +266,7 @@ fn a_second_export_reuses_the_dataforge_read_by_the_first() -> TestResult {
 
     assert!(kept, "kept after the first export");
     assert_eq!(summary.written(), 2, "both ships");
-    assert_eq!(files_below(&out)?.len(), 4, "weapons and ships");
+    assert_eq!(files_below(&out)?.len(), 8, "four payloads and four proofs");
     Ok(())
 }
 
@@ -288,26 +294,29 @@ fn only_one_record_export_runs_at_a_time() -> TestResult {
 
 #[test]
 fn a_cancelled_export_can_be_restarted_at_once_and_keeps_dataforge() -> TestResult {
-    let (_dir, mut model, out) = opened(&many(4000))?;
+    let (_dir, mut model, out) = opened(&database())?;
+    let hold = model.hold_record_export_writing();
     model.begin_record_export();
     choose(&mut model, &out, RecordForm::Json)?;
     model
         .record_export_setup_mut()
         .ok_or("no setup")?
-        .set_filter("items");
-    model.submit_record_export(|| {});
+        .set_filter("weapons");
+    assert!(model.submit_record_export(|| {}), "started");
+    wait_for_writing(&mut model)?;
 
     model.cancel_record_export();
     let RecordExportStatus::Finished(summary) = ended(&mut model)? else {
         return Err("no summary".into());
     };
     let cancelled = summary.was_cancelled();
+    drop(hold);
     model.begin_record_export();
     choose(&mut model, &out, RecordForm::Json)?;
     model
         .record_export_setup_mut()
         .ok_or("no setup")?
-        .set_filter("items");
+        .set_filter("weapons");
     let restarted = model.submit_record_export(|| {});
     let RecordExportStatus::Finished(again) = ended(&mut model)? else {
         return Err("no summary for the restart".into());
@@ -316,7 +325,7 @@ fn a_cancelled_export_can_be_restarted_at_once_and_keeps_dataforge() -> TestResu
 
     assert!(cancelled, "the summary says so");
     assert!(restarted, "a new export starts at once");
-    assert_eq!(handled, 4000, "the restart writes every Record");
+    assert_eq!(handled, 2, "the restart writes every Record");
     assert!(model.record_export_keeps_dataforge(), "DataForge is kept");
     Ok(())
 }
@@ -360,31 +369,28 @@ fn an_open_setup_closes_and_dataforge_is_forgotten_when_the_archive_changes() ->
 
 #[test]
 fn a_running_export_goes_on_when_the_archive_changes() -> TestResult {
-    let (dir, mut model, out) = opened(&many(4000))?;
+    let (dir, mut model, out) = opened(&database())?;
+    let hold = model.hold_record_export_writing();
     model.begin_record_export();
     choose(&mut model, &out, RecordForm::Json)?;
     model
         .record_export_setup_mut()
         .ok_or("no setup")?
-        .set_filter("items");
-    model.submit_record_export(|| {});
-    wait_until(&mut model, |model| {
-        model.record_export().is_some_and(|run| {
-            !matches!(
-                run.status(),
-                RecordExportStatus::Running(progress)
-                    if progress.stage != p4kx_gui::RecordExportStage::Writing
-            )
-        })
-    })?;
+        .set_filter("weapons");
+    assert!(model.submit_record_export(|| {}), "started");
+    wait_for_writing(&mut model)?;
 
     rewritten(dir.path(), &many(10))?;
-    model.check_archive();
+    assert!(
+        model.check_archive(),
+        "archive change observed before writing"
+    );
+    drop(hold);
     let RecordExportStatus::Finished(summary) = ended(&mut model)? else {
         return Err("no summary".into());
     };
 
     assert!(!summary.was_cancelled(), "not cancelled");
-    assert_eq!(summary.written(), 4000, "every Record");
+    assert_eq!(summary.written(), 2, "every Record");
     Ok(())
 }

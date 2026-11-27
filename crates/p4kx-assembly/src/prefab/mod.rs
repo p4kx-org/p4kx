@@ -3,10 +3,19 @@
 
 use thiserror::Error;
 
+mod capture;
+mod guid_remapping;
+mod resolution_source;
 mod resolve;
 mod resolved;
 mod set;
 
+pub use guid_remapping::PrefabGuidRemappingInstance;
+pub use resolution_source::{
+    PrefabInstanceSource, PrefabIssueSource, PrefabLinkSource, PrefabLocation, PrefabLookupRoute,
+    PrefabObjectLocation, PrefabResolutionSource, PrefabSelectionSource, PrefabUnreadableEvidence,
+    PrefabUnreadableSource,
+};
 pub use resolved::{ResolvedObject, ResolvedPrefab};
 pub use set::{PrefabFile, PrefabSet};
 

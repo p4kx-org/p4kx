@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use p4kx_extraction::{Guid, StructValue};
+use p4kx_extraction::{Guid, StructValue, Value};
 
-use crate::contract::LocalisedText;
 use crate::contract_missions::PickupPlace;
 use crate::contract_offer::OfferedAt;
 use crate::contract_starmap::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::mission_index::MissionIndex;
+use crate::mission_index::demand::{DependencyKey, PreparedDependencies};
 use crate::mission_layers::items;
 use crate::record_fields::linked;
-
-/// The most pickup places an entry lists.
-pub(crate) const MAX_PICKUP_PLACES: usize = 5;
+use crate::record_read::ReadError;
 
 const LOCALITY: &str = "ContractPrerequisite_Locality";
 const LOCATION: &str = "ContractPrerequisite_Location";
@@ -26,8 +24,30 @@ const STAR: &str = "Star";
 /// `ContractPrerequisite_Locality` and the starmap objects of `ContractPrerequisite_Location`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Where {
-    pub(crate) localities: Vec<Guid>,
+    localities: Vec<LocalityLink>,
     pub(crate) locations: Vec<Guid>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LocalityLink {
+    guid: Guid,
+    record_index: Option<u32>,
+}
+
+impl LocalityLink {
+    fn read(prerequisite: &StructValue<'_>) -> Option<Self> {
+        match prerequisite.field("localityAvailable")? {
+            Value::Reference(target) if target.location().is_none() => Some(Self {
+                guid: target.guid(),
+                record_index: Some(target.record_index()),
+            }),
+            Value::Error(error) => error.dangling_guid().map(|guid| Self {
+                guid,
+                record_index: None,
+            }),
+            _ => None,
+        }
+    }
 }
 
 impl Where {
@@ -39,9 +59,7 @@ impl Where {
             .filter_map(crate::blueprint::as_struct)
         {
             match prerequisite.type_name() {
-                LOCALITY => found
-                    .localities
-                    .extend(linked(Some(prerequisite), "localityAvailable").map(|guid| guid.0)),
+                LOCALITY => found.localities.extend(LocalityLink::read(prerequisite)),
                 LOCATION => found
                     .locations
                     .extend(linked(Some(prerequisite), "locationAvailable").map(|guid| guid.0)),
@@ -58,37 +76,88 @@ impl Where {
 
 /// The starmap objects by GUID, to turn the places of a contract into names.
 pub(crate) struct Places<'s, 'f> {
-    objects: HashMap<Guid, &'s StarmapObject<'f>>,
+    objects: PlaceObjects<'s, 'f>,
+    prepared: PreparedDependencies,
+}
+
+enum PlaceObjects<'s, 'f> {
+    Local(HashMap<Guid, &'s StarmapObject<'f>>),
+    Prepared {
+        records_by_guid: &'s BTreeMap<Guid, Vec<u32>>,
+        objects_by_index: &'s BTreeMap<u32, StarmapObject<'f>>,
+    },
+}
+
+impl<'s, 'f> PlaceObjects<'s, 'f> {
+    fn get(&self, guid: Guid) -> Option<&'s StarmapObject<'f>> {
+        match self {
+            Self::Local(objects) => objects.get(&guid).copied(),
+            Self::Prepared {
+                records_by_guid,
+                objects_by_index,
+            } => records_by_guid
+                .get(&guid)?
+                .iter()
+                .rev()
+                .find_map(|index| objects_by_index.get(index)),
+        }
+    }
 }
 
 impl<'s, 'f> Places<'s, 'f> {
     pub(crate) fn new(objects: &'s [StarmapObject<'f>]) -> Self {
         Self {
-            objects: objects
-                .iter()
-                .map(|object| (object.guid.0, object))
-                .collect(),
+            prepared: PreparedDependencies::default(),
+            objects: PlaceObjects::Local(
+                objects
+                    .iter()
+                    .map(|object| (object.guid.0, object))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) const fn from_prepared(
+        records_by_guid: &'s BTreeMap<Guid, Vec<u32>>,
+        objects_by_index: &'s BTreeMap<u32, StarmapObject<'f>>,
+        prepared: PreparedDependencies,
+    ) -> Self {
+        Self {
+            objects: PlaceObjects::Prepared {
+                records_by_guid,
+                objects_by_index,
+            },
+            prepared,
         }
     }
 
     /// Returns the pickup places of the levels `levels`, nearest first: the starmap objects of
     /// their localities and locations, a star left out, the system first, then planets and moons,
-    /// then the rest, each group in stored order, at most [`MAX_PICKUP_PLACES`], none twice.
+    /// then the rest, each group in stored order and none twice.
     pub(crate) fn pickup(
         &self,
         index: &MissionIndex<'f>,
         levels: &[&Where],
-    ) -> Vec<PickupPlace<'f>> {
-        let listed = unique(levels.iter().flat_map(|level| {
-            level
-                .localities
-                .iter()
-                .flat_map(|locality| index.locality(*locality).iter().copied())
-                .chain(level.locations.iter().copied())
-        }));
+    ) -> Result<Vec<PickupPlace<'f>>, ReadError> {
+        let mut available = Vec::new();
+        for level in levels {
+            for locality in &level.localities {
+                if let Some(record_index) = locality.record_index {
+                    available.extend(
+                        index
+                            .lookup_locality(locality.guid, record_index)?
+                            .iter()
+                            .copied(),
+                    );
+                }
+            }
+            available.extend(level.locations.iter().copied());
+        }
+        let listed = unique(available.into_iter());
         let mut ranked: Vec<(u8, Guid, &StarmapObject<'f>)> = Vec::new();
         for guid in listed {
-            let Some(object) = self.objects.get(&guid).copied() else {
+            self.prepared.require(DependencyKey::Place(guid))?;
+            let Some(object) = self.objects.get(guid) else {
                 continue;
             };
             let kind = object.r#type;
@@ -107,11 +176,10 @@ impl<'s, 'f> Places<'s, 'f> {
             ranked.push((rank, guid, object));
         }
         ranked.sort_by_key(|(rank, _, _)| *rank);
-        ranked
+        Ok(ranked
             .into_iter()
-            .take(MAX_PICKUP_PLACES)
             .map(|(_, guid, object)| describe(guid, Some(object)))
-            .collect()
+            .collect())
     }
 
     /// Returns the pickup places and everywhere the contract is offered. A contract left without
@@ -122,9 +190,9 @@ impl<'s, 'f> Places<'s, 'f> {
         index: &MissionIndex<'f>,
         prerequisites: &Prerequisites<'_>,
         broker: Option<Guid>,
-    ) -> (Vec<PickupPlace<'f>>, OfferedAt<'f>) {
+    ) -> Result<(Vec<PickupPlace<'f>>, OfferedAt<'f>), ReadError> {
         let levels = prerequisites.levels();
-        let mut pickup = self.pickup(index, &levels);
+        let mut pickup = self.pickup(index, &levels)?;
         if pickup.is_empty()
             && let Some(location) = broker
         {
@@ -132,19 +200,23 @@ impl<'s, 'f> Places<'s, 'f> {
                 localities: Vec::new(),
                 locations: vec![location],
             };
-            pickup = self.pickup(index, &[&at_broker]);
+            pickup = self.pickup(index, &[&at_broker])?;
         }
-        (pickup, self.offered(&levels, broker))
+        Ok((pickup, self.offered(&levels, broker)?))
     }
 
     /// Returns every place the levels `levels` name, uncapped: their localities and their
     /// location objects, each in stored order and none twice. When they name no place at all the
     /// location `fallback` is the only one and `broker_fallback` is set.
-    fn offered(&self, levels: &[&Where], fallback: Option<Guid>) -> OfferedAt<'f> {
+    fn offered(
+        &self,
+        levels: &[&Where],
+        fallback: Option<Guid>,
+    ) -> Result<OfferedAt<'f>, ReadError> {
         let localities = unique(
             levels
                 .iter()
-                .flat_map(|level| level.localities.iter().copied()),
+                .flat_map(|level| level.localities.iter().map(|locality| locality.guid)),
         );
         let mut locations = unique(
             levels
@@ -155,14 +227,18 @@ impl<'s, 'f> Places<'s, 'f> {
         if broker_fallback {
             locations.extend(fallback);
         }
-        OfferedAt {
+        let locations = locations
+            .into_iter()
+            .map(|guid| {
+                self.prepared.require(DependencyKey::Place(guid))?;
+                Ok(describe(guid, self.objects.get(guid)))
+            })
+            .collect::<Result<_, ReadError>>()?;
+        Ok(OfferedAt {
             locality_guids: localities.into_iter().map(CatalogGuid).collect(),
-            locations: locations
-                .into_iter()
-                .map(|guid| describe(guid, self.objects.get(&guid).copied()))
-                .collect(),
+            locations,
             broker_fallback,
-        }
+        })
     }
 }
 
@@ -192,10 +268,6 @@ fn describe<'f>(guid: Guid, object: Option<&StarmapObject<'f>>) -> PickupPlace<'
     PickupPlace {
         starmap_object_guid: CatalogGuid(guid),
         object_type: object.and_then(|object| object.r#type),
-        place: object.map_or_else(LocalisedText::default, |object| LocalisedText {
-            key: object.name.key,
-            en: object.name.en.clone(),
-            de: object.name.de.clone(),
-        }),
+        place: object.map(|object| object.name.clone()),
     }
 }

@@ -5,6 +5,7 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use p4kx_extraction::OriginApplicability;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
@@ -16,9 +17,10 @@ use crate::entries;
 use crate::error::{ToolError, capped};
 use crate::forge_file::ForgeSource;
 use crate::gate::Gate;
+use crate::key_report;
 use crate::keys::KeyChoice;
 use crate::locate::{Accepts, Locations};
-use crate::noted::{self, Noted};
+use crate::noted::{self, Noted, Notes};
 use crate::ordered::Ordered;
 use crate::page::Page;
 use crate::params::{ArchiveParams, ChannelsParams, ListParams, MAX_PATH_LEN, SearchParams};
@@ -106,14 +108,17 @@ impl Server {
     pub(crate) async fn preload(&self, archive: Option<String>) -> Result<(), String> {
         let state = Arc::clone(&self.state);
         let outcome = tokio::task::spawn_blocking(move || {
-            let loaded = state.forge(archive.as_deref())?.load_dataforge();
             noted::clear();
-            loaded
+            let loaded = state
+                .forge(archive.as_deref())
+                .and_then(|forge| forge.load_dataforge());
+            let notes = noted::take();
+            loaded.map_err(|error| notes.error_message(&error))
         })
         .await;
         match outcome {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(error)) => Err(error.message()),
+            Ok(Err(error)) => Err(error),
             Err(_) => Err(ToolError::Stopped.message()),
         }
     }
@@ -125,7 +130,7 @@ impl Server {
     {
         self.run_plain(work)
             .await
-            .map(|(value, notice)| Noted { value, notice })
+            .map(|(value, notes)| Noted { value, notes })
     }
 
     /// Like [`Server::run`], with the key order of the result kept in its text content.
@@ -136,10 +141,10 @@ impl Server {
     {
         self.run_plain(work)
             .await
-            .map(|(value, notice)| Ordered { value, notice })
+            .map(|(value, notes)| Ordered { value, notes })
     }
 
-    async fn run_plain<T, F>(&self, work: F) -> Result<(T, Option<String>), String>
+    async fn run_plain<T, F>(&self, work: F) -> Result<(T, Notes), String>
     where
         T: Send + 'static,
         F: FnOnce(&State) -> Result<T, ToolError> + Send + 'static,
@@ -151,14 +156,17 @@ impl Server {
         let outcome = tokio::task::spawn_blocking(move || {
             noted::clear();
             let result = work(&state);
-            let notice = noted::take();
+            let notes = noted::take();
             drop(permit);
-            result.map(|value| (value, notice))
+            match result {
+                Ok(value) => Ok((value, notes)),
+                Err(error) => Err(notes.error_message(&error)),
+            }
         })
         .await;
         match outcome {
             Ok(Ok(done)) => Ok(done),
-            Ok(Err(error)) => Err(error.message()),
+            Ok(Err(error)) => Err(error),
             Err(_) => Err(ToolError::Stopped.message()),
         }
     }
@@ -177,6 +185,7 @@ impl State {
         let path = self.path(archive, Accepts::Archive)?;
         let opened = self.archives.get(&path)?;
         noted::remember(opened.notice());
+        key_report::watch(&opened);
         Ok(opened)
     }
 
@@ -187,6 +196,7 @@ impl State {
         let source = self.archives.forge(&path)?;
         if let ForgeSource::Archive(opened) = &source {
             noted::remember(opened.notice());
+            key_report::watch(opened);
         }
         Ok(source)
     }
@@ -220,6 +230,7 @@ impl Server {
             let page = Page::new(&"list_channels", params.cursor.as_deref(), params.limit)?;
             let channels = state.locations.channels()?;
             Ok(ChannelsResult {
+                origin_applicability: OriginApplicability::NotApplicable,
                 total: channels.len(),
                 channels: page
                     .slice(&channels)
@@ -249,10 +260,7 @@ impl Server {
     ) -> Result<Noted<ArchiveInfo>, String> {
         self.run(move |state| {
             let opened = state.archive(params.archive.as_deref())?;
-            Ok(entries::info(
-                opened.archive(),
-                &state.locations.public_patches(),
-            ))
+            entries::info(opened.archive(), &state.locations.public_patches())
         })
         .await
     }
@@ -340,3 +348,7 @@ impl ServerHandler for Server {
             .with_instructions(INSTRUCTIONS)
     }
 }
+
+#[cfg(test)]
+#[path = "server_prefix_tests.rs"]
+mod prefix_tests;

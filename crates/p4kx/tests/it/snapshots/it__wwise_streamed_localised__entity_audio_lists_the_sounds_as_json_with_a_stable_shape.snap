@@ -42,6 +42,7 @@ expression: "serde_json::to_string_pretty(&value)?"
       "references": 1,
       "sounds": {
         "breaks": [],
+        "truncated_by_limits": false,
         "variants": [
           {
             "event": "Play_Long",
@@ -163,6 +164,7 @@ expression: "serde_json::to_string_pretty(&value)?"
       "references": 1,
       "sounds": {
         "breaks": [],
+        "truncated_by_limits": false,
         "variants": [
           {
             "event": "Play_DX_Hello",
@@ -220,6 +222,7 @@ expression: "serde_json::to_string_pretty(&value)?"
       "references": 1,
       "sounds": {
         "breaks": [],
+        "truncated_by_limits": false,
         "variants": [
           {
             "event": "Play_DX_Only",

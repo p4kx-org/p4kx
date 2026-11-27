@@ -6,6 +6,7 @@
 mod archive_key_store;
 mod assembly_export;
 mod extraction_folder;
+mod isolated_folders;
 mod locations;
 mod model_export;
 mod profile_migration;

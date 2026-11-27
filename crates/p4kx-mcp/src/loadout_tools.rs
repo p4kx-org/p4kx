@@ -21,7 +21,8 @@ impl Server {
         (loadout, override, port_default, unset, empty for a port only the vehicle implementation declares), the item types and sizes it takes, the Entity attached to it with its class \
         name and GUID, and for every port that cannot be resolved the reason (dangling_reference, unknown_class, cycle, ...) \
         and the reference or class name the Loadout names. Counts cover the whole tree; max_depth (16 by default, at most 32) \
-        leaves deeper ports out and deeper says how many. Paged with a cursor. The content may be forwarded by the client to \
+        leaves deeper ports out and deeper says how many. Retained strings are complete. Paged with a cursor within the \
+        256 KiB response budget; an item that cannot fit first is explicitly refused. The content may be forwarded by the client to \
         third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<LoadoutResult>(),
         annotations(
@@ -51,7 +52,9 @@ impl Server {
             );
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
             let held = Arc::clone(&opened);
-            opened.with_dataforge(move |forge, _| loadout::resolve(&held, forge, &params, page))
+            opened.with_dataforge_origin(move |forge, _, origin| {
+                loadout::resolve(&held, forge, origin, &params, page)
+            })
         })
         .await
     }

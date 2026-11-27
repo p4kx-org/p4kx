@@ -24,6 +24,7 @@ fn at_rest(operations: &Operations, inputs: &[(String, Rest)], variables: &[Vari
 
 fn binding(field: &str, kind: FieldKind, input: usize) -> Binding {
     Binding {
+        operation: 0,
         widget: 0,
         field: field.to_owned(),
         kind,
@@ -58,7 +59,7 @@ fn a_cycle_is_unknown_and_does_not_loop() {
     );
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.active(0), None);
-    assert_eq!(state.unknown().len(), 1);
+    assert_eq!(state.omissions().len(), 1);
 }
 
 #[test]
@@ -68,12 +69,12 @@ fn a_chain_deeper_than_the_limit_is_unknown() {
     let operations = graph(nodes, vec![binding("IsActive", FieldKind::Boolean, 400)]);
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.active(0), None);
-    assert!(
-        state
-            .unknown()
-            .iter()
-            .any(|(_, _, why)| why.contains("too deep"))
-    );
+    assert!(state.omissions().iter().any(|issue| {
+        issue
+            .detail
+            .as_deref()
+            .is_some_and(|why| why.contains("too deep"))
+    }));
 }
 
 #[test]
@@ -143,7 +144,7 @@ fn no_number_that_is_not_finite_reaches_an_alpha_or_a_parameter() {
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.alpha(0), None);
     assert_eq!(state.typed(0), []);
-    assert_eq!(state.unknown().len(), 3);
+    assert_eq!(state.omissions().len(), 3);
     let clamped = graph(
         vec![
             variable("level", Rest::Num(0.5)),
@@ -241,12 +242,12 @@ fn a_variable_that_does_not_fit_its_kind_is_unknown() {
     let word = [Variable::new("powerstate", "on").expect("variable")];
     let state = at_rest(&operations, &[], &word);
     assert_eq!(state.alpha(0), None);
-    assert!(
-        state
-            .unknown()
-            .iter()
-            .any(|(_, _, why)| why.contains("powerstate") && why.contains("not a number"))
-    );
+    assert!(state.omissions().iter().any(|issue| {
+        issue
+            .detail
+            .as_deref()
+            .is_some_and(|why| why.contains("powerstate") && why.contains("not a number"))
+    }));
 }
 
 fn tag(byte: u8) -> Guid {
@@ -284,7 +285,7 @@ fn a_branch_without_a_tag_gives_none() {
     let operations = graph(vec![flag(), choice], vec![state_tag(1)]);
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.state_tags(0).first(), None);
-    assert_eq!(state.unknown().first(), None);
+    assert_eq!(state.omissions(), [], "an authored tagless branch is valid");
 }
 
 #[test]
@@ -336,7 +337,7 @@ fn a_tag_the_game_names_at_run_time_is_unknown() {
     );
     let state = at_rest(&operations, &[], &[]);
     assert_eq!(state.state_tags(0).first(), None);
-    assert_eq!(state.unknown().len(), 1);
+    assert_eq!(state.omissions().len(), 1);
 }
 
 #[test]
@@ -355,12 +356,12 @@ fn a_tag_read_as_a_text_is_a_typed_unknown() {
     let state = at_rest(&operations, &given, &[]);
     assert_eq!(state.active(0), None);
     assert!(
-        state
-            .unknown()
-            .iter()
-            .any(|(_, _, why)| why.contains("not a text")),
+        state.omissions().iter().any(|issue| issue
+            .detail
+            .as_deref()
+            .is_some_and(|why| why.contains("not a text"))),
         "{:?}",
-        state.unknown()
+        state.omissions()
     );
 }
 

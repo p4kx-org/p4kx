@@ -2,14 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
+use std::slice::Iter;
 
-use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::{Field, Guid, RecordTree, Reference, StructValue, Value};
 
-use crate::blueprint::as_struct;
 use crate::crafting_types::RewardSource;
 use crate::record_fields::{guid_value, number, text};
-
-const MAX_DEPTH: usize = 128;
 
 /// The nearest enclosing identity of a struct: the `id` and the `debugName` of the nearest struct
 /// with an `id`, or, above any such struct, the nearest `debugName`.
@@ -35,53 +33,144 @@ impl<'f> Scope<'f> {
     }
 }
 
-/// Appends to `out` every struct of `tree` with a Reference to one of the `pools`, with the
-/// chance the struct states. A Reference of a Record to itself, as a pool Record to its own GUID,
-/// is no reward source.
-pub(crate) fn collect<'f>(
-    tree: &RecordTree<'f>,
+/// Appends selected direct pool References from owned structs in source order.
+pub(crate) fn collect<'source>(
+    tree: &RecordTree<'source>,
     pools: &HashSet<Guid>,
-    out: &mut Vec<RewardSource<'f>>,
+    out: &mut Vec<RewardSource<'source>>,
 ) {
-    visit(tree, tree.root(), Scope::default(), pools, 0, out);
+    out.extend(walk(tree).filter_map(|step| step.reward(tree, pools)));
 }
 
-fn visit<'f>(
-    tree: &RecordTree<'f>,
-    node: &StructValue<'f>,
-    parent: Scope<'f>,
-    pools: &HashSet<Guid>,
-    depth: usize,
-    out: &mut Vec<RewardSource<'f>>,
-) {
-    if depth >= MAX_DEPTH {
-        return;
+pub(crate) struct WalkStep<'tree, 'source> {
+    pub(crate) node: &'tree StructValue<'source>,
+    pub(crate) value: &'tree Value<'source>,
+    scope: Scope<'source>,
+    edge: Edge,
+}
+
+#[derive(Clone, Copy)]
+enum Edge {
+    Field,
+    ArrayElement,
+}
+
+struct VisitedValue<'tree, 'source> {
+    value: &'tree Value<'source>,
+    edge: Edge,
+}
+
+impl<'source> WalkStep<'_, 'source> {
+    pub(crate) fn pool_reference(&self, tree: &RecordTree<'_>) -> Option<&Reference<'source>> {
+        let Value::Reference(reference) = self.value else {
+            return None;
+        };
+        (matches!(self.edge, Edge::Field)
+            && reference.location().is_none()
+            && reference.guid() != tree.guid())
+        .then_some(reference)
     }
-    let scope = parent.within(node);
-    let next = depth.saturating_add(1);
-    for field in node.fields() {
-        match field.value() {
-            Value::Reference(reference)
-                if reference.location().is_none()
-                    && reference.guid() != tree.guid()
-                    && pools.contains(&reference.guid()) =>
-            {
-                out.push(RewardSource {
-                    record: tree.guid(),
-                    record_path: tree.record_path(),
-                    contract_id: scope.id,
-                    contract_name: scope.name,
-                    pool: reference.guid(),
-                    chance: number(Some(node), "chance"),
-                });
+
+    pub(crate) fn reward(
+        &self,
+        tree: &RecordTree<'source>,
+        pools: &HashSet<Guid>,
+    ) -> Option<RewardSource<'source>> {
+        let guid = self.pool_reference(tree)?.guid();
+        if !pools.contains(&guid) {
+            return None;
+        }
+        Some(RewardSource {
+            record: tree.guid(),
+            record_path: tree.record_path(),
+            contract_id: self.scope.id,
+            contract_name: self.scope.name,
+            pool: guid,
+            chance: number(Some(self.node), "chance"),
+        })
+    }
+}
+
+pub(crate) struct Walk<'tree, 'source> {
+    pending: Vec<Frame<'tree, 'source>>,
+}
+
+pub(crate) fn walk<'tree, 'source>(tree: &'tree RecordTree<'source>) -> Walk<'tree, 'source> {
+    Walk {
+        pending: vec![Frame::new(tree.root(), Scope::default())],
+    }
+}
+
+impl<'tree, 'source> Iterator for Walk<'tree, 'source> {
+    type Item = WalkStep<'tree, 'source>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let frame = self.pending.last_mut()?;
+            let Some(visited) = frame.next() else {
+                self.pending.pop();
+                continue;
+            };
+            let step = WalkStep {
+                node: frame.node,
+                value: visited.value,
+                scope: frame.scope,
+                edge: visited.edge,
+            };
+            if let Value::Struct(child) = visited.value {
+                self.pending.push(Frame::new(child, step.scope));
             }
-            Value::Struct(child) => visit(tree, child, scope, pools, next, out),
-            Value::Array(items) => {
-                for child in items.iter().filter_map(as_struct) {
-                    visit(tree, child, scope, pools, next, out);
-                }
-            }
-            _ => {}
+            return Some(step);
         }
     }
 }
+
+struct Frame<'tree, 'source> {
+    node: &'tree StructValue<'source>,
+    scope: Scope<'source>,
+    fields: Iter<'tree, Field<'source>>,
+    children: Iter<'tree, Value<'source>>,
+}
+
+impl<'tree, 'source> Frame<'tree, 'source> {
+    fn new(node: &'tree StructValue<'source>, parent: Scope<'source>) -> Self {
+        Self {
+            node,
+            scope: parent.within(node),
+            fields: node.fields().iter(),
+            children: [].iter(),
+        }
+    }
+}
+
+impl<'tree, 'source> Iterator for Frame<'tree, 'source> {
+    type Item = VisitedValue<'tree, 'source>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(value) = self.children.next() {
+            return Some(VisitedValue {
+                value,
+                edge: Edge::ArrayElement,
+            });
+        }
+        let value = self.fields.next()?.value();
+        if let Value::Array(children) = value {
+            self.children = children.iter();
+        }
+        Some(VisitedValue {
+            value,
+            edge: Edge::Field,
+        })
+    }
+}
+
+#[cfg(test)]
+#[path = "crafting_sources_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+#[path = "crafting_source_fixture.rs"]
+pub(crate) mod fixture;
+#[cfg(test)]
+#[path = "crafting_source_scope_fixture.rs"]
+pub(crate) mod scope_fixture;

@@ -106,7 +106,7 @@ fn cube_names_its_material_library() -> TestResult {
         "the MtlName chunk"
     );
     assert!(
-        matches!(&model.materials, MaterialStatus::Missing { path } if path == CUBE_MATERIAL_LIBRARY),
+        matches!(&model.materials, MaterialStatus::Missing { path, .. } if path == CUBE_MATERIAL_LIBRARY),
         "no resolver file: {:?}",
         model.materials
     );
@@ -236,4 +236,124 @@ fn a_file_without_nodes_has_a_root_node_and_no_meshes() -> TestResult {
         "no meshes"
     );
     Ok(())
+}
+
+#[test]
+fn physics_count_sources_follow_emitted_meshes_and_exclude_other_read_chunks() -> TestResult {
+    let bytes = physics_count_fixture()?;
+    let model = read_bytes(bytes.clone(), LodSelection::All)?;
+    check_physics_selection(&model)?;
+    let [lod] = model.lods.as_slice() else {
+        return Err("one CrCh level".into());
+    };
+    let [mesh] = lod.meshes.as_slice() else {
+        return Err("only the nonempty physics chunk produces a mesh".into());
+    };
+    let source = mesh
+        .crch_physics_source(&model.chunks)
+        .ok_or("selected physics evidence")?;
+    assert_eq!(
+        source.chunk(),
+        SELECTED_PHYSICS,
+        "the empty earlier read is not selected"
+    );
+    let table = model
+        .chunks
+        .get(SELECTED_PHYSICS)
+        .ok_or("selected physics table row")?;
+    assert_eq!(
+        source.triangle_count_range().start,
+        table.layout.offset + TRIANGLE_COUNT_AT as u64,
+        "original word address in the selected primary model",
+    );
+    assert_eq!(
+        word(&bytes, source.primitive_range())?,
+        1,
+        "selected primitive"
+    );
+    for (range, count) in [
+        (source.vertex_count_range(), mesh.positions.len()),
+        (source.triangle_count_range(), lod.triangle_count()),
+    ] {
+        assert_eq!(
+            usize::try_from(word(&bytes, range)?)?,
+            count,
+            "emitted count"
+        );
+    }
+
+    let mut changed = mesh.clone();
+    changed.indices.clear();
+    assert!(
+        changed.crch_physics_source(&model.chunks).is_none(),
+        "transformed counts cannot reuse the proof"
+    );
+    assert!(
+        mesh.crch_physics_source(&[]).is_none(),
+        "the physical table binding is required"
+    );
+    Ok(())
+}
+
+fn check_physics_selection(model: &Model) -> TestResult {
+    const EMPTY_PHYSICS: usize = 7;
+    const SKIPPED_PHYSICS: usize = 9;
+    for (ordinal, expected) in [
+        (SELECTED_PHYSICS, ChunkUsage::Read),
+        (EMPTY_PHYSICS, ChunkUsage::Read),
+        (SKIPPED_PHYSICS, ChunkUsage::Skipped),
+    ] {
+        let usage = model.chunks.get(ordinal).ok_or("physical table row")?.usage;
+        assert_eq!(usage, expected, "original physics chunk at {ordinal}");
+    }
+    Ok(())
+}
+
+const SELECTED_PHYSICS: usize = 3;
+const TRIANGLE_COUNT_AT: usize = 100;
+
+fn physics_count_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    const ROOT_NODE: usize = 2;
+    const SELECTED_MESH: usize = 4;
+    const EMPTY_PHYSICS_ID: u32 = 8;
+    const EMPTY_MESH_ID: u32 = 9;
+    const OBJECT_ID_AT: usize = 64;
+    const FIRST_PHYSICS_SLOT_AT: usize = 92;
+
+    let cube = ChunkFile::parse(TestCrchModel::cube().bytes())?;
+    let physical_mesh = cube.chunk_data(SELECTED_MESH).ok_or("Mesh source")?;
+    let physical_counts = cube
+        .chunk_data(SELECTED_PHYSICS)
+        .ok_or("MeshPhysicsData source")?;
+    let mut zero = physical_counts.to_vec();
+    set_word(&mut zero, TRIANGLE_COUNT_AT, 0)?;
+    let mut zero_mesh = physical_mesh.to_vec();
+    set_word(&mut zero_mesh, FIRST_PHYSICS_SLOT_AT, EMPTY_PHYSICS_ID)?;
+    let mut fixture = TestChunkFile::crch();
+    for (ordinal, chunk) in cube.chunks().iter().enumerate() {
+        let mut bytes = cube.chunk_data(ordinal).ok_or("chunk payload")?.to_vec();
+        if ordinal == ROOT_NODE {
+            set_word(&mut bytes, OBJECT_ID_AT, EMPTY_MESH_ID)?;
+        }
+        fixture = fixture.chunk(chunk.chunk_type().id(), chunk.version(), bytes);
+    }
+    Ok(fixture
+        .chunk(0x1018, 0x800, zero)
+        .chunk(0x1000, 0x801, zero_mesh)
+        .chunk(0x1018, 0x800, physical_counts.to_vec())
+        .bytes())
+}
+
+fn set_word(bytes: &mut [u8], start: usize, word: u32) -> TestResult {
+    bytes
+        .get_mut(start..start + size_of::<u32>())
+        .ok_or("fixture word address")?
+        .copy_from_slice(&word.to_le_bytes());
+    Ok(())
+}
+
+fn word(bytes: &[u8], range: std::ops::Range<u64>) -> Result<u32, Box<dyn Error>> {
+    let range = usize::try_from(range.start)?..usize::try_from(range.end)?;
+    let original = bytes.get(range).ok_or("original word address")?;
+    Ok(u32::from_le_bytes(original.try_into()?))
 }

@@ -61,8 +61,8 @@ fn the_model_view_sits_on_the_inset_surface_with_a_hairline() {
     assert_eq!(spec["border"].as_str(), Some("color-gray-3"), "hairline");
     assert_eq!(
         super::palette::SURFACE_INSET,
-        super::palette::CANVAS,
-        "the inset is the canvas colour the render target is cleared with"
+        super::palette::SURFACE_INPUT,
+        "the preview target is cleared with the recessed bar colour"
     );
 }
 

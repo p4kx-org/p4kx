@@ -1,0 +1,2 @@
+# Upstream release packages have no Debian archive upload or Debian ITP bug.
+p4kx: initial-upload-closes-no-bugs [usr/share/doc/p4kx/changelog.Debian.gz:1]

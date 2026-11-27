@@ -3,7 +3,9 @@
 
 use p4kx_audio::{ContainerKind, HircKind, MediaStorage, SoundSource};
 
-use super::{AtlTrigger, BrokenLink, IndexedSoundbank, WwiseEvent};
+use super::music_clip_features::MusicClipFeatures;
+use super::playback_features::PlaybackFeatures;
+use super::{AtlTrigger, BrokenLink, IndexedSoundbank, LanguageChoice, WemSelection, WwiseEvent};
 
 /// The kind of a `HIRC` object on the way from a Wwise event to a sound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -207,8 +209,16 @@ pub struct SoundVariant<'i> {
     pub(crate) soundbank: &'i IndexedSoundbank,
     pub(crate) sound_id: u32,
     pub(crate) path: Box<[PathStep]>,
+    pub(super) path_sources: Box<[super::HircPathSource]>,
+    /// Number of visits still shared with the previous emitted variant in this Event walk.
+    pub(crate) shared_path_prefix: usize,
+    pub(super) music_clip_features: MusicClipFeatures,
+    pub(super) playback_features: PlaybackFeatures,
     pub(crate) source: SoundSource,
+    pub(super) source_ordinal: usize,
     pub(crate) location: Option<WemLocation<'i>>,
+    pub(super) location_source: Option<Box<super::wem_location_origin::WemLocationSource>>,
+    pub(crate) selection: WemSelection,
     pub(crate) localised: bool,
     pub(crate) language: Option<&'i str>,
     pub(crate) fallback: bool,
@@ -229,7 +239,7 @@ impl<'i> SoundVariant<'i> {
         self.language
     }
 
-    /// Returns whether the language is the fallback language, not the one asked for.
+    /// Returns whether the resolved language differs from the explicitly preferred language.
     #[must_use]
     pub const fn used_fallback(&self) -> bool {
         self.fallback
@@ -251,6 +261,12 @@ impl<'i> SoundVariant<'i> {
     #[must_use]
     pub fn path(&self) -> &[PathStep] {
         &self.path
+    }
+
+    /// Returns the original HIRC sources in path order when requested.
+    #[must_use]
+    pub fn path_sources(&self) -> &[super::HircPathSource] {
+        &self.path_sources
     }
 
     /// Returns the ID of the Sound object.
@@ -282,7 +298,13 @@ impl<'i> SoundVariant<'i> {
         SourceKind::of(&self.source)
     }
 
-    /// Returns where the WEM's bytes are, or `None` when no soundbank embeds it.
+    /// Returns the exact selection rule used to locate the WEM or establish its absence.
+    #[must_use]
+    pub const fn wem_selection(&self) -> WemSelection {
+        self.selection
+    }
+
+    /// Returns the physical location of the selected WEM, when found.
     #[must_use]
     pub const fn location(&self) -> Option<&WemLocation<'i>> {
         self.location.as_ref()
@@ -295,6 +317,8 @@ impl<'i> SoundVariant<'i> {
 pub struct TriggerSounds<'i> {
     pub(crate) trigger: &'i AtlTrigger,
     pub(crate) definition_path: Option<&'i str>,
+    pub(crate) definition_entry: Option<usize>,
+    pub(crate) choice: LanguageChoice,
     pub(crate) variants: Vec<SoundVariant<'i>>,
     pub(crate) breaks: Vec<BrokenLink<'i>>,
 }
@@ -312,6 +336,18 @@ impl<'i> TriggerSounds<'i> {
         self.definition_path
     }
 
+    /// Returns the position of the selected ATL Entry in the owning Archive.
+    #[must_use]
+    pub const fn definition_entry_position(&self) -> Option<usize> {
+        self.definition_entry
+    }
+
+    /// Returns the language policy used for this resolution.
+    #[must_use]
+    pub const fn language_choice(&self) -> &LanguageChoice {
+        &self.choice
+    }
+
     /// Returns the variants in the order of the trigger's events, their soundbanks in path order
     /// and the containers' children in bank order.
     #[must_use]
@@ -323,5 +359,17 @@ impl<'i> TriggerSounds<'i> {
     #[must_use]
     pub fn breaks(&self) -> &[BrokenLink<'i>] {
         &self.breaks
+    }
+
+    /// Returns whether a traversal limit left any authored route unvisited.
+    #[must_use]
+    pub fn truncated_by_limits(&self) -> bool {
+        self.first_truncation().is_some()
+    }
+
+    pub(super) fn first_truncation(&self) -> Option<&BrokenLink<'i>> {
+        self.breaks()
+            .iter()
+            .find(|link| link.reason().truncated_by_limit())
     }
 }

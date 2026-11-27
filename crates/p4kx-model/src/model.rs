@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_chunks::{ChunkFile, ChunkType, Container, ivo};
+use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
-use crate::build::build;
-use crate::crch::build as build_crch;
+#[path = "model_chunk.rs"]
+mod chunk;
+pub use chunk::ModelChunk;
+pub(crate) use chunk::chunk_usage;
+
+#[path = "model_drawable.rs"]
+mod drawable;
+
+use crate::model_node_sources::{self, ReadCapture};
 use crate::{
-    Bone, CompanionResolver, Influences, MaterialReading, MaterialStatus, ModelError, ModelIssue,
-    PositionBox, RigLogicBytes, Transform,
+    Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
+    MeshOrigin, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -38,7 +45,7 @@ pub struct Model {
     /// ([`LodSelection::OnlyOrBase`]) and data a `CrCh` read left out
     /// ([`ModelIssue::PhysicsSlotsIgnored`]), which every selection reports.
     pub issues: Vec<ModelIssue>,
-    /// Every chunk of the model file and its geometry companion, with how the model used it.
+    /// Every chunk of actually read model and geometry files, including LOD skeleton models.
     pub chunks: Vec<ModelChunk>,
     /// The bytes of the model file's `RigLogic` chunk, which a consumer above this layer parses;
     /// `None` for a model without one.
@@ -80,7 +87,7 @@ impl Node {
     /// Returns whether the node is a helper: a point, box or dummy without geometry.
     #[must_use]
     pub const fn is_helper(&self) -> bool {
-        matches!(self.geometry_type, Some(2 | 3))
+        matches!(self.geometry_type, Some(kind) if is_helper_geometry(kind))
     }
 
     /// Returns the value of the property `key`, the first when it is stored more than once.
@@ -105,6 +112,8 @@ pub struct Lod {
     /// `<stem>_lod<n>.<extension>` file carries one that differs from [`Model::bones`]; see
     /// [`Model::bones_of`].
     pub bones: Option<Vec<Bone>>,
+    /// What the level-specific skeleton lookup observed without changing its effective bones.
+    pub skeleton_origin: LodSkeletonOrigin,
 }
 
 impl Lod {
@@ -133,6 +142,10 @@ pub struct Mesh {
     /// mesh keeps only the vertices its triangles use, in the order they are first used, so this
     /// is how data stored per stream vertex, such as a DNA rig, is matched to the mesh.
     pub source: Vec<u32>,
+    pub(crate) origin: Option<MeshOrigin>,
+    pub(crate) crch_physics: Option<crate::CrchMeshSource>,
+    pub(crate) index_width: Option<u32>,
+    pub(crate) original_vertex_order_changed: bool,
     /// The unit vertex normals: the stored ones, or the computed smooth ones when the mesh
     /// stores none, see [`Self::normals_computed`]. `None` only for a mesh without triangles.
     pub normals: Option<Vec<[f32; 3]>>,
@@ -175,6 +188,7 @@ pub struct Submesh {
     pub first_index: usize,
     /// The number of indices, a multiple of three.
     pub index_count: usize,
+    pub(crate) origin: Option<crate::mesh_origin::MeshSubmeshOrigin>,
 }
 
 /// Which file of a model a chunk is in.
@@ -187,6 +201,8 @@ pub enum ModelFile {
     Geometry,
     /// The geometry companion of a level of detail from 1 on, e.g. `_lod1.cgfm`.
     LodGeometry(u32),
+    /// The model file of a level from 1 on, read for its skeleton.
+    LodModel(u32),
 }
 
 /// Which levels of detail [`Model::read_with`] reads.
@@ -233,20 +249,6 @@ pub enum ChunkUsage {
     Skipped,
     /// The chunk type is unknown and was skipped.
     Unknown,
-}
-
-/// One chunk of a model's files and how the model used it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct ModelChunk {
-    /// The file holding the chunk.
-    pub file: ModelFile,
-    /// The chunk's position in the file's chunk table.
-    pub index: usize,
-    /// The chunk's type.
-    pub chunk_type: ChunkType,
-    /// How the model used it.
-    pub usage: ChunkUsage,
 }
 
 impl Model {
@@ -340,10 +342,15 @@ impl Model {
         position_box: PositionBox,
         materials: MaterialReading,
     ) -> Result<Self, ModelError> {
-        match file.container() {
-            Container::Ivo => build(name, file, companions, lods, materials, position_box),
-            Container::CrCh => build_crch(name, file, companions, lods, materials),
-        }
+        model_node_sources::read(
+            name,
+            file,
+            companions,
+            lods,
+            position_box,
+            materials,
+            ReadCapture::default(),
+        )
     }
 
     /// Returns the bones the meshes of `lod` are weighted to: those of the level's own file when
@@ -355,9 +362,15 @@ impl Model {
 
     /// Returns the chunks of unknown type, which the model skipped.
     pub fn unknown_chunks(&self) -> impl Iterator<Item = &ModelChunk> {
+        self.unknown_chunks_with_positions().map(|(_, chunk)| chunk)
+    }
+
+    /// Returns each skipped unknown chunk with its position in the model-wide chunk list.
+    pub fn unknown_chunks_with_positions(&self) -> impl Iterator<Item = (usize, &ModelChunk)> {
         self.chunks
             .iter()
-            .filter(|chunk| chunk.usage == ChunkUsage::Unknown)
+            .enumerate()
+            .filter(|(_, chunk)| chunk.usage == ChunkUsage::Unknown)
     }
 
     /// Returns the material IDs the submeshes of every level of detail use, ascending.
@@ -378,3 +391,7 @@ impl Model {
 
 /// The chunk types holding a mesh, preferred first.
 pub(crate) const MESH_TYPES: [ChunkType; 2] = [ivo::SKIN_2, ivo::SKIN];
+
+pub(crate) const fn is_helper_geometry(kind: u16) -> bool {
+    matches!(kind, 2 | 3)
+}

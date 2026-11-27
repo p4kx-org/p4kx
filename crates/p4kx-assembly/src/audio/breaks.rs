@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_archive::{Archive, ObservedEntry, ObservedEntryBinding};
 use p4kx_audio::BankError;
+use p4kx_extraction::{
+    FieldOrigin, InputScope, SourceCoordinateOmission, SourceEvidenceError, SourceInput,
+    SourceUseRole, SourceUses,
+};
 use thiserror::Error;
 
+use super::hirc_path_source::HircInboundSource;
 use super::{AudioFileError, IndexedSoundbank, PathStep, WwiseEvent};
 
 fn no_localisation(language: &str, fallback: &str) -> String {
@@ -33,9 +39,8 @@ pub enum BreakReason {
         /// The ID referred to.
         id: u32,
     },
-    /// A reference leads into a soundbank the walk does not enter: the Archive holds no soundbank
-    /// of the ID a Play action names, or the walk has already read its one other soundbank.
-    #[error("object {id} lies in soundbank {bank_id}, which the walk does not enter")]
+    /// A Play action names a soundbank absent from the eligible indexed candidates.
+    #[error("no eligible indexed soundbank {bank_id} holds object {id}")]
     OtherSoundbank {
         /// The ID referred to.
         id: u32,
@@ -55,33 +60,11 @@ pub enum BreakReason {
     /// The object is of a kind that is not followed, e.g. an actor-mixer.
     #[error("objects of this kind are not followed")]
     Unsupported,
-    /// The object refers back to an object on its own path.
+    /// The reference returns to the same object in the same soundbank Entry on its path.
     #[error("the object refers back to object {id} on its own path")]
     Cycle {
         /// The ID referred to.
         id: u32,
-    },
-    /// The path is as long as [`MAX_PATH_DEPTH`](super::MAX_PATH_DEPTH) allows.
-    #[error("the path is deeper than {limit} objects")]
-    TooDeep {
-        /// The limit.
-        limit: usize,
-    },
-    /// `PlayEvent` and `Trigger` actions follow one another more often than
-    /// [`MAX_ACTION_CHAIN`](super::MAX_ACTION_CHAIN) allows.
-    #[error("more than {limit} PlayEvent and Trigger actions follow one another")]
-    ChainTooLong {
-        /// The limit.
-        limit: usize,
-    },
-    /// The container has more children than
-    /// [`MAX_CONTAINER_CHILDREN`](super::MAX_CONTAINER_CHILDREN); the rest are left out.
-    #[error("the container has {count} children; only the first {limit} are followed")]
-    TooManyChildren {
-        /// How many children it has.
-        count: usize,
-        /// The limit.
-        limit: usize,
     },
     /// A localised sound has no WEM in the language asked for or in the fallback language.
     #[error("{}", no_localisation(.language, .fallback))]
@@ -91,10 +74,8 @@ pub enum BreakReason {
         /// The fallback language, empty when there is none.
         fallback: Box<str>,
     },
-    /// The walk followed as many references as its budget allows, at most
-    /// [`MAX_EVENT_OBJECTS`](super::MAX_EVENT_OBJECTS) and a share of
-    /// [`MAX_TRIGGER_OBJECTS`](super::MAX_TRIGGER_OBJECTS); the rest are left out.
-    #[error("the event leads to more than {limit} references; the rest are left out")]
+    /// The trigger has more visits than the caller's budget allows.
+    #[error("the trigger exceeds the visit budget of {limit}, leaving references unfollowed")]
     TooManyObjects {
         /// The limit.
         limit: usize,
@@ -102,6 +83,12 @@ pub enum BreakReason {
 }
 
 impl BreakReason {
+    /// Returns whether a traversal limit left authored routes unvisited.
+    #[must_use]
+    pub const fn truncated_by_limit(&self) -> bool {
+        matches!(self, Self::TooManyObjects { .. })
+    }
+
     /// Returns a stable code for the reason, e.g. `missing`, for scripts.
     #[must_use]
     pub const fn kind(&self) -> &'static str {
@@ -114,9 +101,6 @@ impl BreakReason {
             Self::UnknownLayout { .. } => "unknown_layout",
             Self::Unsupported => "unsupported",
             Self::Cycle { .. } => "cycle",
-            Self::TooDeep { .. } => "too_deep",
-            Self::ChainTooLong { .. } => "chain_too_long",
-            Self::TooManyChildren { .. } => "too_many_children",
             Self::TooManyObjects { .. } => "too_many_objects",
             Self::NoLocalisation { .. } => "no_localisation",
         }
@@ -129,7 +113,10 @@ impl BreakReason {
 pub struct BrokenLink<'i> {
     pub(crate) event: &'i WwiseEvent,
     pub(crate) soundbank: Option<&'i IndexedSoundbank>,
+    pub(super) bank_source: Option<ObservedEntryBinding>,
     pub(crate) path: Box<[PathStep]>,
+    pub(super) path_sources: Box<[super::HircPathSource]>,
+    pub(super) failed_edge: Option<HircInboundSource>,
     pub(crate) reason: BreakReason,
 }
 
@@ -153,10 +140,51 @@ impl<'i> BrokenLink<'i> {
         &self.path
     }
 
+    /// Returns the original HIRC sources in path order when requested.
+    #[must_use]
+    pub fn path_sources(&self) -> &[super::HircPathSource] {
+        &self.path_sources
+    }
+
     /// Returns the object the way breaks at, the last step of the path.
     #[must_use]
     pub fn object(&self) -> Option<PathStep> {
         self.path.last().copied()
+    }
+
+    /// Returns the exact observed soundbank Entry associated with this break.
+    #[must_use]
+    pub fn entry<'a>(&self, archive: &'a Archive) -> Option<ObservedEntry<'a>> {
+        let binding = self.bank_source.as_ref()?;
+        let entry =
+            archive.observed_entry(archive.entries().get(self.soundbank?.entry_position())?)?;
+        binding.is_same_entry(&entry.binding()).then_some(entry)
+    }
+
+    /// Registers the authored edge selector and any actual unreadable bank attempt.
+    ///
+    /// The returned field origin is incomplete when the authored edge was not captured.
+    ///
+    /// # Errors
+    /// Returns an error if the provenance registry cannot retain the observations.
+    pub fn failed_edge_origin(
+        &self,
+        archive: &Archive,
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        if matches!(self.reason, BreakReason::Unreadable(_))
+            && let Some(entry) = self.entry(archive)
+        {
+            let scope = uses.observe(SourceInput::ArchiveView(entry), InputScope::Payload)?;
+            scope.at_opaque(
+                SourceUseRole::Attempted,
+                SourceCoordinateOmission::Unavailable,
+            )?;
+        }
+        self.failed_edge.as_ref().map_or_else(
+            || Ok(uses.origin(&[], false)),
+            |edge| edge.origin(archive, uses),
+        )
     }
 
     /// Returns why the way breaks.

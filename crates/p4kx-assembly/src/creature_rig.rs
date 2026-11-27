@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
-use p4kx_model::{Bone, BoneMatch, Model, Transform};
+use p4kx_model::{Bone, BoneMatch, Model};
 
 use crate::character_path::{is_character_path, is_creature_path};
-use crate::placement::bone_pose;
+use crate::placement::{BonePlacement, PlacementSkeleton};
 use crate::{Assembly, EntityNode, Issue, IssueKind, LoadoutError, Part, Placement};
 
 /// Returns the bones of the root part's model at the level `level` of detail, or `None` when the
@@ -26,7 +26,7 @@ pub(crate) fn skeleton_of<'a>(
     issues: &[Issue],
     level: u32,
 ) -> Option<&'a [Bone]> {
-    bones_of_root(parts, issues, level, is_creature_path)
+    skeleton_of_root(parts, issues, level, is_creature_path).map(PlacementSkeleton::bones)
 }
 
 impl Assembly {
@@ -50,25 +50,25 @@ impl Assembly {
 /// Returns the bones the item ports of the skins anchor to: those of the root part's model when
 /// its geometry is any character file, a human body rig included, at the level `level` of detail.
 /// The skins of a human root are not bound to these bones, but the props on its ports hang on them.
-pub(crate) fn anchor_bones_of<'a>(
+pub(crate) fn anchor_skeleton<'a>(
     parts: &'a [Part],
     issues: &[Issue],
     level: u32,
-) -> Option<&'a [Bone]> {
-    bones_of_root(parts, issues, level, is_character_path)
+) -> Option<PlacementSkeleton<'a>> {
+    skeleton_of_root(parts, issues, level, is_character_path)
 }
 
 /// Returns the bones of the root part's model at the level `level` when [`rig_model`] finds one
 /// for `accepts`, or `None` when the level is missing or the model has no bones.
-fn bones_of_root<'a>(
+fn skeleton_of_root<'a>(
     parts: &'a [Part],
     issues: &[Issue],
     level: u32,
     accepts: fn(&str) -> bool,
-) -> Option<&'a [Bone]> {
+) -> Option<PlacementSkeleton<'a>> {
     let model = rig_model(parts, issues, accepts)?;
-    let bones = model.bones_of(model.nearest_lod(level)?);
-    (!bones.is_empty()).then_some(bones)
+    let skeleton = PlacementSkeleton::of(model, Some(model.nearest_lod(level)?));
+    (!skeleton.bones().is_empty()).then_some(skeleton)
 }
 
 /// Returns the model of the root part when its geometry is a file `accepts` and its skeleton file
@@ -94,20 +94,18 @@ fn rig_model<'a>(
     root.model.as_ref()
 }
 
-/// Anchors the item port of a skin part to the bone `helper` of the character skeleton `bones`
-/// (from [`anchor_bones_of`]): the bind pose of the bone in the space of `parent`, a skin part.
-/// Returns `None` when `parent` is no skin part or the skeleton lacks the bone.
+/// Returns the selected character bone's bind pose in the space of the parent skin.
 pub(crate) fn skin_port_anchor(
-    bones: &[Bone],
+    skeleton: PlacementSkeleton<'_>,
     parent: &Part,
     helper: &str,
-) -> Option<(Placement, Transform)> {
+) -> Option<BonePlacement> {
     if parent.placement != Placement::Skin {
         return None;
     }
-    let pose = bone_pose(bones, helper)?;
-    let transform = parent.world.inverse()?.then(&pose);
-    Some((Placement::Helper(helper.to_owned()), transform))
+    let mut placement = skeleton.find(helper)?;
+    placement.transform = parent.world.inverse()?.then(&placement.transform);
+    Some(placement)
 }
 
 /// Lists, per skinned part below the root, the bones of its model that the root's skeleton lacks;
@@ -153,7 +151,9 @@ pub(crate) fn note_loadout(root: &EntityNode, issues: &mut Vec<Issue>) {
         .filter(|issue| {
             !matches!(
                 issue,
-                LoadoutError::AmbiguousClass { .. } | LoadoutError::VehicleImplementation { .. }
+                LoadoutError::AmbiguousClass { .. }
+                    | LoadoutError::VehicleImplementation { .. }
+                    | LoadoutError::MissingVehicleImplementation { .. }
             )
         })
         .map(|issue| Issue {

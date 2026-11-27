@@ -14,7 +14,7 @@ the catalog states the property-to-stat link and how armour and clothing stats a
   (`propertyName`), a unit format, a display transformation and in one case a name override; it
   names no item field, struct or path. No other Record refers to a property either (a search for
   the name key finds the Record itself). The catalog does not invent a link. `gameplayProperties`
-  stays as it is, and `docs/basetool-catalog.md` documents, per `className`, the `stats` field the
+  stays as it is, and `docs/catalog.md` documents, per `className`, the `stats` field the
   property modifies. The consumer keeps that mapping; a real-Archive test checks that every
   property of the Archive has a row, so a property the game adds fails the test instead of going
   unnoticed.

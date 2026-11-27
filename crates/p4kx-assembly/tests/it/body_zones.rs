@@ -7,10 +7,10 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use p4kx_assembly::{
-    ArchiveModels, Armour, AssemblyOptions, BodyVariant, IssueKind, LoadoutResolver, PartOrigin,
-    Piece,
+    ArchiveModels, Armour, AssemblyOptions, BodyVariant, BodyZoneLayoutError, IssueKind,
+    LoadoutResolver, PartOrigin, Piece,
 };
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
 use p4kx_testkit::{
     TestEntry, TestZoneChunk, ZONE_SHIRT, zone_entries, zone_entries_with_layer_textures,
 };
@@ -49,7 +49,7 @@ fn wear_entries(variant: BodyVariant, entries: Vec<TestEntry>) -> Result<Armour,
     let archive = Archive::open(&fixture.path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let mut resolver = LoadoutResolver::new(&forge);
+    let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&entry);
     let record = resolver.entities().find(ZONE_SHIRT)?;
     let pieces = [Piece::wearable(resolver.wearable(&record)?)];
     let models = ArchiveModels::new(&archive);
@@ -118,6 +118,7 @@ fn a_zone_the_clothing_covers_is_left_out_of_the_male_body() -> TestResult {
     assert!(!drawn.contains(&node_of(variant, "torso03_zone")?));
     assert!(drawn.contains(&node_of(variant, "torso02_zone")?));
     assert_eq!(hidden_zones(&armour), ["torso03_zone", "torso01_zone"]);
+    assert_eq!(armour.body_zone_layout(0)?, hidden_zones(&armour));
     Ok(())
 }
 
@@ -168,6 +169,61 @@ fn a_chunk_that_lets_the_body_show_or_depends_on_a_condition_covers_nothing() ->
     let armour = wear(variant, &chunks)?;
     assert_eq!(drawn_nodes(&armour)?.len(), variant.zone_names().len());
     assert_eq!(hidden_zones(&armour), Vec::<String>::new());
+    Ok(())
+}
+
+#[test]
+fn intact_layout_uses_the_same_placement_rules_without_clothing() -> TestResult {
+    let variant = BodyVariant::Male;
+    let mut male = places(variant);
+    assert_eq!(
+        wear(variant, &[])?.body_zone_layout(0)?.len(),
+        0,
+        "intact body has no omitted zones"
+    );
+
+    let left_arm = node_of(variant, "l_arm01_zone")?;
+    male[usize::from(left_arm)][0] = 0.3;
+    let armour = wear_on(variant, &[male, places(BodyVariant::Female)], &[])?;
+    assert!(matches!(
+        armour.body_zone_layout(0),
+        Err(BodyZoneLayoutError::Place {
+            zone: "l_arm01_zone",
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn clothing_evidence_retains_the_record_and_distinguishes_coverage() -> TestResult {
+    let variant = BodyVariant::Male;
+    let chunks = [
+        TestZoneChunk::new("torso01_zone", 1),
+        TestZoneChunk::new("torso02_zone", 2).conditional(),
+        TestZoneChunk::new("torso03_zone", 1).showing(&[0]),
+        TestZoneChunk::new("underwear_top_zone", 1),
+    ];
+    let armour = wear(variant, &chunks)?;
+    let body = armour.parts().first().ok_or("no body")?;
+    assert!(body.clothing_zones().is_none());
+    let shirt = armour
+        .parts()
+        .iter()
+        .find_map(|part| part.clothing_zones())
+        .ok_or("no clothing evidence from the shirt")?;
+    assert!(shirt.chunks_complete());
+    assert_eq!(shirt.chunks().len(), chunks.len());
+    assert!(shirt.forge_origin().is_some());
+    let used: Vec<_> = shirt.coverage_sources("torso01_zone").collect();
+    assert!(matches!(
+        used.as_slice(),
+        [SourceLocation::DataForge { record_index, field, .. }]
+            if Some(*record_index) == shirt.record_index() && field.ends_with("].Chunks[0]")
+    ));
+    let coverage = shirt.coverage(variant);
+    assert_eq!(*coverage.covered(), BTreeSet::from(["torso01_zone"]));
+    assert_eq!(*coverage.undecided(), BTreeSet::from(["torso02_zone"]));
     Ok(())
 }
 

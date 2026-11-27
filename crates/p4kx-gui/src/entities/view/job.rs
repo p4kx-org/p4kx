@@ -12,7 +12,10 @@ use p4kx_assembly::{
     ModelCache, ModelFailure, ModelProvider, ProvidedModel,
 };
 use p4kx_extraction::model::{LayerBudget, MaterialStatus};
-use p4kx_extraction::{CancelToken, ConversionError, DataForge};
+use p4kx_extraction::{
+    ArchiveDefaultMaterial, ArchiveMaterialRead, CancelToken, ConversionError, DataForge,
+    EntryOrigin,
+};
 use p4kx_settings::ModelMaterials;
 
 use crate::assembly_export::{Stoppable, StoppableTextures, failure_of};
@@ -179,12 +182,28 @@ impl ModelProvider for Counting<'_> {
         self.inner.library(entry, name)
     }
 
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        self.inner.library_observed(entry, name)
+    }
+
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        self.inner.default_material()
+    }
+
     fn layer_budget(&self) -> LayerBudget {
         self.inner.layer_budget()
     }
 
     fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
         self.inner.layer_library(path, budget)
+    }
+
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        self.inner.layer_library_observed(path, budget)
     }
 }
 

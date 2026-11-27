@@ -4,7 +4,7 @@
 use std::fmt;
 
 use p4kx_archive::{Archive, Entry};
-use p4kx_localization::{Language, TextSet};
+use p4kx_localization::{Language, LocalizationLimits, TextSet};
 use rayon::prelude::*;
 
 use crate::localization::{LocalizationEntry, LocalizationLoadError};
@@ -18,6 +18,15 @@ pub struct LocalizationNote {
 }
 
 impl LocalizationNote {
+    pub(crate) fn for_entry(entry: &LocalizationEntry, skipped: usize) -> Option<Self> {
+        let lossy = entry.text().is_lossy();
+        (lossy || skipped > 0).then(|| Self {
+            path: entry.path().to_owned(),
+            lossy,
+            skipped,
+        })
+    }
+
     /// Returns the path of the Entry.
     #[must_use]
     pub fn path(&self) -> &str {
@@ -68,6 +77,26 @@ impl LocalizationSet {
     ///
     /// Returns the first [`LocalizationLoadError`] of an Entry that cannot be read.
     pub fn read(archive: &Archive, wanted: &[Language]) -> Result<Self, LocalizationLoadError> {
+        Self::read_with_limits(archive, wanted, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Reads each present wanted language with an independent application of `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LocalizationLoadError`] if any selected Entry cannot be read within the
+    /// source and decoded byte limits.
+    pub fn read_with_limits(
+        archive: &Archive,
+        wanted: &[Language],
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationLoadError> {
+        if wanted.is_empty() {
+            return Ok(Self {
+                entries: Vec::new(),
+            });
+        }
+
         let located: Vec<(Language, &Entry)> = archive
             .entries()
             .par_iter()
@@ -86,7 +115,9 @@ impl LocalizationSet {
         first_of_each.sort_by_key(|(language, _)| *language);
         let entries = first_of_each
             .into_par_iter()
-            .map(|(language, entry)| LocalizationEntry::read_entry(archive, language, entry))
+            .map(|(language, entry)| {
+                LocalizationEntry::read_entry_with_limits(archive, language, entry, limits)
+            })
             .collect::<Result<_, _>>()?;
         Ok(Self { entries })
     }
@@ -98,6 +129,18 @@ impl LocalizationSet {
     /// Returns the first [`LocalizationLoadError`] of an Entry that cannot be read.
     pub fn read_all(archive: &Archive) -> Result<Self, LocalizationLoadError> {
         Self::read(archive, &Language::ALL)
+    }
+
+    /// Reads all available supported languages with `limits` applied independently to each Entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::read_with_limits`].
+    pub fn read_all_with_limits(
+        archive: &Archive,
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationLoadError> {
+        Self::read_with_limits(archive, &Language::ALL, limits)
     }
 
     /// Returns the languages that were read, in the order of [`Language::ALL`].
@@ -129,12 +172,7 @@ impl LocalizationSet {
                 let skipped = texts
                     .ini(entry.language())
                     .map_or(0, p4kx_localization::GlobalIni::skipped);
-                let lossy = entry.text().is_lossy();
-                (lossy || skipped > 0).then(|| LocalizationNote {
-                    path: entry.path().to_owned(),
-                    lossy,
-                    skipped,
-                })
+                LocalizationNote::for_entry(entry, skipped)
             })
             .collect()
     }
@@ -143,20 +181,13 @@ impl LocalizationSet {
     ///
     /// # Errors
     ///
-    /// Returns [`LocalizationLoadError::Index`] for the first Entry that exceeds a limit.
+    /// Returns [`LocalizationLoadError::Index`] if any Entry cannot be indexed within its
+    /// retained limits or the index cannot be allocated.
     pub fn index(&self) -> Result<TextSet<'_>, LocalizationLoadError> {
         let files = self
             .entries
             .par_iter()
-            .map(|entry| {
-                let ini = entry
-                    .parse()
-                    .map_err(|source| LocalizationLoadError::Index {
-                        path: entry.path().to_owned(),
-                        source,
-                    })?;
-                Ok((entry.language(), ini))
-            })
+            .map(|entry| Ok((entry.language(), entry.index()?)))
             .collect::<Result<Vec<_>, LocalizationLoadError>>()?;
         Ok(TextSet::new(files))
     }

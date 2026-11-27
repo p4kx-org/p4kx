@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::ArchiveKeyState;
 use p4kx_extraction::{ArchiveKey, archive_error_in};
 use p4kx_settings::{KEY_VARIABLE, KeyChoiceError, KeyStore, KeyText, choose_key};
 
@@ -47,11 +48,20 @@ impl KeyChoice {
     }
 }
 
-const KEY_HINT: &str = "The Entry is encrypted and the server has no Archive key. Start the server \
+const KEY_HINT: &str = "The server has no Archive key, so it cannot read encrypted Entries. Start the server \
 with --key <hex>, set P4KX_ARCHIVE_KEY in its configuration, or store the key once with \
 `p4kx key set` or in the GUI.";
 const WRONG_KEY_HINT: &str = "The server's Archive key does not fit this Archive. Correct --key or \
 P4KX_ARCHIVE_KEY, or replace the stored key with `p4kx key set` or in the GUI.";
+
+/// Returns how to give the server the key when `state` says encrypted Entries stayed unread.
+pub(crate) const fn state_hint(state: ArchiveKeyState) -> Option<&'static str> {
+    match state {
+        ArchiveKeyState::Given => None,
+        ArchiveKeyState::Missing => Some(KEY_HINT),
+        ArchiveKeyState::Wrong => Some(WRONG_KEY_HINT),
+    }
+}
 
 /// Returns how to give the server the key when `error` is about a missing or wrong Archive key.
 pub(crate) fn hint(error: &(dyn std::error::Error + 'static)) -> Option<&'static str> {

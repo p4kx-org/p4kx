@@ -11,6 +11,7 @@ use fluent_bundle::FluentValue;
 use super::extraction::number;
 use super::extraction_outcome::{decorate, list_row, ratio};
 use super::record_line::record_line;
+use super::source_origin;
 use crate::texts::describe_rename;
 use crate::theme::desktop::{
     MODAL_WIDE_WIDTH, MODAL_WIDTH, ROW_HEIGHT, SECTION_LIST_HEIGHT, SPINNER_INLINE,
@@ -22,10 +23,14 @@ use crate::widgets::frames::{self, Tone};
 use crate::widgets::indicator;
 use crate::widgets::placement;
 use crate::widgets::rows::section_header;
+use crate::widgets::tooltip;
 use crate::{
     ExtractionText, Language, Model, RecordExportProgress, RecordExportStage, RecordExportStatus,
     RecordExportSummary, RecordExportText as T, RenameText, Text, Texts,
 };
+
+#[path = "record_export_origin_lists.rs"]
+mod origin_lists;
 
 const REFRESH: Duration = Duration::from_millis(100);
 const WINDOW: &str = "record-export-run";
@@ -63,7 +68,7 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
                 T::SummaryTitle
             };
             close = outcome_window(ui, texts, (OUTCOME, title.into(), Tone::Normal), |ui| {
-                finished(ui, &laid);
+                finished(ui, texts, &laid, summary);
             });
         }
         RecordExportStatus::Failed(reason) => {
@@ -168,7 +173,7 @@ fn running(ui: &mut Ui, texts: &Texts, progress: RecordExportProgress, cancellin
 /// The texts of one summary, formatted once per export and language.
 struct Laid {
     key: (u64, Language),
-    notes: Vec<(String, egui::Color32)>,
+    notes: Vec<Note>,
     failures: Vec<String>,
     reasons: Vec<usize>,
     renamed: Vec<String>,
@@ -248,13 +253,23 @@ impl Laid {
     }
 }
 
-/// Returns the lines above the lists of a summary, each with its colour.
-fn notes(texts: &Texts, summary: &RecordExportSummary) -> Vec<(String, egui::Color32)> {
+enum Note {
+    Counts(String),
+    Message(String, egui::Color32),
+}
+
+fn notes(texts: &Texts, summary: &RecordExportSummary) -> Vec<Note> {
     let mut notes = Vec::new();
     if summary.was_cancelled() {
-        notes.push((texts.get(T::SummaryCancelled), palette::WARNING));
+        notes.push(Note::Message(
+            texts.get(T::SummaryCancelled),
+            palette::WARNING,
+        ));
     } else if summary.selected() == 0 {
-        notes.push((texts.get(T::SummaryNoMatch), palette::GRAY_2_TEXT));
+        notes.push(Note::Message(
+            texts.get(T::SummaryNoMatch),
+            palette::GRAY_2_TEXT,
+        ));
     }
     let counts = [
         ("written", number(texts, summary.written())),
@@ -262,12 +277,15 @@ fn notes(texts: &Texts, summary: &RecordExportSummary) -> Vec<(String, egui::Col
         ("failed", number(texts, summary.failures().len())),
         ("cancelled", number(texts, summary.cancelled())),
     ];
-    notes.push((texts.format(T::SummaryCounts, &counts), palette::GRAY_1));
+    notes.push(Note::Counts(texts.format(T::SummaryCounts, &counts)));
     let errors = [
         ("erroneous", number(texts, summary.records_with_errors())),
         ("errors", number(texts, summary.error_values())),
     ];
-    notes.push((texts.format(T::SummaryErrors, &errors), palette::GRAY_1));
+    notes.push(Note::Message(
+        texts.format(T::SummaryErrors, &errors),
+        palette::GRAY_1,
+    ));
     let Some(target) = summary
         .file()
         .or_else(|| summary.target().map(Path::to_path_buf))
@@ -280,21 +298,34 @@ fn notes(texts: &Texts, summary: &RecordExportSummary) -> Vec<(String, egui::Col
             ("path", target.clone().into()),
             ("reason", reason.to_owned().into()),
         ];
-        notes.push((
+        notes.push(Note::Message(
             texts.format(T::SummaryFileFailed, &args),
             palette::DANGER_TEXT,
         ));
     }
-    notes.push((
+    notes.push(Note::Message(
         texts.format(T::SummaryTarget, &[("path", target.into())]),
         palette::GRAY_1,
     ));
     notes
 }
 
-fn finished(ui: &mut Ui, laid: &Laid) {
-    for (note, colour) in &laid.notes {
-        ui.colored_label(*colour, note);
+fn finished(ui: &mut Ui, texts: &Texts, laid: &Laid, summary: &RecordExportSummary) {
+    for note in &laid.notes {
+        match note {
+            Note::Counts(note) => {
+                let response = ui.colored_label(palette::GRAY_1, note);
+                if summary.written() != 0 {
+                    let proof = summary.provenance().and_then(Result::ok);
+                    tooltip::hover(response, |ui| {
+                        source_origin::row(ui, texts, T::SummaryWritten, proof.map(|p| &p.written));
+                    });
+                }
+            }
+            Note::Message(note, colour) => {
+                ui.colored_label(*colour, note);
+            }
+        }
     }
     list(
         ui,
@@ -317,16 +348,33 @@ fn finished(ui: &mut Ui, laid: &Laid) {
         None,
         false,
     );
+    origin_lists::show(ui, texts, summary);
 }
 
 pub(super) fn list(
     ui: &mut Ui,
-    (heading, salt): (&str, &str),
+    heading: (&str, &str),
     lines: &[String],
     reasons: Option<&[usize]>,
     open: bool,
 ) {
-    if lines.is_empty() {
+    list_rows(ui, heading, lines.len(), open, |ui, index| {
+        if let Some(text) = lines.get(index) {
+            let reason = reasons.and_then(|starts| starts.get(index)).copied();
+            list_row(ui, text, reason);
+        }
+    });
+}
+
+/// Renders only the visible rows with the existing list widgets and desktop metrics.
+pub(super) fn list_rows(
+    ui: &mut Ui,
+    (heading, salt): (&str, &str),
+    count: usize,
+    open: bool,
+    mut row: impl FnMut(&mut Ui, usize),
+) {
+    if count == 0 {
         return;
     }
     ui.add_space(SPACE_2);
@@ -337,13 +385,9 @@ pub(super) fn list(
     ScrollArea::vertical()
         .id_salt(salt)
         .max_height(SECTION_LIST_HEIGHT)
-        .show_rows(ui, ROW_HEIGHT, lines.len(), |ui, rows| {
+        .show_rows(ui, ROW_HEIGHT, count, |ui, rows| {
             for index in rows {
-                let Some(text) = lines.get(index) else {
-                    continue;
-                };
-                let reason = reasons.and_then(|starts| starts.get(index)).copied();
-                list_row(ui, text, reason);
+                row(ui, index);
             }
         });
 }

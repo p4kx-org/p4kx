@@ -4,21 +4,21 @@ P4KX opens, browses, compares and extracts Star Citizen Archives and converts th
 formats. It replaces the owner's earlier reference tool and covers the functionality of unp4k and StarBreaker with
 an own Rust core (ADR-0001). Terms follow [CONTEXT.md](../CONTEXT.md).
 
-Every Release is usable: SemVer `0.x`, built by GitHub Actions from a `v*` tag as a portable ZIP
-with `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`, a per-user MSI (ADR-0007) and the Blender
-add-on ZIP, with notes from `CHANGELOG.md`.
+GitHub Actions builds tagged SemVer releases and uses `CHANGELOG.md` for their notes.
+The [v0.5.0 native release contract](supported-platforms.md) defines each target's required
+packages and the evidence needed before publication.
 
 ## Status
 
 | Release | State | Content |
 |---|---|---|
 | 0.1.0 | Released | Archive, browsing, Extraction and the command line |
-| 0.2.0 | Released | Readable game data: CryXml and DataForge as XML and JSON, the Basetool catalog, the Comparison, textures, localisation and first commands for Queries, audio, models, UI movies, socpak containers, CHF files and the MCP server |
-| 0.3.0 | Released | The first Release as P4KX; the Basetool catalog as a full game-data export, `.json.zst` for the upload, `p4kx coverage` |
-| 0.4.0 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.0) | The 3D side: Assemblies, interiors, characters and armour, the Blender package and add-on, MFD screens and holograms, Wwise resolution; more Basetool catalog kinds with `schemaVersion` 2; P4KX's own theme and the smallest-window layout. Milestones M1 to M14 are complete |
-| 0.4.1 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.1) | The first follow-ups of the 3D, render, texture, material, character and Assembly work, further Basetool catalog kinds and documentation |
-| 0.4.2 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) | Creatures, hair, heads and skins, liveries and stencil decals in the primary decal colour, glass and layered materials, MFD screens with game variables, Direct3D 12 first in the window, audio (`.txtp` files, soundbank objects), exclusion Filters, folder conversion, portable file names, DataForge files without an Archive, and the contract kinds of the Basetool catalog (templates, broker entries, NPC and entity spawns, property values) |
-| 0.5.0 | Next, GitHub milestone `v0.5.0` | The remaining screen work (run-time pictures, text sizes, buttons), the second and third stencil colours and the emblem of a livery, open Assembly, NPC and starmap fixes (port rotation, generic NPC heads, Starchitect-style system containers), further catalog kinds (planet data, loot themes, the `ResourceType` Records as a kind of their own so that every `resourceGuid` joins exactly one row, while a commodity stays identified by its `guid`), the full Linux build, and the open questions on face rigs and additive animations; the milestone lists the rest |
+| 0.2.0 | Released | Readable game data: CryXml and DataForge as XML and JSON, the first catalog, the Comparison, textures, localisation and first commands for Queries, audio, models, UI movies, socpak containers, CHF files and the MCP server |
+| 0.3.0 | Released | The first Release as P4KX; the catalog as a full game-data export, `.json.zst` for the upload, `p4kx coverage` |
+| 0.4.0 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.0) | The 3D side: Assemblies, interiors, characters and armour, the Blender package and add-on, MFD screens and holograms, Wwise resolution; more catalog kinds with `schemaVersion` 2; P4KX's own theme and the smallest-window layout. Milestones M1 to M14 are complete |
+| 0.4.1 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.1) | The first follow-ups of the 3D, render, texture, material, character and Assembly work, further catalog kinds and documentation |
+| 0.4.2 | [Released](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) | Creatures, hair, heads and skins, liveries and stencil decals in the primary decal colour, glass and layered materials, MFD screens with game variables, Direct3D 12 first in the window, audio (`.txtp` files, soundbank objects), exclusion Filters, folder conversion, portable file names, DataForge files without an Archive, and the contract kinds of the catalog (templates, broker entries, NPC and entity spawns, property values) |
+| 0.5.0 | Next, GitHub milestone `v0.5.0` | The remaining screen work (run-time pictures, text sizes, buttons), the remaining stencil colours and the light grey hull panel comparison, open Assembly, NPC and starmap fixes (port rotation, generic NPC heads, Starchitect-style system containers), the P4KX catalog with schema v3 and further catalog kinds (planet data, loot themes, the `ResourceType` Records as a kind of their own so that every `resourceGuid` joins exactly one row, while a commodity stays identified by its `guid`), [native Linux packages on AMD64 and ARM64](linux-packages.md), [native macOS support on Apple Silicon](macos-support.md), and the open questions on face rigs and additive animations; the milestone lists the rest |
 
 The open work of a release is its GitHub milestone, not this document. The milestones M1 to M14
 below are the plan of 0.4.0; the later releases only follow their GitHub milestones.
@@ -29,13 +29,13 @@ below are the plan of 0.4.0; the later releases only follow their GitHub milesto
 |---|---|
 | Purpose | End-user tool first; the core is a library so Exports for other tools need no rework |
 | Front-ends | `p4kx` (CLI), `p4kx-gui` ("P4KX", egui/eframe), `p4kx-mcp` (MCP server, stdio, read-only) |
-| Platforms | Windows is shipped; the code stays platform-neutral and CI also builds on Linux; no macOS |
-| Distribution | Portable ZIP and MSI (WiX Toolset 7, per-user install to `%LOCALAPPDATA%`, no admin rights, Start menu entry, stable UpgradeCode) from M1 |
+| Platforms | Releases through v0.4.2 shipped native Windows AMD64 builds. v0.5.0 requires native Windows and Linux on AMD64 and ARM64, plus [macOS 26+ on Apple Silicon](macos-support.md). [The platform contract](supported-platforms.md) defines the required runtime evidence. |
+| Distribution | v0.5.0 requires per-user MSI and portable ZIP for Windows, tar.gz, AppImage, deb and Flatpak for Linux, a DMG for macOS, and one architecture-independent Blender add-on ZIP. [Windows packages](windows-packages.md) and [Linux packages](linux-packages.md) give installation details. |
 | Licence | `MIT OR Apache-2.0`; the repository `p4kx-org/p4kx` is public |
 | UI languages | German (`de-DE`) and British English (`en-GB`) via Fluent, chosen from the system locale, switchable |
-| Look | P4KX theme (colours, Lato) in egui, dark only (ADR-0006); native window frame tinted via DWM |
-| State | `%APPDATA%\P4KX\` (TOML): detected Channels, recent Archives, target folder, language, window |
-| Channel detection | Library folders named in the RSI Launcher log (ADR-0005), the default install path, and manually added folders and Archives; `loginData.json` and the launcher's settings store are never read |
+| Look | P4KX uses a dark egui theme with Lato (ADR-0006). On Windows DWM tints the window frame. |
+| State | Settings and the stored key follow [platform profile locations](profile-folders.md). Windows uses known folders, Linux uses XDG, and macOS uses Application Support. |
+| Channel detection | Read-only launcher logs, platform-specific install and Wine roots, and manually added folders or Archives. The [discovery contract](channel-discovery.md) covers Proton, Bottles, Lutris and CrossOver, plus the exact files read. |
 | Network | Only an optional, switchable check for new GitHub releases, off by default (ADR-0007); no telemetry, no crash reports |
 | Live changes | Archives are opened read-only with shared access; a changed size, timestamp or Build cancels running jobs and offers a reload |
 
@@ -68,11 +68,10 @@ milestone delivered.
 
 ### M3 — Exports (replaces the earlier reference tool)
 
-- Basetool catalog in the new format (ADR-0002): manufacturers, items, ships, commodities,
+- Versioned catalog (ADR-0002): manufacturers, items, ships, commodities,
   blueprints; Channel, Build and completeness per kind; JSON Schema generated from the Rust types
   and checked in.
 - Record export as one JSON file per Record or one NDJSON file, from the same Record tree.
-- Hand-off: a separate session adapts the Basetool import.
 
 ### M4 — Comparison
 
@@ -147,11 +146,14 @@ milestone delivered.
 - Libraries are synchronous and parallelise with rayon; tokio only in `p4kx-mcp`.
 - Rust edition 2024, `rustfmt`, clippy `all`, `pedantic`, `nursery` and selected `restriction`
   lints as errors, `missing_docs`; suppressions only as `#[expect(lint, reason = "…")]`.
-- `unsafe_code = "forbid"` everywhere except the `cfg(windows)` DWM module in `p4kx-gui`.
+- `unsafe_code = "forbid"` with the bounded Windows module exceptions documented for the
+  [DWM integration](adr/0006-p4kx-theme-dark-and-lato-only.md) and the
+  [MSI environment notification](adr/0354-msi-path-ownership-and-bounded-environment-notification.md).
 - `thiserror` in libraries, `anyhow` only in binaries; no `unwrap` / `expect` outside tests.
 - Source files stay below about 400 lines; clippy `too_many_lines` and `cognitive_complexity`.
 - Tests: synthetic fixtures from own test writers (Archive, DataForge, CryXml, DDS / WEM headers)
   run in CI; tests against real Archives run locally when `P4KX_DATA_P4K` points to one.
-- CI on Windows and Linux: `fmt`, `clippy`, `test`, layer-direction and file-size checks.
+- CI uses the [five native targets](supported-platforms.md) for lints, tests and doctests.
+  Repository checks enforce formatting, layer direction and file sizes.
 - References: StarBreaker and unp4k (both MIT) and the observed behaviour of the owner's earlier reference tool;
   ported code keeps its copyright notice.

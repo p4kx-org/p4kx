@@ -36,8 +36,10 @@ pub enum QueryText {
     EmptyTitle,
     /// The hint before an Archive is open.
     EmptyHint,
-    /// Shown in place of the result before a Query ran.
+    /// Shown before a Query ran; takes the run shortcut.
     Prompt,
+    /// Localized run shortcut for non-Mac platforms.
+    RunShortcut,
     /// Shown when no Record matches.
     NoRows,
     /// The number of rows; takes `count` and `number`.
@@ -124,7 +126,7 @@ pub enum QueryText {
 
 impl QueryText {
     /// Every Query text.
-    pub(crate) const ALL: [Self; 58] = [
+    pub(crate) const ALL: [Self; 59] = [
         Self::Tab,
         Self::Label,
         Self::Hint,
@@ -142,6 +144,7 @@ impl QueryText {
         Self::EmptyTitle,
         Self::EmptyHint,
         Self::Prompt,
+        Self::RunShortcut,
         Self::NoRows,
         Self::Rows,
         Self::RowsFailed,
@@ -187,6 +190,7 @@ impl QueryText {
 
     /// Returns the Fluent message id.
     #[must_use]
+    #[expect(clippy::too_many_lines, reason = "one arm per text")]
     pub const fn id(self) -> &'static str {
         match self {
             Self::Tab => "query-tab",
@@ -206,6 +210,7 @@ impl QueryText {
             Self::EmptyTitle => "query-empty-title",
             Self::EmptyHint => "query-empty-hint",
             Self::Prompt => "query-prompt",
+            Self::RunShortcut => "query-run-shortcut",
             Self::NoRows => "query-no-rows",
             Self::Rows => "query-rows",
             Self::RowsFailed => "query-rows-failed",

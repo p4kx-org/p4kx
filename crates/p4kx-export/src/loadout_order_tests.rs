@@ -1,0 +1,167 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::cell::Cell;
+use std::collections::HashSet;
+
+use p4kx_extraction::{
+    Guid, InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses, SourceValue,
+};
+
+use super::Wanted;
+use super::resolution::{UseCompaction, in_catalog_order, resolve_ordered};
+use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
+use crate::guid_text::CatalogGuid;
+use crate::loadout::staging::StagedLoadoutWriter;
+use crate::{CatalogError, LoadoutSummary};
+
+fn guid(value: u128) -> CatalogGuid {
+    CatalogGuid(Guid::from_stored(value.to_le_bytes()))
+}
+
+fn wanted(index: u32, guid: CatalogGuid, kind: EntityKind) -> Wanted {
+    Wanted {
+        record_index: index,
+        guid,
+        kind,
+    }
+}
+
+fn resolved(want: Wanted) -> Loadout {
+    Loadout {
+        root_record_index: want.record_index,
+        source_record_index: crate::contract_loadout::fixture_record_index(want.record_index),
+        port_inventory_complete: true,
+        entity_guid: crate::loadout_owner_value::LoadoutOwnerValue::fixture(want.guid),
+        entity_kind: crate::loadout_owner_value::LoadoutOwnerValue::fixture(want.kind),
+        issues: Vec::new(),
+        ports: vec![LoadoutPort {
+            item_guid: SourceUses::default().value(SourceValue::Present(guid(99)), &[], false),
+            ..LoadoutPort::named(SourceUses::default().value(
+                SourceValue::Present(want.record_index.to_string()),
+                &[],
+                false,
+            ))
+        }],
+    }
+}
+
+#[test]
+fn an_empty_or_single_owner_keeps_its_original_position() {
+    assert!(
+        in_catalog_order(std::iter::empty()).next().is_none(),
+        "an empty selection yields no owners"
+    );
+    let owner = wanted(42, guid(3), EntityKind::Ship);
+    let mut ordered = in_catalog_order(std::iter::once(owner));
+    assert_eq!(
+        ordered
+            .next()
+            .map(|(position, want)| (position, want.record_index)),
+        Some((0, owner.record_index)),
+        "the singleton retains its input position and physical owner"
+    );
+    assert!(ordered.next().is_none(), "the owner is delivered once");
+}
+
+#[test]
+fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std::error::Error>> {
+    let scratch = tempfile::tempdir()?;
+    let same = guid(2);
+    let known = HashSet::new();
+    let mut outside = HashSet::new();
+    let mut summary = LoadoutSummary::default();
+    let mut staged = StagedLoadoutWriter::new(scratch.path(), None);
+    let wanted = [
+        wanted(5, guid(3), EntityKind::Ship),
+        wanted(1, guid(1), EntityKind::Item),
+        wanted(2, same, EntityKind::Item),
+        wanted(3, same, EntityKind::Ship),
+        wanted(4, same, EntityKind::Item),
+    ];
+
+    let failures = resolve_ordered(
+        wanted.into_iter(),
+        None,
+        |want| Ok((want.record_index != 4).then(|| resolved(want))),
+        |entry| {
+            summary.add_entry(&entry, &known, &mut outside);
+            staged.append(entry)?;
+            Ok(())
+        },
+        |_| Ok(()),
+    )?;
+    assert!(failures.is_empty(), "the skipped row is not a failed read");
+    let staged = staged.finish()?;
+    let expected = [wanted[1], wanted[2], wanted[3], wanted[0]].map(resolved);
+    assert_eq!(
+        serde_json::to_vec(&staged)?,
+        serde_json::to_vec(&expected)?,
+        "canonical stable order includes emitted Item rows",
+    );
+    assert_eq!(
+        staged
+            .ships()
+            .iter()
+            .map(|ship| ship.view().record_index)
+            .collect::<Vec<_>>(),
+        [3, 5],
+        "Ship joins preserve the physical Records in canonical traversal order",
+    );
+    assert_eq!(summary.items, 2, "both emitted Item rows are counted");
+    assert_eq!(summary.ships, 2, "both Ship rows are counted");
+    assert_eq!(summary.attached, 4, "each occurrence contributes");
+    assert_eq!(outside.len(), 1, "one outside GUID is shared by all rows");
+    Ok(())
+}
+
+#[test]
+fn catalog_batches_count_empty_resolutions_and_stop_after_a_checkpoint_error()
+-> Result<(), Box<dyn std::error::Error>> {
+    let uses = SourceUses::with_compact_coordinates();
+    let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let visited = Cell::new(0);
+    let owners = (0..66).map(|index| wanted(index, guid(1), EntityKind::Item));
+    let result = resolve_ordered(
+        owners,
+        None,
+        |_| {
+            visited.set(visited.get() + 1);
+            Ok(None)
+        },
+        |_| panic!("empty resolutions have no staged rows"),
+        |completed| {
+            scope.at(
+                SourceLocation::DataForge {
+                    record_index: 0,
+                    field: completed.to_string(),
+                },
+                SourceUseRole::Payload,
+            )?;
+            UseCompaction::BetweenCatalogBatches.after_owner(completed, &uses, None)?;
+            match completed {
+                63 => assert_eq!(
+                    uses.packed_use_count()?,
+                    0,
+                    "the batch is still in progress"
+                ),
+                64 => {
+                    assert_eq!(
+                        uses.packed_use_count()?,
+                        64,
+                        "all completed owner uses packed"
+                    );
+                    return Err(CatalogError::Cancelled);
+                }
+                _ => {}
+            }
+            Ok(())
+        },
+    );
+    assert!(
+        matches!(result, Err(CatalogError::Cancelled)),
+        "the checkpoint's error reaches the caller"
+    );
+    assert_eq!(visited.get(), 64, "the next original owner is untouched");
+    Ok(())
+}

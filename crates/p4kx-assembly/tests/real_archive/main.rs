@@ -3,6 +3,9 @@
 
 //! Tests of `p4kx-assembly` against a real Archive; run with `--ignored` when `P4KX_DATA_P4K` names one.
 
+#[path = "../support/media_fixtures/mod.rs"]
+mod media_fixtures;
+
 mod real_archive;
 mod real_armour;
 mod real_armour_backpack;
@@ -35,6 +38,7 @@ mod real_creature_skeletons;
 mod real_default_fit;
 mod real_docked_vehicles;
 mod real_dressed_head;
+mod real_entity_glow;
 mod real_entity_head_skins;
 mod real_entity_interior;
 mod real_face_tags;
@@ -72,9 +76,15 @@ mod real_rig_logic;
 mod real_search;
 mod real_skin_port_helpers;
 mod real_skin_port_props;
+mod real_soc_capture;
+mod real_soc_doors;
+mod real_soc_light_modes;
 mod real_soc_lights;
 mod real_soc_palette;
+mod real_soc_rooms;
 mod real_soc_survey;
+mod real_soc_tile_ports;
+mod real_static_attachment_rotation;
 mod real_streamed_localised;
 mod real_trigger_discovery;
 mod real_txtp;

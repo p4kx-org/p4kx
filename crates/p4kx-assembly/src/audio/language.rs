@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-/// The folder below which the game keeps its soundbanks and loose WEMs; a file in a language
-/// subfolder of it is localised for that language.
-pub(crate) const SOUND_FOLDER: &str = "Data\\Sounds\\wwise\\";
-
-/// The folder below the sound folder, and below a language folder, that holds the loose WEMs.
-const MEDIA_FOLDER: &str = "Media";
+pub(crate) use p4kx_extraction::sound::wwise_path::{
+    LooseName, SOUND_FOLDER, bank_language, loose_name,
+};
 
 /// The language the audio of an Archive is read in: the one asked for and the one used when the
 /// first has no localisation of a sound.
@@ -76,48 +73,4 @@ impl LanguageChoice {
             _ => false,
         }
     }
-}
-
-/// Returns the language folder of a soundbank Entry: `Data\Sounds\wwise\<language>\x.bnk`.
-pub(crate) fn bank_language(path: &str) -> Option<&str> {
-    let mut folders = path.rsplit(['\\', '/']).skip(1);
-    let folder = folders.next()?;
-    let parent = folders.next()?;
-    (parent.eq_ignore_ascii_case("wwise") && !folder.is_empty()).then_some(folder)
-}
-
-/// Where a loose WEM Entry lies and which sound it is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct LooseName<'p> {
-    pub(crate) id: u32,
-    pub(crate) language: Option<&'p str>,
-}
-
-/// Reads the name of a loose WEM Entry `Data\Sounds\wwise\[<language>\][Media\][<language>\]<id>.wem`,
-/// or `None` for any other path.
-pub(crate) fn loose_name(path: &str) -> Option<LooseName<'_>> {
-    let rest = path.get(SOUND_FOLDER.len()..)?;
-    let (folders, file) = rest.rsplit_once(['\\', '/']).unwrap_or(("", rest));
-    let stem = file
-        .len()
-        .checked_sub(".wem".len())
-        .and_then(|end| Some((file.get(..end)?, file.get(end..)?)))
-        .filter(|(_, extension)| extension.eq_ignore_ascii_case(".wem"))
-        .map(|(stem, _)| stem)?;
-    if stem.is_empty() || !stem.bytes().all(|byte| byte.is_ascii_digit()) {
-        return None;
-    }
-    let id = stem.parse().ok()?;
-    let mut language = None;
-    if !folders.is_empty() {
-        for folder in folders.split(['\\', '/']) {
-            if folder.eq_ignore_ascii_case(MEDIA_FOLDER) {
-                continue;
-            }
-            if folder.is_empty() || language.replace(folder).is_some() {
-                return None;
-            }
-        }
-    }
-    Some(LooseName { id, language })
 }

@@ -19,7 +19,10 @@ impl Material {
     pub fn layer_shares(&self, resolved: impl Fn(usize) -> bool) -> Option<Vec<f32>> {
         let count = self.layers.len();
         let wear = self.wear_blend().clamp(0.0, 1.0);
-        #[expect(clippy::cast_precision_loss, reason = "at most 64 layers")]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "layer shares use approximate f32 weights"
+        )]
         let others = count.saturating_sub(1).max(1) as f32;
         let weight = |at: usize| if at == 0 { 1.0 - wear } else { wear / others };
         let first = (0..count).find(|&at| resolved(at))?;
@@ -87,6 +90,16 @@ mod tests {
     fn without_any_weight_the_first_layer_takes_everything_if_it_exists() -> Result {
         assert_shares(shares("1", 1, &[0])?, &[1.0]);
         assert_shares(shares("1", 2, &[0])?, &[1.0, 0.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn all_layer_positions_keep_their_shares_beyond64() -> Result {
+        const LAYERS: usize = 65;
+        let resolved: Vec<_> = (0..LAYERS).collect();
+        let mut expected = vec![1.0 / 128.0; LAYERS];
+        *expected.first_mut().ok_or("first expected layer")? = 0.5;
+        assert_shares(shares("0.5", LAYERS, &resolved)?, &expected);
         Ok(())
     }
 

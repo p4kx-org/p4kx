@@ -38,7 +38,7 @@ pub(crate) enum SocpakAction {
         #[arg(long, value_name = "FILTER")]
         exclude: Vec<String>,
         /// Target folder; created if missing, files already in it are handled by --conflict.
-        /// Defaults to a new folder SC-EXPORT-<Channel>-<Build version>-<timestamp> in the
+        /// Defaults to a new folder `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the
         /// current directory.
         #[arg(long, value_name = "FOLDER")]
         out: Option<PathBuf>,

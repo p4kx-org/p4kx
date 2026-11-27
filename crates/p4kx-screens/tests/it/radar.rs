@@ -7,7 +7,7 @@
 //! Set `P4KX_UPDATE_REFERENCE` to write the reference again after a deliberate change.
 
 use p4kx_dataforge::DataForge;
-use p4kx_screens::{Composed, ImageSources, ScreenComposer};
+use p4kx_screens::{Composed, ContentOmissionCode, ImageSources, ScreenComposer};
 use p4kx_testkit::{
     TestCanvas, TestColour, TestCondition, TestDim, TestModifier, TestRecord, TestStyleEntry,
     TestValue, TestWidget, named_tag_record, tag_record,
@@ -322,6 +322,16 @@ fn a_run_time_image_is_listed_with_the_field_that_names_it() -> TestResult {
         .find(|entry| entry.element == "WidgetRuntimeImage")
         .ok_or("the map is not listed")?;
     assert!(entry.reason.contains("imageSource"), "{}", entry.reason);
+    let missing = composed
+        .report()
+        .content_omissions
+        .iter()
+        .find(|entry| entry.element == "WidgetRuntimeImage")
+        .ok_or("no render target omission")?;
+    assert_eq!(missing.widget, "map");
+    assert_eq!(missing.field, "imageSource");
+    assert_eq!(missing.source.as_deref(), Some("InteriorMap"));
+    assert_eq!(missing.code, ContentOmissionCode::RuntimeTarget);
     Ok(())
 }
 
@@ -329,7 +339,8 @@ fn a_run_time_image_is_listed_with_the_field_that_names_it() -> TestResult {
 fn widget_names_are_listed_as_the_records_hold_them() -> TestResult {
     let canvas = TestCanvas::new(SCREEN, "names", 20.0, 20.0).raw().widget(
         TestWidget::new("BuildingBlocks_WidgetRuntimeImage", "<unnamed> & \"co\"")
-            .size(TestDim::Fixed(10.0), TestDim::Fixed(10.0)),
+            .size(TestDim::Fixed(10.0), TestDim::Fixed(10.0))
+            .with("imageSource", TestValue::text("")),
     );
     let composed = compose(&canvas, Vec::new())?;
     let entry = composed
@@ -339,5 +350,13 @@ fn widget_names_are_listed_as_the_records_hold_them() -> TestResult {
         .find(|entry| entry.element == "WidgetRuntimeImage")
         .ok_or("the widget is not listed")?;
     assert_eq!(entry.examples, ["<unnamed> & \"co\""]);
+    let missing = composed
+        .report()
+        .content_omissions
+        .first()
+        .ok_or("no missing render target omission")?;
+    assert_eq!(missing.widget, "<unnamed> & \"co\"");
+    assert_eq!(missing.source, None);
+    assert_eq!(missing.code, ContentOmissionCode::SourceMissing);
     Ok(())
 }

@@ -4,11 +4,15 @@
 //! The language choice, the soundbank kept for playing and the note about a missing player of the
 //! Sounds tab.
 
+use std::error::Error;
+
 use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use p4kx_extraction::{SourceLocation, SourceUseRole};
 use p4kx_gui::{
-    Language, ListStatus, Model, SoundFormat, SoundsExport, SoundsExportStatus, SoundsListStatus,
+    AudioPreview, Language, ListStatus, Model, SoundFormat, SoundsExport, SoundsExportStatus,
+    SoundsListStatus,
 };
 
 use crate::entity_sounds::{TestResult, opened, wait_until};
@@ -190,18 +194,74 @@ fn the_soundbank_of_a_played_sound_is_kept_for_the_next_one() -> TestResult {
         "nothing yet"
     );
 
-    harness.state_mut().select_sound_variant(0, || {});
-    wait_until(&mut harness, |model| {
-        model
-            .sounds()
-            .audio()
-            .is_some_and(|audio| audio.player().is_some())
-    })?;
-
+    let first = play_first_embedded(&mut harness)?;
     assert_eq!(
         harness.state().sounds().kept_soundbank(),
         Some(id),
         "kept after the first embedded sound"
     );
+    resolved(&mut harness, "play_single")?;
+    let second = play_first_embedded(&mut harness)?;
+    assert_eq!(
+        harness.state().sounds().kept_soundbank(),
+        Some(id),
+        "same Bank"
+    );
+    let triplet = u64::try_from(3 * size_of::<u32>())?;
+    assert_eq!(
+        second.checked_sub(first),
+        Some(triplet),
+        "the next WEM's original DIDX triplet"
+    );
     Ok(())
+}
+
+fn play_first_embedded(harness: &mut Harness<'_, Model>) -> Result<u64, Box<dyn Error>> {
+    harness.state_mut().select_sound_variant(0, || {});
+    wait_until(harness, |model| {
+        model
+            .sounds()
+            .audio()
+            .is_some_and(|audio| audio.player().is_some())
+    })?;
+    let proof = harness
+        .state()
+        .sounds()
+        .audio()
+        .and_then(AudioPreview::header_provenance)
+        .ok_or("resolved embedded WEM header proof")?
+        .map_err(ToString::to_string)?;
+    for field in [
+        &proof.codec,
+        &proof.channels,
+        &proof.sample_rate,
+        &proof.duration,
+    ] {
+        assert_eq!(
+            field.contains_encrypted_source(),
+            Some(false),
+            "ordinary plain Bank origin"
+        );
+        assert!(
+            field.source_set_complete(),
+            "the selected metadata inputs are bound"
+        );
+    }
+    proof
+        .inventory()
+        .uses()
+        .iter()
+        .filter(|used| {
+            proof.codec.source_uses_refs().contains(used.id())
+                && used.role() == SourceUseRole::Selector
+        })
+        .find_map(|used| match used.location() {
+            SourceLocation::Subresource {
+                namespace,
+                field,
+                indices,
+            } if namespace == "bnkDidx" && field == "mediaId" => indices.first().copied(),
+            _ => None,
+        })
+        .ok_or_else(|| "the playback header is missing its original DIDX selection".into())
 }

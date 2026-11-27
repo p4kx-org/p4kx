@@ -6,11 +6,22 @@ use std::path::Path;
 use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};
 
-use crate::starmap_containers::{Limits, Placements};
+use crate::starmap_containers::{Limits, PlacementScope, Placements};
 use crate::starmap_index::Index;
 use crate::starmap_parse::read_all;
 
 const FOLDER: &str = "Data\\ObjectContainers\\PU\\system\\t\\";
+
+#[path = "starmap_budget_tests.rs"]
+mod budgets;
+#[path = "starmap_direct_depth_tests.rs"]
+mod direct_depth;
+#[path = "starmap_external_chain_tests.rs"]
+mod external_chain;
+#[path = "starmap_placement_storage_tests.rs"]
+mod placement_storage;
+#[path = "starmap_unresolved_container_tests.rs"]
+mod unresolved_container_links;
 
 fn guid(value: u128) -> Guid {
     let text = format!("{value:032x}");
@@ -81,7 +92,16 @@ fn open(dir: &Path, entries: Vec<TestEntry>) -> Archive {
 
 fn read(dir: &Path, entries: Vec<TestEntry>, limits: Limits) -> Placements {
     let archive = open(dir, entries);
-    Placements::read_within(&archive, None, limits).expect("placements")
+    crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        Placements::read_within(
+            &archive,
+            None,
+            limits,
+            capture,
+            PlacementScope::RecordSelection,
+        )
+    })
+    .expect("placements")
 }
 
 fn system(xml: &str, others: &[(&str, String)]) -> Vec<TestEntry> {
@@ -124,23 +144,6 @@ fn a_position_beyond_a_million_billion_metres_or_overflowing_is_not_placed() {
 }
 
 #[test]
-fn nested_children_beyond_the_depth_limit_are_counted() {
-    let dir = tempfile::tempdir().expect("a directory");
-    let deepest = child("1,0,0", 3);
-    let middle = child("1,0,0", 2).child(TestElement::new("ChildObjectContainers").child(deepest));
-    let top = child("1,0,0", 1).child(TestElement::new("ChildObjectContainers").child(middle));
-    let limits = Limits {
-        depth: 2,
-        ..Limits::default()
-    };
-    let placements = read(dir.path(), system(&root(vec![top]), &[]), limits);
-    assert!(placed(&placements, 1).is_some(), "depth 0");
-    assert!(placed(&placements, 2).is_some(), "depth 1");
-    assert_eq!(placed(&placements, 3), None, "depth 2 is beyond the limit");
-    assert_eq!(placements.counts.malformed, 1, "counted once");
-}
-
-#[test]
 fn children_beyond_the_budget_of_a_system_are_counted() {
     let dir = tempfile::tempdir().expect("a directory");
     let xml = root(vec![
@@ -148,40 +151,10 @@ fn children_beyond_the_budget_of_a_system_are_counted() {
         child("2,0,0", 2),
         child("3,0,0", 3),
     ]);
-    let limits = Limits {
-        children: 2,
-        ..Limits::default()
-    };
+    let limits = Limits::new().with_placed_children_per_system(2);
     let placements = read(dir.path(), system(&xml, &[]), limits);
     assert!(placed(&placements, 2).is_some(), "within the budget");
     assert_eq!(placed(&placements, 3), None, "beyond the budget");
-    assert_eq!(placements.counts.malformed, 1, "counted once");
-}
-
-#[test]
-fn external_containers_beyond_the_chain_limit_are_counted() {
-    let dir = tempfile::tempdir().expect("a directory");
-    let entries = system(
-        &root(vec![external("a")]),
-        &[
-            ("a", root(vec![child("1,0,0", 1), external("b")])),
-            ("b", root(vec![child("2,0,0", 2)])),
-        ],
-    );
-    let limits = Limits {
-        external: 1,
-        ..Limits::default()
-    };
-    let placements = read(dir.path(), entries, limits);
-    assert!(
-        placed(&placements, 1).is_some(),
-        "the first external container"
-    );
-    assert_eq!(
-        placed(&placements, 2),
-        None,
-        "the second one is beyond the limit"
-    );
     assert_eq!(placements.counts.malformed, 1, "counted once");
 }
 
@@ -270,14 +243,17 @@ fn a_container_instanced_several_times_is_parsed_once() {
     let index = Index::new(&archive);
     let roots: Vec<usize> = index.systems().iter().map(|(_, entry)| *entry).collect();
     let limits = Limits::default();
-    let read = read_all(
-        &archive,
-        &index,
-        &roots,
-        None,
-        limits.external,
-        (limits.depth, limits.children),
-    );
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_all(
+            &archive,
+            &index,
+            &roots,
+            None,
+            limits.source_children,
+            capture,
+        )
+    })
+    .expect("original Entry capture");
     assert_eq!(read.parsed, 3, "the system, the ring and the leaf");
     assert_eq!(read.bodies.len(), 3, "each held once");
 }
@@ -307,21 +283,56 @@ fn a_container_without_the_main_xml_name_is_read_and_reported() {
 }
 
 #[test]
-fn a_second_child_list_is_reported() {
+fn all_direct_child_lists_are_read_in_document_order() {
     let dir = tempfile::tempdir().expect("a directory");
     let xml = TestElement::new("ObjectContainer")
         .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1)))
-        .child(TestElement::new("ChildObjectContainers").child(child("2,0,0", 2)))
+        .child(
+            TestElement::new("ChildObjectContainers")
+                .child(child("1.001,0,0", 1))
+                .child(child("2,0,0", 2)),
+        )
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("3,0,0", 3))),
+        )
         .to_xml();
     let placements = read(dir.path(), system(&xml, &[]), Limits::default());
-    assert!(placed(&placements, 1).is_some(), "the first list is read");
-    assert_eq!(placed(&placements, 2), None, "the second is not");
-    assert!(
-        placements
-            .report
-            .issues
-            .iter()
-            .any(|line| line.contains("more than one ChildObjectContainers")),
-        "an issue line"
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "the first direct list wins for an equivalent repeated position"
+    );
+    assert_eq!(
+        placed(&placements, 2),
+        Some([2.0, 0.0, 0.0]),
+        "the second direct list supplies its authored position"
+    );
+    assert_eq!(placed(&placements, 3), None, "direct list ownership wins");
+}
+
+#[test]
+fn a_legacy_wrapped_child_list_is_read_when_there_is_no_direct_list() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let xml = TestElement::new("ObjectContainer")
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1))),
+        )
+        .to_xml();
+    let placements = read(dir.path(), system(&xml, &[]), Limits::default());
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "a wrapped list is the fallback when no direct list exists"
     );
 }
+
+#[path = "starmap_child_path_tests.rs"]
+mod child_paths;
+
+#[path = "starmap_hcd_tests.rs"]
+mod hcd;
+
+#[path = "starmap_entxml_tests.rs"]
+mod entxml;

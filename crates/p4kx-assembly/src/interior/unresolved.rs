@@ -5,12 +5,12 @@
 
 use p4kx_model::{MaterialStatus, UnresolvedLayers};
 
-use super::Interior;
+use super::{Interior, InteriorPart};
 
 impl Interior {
     /// Returns the material libraries of the parts.
     pub(crate) fn libraries(&self) -> impl Iterator<Item = &MaterialStatus> {
-        self.parts.iter().map(|part| &*part.materials)
+        self.parts.iter().map(InteriorPart::materials)
     }
 
     /// Returns the layer files that the material libraries of the parts could not resolve; their

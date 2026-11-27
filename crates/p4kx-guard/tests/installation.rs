@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::fs;
 
-use p4kx_guard::{Installation, any_game_process, game_is_running, is_game_process};
+use p4kx_guard::{Installation, any_game_process, game_process_status, is_game_process};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -90,13 +90,46 @@ fn dot_dot_does_not_hide_the_installation() -> TestResult {
     Ok(())
 }
 
-#[cfg(any(windows, target_os = "macos"))]
+#[cfg(windows)]
 #[test]
 fn letter_case_does_not_hide_the_installation() -> TestResult {
     let root = tempfile::tempdir()?;
     let installation = installation_in(root.path())?;
     let shouted = root.path().join("STARCITIZEN").join("live").join("x");
     assert!(installation.check(&shouted).is_err(), "other letter case");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_installation_case_follows_the_actual_volume() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let mut installation = installation_in(root.path())?;
+    let alias = root.path().join("STARCITIZEN");
+    let same_directory = fs::exists(&alias)?;
+    assert_eq!(
+        installation.check(&alias.join("live/new/output")).is_err(),
+        same_directory,
+        "existing ancestor identity determines case behavior"
+    );
+    if !same_directory {
+        fs::create_dir_all(&alias)?;
+        assert!(
+            installation.check(&alias.join("output")).is_ok(),
+            "a distinct case-sensitive sibling remains writable"
+        );
+        installation.add(&alias);
+    }
+    assert!(
+        installation.check(&alias.join("output")).is_err(),
+        "the alias or separately admitted sibling is protected"
+    );
+    assert!(
+        installation
+            .check(&root.path().join("StarCitizen/output"))
+            .is_err(),
+        "the original folder remains protected"
+    );
     Ok(())
 }
 
@@ -269,13 +302,20 @@ fn notices_a_running_game_from_the_process_list() -> TestResult {
             .spawn()?,
     );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-    let mut seen = game_is_running();
-    while !seen && std::time::Instant::now() < deadline {
+    let seen = loop {
+        if matches!(game_process_status(), Ok(true)) {
+            break true;
+        }
+        if std::time::Instant::now() >= deadline {
+            break false;
+        }
         std::thread::sleep(std::time::Duration::from_millis(50));
-        seen = game_is_running();
-    }
+    };
     drop(game);
-    assert!(seen, "the fake game is in the process list");
+    assert!(
+        seen,
+        "the native observer identifies the running synthetic executable"
+    );
     Ok(())
 }
 

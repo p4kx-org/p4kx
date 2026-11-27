@@ -4,7 +4,7 @@ Decided for issue #109.
 
 ## Decision
 
-- The model preview reads every level of detail of the model once and keeps two results: the
+- The model preview reads every level of detail of the model once and prepares the
   `Scene` of level 0 for the 3D view and a small `ModelInfo` with the counts and notes the Info
   tab lists. The info exists whenever the model could be read, also when the view cannot show it
   (a skeleton file, a model without triangles). A model whose other levels cannot be read falls
@@ -13,6 +13,21 @@ Decided for issue #109.
   key and value rows, then the levels of detail and the chunks that were not read as tables. The
   texts are formatted and laid out once per model, language, width and scale and kept in egui's
   frame data, so a frame allocates nothing for them.
+- Hover over the node count, bone count or a visible chunk field to see its source
+  encryption marker. The chunk summary has separate markers for total, read, skipped
+  known and unknown chunks. Each of the three usage groups retains one observed chunk
+  type per contributing Entry, including chunks beyond the visible table. A group with
+  no source witness shows unknown origin. The preview retains these sources from the
+  same model read and discards them when the Archive changes.
+- The material row tooltip reports separate markers for the library name, read status and
+  displayed material count or single-material declaration. They use the library selected by
+  the drawn model reader. A failed library read retains its attempted use in the inventory.
+- The Info summary shows source markers for the geometry selection and the total count
+  of emitted LOD rows. The mesh count comes from the first emitted level. Each LOD row
+  shows source markers for its mesh, vertex and triangle counts. The IVO vertex count
+  carries an unknown origin. Geometry and count selectors describe the admitted model
+  or companions with incomplete source coverage. The material-ID tooltip covers the
+  IDs visible in the Info tab and identifies that scope when the list is shortened.
 - Export as GLB reads the model again for the chosen level only, on its own thread, and writes
   through `ModelSource::write_glb_observed`. The stream reports the bytes written against the length
   the GLB header states and fails with a marker once the caller's `CancelToken` is set; the

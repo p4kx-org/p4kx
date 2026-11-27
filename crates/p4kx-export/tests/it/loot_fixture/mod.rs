@@ -12,6 +12,7 @@ use p4kx_testkit::{
     TestChunkFile, TestContainer, TestElement, TestEntry, TestInstance, TestRecord, TestValue,
 };
 
+use crate::health_origin_fixture::{Fixture, Input, REGISTRY, TestResult};
 use crate::starmap_fixture::{child, children, guid_text};
 
 mod legacy;
@@ -40,24 +41,66 @@ pub(crate) const GHOST: &str = "ObjectContainers/PU/loc/loot/ghost.socpak";
 
 const CONTAINERS: &str = "Data\\ObjectContainers\\PU\\system\\stanton\\";
 
-fn database() -> DataForgeBuilder {
-    records::records(
-        structures(DataForgeBuilder::new().version(8)),
-        &records::Ids {
-            tag_rare: TAG_RARE,
-            tag_common: TAG_COMMON,
-            entity: ENTITY,
-            archetype: ARCHETYPE,
-            table: TABLE,
-            table_debug: TABLE_DEBUG,
-            legacy_table: LEGACY_TABLE,
-            legacy_archetype: LEGACY_ARCHETYPE,
-            filter_leaf: FILTER_LEAF,
-            filter: FILTER,
-            config: CONFIG,
-            planet: PLANET,
-        },
+pub(crate) fn database() -> DataForgeBuilder {
+    records::records(structures(DataForgeBuilder::new().version(8)), &ids())
+}
+
+pub(crate) fn database_with_loot_aliases() -> DataForgeBuilder {
+    database()
+        .record(records::table_record(TABLE, "V3LootTable_Alias", &ids()))
+        .record(TestRecord::new(
+            TABLE,
+            "LootTableV3Record",
+            "LootTableV3Record.Outside",
+            "unselected/loottables/outside.xml",
+        ))
+}
+
+pub(crate) fn database_with_legacy_loot_alias() -> DataForgeBuilder {
+    let broken_link = TestInstance::new("WeightedLootArchetype")
+        .value("weight", TestValue::Single(0.5))
+        .value("archetype", TestValue::Reference(u128::MAX));
+    database()
+        .record(
+            TestRecord::new(
+                LEGACY_TABLE,
+                "LootTable",
+                "LootTable.LegacyAlias",
+                "libs/foundry/records/lootgeneration/loottables/legacy_alias.xml",
+            )
+            .value("lootArchetypes", array(vec![broken_link])),
+        )
+        .record(TestRecord::new(
+            LEGACY_TABLE,
+            "LootTable",
+            "LootTable.Outside",
+            "unselected/loottables/legacy_outside.xml",
+        ))
+}
+
+pub(crate) fn source_fixture(data: &[u8], input: Input) -> TestResult<Fixture> {
+    Fixture::open(
+        data,
+        input,
+        vec![TestEntry::stored(REGISTRY, b"<LayerBackups/>")],
     )
+}
+
+const fn ids() -> records::Ids {
+    records::Ids {
+        tag_rare: TAG_RARE,
+        tag_common: TAG_COMMON,
+        entity: ENTITY,
+        archetype: ARCHETYPE,
+        table: TABLE,
+        table_debug: TABLE_DEBUG,
+        legacy_table: LEGACY_TABLE,
+        legacy_archetype: LEGACY_ARCHETYPE,
+        filter_leaf: FILTER_LEAF,
+        filter: FILTER,
+        config: CONFIG,
+        planet: PLANET,
+    }
 }
 
 fn xml(list: Vec<TestElement>) -> String {
@@ -187,7 +230,12 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 CONFIG,
             )],
             vec![
-                soc(&[&[TAG_COMMON, TAG_RARE], &[TAG_COMMON], &[TAG_COMMON], &[]]),
+                soc(&[
+                    &[TAG_COMMON, TAG_RARE, TAG_COMMON],
+                    &[TAG_COMMON],
+                    &[TAG_COMMON],
+                    &[],
+                ]),
                 soc(&[&[TAG_RARE]]),
             ],
         ))

@@ -3,22 +3,48 @@
 
 //! One group of an assortment: its alternatives and the choice among them.
 
-use p4kx_dataforge::Guid;
+use std::sync::Arc;
 
-use crate::LoadoutError;
+use p4kx_dataforge::{StructValue, Value};
+
+use crate::LoadoutTargetGuid;
+use crate::loadout_path::{PathRead, XML_LOADOUT_PATH};
 use crate::pick::{Choice, LoadoutPicks};
 use crate::spec::LoadoutSpec;
+use crate::spec_loadout::{XML_LOADOUT, read_loadout};
+use crate::{LoadoutError, LoadoutReference};
 
-/// A group of an assortment with every alternative in order; `None` is an alternative that is no
-/// Loadout.
+/// One admitted assortment alternative.
+#[derive(Debug, Clone)]
+pub(crate) enum Alternative {
+    /// A decoded Loadout.
+    Loadout(LoadoutSpec),
+    /// An XML choice whose authored String path is empty.
+    EmptyXmlPath,
+    /// An alternative whose Loadout could not be read.
+    Unreadable,
+}
+
+impl Alternative {
+    pub(crate) fn read(loadout: &StructValue<'_>, record: &Arc<str>, paths: &PathRead<'_>) -> Self {
+        if loadout.type_name() == XML_LOADOUT
+            && matches!(loadout.field(XML_LOADOUT_PATH), Some(Value::String("")))
+        {
+            return Self::EmptyXmlPath;
+        }
+        read_loadout(loadout, record, paths).map_or(Self::Unreadable, Self::Loadout)
+    }
+}
+
+/// A group of an assortment with its alternatives in order.
 #[derive(Debug, Clone)]
 pub(crate) struct Group {
     name: String,
-    alternatives: Vec<Option<LoadoutSpec>>,
+    alternatives: Vec<Alternative>,
 }
 
 impl Group {
-    pub(crate) const fn new(name: String, alternatives: Vec<Option<LoadoutSpec>>) -> Self {
+    pub(crate) const fn new(name: String, alternatives: Vec<Alternative>) -> Self {
         Self { name, alternatives }
     }
 
@@ -27,39 +53,45 @@ impl Group {
         &self.name
     }
 
-    /// Returns the Loadout of the alternative `picks` choose, or `None` when the group gives
-    /// nothing: it has no alternatives, or the chosen one is no Loadout, which is an issue of the
-    /// assortment `guid`.
+    /// Returns the selected Loadout layer. A chosen unreadable alternative records an issue.
     pub(crate) fn chosen(
         &self,
         picks: &LoadoutPicks,
-        guid: Guid,
+        reference: &LoadoutReference,
         issues: &mut Vec<LoadoutError>,
     ) -> Option<LoadoutSpec> {
-        let index = self.index(picks, guid, issues);
-        let alternative = self.alternatives.get(index)?;
-        if alternative.is_none() {
-            let which = if index == 0 {
-                "the first alternative".to_owned()
-            } else {
-                format!("the alternative {index}")
-            };
-            issues.push(LoadoutError::Assortment {
-                guid,
-                reason: format!("{which} of the group {} is no Loadout", self.name),
-            });
+        let index = self.index(picks, reference, issues);
+        match self.alternatives.get(index)? {
+            Alternative::Loadout(loadout) => Some(loadout.clone()),
+            Alternative::EmptyXmlPath => None,
+            Alternative::Unreadable => {
+                let which = if index == 0 {
+                    "the first alternative".to_owned()
+                } else {
+                    format!("the alternative {index}")
+                };
+                issues.push(LoadoutError::Assortment {
+                    guid: LoadoutTargetGuid::from_reference(reference),
+                    reason: format!("{which} of the group {} is no Loadout", self.name),
+                });
+                None
+            }
         }
-        alternative.clone()
     }
 
     /// Returns the index of the alternative `picks` choose. A named index beyond the group is an
-    /// issue of the assortment `guid` and gives 0; a bare index beyond it gives 0 silently.
-    fn index(&self, picks: &LoadoutPicks, guid: Guid, issues: &mut Vec<LoadoutError>) -> usize {
+    /// issue of the assortment `reference` and gives 0; a bare index beyond it gives 0 silently.
+    fn index(
+        &self,
+        picks: &LoadoutPicks,
+        reference: &LoadoutReference,
+        issues: &mut Vec<LoadoutError>,
+    ) -> usize {
         let count = self.alternatives.len();
         match picks.choice(&self.name) {
             Choice::Named(index) if index > 0 && index >= count => {
                 issues.push(LoadoutError::Assortment {
-                    guid,
+                    guid: LoadoutTargetGuid::from_reference(reference),
                     reason: format!(
                         "the pick {index} of the group {} is beyond its {count} \
                          alternatives; the first is used",
@@ -74,3 +106,7 @@ impl Group {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "assortment_group_tests.rs"]
+mod tests;

@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::entity_creature::{bone, skeleton_file};
+use crate::entity_port::helper_node;
+use crate::entity_schema::add_port_subhelper_fields;
 use crate::model_cube::cube_nodes;
 use crate::{
-    DataForgeBuilder, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel, TestNode,
-    TestPort, entity_schema,
+    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout, TestLoadoutEntry,
+    TestModel, TestNode, TestPort, TestValue, entity_schema,
 };
 
 /// A character whose root geometry is a human skeleton file (`.chr`) with the bones `pelvis`,
@@ -86,19 +88,21 @@ const SKIN_PORTS: [(&str, &str, bool); 7] = [
 ];
 
 /// Returns the skin entity that holds the item ports of [`SKIN_PORTS`].
-fn skin_entity() -> TestEntity {
+fn skin_entity(configure_port: impl Fn(&str, TestPort) -> TestPort) -> TestEntity {
     SKIN_PORTS.iter().fold(
         TestEntity::new(0x10, "Test_Prop_Skin", "entities/Test_Prop_Skin.xml")
             .geometry(format!("{HUMAN_FOLDER}/body.skin"), None),
         |entity, &(name, helper, is_skin)| {
             let port = TestPort::new(name).helper(helper, [0.0; 3], [0.0; 3]);
-            entity.port(if is_skin { port.skin() } else { port })
+            entity.port(configure_port(
+                name,
+                if is_skin { port.skin() } else { port },
+            ))
         },
     )
 }
 
-fn database() -> DataForgeBuilder {
-    let skin = skin_entity();
+fn database(skin: TestEntity) -> DataForgeBuilder {
     let garment = TestEntity::new(0x13, "Test_Prop_Garment", "entities/Test_Prop_Garment.xml")
         .attach_type("Char_Clothing_Legs")
         .geometry("Objects/Test/prop.cgf", None);
@@ -150,6 +154,34 @@ fn database() -> DataForgeBuilder {
 /// [`SKINNED_ON_SKIN_PORT`], [`PROP_ON_BONE_PORT`] and [`GARMENT_ON_SKIN_PORT`].
 #[must_use]
 pub fn prop_rig_entries() -> Vec<TestEntry> {
+    entries_with_database(database(skin_entity(|_, port| port)).build())
+}
+
+/// Returns the rig fixture with competing authored helpers on its rigid and weighted skin ports.
+#[must_use]
+pub fn prop_rig_unresolved_helper_entries() -> Vec<TestEntry> {
+    let skin = skin_entity(|name, port| {
+        if matches!(name, PROP_ON_SKIN_PORT | SKINNED_ON_SKIN_PORT) {
+            return port.sub_helpers(tagged_alternatives());
+        }
+        port
+    });
+    entries_with_database(add_port_subhelper_fields(database(skin)).build())
+}
+
+fn tagged_alternatives() -> Vec<TestValue> {
+    let alternative = helper_node("tip", "", [0.5, 0.0, 0.0], [0.0; 3])
+        .value("Tags", TestValue::text("FixtureUnresolvedTag"));
+    let group = TestInstance::new("SItemPortDefHelperNode")
+        .value("Tags", TestValue::text(""))
+        .value(
+            "SubHelpers",
+            TestValue::Array(vec![TestValue::Struct(alternative)]),
+        );
+    vec![TestValue::Null, TestValue::Struct(group)]
+}
+
+fn entries_with_database(database: Vec<u8>) -> Vec<TestEntry> {
     let skin = TestModel::two_bone_skin().with_nodes(skin_nodes());
     let prop = TestModel::cube().scaled(0.25);
     let empty = TestModel::cube().helpers_only();
@@ -162,7 +194,7 @@ pub fn prop_rig_entries() -> Vec<TestEntry> {
     };
     let stored = |path: &str, bytes: Vec<u8>| TestEntry::stored(path.replace('/', "\\"), bytes);
     vec![
-        TestEntry::zstd("Data\\Game2.dcb", database().build()),
+        TestEntry::zstd("Data\\Game2.dcb", database),
         stored(&format!("Data/{HUMAN_FOLDER}/skeleton.chr"), bones()),
         stored(&format!("Data/{CREATURE_FOLDER}/skeleton.chr"), bones()),
         stored(&format!("Data/{STATIC_FOLDER}/skeleton.chr"), bones()),

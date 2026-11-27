@@ -13,6 +13,9 @@ use p4kx_testkit::{
     TestValue, real_archive_path,
 };
 
+#[path = "dcb_fields_provenance.rs"]
+mod provenance;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn weapon(rate: f32) -> TestValue {

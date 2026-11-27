@@ -12,6 +12,24 @@ expression: json
       "path": "Data\\broken.xml"
     }
   ],
+  "raw_artifacts": [
+    {
+      "digest": {
+        "byteLength": "4",
+        "sha256": "29114363f749a0226b6988dda3ca2492a954117ab6b5f382706c20300dabc079"
+      },
+      "origin_receipt": "Data/Libs/a.xml.p4kx-origin.jsonl",
+      "path": "Data/Libs/a.xml"
+    },
+    {
+      "digest": {
+        "byteLength": "100",
+        "sha256": "09ecb6ebc8bcefc733f6f2ec44f791abeed6a99edf0cc31519637898aebd52d8"
+      },
+      "origin_receipt": "Data/Libs/secret.xml.p4kx-origin.jsonl",
+      "path": "Data/Libs/secret.xml"
+    }
+  ],
   "skipped": [],
   "target": "[DIR]/out"
 }

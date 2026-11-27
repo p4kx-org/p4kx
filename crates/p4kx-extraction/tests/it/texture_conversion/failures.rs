@@ -50,11 +50,16 @@ fn a_texture_with_a_missing_part_is_reported_and_its_raw_entries_are_written() -
         files(&fixture.target)?,
         [
             "Data/Ships/hull_ddna.dds",
+            "Data/Ships/hull_ddna.dds.p4kx-origin.jsonl",
             "Data/Ships/hull_ddna.png",
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.3",
+            "Data/Textures/rock_diff.dds.3.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "the raw Entries of the failed texture, the rest converted"
     );
@@ -85,15 +90,17 @@ fn a_format_without_a_decoder_keeps_the_merged_dds_and_writes_the_raw_parts() ->
         .first()
         .and_then(|failure| Error::source(failure.error()))
         .and_then(Error::source)
-        .map(ToString::to_string)
-        .unwrap_or_default();
+        .map_or_default(ToString::to_string);
     assert!(source.contains("R32G32_SINT"), "names the format: {source}");
     assert_eq!(
         files(&fixture.target)?,
         [
             "Data/Ships/hull_ddna.dds",
             "Data/Ships/hull_ddna.dds.1",
+            "Data/Ships/hull_ddna.dds.1.p4kx-origin.jsonl",
             "Data/Ships/hull_ddna.dds.2",
+            "Data/Ships/hull_ddna.dds.2.p4kx-origin.jsonl",
+            "Data/Ships/hull_ddna.dds.p4kx-origin.jsonl",
         ],
         "the merged DDS and the raw parts, no PNG"
     );

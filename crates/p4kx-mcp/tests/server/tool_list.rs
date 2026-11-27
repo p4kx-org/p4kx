@@ -70,9 +70,39 @@ fn every_tool_is_annotated_read_only_and_declares_its_result_shape() -> TestResu
             tool.get("description").and_then(Value::as_str).is_some(),
             "{tool} has a description"
         );
+        assert_origin_schema(tool)?;
+    }
+    Ok(())
+}
+
+fn assert_origin_schema(tool: &Value) -> TestResult {
+    let name = tool
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or("tool name")?;
+    let schema = tool.get("outputSchema").ok_or("tool output schema")?;
+    let properties = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .ok_or_else(|| format!("{name} has no output properties"))?;
+    let required_path = match name {
+        "list_model_items" => "/allOf/0/then/required",
+        _ => "/required",
+    };
+    let required = schema
+        .pointer(required_path)
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{name} has no required output fields at {required_path}"))?;
+    let origin_fields: &[&str] = if name == "list_channels" {
+        &["originApplicability"]
+    } else {
+        &["fieldOrigins", "provenance"]
+    };
+    for &field in origin_fields {
+        assert!(properties.contains_key(field), "{name} declares {field}");
         assert!(
-            tool.get("outputSchema").is_some(),
-            "{tool} declares its result shape"
+            required.iter().any(|entry| entry.as_str() == Some(field)),
+            "{name} requires {field} in its structured result"
         );
     }
     Ok(())

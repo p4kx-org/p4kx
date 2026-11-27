@@ -37,7 +37,11 @@ fn an_alpha_tail_goes_into_the_png_and_its_entries_are_not_written_raw() -> Test
     );
     assert_eq!(
         files(&fixture.target)?,
-        ["Data/Textures/rock_diff.dds", "Data/Textures/rock_diff.png"],
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.png",
+        ],
         "no tail Entries"
     );
     assert_eq!(
@@ -77,10 +81,16 @@ fn keeping_raw_parts_also_writes_the_alpha_tail_entries() -> TestResult {
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2a",
+            "Data/Textures/rock_diff.dds.2a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
         ]
     );
@@ -109,9 +119,14 @@ fn a_broken_alpha_tail_is_reported_and_the_raw_entries_are_written() -> TestResu
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
         ],
         "the merged DDS keeps the header's path, the other Entries are written raw"
     );
@@ -128,7 +143,10 @@ fn a_cubemap_is_merged_and_exported_as_six_faces() -> TestResult {
     let report = run(&fixture, ConflictPolicy::Skip);
 
     assert!(report.is_complete(), "{report:?}");
-    let mut expected = vec!["Data/Textures/rock_diff.dds".to_owned()];
+    let mut expected = vec![
+        "Data/Textures/rock_diff.dds".to_owned(),
+        "Data/Textures/rock_diff.dds.p4kx-origin.jsonl".to_owned(),
+    ];
     expected.extend(
         CUBE_FACE_NAMES
             .iter()
@@ -176,7 +194,9 @@ fn merging_alone_writes_the_alpha_tail_as_its_own_merged_dds() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Textures/rock_diff.dds",
-            "Data/Textures/rock_diff.dds.a"
+            "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
         ],
         "the colour and the tail, each merged"
     );
@@ -207,9 +227,22 @@ fn merging_alone_with_raw_parts_keeps_the_merged_tail_under_the_tail_header_path
 
     assert!(report.is_complete(), "{report:?}");
     assert_eq!(
-        files(&fixture.target)?.len(),
-        6,
-        "two merged files and four raw parts"
+        files(&fixture.target)?,
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.2a",
+            "Data/Textures/rock_diff.dds.2a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+        ],
+        "the two merged files and four raw parts each have their companion"
     );
     assert_eq!(
         fixture.read("Data/Textures/rock_diff.dds.a")?,

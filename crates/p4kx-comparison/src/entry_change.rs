@@ -11,41 +11,75 @@ use crate::path_key::{eq_normalised, top_level};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeKind {
-    /// Only the new side has the Entry.
+    /// An unpaired occurrence on the new side.
     Added,
-    /// Only the old side has the Entry.
+    /// An unpaired occurrence on the old side.
     Removed,
-    /// Both sides have the Entry, with a different uncompressed size or CRC-32C.
+    /// A matched occurrence with a different uncompressed size or comparable declared checksum.
     Changed,
 }
 
-/// One Entry that was added, removed or changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntryDecision {
+    SizeDiffers,
+    ChecksumDiffers,
+    Incomparable {
+        collision: Option<usize>,
+        ambiguous: bool,
+    },
+    OrderedAgainst(usize),
+    OppositeExhausted,
+    Collision {
+        evidence: usize,
+        ambiguous: bool,
+    },
+}
+
+/// One Entry that was added, removed or changed.
+#[derive(Debug, Clone, Copy)]
 pub struct EntryChange<'a> {
     old: Option<&'a Entry>,
     new: Option<&'a Entry>,
+    decision: EntryDecision,
 }
 
+impl PartialEq for EntryChange<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old == other.old
+            && self.new == other.new
+            && self.pairing_is_ambiguous() == other.pairing_is_ambiguous()
+    }
+}
+
+impl Eq for EntryChange<'_> {}
+
 impl<'a> EntryChange<'a> {
-    pub(crate) const fn added(new: &'a Entry) -> Self {
+    pub(crate) const fn added(new: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: None,
             new: Some(new),
+            decision,
         }
     }
 
-    pub(crate) const fn removed(old: &'a Entry) -> Self {
+    pub(crate) const fn removed(old: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: Some(old),
             new: None,
+            decision,
         }
     }
 
-    pub(crate) const fn changed(old: &'a Entry, new: &'a Entry) -> Self {
+    pub(crate) const fn changed(old: &'a Entry, new: &'a Entry, decision: EntryDecision) -> Self {
         Self {
             old: Some(old),
             new: Some(new),
+            decision,
         }
+    }
+
+    pub(crate) const fn decision(&self) -> EntryDecision {
+        self.decision
     }
 
     /// Returns how the Entry differs.
@@ -56,6 +90,18 @@ impl<'a> EntryChange<'a> {
             (Some(_), None) => ChangeKind::Removed,
             (None, _) => ChangeKind::Added,
         }
+    }
+
+    /// Returns whether indistinguishable physical occurrences make this pairing ambiguous.
+    #[must_use]
+    pub const fn pairing_is_ambiguous(&self) -> bool {
+        matches!(
+            self.decision,
+            EntryDecision::Collision {
+                ambiguous: true,
+                ..
+            }
+        )
     }
 
     /// Returns the Entry path as the new side stores it, or as the old side does for a removed
@@ -85,7 +131,7 @@ pub struct EntryCounts {
     pub added: usize,
     /// Entries only the old side has.
     pub removed: usize,
-    /// Entries with a different uncompressed size or CRC-32C.
+    /// Entries with a different uncompressed size or comparable declared checksum.
     pub changed: usize,
 }
 

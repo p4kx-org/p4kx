@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
 use std::ops::Range;
 
 use thiserror::Error;
+
+use crate::needle_scan::{self, NeedleScan};
 
 /// The text to search for is empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -14,12 +17,22 @@ pub struct EmptyNeedle;
 ///
 /// Case is folded with Unicode lower-casing, character by character, and the final sigma `ς` is
 /// folded to `σ`, so `GLADI` finds `AEGS_Gladius` and `STRASSE` does not find `Straße`. A needle
-/// may end inside the expansion of a character: `i` finds `İ`. Matching allocates nothing; text
-/// that is ASCII on both sides takes a byte loop.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// may end inside the expansion of a character: `i` finds `İ`. Searching a whole string allocates
+/// nothing; text that is ASCII on both sides takes a byte loop.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Needle {
     folded: Vec<char>,
     ascii: Option<Box<[u8]>>,
+    prefix: Vec<usize>,
+}
+
+impl fmt::Debug for Needle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Needle")
+            .field("folded", &self.folded)
+            .field("ascii", &self.ascii)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Needle {
@@ -35,9 +48,12 @@ impl Needle {
         let ascii = text
             .is_ascii()
             .then(|| text.bytes().map(|byte| byte.to_ascii_lowercase()).collect());
+        let folded: Vec<_> = text.chars().flat_map(fold).collect();
+        let prefix = needle_scan::prefix(&folded);
         Ok(Self {
-            folded: text.chars().flat_map(fold).collect(),
+            folded,
             ascii,
+            prefix,
         })
     }
 
@@ -54,6 +70,14 @@ impl Needle {
     #[must_use]
     pub fn is_in(&self, haystack: &str) -> bool {
         self.find(haystack).is_some()
+    }
+
+    pub(crate) fn scanner(&self) -> NeedleScan<'_> {
+        NeedleScan::new(&self.folded, &self.prefix)
+    }
+
+    pub(crate) const fn folded_len(&self) -> usize {
+        self.folded.len()
     }
 
     fn find_folded(&self, haystack: &str) -> Option<Range<usize>> {
@@ -86,7 +110,7 @@ impl Needle {
     }
 }
 
-fn fold(c: char) -> impl Iterator<Item = char> {
+pub(crate) fn fold(c: char) -> impl Iterator<Item = char> {
     c.to_lowercase()
         .map(|lower| if lower == '\u{3c2}' { '\u{3c3}' } else { lower })
 }

@@ -141,9 +141,10 @@ pub(crate) fn texture_set(
         .map(|(part, instance)| {
             let mut slots: Vec<Slot> = Vec::new();
             for slot in layout
-                .part_material_ids(part)
+                .part_materials(part)
                 .into_iter()
-                .filter_map(|id| instance.plan.slot(id))
+                .filter(|usage| usage.has_uvs)
+                .filter_map(|usage| instance.plan.slot(usage.id))
             {
                 if !slots.contains(&slot) {
                     slots.push(slot);
@@ -172,6 +173,12 @@ fn shared_textures(root: &json::Root) -> usize {
                 .as_ref()
                 .map(|info| info.index),
             material.normal_texture.as_ref().map(|info| info.index),
+            material
+                .extensions
+                .as_ref()
+                .and_then(|extension| extension.specular.as_ref())
+                .and_then(|specular| specular.specular_color_texture.as_ref())
+                .map(|info| info.index),
         ];
         for index in indices.into_iter().flatten() {
             references += 1;
@@ -219,6 +226,11 @@ pub(crate) fn summarise(
                         .metallic_roughness_texture
                         .is_some()
                     || material.normal_texture.is_some()
+                    || material
+                        .extensions
+                        .as_ref()
+                        .and_then(|extension| extension.specular.as_ref())
+                        .is_some_and(|specular| specular.specular_color_texture.is_some())
             })
             .count(),
         textures: images.images.len(),

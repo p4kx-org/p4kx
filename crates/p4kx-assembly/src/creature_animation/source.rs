@@ -3,16 +3,19 @@
 
 use std::collections::HashSet;
 
-use p4kx_extraction::{AnimationChoice, AnimationSet, ConversionError};
+use p4kx_extraction::{AnimationChoice, AnimationSet, ArchiveAnimationRead, ConversionError};
 
 use super::clip_files;
-use super::database::{DatabaseProblem, clips};
+use super::database::{Clips, DatabaseProblem, NameSelector, clips};
+use super::owner::{
+    self, CdfModel, CreatureAnimationSourceReport, OwnerInputs, ParameterRoute, SelectionInputs,
+};
 use crate::cdf::{self, MAX_CDF_BYTES, is_character_definition};
 use crate::creature_rig::{is_skinned, skeleton_of};
 use crate::gear_clip::{
     ChrParams, MAX_CHRPARAMS_BYTES, MAX_PARAM_SOURCES, params_path, read_params,
 };
-use crate::{ArchiveModels, Assembly, EntityNode, Issue, IssueKind, ModelFailure, ModelProvider};
+use crate::{ArchiveModels, Assembly, EntityNode, Issue, IssueKind, ModelFailure};
 
 /// The clips of a creature Entity, read from the Archive, and what kept some from being read.
 #[derive(Debug, Default)]
@@ -21,6 +24,8 @@ pub struct CreatureClips {
     /// The clips the Entity's animation database names that were found, as read by
     /// [`ArchiveModels::animations`].
     pub set: AnimationSet,
+    /// Original Entity route and selected physical clip contributors.
+    pub sources: Option<CreatureAnimationSourceReport>,
     /// What could not be found or read, as [`IssueKind::AnimationsUnavailable`] of the root Entity,
     /// whose [`Issue::path`] is empty.
     pub issues: Vec<Issue>,
@@ -42,7 +47,7 @@ pub fn creature_animations(
     node: &EntityNode,
 ) -> Result<CreatureClips, ConversionError> {
     let (Some(database), Some(geometry)) = (
-        node.animation_database(),
+        node.animation_database.as_ref(),
         assembly.root().and_then(|root| root.geometry()),
     ) else {
         return Ok(CreatureClips::default());
@@ -56,7 +61,32 @@ pub fn creature_animations(
         return Ok(CreatureClips::default());
     }
     let mut reasons = Vec::new();
-    let set = gather(models, (geometry, database), &mut reasons)?;
+    let database_path = database.authored().trim();
+    let gathered = gather(models, (geometry, database_path), &mut reasons)?;
+    let sources = gathered
+        .parameters
+        .as_ref()
+        .map(|parameters| {
+            owner::report(
+                &OwnerInputs {
+                    forge: node
+                        .forge_origin
+                        .as_deref()
+                        .filter(|origin| origin.matches_archive(models.archive)),
+                    database,
+                    geometry,
+                    geometry_field: geometry_field(assembly, node),
+                    parameters,
+                },
+                &SelectionInputs {
+                    names: &gathered.selectors,
+                    clips: &gathered.clips,
+                    complete: gathered.selection_complete,
+                },
+            )
+        })
+        .transpose()?;
+    let set = gathered.clips.into_set();
     let issues = reasons
         .into_iter()
         .map(|reason| Issue {
@@ -65,34 +95,73 @@ pub fn creature_animations(
             kind: IssueKind::AnimationsUnavailable { reason },
         })
         .collect();
-    Ok(CreatureClips { set, issues })
+    Ok(CreatureClips {
+        set,
+        sources,
+        issues,
+    })
+}
+
+fn geometry_field(
+    assembly: &Assembly,
+    node: &EntityNode,
+) -> Option<p4kx_extraction::SourceLocation> {
+    let root = assembly.root()?;
+    let record_index = root.entity_record_index()?;
+    if node.record_index() != Some(record_index)
+        || root.guid() != node.guid()
+        || assembly.forge_origin() != node.forge_origin.as_deref()
+    {
+        return None;
+    }
+    root.geometry_selectors.model_field()
 }
 
 /// Reads the clips of `database`, a path below `Data`, for the root geometry `geometry`, and adds
 /// to `reasons` what kept some from being read; an empty set when nothing can be read at all.
+#[derive(Default)]
+struct Gathered {
+    clips: ArchiveAnimationRead,
+    selectors: Vec<NameSelector>,
+    parameters: Option<ParameterRoute>,
+    selection_complete: bool,
+}
+
 fn gather(
     models: &ArchiveModels<'_>,
     (geometry, database): (&str, &str),
     reasons: &mut Vec<String>,
-) -> Result<AnimationSet, ConversionError> {
-    let params = match parameters(models, geometry) {
+) -> Result<Gathered, ConversionError> {
+    let (params, parameters) = match parameters(models, geometry) {
         Ok(params) => params,
         Err(reason) => {
             reasons.push(reason);
-            return Ok(AnimationSet::default());
+            return Ok(Gathered::default());
         }
+    };
+    let mut gathered = Gathered {
+        parameters: Some(parameters),
+        ..Gathered::default()
     };
     if params.folders.is_empty() {
         reasons.push("the parameter file of the skeleton names no animation folder".to_owned());
-        return Ok(AnimationSet::default());
+        return Ok(gathered);
     }
     if params.capped {
         reasons.push(format!(
             "the parameter file of the skeleton lists more than {MAX_PARAM_SOURCES} animation folders or track databases, the others are left out"
         ));
     }
-    let Some(mut names) = database_names(models, database, reasons) else {
-        return Ok(AnimationSet::default());
+    let Some((
+        Clips {
+            mut names,
+            selectors,
+            ..
+        },
+        database_complete,
+    )) = database_names(models, database, reasons)
+    else {
+        return Ok(gathered);
     };
     let extra: Vec<String> = params
         .databases
@@ -104,13 +173,18 @@ fn gather(
     if !files.has_database && extra.is_empty() {
         names.retain(|name| files.stems.contains(&name.to_ascii_lowercase()));
     }
-    let set = read_named(models, &folders, names, &extra)?;
-    if set.animations.is_empty() {
+    gathered.clips = read_named(models, &folders, names, &extra)?;
+    gathered.selectors = selectors;
+    gathered.selection_complete = database_complete
+        && !params.capped
+        && extra.len() == params.databases.len()
+        && gathered.clips.set().unread.is_empty();
+    if gathered.clips.set().animations.is_empty() {
         reasons.push(format!(
             "no clip of the animation database {database} is in the animation folders of the skeleton"
         ));
     }
-    Ok(set)
+    Ok(gathered)
 }
 
 /// Returns the clip names of `database`, adding to `reasons` what it could not read or had to drop;
@@ -119,16 +193,18 @@ fn database_names(
     models: &ArchiveModels<'_>,
     database: &str,
     reasons: &mut Vec<String>,
-) -> Option<Vec<String>> {
+) -> Option<(Clips, bool)> {
     match clips(models, database) {
-        Ok(read) => {
-            reasons.extend(read.unread.into_iter().map(|(file, reason)| {
+        Ok(mut read) => {
+            let complete =
+                read.unread.is_empty() && read.truncated.is_empty() && !read.unpositioned_selectors;
+            reasons.extend(std::mem::take(&mut read.unread).into_iter().map(|(file, reason)| {
                 format!(
                     "the animation database {file}, nested in {database}, cannot be read: {reason}"
                 )
             }));
-            reasons.extend(read.truncated);
-            Some(read.names)
+            reasons.append(&mut read.truncated);
+            Some((read, complete))
         }
         Err(DatabaseProblem::Missing) => {
             reasons.push(format!(
@@ -147,29 +223,48 @@ fn database_names(
 
 /// Reads the parameter file beside the skeleton of the root geometry `geometry`: the file itself
 /// for a skeleton, the one a character definition names otherwise.
-fn parameters(models: &ArchiveModels<'_>, geometry: &str) -> Result<ChrParams, String> {
-    let skeleton = if is_character_definition(geometry) {
-        let bytes = models
-            .file(geometry, MAX_CDF_BYTES)
-            .map_err(|failure| format!("the character definition {geometry}: {failure}"))?;
-        cdf::read(&bytes)
-            .map_err(|reason| format!("the character definition {geometry}: {reason}"))?
-            .skeleton
-            .ok_or_else(|| format!("the character definition {geometry} names no skeleton"))?
+fn parameters(
+    models: &ArchiveModels<'_>,
+    geometry: &str,
+) -> Result<(ChrParams, ParameterRoute), String> {
+    let (skeleton, cdf) = if is_character_definition(geometry) {
+        let (origin, bytes) = models.observed_file(geometry, MAX_CDF_BYTES);
+        let bytes =
+            bytes.map_err(|failure| format!("the character definition {geometry}: {failure}"))?;
+        let (skeleton, position) = cdf::read_skeleton_with_position(&bytes)
+            .map_err(|reason| format!("the character definition {geometry}: {reason}"))?;
+        let skeleton = skeleton
+            .ok_or_else(|| format!("the character definition {geometry} names no skeleton"))?;
+        (
+            skeleton,
+            Some(CdfModel {
+                input: origin,
+                field: position,
+            }),
+        )
     } else {
-        geometry.to_owned()
+        (geometry.to_owned(), None)
     };
     let path = params_path(&skeleton);
-    match models.file(&path, MAX_CHRPARAMS_BYTES) {
+    let (params, bytes) = models.observed_file(&path, MAX_CHRPARAMS_BYTES);
+    let (parsed, length) = match bytes {
         Ok(bytes) => read_params(&bytes)
+            .map(|parsed| (parsed, bytes.len() as u64))
             .map_err(|reason| format!("the parameter file {path} cannot be read: {reason}")),
         Err(ModelFailure::Missing) => {
             Err(format!("the parameter file {path} is not in the Archive"))
         }
         Err(other) => Err(format!("the parameter file {path} cannot be read: {other}")),
-    }
+    }?;
+    Ok((
+        parsed,
+        ParameterRoute {
+            skeleton,
+            cdf,
+            params: params.map(|input| (input, length)),
+        },
+    ))
 }
-
 /// Reads the clips `names` below `folders` and the Entries `extra`. A name no clip has is left
 /// out; names that only a database can lack cost a second read.
 fn read_named(
@@ -177,22 +272,22 @@ fn read_named(
     folders: &[&str],
     names: Vec<String>,
     extra: &[String],
-) -> Result<AnimationSet, ConversionError> {
+) -> Result<ArchiveAnimationRead, ConversionError> {
     if names.is_empty() {
-        return Ok(AnimationSet::default());
+        return Ok(ArchiveAnimationRead::default());
     }
     let choice = AnimationChoice::Named(names);
-    match models.animations(folders, &choice, extra) {
+    match models.animations_with_clip_evidence(folders, &choice, extra) {
         Err(ConversionError::UnknownAnimations { names: missing }) => {
             let AnimationChoice::Named(mut present) = choice else {
-                return Ok(AnimationSet::default());
+                return Ok(ArchiveAnimationRead::default());
             };
             let missing: HashSet<&str> = missing.iter().map(String::as_str).collect();
             present.retain(|name| !missing.contains(name.as_str()));
             if present.is_empty() {
-                return Ok(AnimationSet::default());
+                return Ok(ArchiveAnimationRead::default());
             }
-            models.animations(folders, &AnimationChoice::Named(present), extra)
+            models.animations_with_clip_evidence(folders, &AnimationChoice::Named(present), extra)
         }
         other => other,
     }

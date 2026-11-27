@@ -1,19 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Tiers, selections, quality, pools, reward sources and dismantle returns in the Basetool
+//! Tiers, selections, quality, pools, reward sources and dismantle returns in the P4KX
 //! catalog, built from a synthetic Archive with multi-tier blueprints (no blueprint of the
 //! real Archive has more than one tier).
+
+#[path = "catalog_crafting_reward_sdk.rs"]
+mod reward_sdk;
+
+#[path = "catalog_crafting_pool_sdk.rs"]
+mod pool_sdk;
+#[path = "catalog_crafting_pool_tables.rs"]
+mod pool_tables;
+#[path = "catalog_crafting_quality.rs"]
+mod quality;
+#[path = "catalog_crafting_quality_positions.rs"]
+mod quality_positions;
+#[path = "catalog_crafting_tier_selection.rs"]
+mod selection;
 
 use crate::catalog_crafting_support;
 use crate::crafting_detail_fixture;
 
 use std::error::Error;
 
-use catalog_crafting_support::{blueprint, build_from, text};
+use catalog_crafting_support::{blueprint, build_from, diagnostic_from, text};
 use crafting_detail_fixture as fixture;
-use p4kx_export::{BuiltCatalog, CraftingWarning, Filter, Kind, read_crafting};
-use p4kx_extraction::DataForge;
+use p4kx_export::{BuiltCatalog, CraftingWarning};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -25,241 +39,255 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
 #[test]
 fn a_blueprint_lists_every_tier_next_to_the_first_tier_fields() -> TestResult {
     let (_, catalog) = build()?;
-    let blueprint = blueprint(&catalog, fixture::TWO_TIERS)?;
-    let tiers = blueprint["tiers"].as_array().ok_or("tiers")?;
-    assert_eq!(tiers.len(), 2, "both tiers");
+    let blueprint = blueprint::by_guid(&catalog, fixture::TWO_TIERS)?;
+    let tiers = blueprint.tiers()?;
+    let [first, second] = tiers.as_slice() else {
+        return Err("both original tiers".into());
+    };
+    assert_eq!(first["craftTimeSeconds"]["value"], "90");
+    assert_eq!(second["craftTimeSeconds"]["value"], "120");
+    assert_eq!(blueprint.presentation["firstTier"], first["source"]);
     assert_eq!(
-        (
-            &tiers[0]["craftTimeSeconds"],
-            &tiers[1]["craftTimeSeconds"],
-            &blueprint["craftTimeSeconds"]
-        ),
-        (&json!(90), &json!(120), &json!(90)),
-        "the first tier is the one craftTimeSeconds describes"
-    );
-    assert_eq!(
-        blueprint["ingredients"]
+        blueprint.presentation["ingredients"]
             .as_array()
-            .map(|list| list.iter().map(|line| line["slot"].clone()).collect()),
-        Some(vec![json!("FRAME"), json!("CORE"), Value::Null]),
-        "the ingredients are the first tier flattened; the optional item sits in no slot"
+            .map(Vec::len),
+        Some(3)
     );
-    let bare = self::blueprint(&catalog, fixture::BARE)?;
-    assert_eq!(bare["tiers"], json!([]), "no tier");
-    assert_eq!(bare["craftTimeSeconds"], Value::Null);
+    for (index, expected) in [(0, Some("FRAME")), (1, Some("CORE")), (2, None)] {
+        let (_, slot) = blueprint.ingredient(index)?;
+        let name = slot.map(|slot| blueprint.debug_name(slot)).transpose()?;
+        assert_eq!(
+            name.and_then(Value::as_str),
+            expected,
+            "the first tier is flattened in order using the nearest named slot"
+        );
+    }
+    let bare = blueprint::by_guid(&catalog, fixture::BARE)?;
+    assert!(bare.tiers()?.is_empty(), "no tier");
+    assert!(bare.presentation["firstTier"].is_null());
     Ok(())
 }
 
 #[test]
 fn a_selection_keeps_its_count_and_all_its_options() -> TestResult {
     let (_, catalog) = build()?;
-    let outer = &blueprint(&catalog, fixture::TWO_TIERS)?["tiers"][0]["mandatory"];
+    let blueprint = blueprint::by_guid(&catalog, fixture::TWO_TIERS)?;
+    let tiers = blueprint.tiers()?;
+    let first = tiers.first().copied().ok_or("first Blueprint tier")?;
+    let outer = blueprint::cost(first, &first["mandatory"])?;
+    let meaning = &outer["meaning"];
+    assert_eq!(meaning["type"], "select");
+    assert_eq!(meaning["count"]["value"], "2");
+    assert_eq!(blueprint.debug_name(outer)?, "ASPECTS");
     assert_eq!(
-        (
-            &outer["kind"],
-            &outer["count"],
-            &outer["slot"],
-            &outer["slotKey"]
-        ),
-        (
-            &json!("select"),
-            &json!(2),
-            &json!("ASPECTS"),
-            &json!("@crafting_slot")
-        ),
+        blueprint.game_key(&meaning["displayName"])?,
+        "@crafting_slot"
     );
-    assert_eq!(outer["options"].as_array().map(Vec::len), Some(2));
-    let pick = &blueprint(&catalog, fixture::CHOOSE_ONE)?["tiers"][0]["mandatory"];
+    assert_eq!(meaning["options"].as_array().map(Vec::len), Some(2));
+
+    let chosen = blueprint::by_guid(&catalog, fixture::CHOOSE_ONE)?;
+    let tiers = chosen.tiers()?;
+    let tier = tiers.first().copied().ok_or("choose-one tier")?;
+    let pick = blueprint::cost(tier, &tier["mandatory"])?;
+    let options = &pick["meaning"]["options"];
+    assert_eq!(pick["meaning"]["count"]["value"], "1");
+    assert_eq!(options.as_array().map(Vec::len), Some(3));
     assert_eq!(
-        (&pick["count"], pick["options"].as_array().map(Vec::len)),
-        (&json!(1), Some(3)),
-        "choose 1 of 3: fewer than offered"
+        blueprint::cost(tier, &options[2])?["meaning"]["type"],
+        "item"
     );
+
+    let optional = blueprint::cost(first, &first["optional"][0])?;
+    assert_eq!(optional["meaning"]["type"], "item");
     assert_eq!(
-        pick["options"][2]["kind"], "item",
-        "an item option inside the selection"
+        optional["meaning"]["itemGuid"]["value"],
+        text(fixture::PRODUCT_B)
     );
-    let optional = &blueprint(&catalog, fixture::TWO_TIERS)?["tiers"][0]["optional"];
-    assert_eq!(
-        (
-            &optional[0]["kind"],
-            &optional[0]["itemGuid"],
-            &optional[0]["quantityUnits"]
-        ),
-        (&json!("item"), &json!(text(fixture::PRODUCT_B)), &json!(3)),
-        "an optional cost"
-    );
+    assert_eq!(optional["meaning"]["quantityUnits"]["value"], "3");
     Ok(())
 }
 
 #[test]
 fn a_cost_line_keeps_its_quantity_multiplier_and_leaves_the_quantity_alone() -> TestResult {
     let (_, catalog) = build()?;
-    let blueprint = blueprint(&catalog, fixture::TWO_TIERS)?;
-    let line = &blueprint["tiers"][0]["mandatory"]["options"][0]["options"][0];
+    let blueprint = blueprint::by_guid(&catalog, fixture::TWO_TIERS)?;
+    let (line, _) = blueprint.ingredient(0)?;
+    assert_eq!(line["meaning"]["type"], "resource");
+    assert_eq!(line["meaning"]["quantityScu"]["value"], 0.5);
+    assert_eq!(line["context"]["quantityMultiplier"]["value"], 1.15);
+    assert_eq!(line["meaning"]["minQuality"]["value"], "300");
+    let (included, _) = blueprint.ingredient(1)?;
+    assert!(included["context"]["quantityMultiplier"].is_null());
+    let option = blueprint.node(&included["context"]["compositionInclusion"])?;
+    let authored = &option["value"];
     assert_eq!(
-        (
-            &line["kind"],
-            &line["quantityScu"],
-            &line["quantityMultiplier"],
-            &line["minQuality"]
-        ),
-        (&json!("resource"), &json!(0.5), &json!(1.15), &json!(300))
+        authored["value"]["type"], "string",
+        "the source fixture declares a String"
     );
-    let included = &blueprint["tiers"][0]["mandatory"]["options"][1]["options"][0];
-    assert_eq!(
-        (
-            &included["quantityMultiplier"],
-            &included["compositionInclusion"]
-        ),
-        (&Value::Null, &json!("Include"))
-    );
-    assert_eq!(
-        blueprint["ingredients"][0]["quantityScu"], 0.5,
-        "the ingredient keeps the stored quantity"
-    );
+    assert_eq!(authored["value"]["value"]["type"], "gameText");
+    assert_eq!(authored["value"]["value"]["sourceText"], "Include");
+    assert_eq!(authored["containsEncryptedSource"], true);
+    assert_eq!(authored["sourceSetComplete"], true);
     Ok(())
 }
 
 #[test]
 fn quality_modifiers_name_their_property_and_keep_their_ranges() -> TestResult {
-    let (_, catalog) = build()?;
-    let line = &blueprint(&catalog, fixture::TWO_TIERS)?["tiers"][1]["mandatory"]["options"][0];
+    let database = fixture::database();
+    let property_source = crate::catalog_crafting_property::original(
+        &database,
+        fixture::PROPERTY,
+        "@StatName_GPP_Armor",
+    )?;
+    let (built, catalog) = build_from(&database, None)?;
+    let blueprint = blueprint::by_guid(&catalog, fixture::TWO_TIERS)?;
+    let tiers = blueprint.tiers()?;
+    let second = tiers.get(1).copied().ok_or("second original tier")?;
+    let selection = blueprint::cost(second, &second["mandatory"])?;
+    let line = blueprint::cost(second, &selection["meaning"]["options"][0])?;
+    let modifiers = line["context"]["modifiers"].as_array().ok_or("modifiers")?;
+    let [modifier] = modifiers.as_slice() else {
+        return Err("one modifier".into());
+    };
+    assert_eq!(modifier["propertyGuid"]["value"], text(fixture::PROPERTY));
+    let ranges = modifier["ranges"].as_array().ok_or("modifier ranges")?;
+    let [linear, additive] = ranges.as_slice() else {
+        return Err("two ranges".into());
+    };
+    assert_range(linear, "multiplier", "1000", 0.85, 1.15)?;
+    assert_range(additive, "additive", "249", -2.0, -1.0)?;
+    crate::catalog_crafting_property::assert_armour(&built, &property_source)?;
+    Ok(())
+}
+
+fn assert_range(range: &Value, kind: &str, end: &str, at_start: f32, at_end: f32) -> TestResult {
+    assert_eq!(range["kind"], kind, "the original modifier kind survives");
     assert_eq!(
-        line["modifiers"],
-        json!([{
-            "propertyGuid": text(fixture::PROPERTY),
-            "ranges": [
-                {"kind": "multiplier", "startQuality": 0, "endQuality": 1000,
-                 "atStart": 0.85, "atEnd": 1.15},
-                {"kind": "additive", "startQuality": 0, "endQuality": 249,
-                 "atStart": -2.0, "atEnd": -1.0},
-            ],
-        }])
+        range
+            .pointer("/startQuality/value")
+            .ok_or("minimum modifier quality")?,
+        "0",
+        "the original minimum quality survives"
     );
     assert_eq!(
-        catalog["gameplayProperties"],
-        json!([{
-            "guid": text(fixture::PROPERTY),
-            "className": "GPP_Armor_DamageMitigation",
-            "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor_damagemitigation",
-            "name": {"key": "@StatName_GPP_Armor", "en": "Armour", "de": null},
-        }]),
-        "the property the modifier points at"
+        range
+            .pointer("/endQuality/value")
+            .ok_or("maximum modifier quality")?,
+        end,
+        "the original maximum quality survives"
     );
+    for (name, expected) in [("atStart", at_start), ("atEnd", at_end)] {
+        let cell = &range[name];
+        let actual = f32::deserialize(&cell["value"])?;
+        assert_eq!(
+            actual.to_bits(),
+            expected.to_bits(),
+            "exact finite f32 round-trip"
+        );
+        assert_eq!(
+            cell["containsEncryptedSource"], true,
+            "the modifier endpoint comes from encrypted source data"
+        );
+        assert_eq!(
+            cell["sourceSetComplete"], true,
+            "the modifier endpoint retains complete source provenance"
+        );
+    }
     Ok(())
 }
 
 #[test]
 fn quality_distributions_keep_their_location_overrides() -> TestResult {
     let (_, catalog) = build()?;
-    let list = catalog["qualityDistributions"].as_array().ok_or("list")?;
-    assert_eq!(list.len(), 2);
-    assert_eq!(list[0]["guid"], text(fixture::DEFAULT_CURVE).as_str());
-    assert_eq!(
-        list[0]["distribution"],
-        json!({"kind": "CraftingQualityDistributionNormal",
-               "min": 1.0, "max": 1000.0, "mean": 269.0, "stddev": 254.0})
-    );
-    assert_eq!(list[0]["overrides"], json!([]));
-    assert_eq!(list[1]["distribution"], Value::Null);
-    assert_eq!(
-        list[1]["overrides"][0]["locationGuid"],
-        text(fixture::PYRO).as_str()
-    );
-    assert_eq!(
-        list[1]["overrides"][0]["distribution"]["mean"], 295.0,
-        "the override curve"
-    );
-    assert_eq!(
-        list[1]["overrides"][0]["distribution"]["stddev"],
-        Value::Null,
-        "a double beyond f32 is no number"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_pool_lists_its_entries_and_the_places_that_reward_it() -> TestResult {
-    let (_, catalog) = build()?;
-    let pools = catalog["blueprintPools"].as_array().ok_or("pools")?;
-    let pool = pools
-        .iter()
-        .find(|pool| pool["guid"] == text(fixture::POOL).as_str())
-        .ok_or("the pool")?;
-    assert_eq!(pool["totalWeight"], 4.0);
-    assert_eq!(
-        pool["entries"],
-        json!([
-            {"blueprintGuid": text(fixture::TWO_TIERS), "weight": 1.0},
-            {"blueprintGuid": text(fixture::CHOOSE_ONE), "weight": 3.0},
-        ])
-    );
-    assert_eq!(
-        pool["rewardSources"],
-        json!([{
-            "recordGuid": text(fixture::CONTRACTS),
-            "recordPath": "libs/foundry/records/contracts/contractgenerator/haul",
-            "contractId": text(fixture::CONTRACT_ID),
-            "contractName": "Haul_Intro",
-            "chance": 0.5,
-        }]),
-        "the chance of the source; a blueprint's share is weight over totalWeight"
-    );
-    let bad = pools
-        .iter()
-        .find(|pool| pool["guid"] == text(fixture::BAD_POOL).as_str())
-        .ok_or("the pool with a negative weight")?;
-    assert_eq!(bad["totalWeight"], 2.0, "only positive weights count");
-    Ok(())
+    quality::assert_location_overrides(&catalog)
 }
 
 #[test]
 fn a_blueprint_links_to_the_dismantle_process_unless_its_item_is_excluded() -> TestResult {
     let (_, catalog) = build()?;
     assert_eq!(
-        blueprint(&catalog, fixture::TWO_TIERS)?["dismantle"],
-        json!({"processGuid": text(fixture::DISMANTLE), "tierIndex": 0})
+        blueprint::by_guid(&catalog, fixture::TWO_TIERS)?.presentation["dismantle"]["value"]["processGuid"],
+        text(fixture::DISMANTLE)
     );
     assert_eq!(
-        blueprint(&catalog, fixture::BARE)?["dismantle"],
-        Value::Null,
+        blueprint::by_guid(&catalog, fixture::BARE)?.presentation["dismantle"]["state"],
+        "absent",
         "the item is on the dismantle blacklist"
     );
+    let blueprint = blueprint::by_guid(&catalog, fixture::TWO_TIERS)?;
     assert_eq!(
-        catalog["dismantleProcesses"],
-        json!([{
-            "guid": text(fixture::DISMANTLE),
-            "className": "GlobalGenericDismantle",
-            "recordPath": "libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle",
-            "efficiency": 0.5,
-            "timeSeconds": 15,
-        }])
+        blueprint.presentation["dismantle"]["value"]["tier"],
+        blueprint.presentation["firstTier"]
+    );
+    let processes = catalog
+        .pointer("/definitions/dismantleProcesses/rows")
+        .and_then(Value::as_array)
+        .ok_or("physical dismantle rows")?;
+    let [process] = processes.as_slice() else {
+        return Err("one physical dismantle process".into());
+    };
+    assert_eq!(
+        process.pointer("/guid/value"),
+        Some(&json!(text(fixture::DISMANTLE))),
+        "the presentation joins to the physical process"
     );
     assert_eq!(
-        catalog["craftingGlobal"],
-        json!({
-            "dismantleExcludedResourceGuids": [text(fixture::GOLD)],
-            "dismantleExcludedItemGuids": [text(fixture::BLACKLISTED)],
-        })
+        process.pointer("/blueprint/value/processSpecificData/value/timeSeconds/value"),
+        Some(&json!("15")),
+        "the canonical process retains the compatible normalized duration"
     );
+    assert_dismantle_blacklist(&catalog)
+}
+
+fn assert_dismantle_blacklist(catalog: &Value) -> TestResult {
+    assert!(
+        catalog.get("craftingGlobal").is_none(),
+        "no merged compatibility root"
+    );
+    let [global] = catalog
+        .pointer("/configurations/craftingGlobal/rows")
+        .and_then(Value::as_array)
+        .ok_or("physical crafting globals")?
+        .as_slice()
+    else {
+        return Err("one original global owner".into());
+    };
+    for (field, guid) in [
+        ("dismantleBlacklistResources", fixture::GOLD),
+        ("dismantleBlacklistEntityClasses", fixture::BLACKLISTED),
+    ] {
+        let [slot] = global
+            .get(field)
+            .and_then(|cell| cell.get("value"))
+            .and_then(Value::as_array)
+            .ok_or("original exclusion slots")?
+            .as_slice()
+        else {
+            return Err("one original exclusion slot".into());
+        };
+        assert_eq!(
+            slot.pointer("/value/guid/value"),
+            Some(&json!(text(guid))),
+            "original exclusion target"
+        );
+    }
     Ok(())
 }
 
 #[test]
 fn a_default_blueprint_is_marked_available() -> TestResult {
     let (_, catalog) = build()?;
-    let flags: Vec<(String, bool)> = catalog["blueprints"]
-        .as_array()
-        .ok_or("blueprints")?
-        .iter()
-        .map(|entry| {
-            (
-                entry["className"].as_str().unwrap_or_default().to_owned(),
-                entry["defaultAvailable"].as_bool().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let mut flags = Vec::new();
+    for index in 0..blueprint::definitions(&catalog)?.len() {
+        let blueprint = blueprint::by_index(&catalog, index)?;
+        let class = blueprint.definition["className"]["value"]
+            .as_str()
+            .ok_or("original class")?;
+        let available = blueprint.presentation["defaultAvailable"]["value"]
+            .as_bool()
+            .ok_or("default flag")?;
+        flags.push((class.to_owned(), available));
+    }
     assert_eq!(
         flags,
         [
@@ -274,12 +302,20 @@ fn a_default_blueprint_is_marked_available() -> TestResult {
 
 #[test]
 fn several_dismantle_processes_leave_no_link_and_the_summary_incomplete() -> TestResult {
-    let (built, catalog) = build_from(&fixture::ambiguous_database(), None)?;
-    for entry in catalog["blueprints"].as_array().ok_or("blueprints")? {
-        assert_eq!(entry["dismantle"], Value::Null, "{}", entry["className"]);
+    let (built, catalog) = diagnostic_from(&fixture::ambiguous_database(), None)?;
+    for index in 0..blueprint::definitions(&catalog)?.len() {
+        let blueprint = blueprint::by_index(&catalog, index)?;
+        assert_eq!(
+            blueprint.presentation["dismantle"]["state"], "absent",
+            "{}",
+            blueprint.definition["className"]
+        );
     }
     assert_eq!(
-        catalog["dismantleProcesses"].as_array().map(Vec::len),
+        catalog
+            .pointer("/definitions/dismantleProcesses/rows")
+            .and_then(Value::as_array)
+            .map(Vec::len),
         Some(2),
         "both processes are listed"
     );
@@ -288,90 +324,5 @@ fn several_dismantle_processes_leave_no_link_and_the_summary_incomplete() -> Tes
         [CraftingWarning::AmbiguousDismantle(2)]
     );
     assert!(!built.summary().is_complete());
-    Ok(())
-}
-
-#[test]
-fn the_catalog_and_the_library_select_the_same_blueprints() -> TestResult {
-    let filters = [None, Some(Filter::new("*/bp_craft_p*"))];
-    for filter in filters {
-        let (built, catalog) = build_from(&fixture::database(), filter.as_ref())?;
-        let bytes = fixture::database().build();
-        let forge = DataForge::open(&bytes)?;
-        let crafting = read_crafting(&forge, filter.as_ref(), None)?;
-        let from_catalog: Vec<&str> = catalog["blueprints"]
-            .as_array()
-            .ok_or("blueprints")?
-            .iter()
-            .filter_map(|entry| entry["className"].as_str())
-            .collect();
-        let mut from_library: Vec<&str> =
-            crafting.blueprints.iter().map(|b| b.class_name).collect();
-        from_library.sort_unstable();
-        let mut sorted = from_catalog.clone();
-        sorted.sort_unstable();
-        assert_eq!(sorted, from_library, "filter {filter:?}");
-        let kind = built.summary().kind(Kind::Blueprints).ok_or("summary")?;
-        assert_eq!(
-            (kind.count, kind.skipped),
-            (crafting.blueprints.len(), crafting.skipped_blueprints)
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn a_filter_marks_the_crafting_kinds_partial_and_selects_by_record_path() -> TestResult {
-    let filter = Filter::new("*/bp_craft_pick");
-    let (built, catalog) = build_from(&fixture::database(), Some(&filter))?;
-    for kind in [
-        "blueprints",
-        "gameplayProperties",
-        "qualityDistributions",
-        "qualityQuantizations",
-        "blueprintPools",
-        "dismantleProcesses",
-    ] {
-        assert_eq!(
-            catalog["completeness"][kind],
-            json!({"status": "partial", "filter": "*/bp_craft_pick"}),
-            "{kind}"
-        );
-    }
-    assert_eq!(catalog["blueprints"].as_array().map(Vec::len), Some(1));
-    assert_eq!(catalog["blueprintPools"], json!([]), "no pool matches");
-    assert_eq!(catalog["dismantleProcesses"], json!([]), "filtered by path");
-    assert_eq!(
-        catalog["craftingGlobal"]["dismantleExcludedResourceGuids"],
-        json!([text(fixture::GOLD)]),
-        "the global parameters are not a kind and stay"
-    );
-    assert!(built.summary().kinds().iter().all(|kind| !kind.complete));
-    Ok(())
-}
-
-#[test]
-fn the_summary_counts_the_crafting_kinds_and_the_skipped_blueprints() -> TestResult {
-    let (built, _) = build()?;
-    let counts: Vec<(Kind, usize, usize)> = built
-        .summary()
-        .kinds()
-        .iter()
-        .filter(|kind| kind.kind.name().starts_with(['b', 'g', 'q', 'd']))
-        .map(|kind| (kind.kind, kind.count, kind.skipped))
-        .collect();
-    assert_eq!(
-        counts,
-        [
-            (Kind::Blueprints, 3, 1),
-            (Kind::BlueprintCategories, 0, 0),
-            (Kind::GameplayProperties, 1, 0),
-            (Kind::QualityDistributions, 2, 0),
-            (Kind::QualityQuantizations, 0, 0),
-            (Kind::BlueprintPools, 3, 1),
-            (Kind::DismantleProcesses, 1, 0),
-        ]
-    );
-    assert!(built.summary().is_complete(), "no failure, no warning");
     Ok(())
 }

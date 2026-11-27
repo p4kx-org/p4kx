@@ -29,7 +29,7 @@ fn singles_component(name: &str, fields: &[&str]) -> TestStruct {
     })
 }
 
-fn weapons() -> Vec<TestStruct> {
+fn weapons(loop_shape: TestStruct) -> Vec<TestStruct> {
     [
         TestStruct::new("EntityClassDefinition")
             .array("Components", pointer("DataForgeComponentParams")),
@@ -38,21 +38,26 @@ fn weapons() -> Vec<TestStruct> {
         TestStruct::new("SItemDefinition").field("Type", TestType::Enum("EItemType".to_owned())),
         component("SCItemWeaponComponentParams")
             .array("fireActions", pointer("SWeaponActionParams"))
-            .field("ammoContainerRecord", TestType::Reference),
+            .field(
+                "ammoContainerRecord",
+                TestType::ReferenceTo("EntityClassDefinition".to_owned()),
+            ),
         TestStruct::new("SWeaponActionParams"),
         TestStruct::new("SWeaponActionFireRapidParams")
             .parent("SWeaponActionParams")
             .field("name", TestType::String)
-            .field("fireRate", TestType::Single)
+            .field("fireRate", TestType::Int32)
             .field("heatPerShot", TestType::Single)
-            .field("launchParams", class("SProjectileLauncher")),
+            .field("launchParams", pointer("SLauncherBase")),
         TestStruct::new("SWeaponActionFireChargedParams")
             .parent("SWeaponActionParams")
             .field("chargeTime", TestType::Single)
             .field("overchargeTime", TestType::Single)
             .field("cooldownTime", TestType::Single)
             .field("weaponAction", pointer("SWeaponActionParams")),
+        TestStruct::new("SLauncherBase"),
         TestStruct::new("SProjectileLauncher")
+            .parent("SLauncherBase")
             .field("pelletCount", TestType::Int32)
             .field("pellets", TestType::Int32)
             .field("ammoCost", TestType::Int32)
@@ -62,17 +67,17 @@ fn weapons() -> Vec<TestStruct> {
             &["min", "max", "firstAttack", "attack", "decay"],
         ),
         component("SAmmoContainerComponentParams")
-            .field("ammoParamsRecord", TestType::Reference)
+            .field(
+                "ammoParamsRecord",
+                TestType::ReferenceTo("AmmoParams".to_owned()),
+            )
             .field("maxAmmoCount", TestType::Int32),
         TestStruct::new("AmmoParams")
             .field("speed", TestType::Single)
             .field("lifetime", TestType::Single)
             .field("projectileParams", pointer("BulletProjectileParams"))
             .field("trap", pointer("Loop")),
-        TestStruct::new("Loop")
-            .field("left", class("Loop"))
-            .field("right", class("Loop"))
-            .declared_size(0),
+        loop_shape,
         TestStruct::new("BulletProjectileParams")
             .field("damage", class("DamageInfo"))
             .field("detonationParams", pointer("ProjectileDetonationParams")),
@@ -145,38 +150,62 @@ fn others() -> Vec<TestStruct> {
     vec![
         component("SCItemMissileParams")
             .field("explosionParams", class("ExplosionParams"))
-            .field("targetingParams", class("MissileTargetingParams"))
-            .field("GCSParams", class("MissileGcsParams")),
-        singles("MissileGcsParams", &["linearSpeed"]),
+            .field("targetingParams", class("STargetingParams"))
+            .field("GCSParams", class("SGuidanceAndControlParams")),
+        singles("SGuidanceAndControlParams", &["linearSpeed"]),
         singles(
-            "MissileTargetingParams",
+            "STargetingParams",
             &["lockTime", "lockingAngle", "lockRangeMin", "lockRangeMax"],
         )
-        .field("trackingSignalType", TestType::String),
+        .field(
+            "trackingSignalType",
+            TestType::Enum("ESignatureType".to_owned()),
+        ),
         singles_component("SHealthComponentParams", &["Health"]),
     ]
 }
 
 pub(super) fn builder() -> DataForgeBuilder {
-    weapons()
+    with_loop(
+        TestStruct::new("Loop")
+            .field("left", class("Loop"))
+            .field("right", class("Loop"))
+            .declared_size(0),
+    )
+}
+
+pub(super) fn with_invalid_loop_layout() -> DataForgeBuilder {
+    with_loop(
+        TestStruct::new("Loop")
+            .field("left", TestType::Int8)
+            .field("right", TestType::Int8)
+            .declared_size(3),
+    )
+}
+
+fn with_loop(loop_shape: TestStruct) -> DataForgeBuilder {
+    weapons(loop_shape)
         .into_iter()
         .chain(components())
         .chain(others())
         .fold(
-            DataForgeBuilder::new().version(8).enumeration(
-                "EItemType",
-                [
-                    "WeaponGun",
-                    "Shield",
-                    "QuantumDrive",
-                    "PowerPlant",
-                    "Cooler",
-                    "Missile",
-                    "Misc",
-                    "Magazine",
-                    "WeaponPersonal",
-                ],
-            ),
+            DataForgeBuilder::new()
+                .version(8)
+                .enumeration("ESignatureType", ["Infrared"])
+                .enumeration(
+                    "EItemType",
+                    [
+                        "WeaponGun",
+                        "Shield",
+                        "QuantumDrive",
+                        "PowerPlant",
+                        "Cooler",
+                        "Missile",
+                        "Misc",
+                        "Magazine",
+                        "WeaponPersonal",
+                    ],
+                ),
             DataForgeBuilder::structure,
         )
 }

@@ -46,7 +46,10 @@ fn entries<'c>(catalog: &'c Value, kind: &str) -> &'c [Value] {
 fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let summary = built.summary().variants();
     print_line(&format!(
@@ -56,7 +59,7 @@ fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult 
 
     let mut spellings: BTreeMap<String, BTreeSet<&str>> = BTreeMap::new();
     for ship in entries(&catalog, "ships") {
-        if let Some(definition) = ship["vehicleDefinition"].as_str() {
+        if let Some(definition) = ship["vehicleDefinition"]["value"].as_str() {
             spellings
                 .entry(normalised(definition))
                 .or_default()
@@ -77,7 +80,7 @@ fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult 
     for kind in ["ships", "items"] {
         let mut seen: HashMap<&str, usize> = HashMap::new();
         for entry in entries(&catalog, kind) {
-            if let Some(guid) = entry["guid"].as_str() {
+            if let Some(guid) = entry["guid"]["value"].as_str() {
                 *seen.entry(guid).or_default() += 1;
             }
         }

@@ -1,0 +1,11 @@
+# Original value selection
+
+A canonical Record read admits its actual Record and RecordTree through the original build input. Only that admitted Scope's live value sites can mint retained occurrence facts. Each fact keeps the same Scope, borrowed original field/value, preorder ordinal, declaring-field ordinal and typed parent/edge. A retained fact cannot be reconstructed from an exported identifier, value, descriptor or matching path.
+
+Flow target selection builds one compact correspondence on its first target request. It follows the genuine ReferenceOrigin instance positions and the original Location's Field/Element steps, checking field names and element positions for consistency. Forward targets, backward targets and duplicate field names use the original occurrence; content equality does not merge nodes. A private original-Value address index locates an already captured caller fact and supplies no new source authority.
+
+The correspondence stores each actual occurrence once and no full path vector or path string per occurrence. It reuses the same iterative owned-value kernel as inspection. A flow that requests targets therefore traverses the materialized tree once for inspection and once for correspondence, with no additional decode or numeric inspection. A flow without a target request does not allocate the correspondence. Existing canonical-reader resource policies remain separate; the correspondence adds no depth or count cutoff.
+
+Reference admission is shared with original Loot capture. The actual same-field storage/value and genuine target receipt are checked against the original Scope before use. Existing Loot coordinates, source contribution roles, encryption markers and immutable shared instance locations keep their contract. Cached candidates register no source uses until a fact is actually bound. Foreign frame, inconsistent correspondence, cancellation and source-evidence failures are explicit errors.
+
+This selection layer does not change the Catalog wire shape, recursive flow condition policy, numeric coverage, ordinary unknown-action handling or text domain rules. The canonical mission-flow inventory and the common value-coordinate namespace have separate contracts.

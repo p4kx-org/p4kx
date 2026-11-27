@@ -2,8 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::ops::Range;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use p4kx_extraction::XmlRenderOrigins;
+
+use super::XmlPreviewOriginError;
 use crate::comparison::shown_len;
 
 /// The most bytes of converted XML a preview keeps; the lines after them are left out.
@@ -19,6 +23,7 @@ pub struct XmlDocument {
     starts: Vec<u32>,
     truncated: bool,
     widest: usize,
+    provenance: Option<Result<XmlRenderOrigins, XmlPreviewOriginError>>,
 }
 
 impl XmlDocument {
@@ -51,6 +56,27 @@ impl XmlDocument {
             starts,
             truncated,
             widest: widest.1,
+            provenance: None,
+        }
+    }
+
+    pub(super) fn with_provenance(
+        mut self,
+        provenance: Result<XmlRenderOrigins, XmlPreviewOriginError>,
+    ) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
+
+    /// Returns the source evidence for the retained converted spans, when collected.
+    ///
+    /// # Errors
+    /// Returns an error if the converted bytes were displayed without their source proof.
+    #[must_use]
+    pub const fn provenance(&self) -> Option<Result<&XmlRenderOrigins, &XmlPreviewOriginError>> {
+        match &self.provenance {
+            Some(proof) => Some(proof.as_ref()),
+            None => None,
         }
     }
 
@@ -81,12 +107,18 @@ impl XmlDocument {
     /// Returns the zero-based line `index` with its terminator, empty past the end.
     #[must_use]
     pub fn line(&self, index: usize) -> &[u8] {
-        let start = self.starts.get(index).map_or(usize::MAX, |&at| at as usize);
-        let end = index
-            .checked_add(1)
-            .and_then(|next| self.starts.get(next))
+        self.line_range(index)
+            .and_then(|bytes| self.bytes.get(bytes))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn line_range(&self, index: usize) -> Option<Range<usize>> {
+        let start = *self.starts.get(index)? as usize;
+        let end = self
+            .starts
+            .get(index + 1)
             .map_or(self.bytes.len(), |&at| at as usize);
-        self.bytes.get(start..end).unwrap_or_default()
+        Some(start..end)
     }
 
     /// Returns the longest line by its characters, a tab counting as four.

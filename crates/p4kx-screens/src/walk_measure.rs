@@ -6,6 +6,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use p4kx_dataforge::Guid;
 
 use crate::canvas::Canvas;
+use crate::flex;
 use crate::geometry::{Dim, Geometry};
 use crate::look::Look;
 use crate::paint::Area;
@@ -36,6 +37,18 @@ fn edges(geometry: &Geometry, axis: usize) -> (f32, f32) {
         (padding.left + padding.right, margin.left + margin.right)
     } else {
         (padding.top + padding.bottom, margin.top + margin.bottom)
+    }
+}
+
+fn limit_intrinsic(size: f32, min: Option<Dim>, max: Option<Dim>) -> f32 {
+    let absolute = |bound, fallback| match bound {
+        Some(Dim::Fixed(value)) if value.is_finite() => Some(value),
+        None | Some(Dim::Auto | Dim::Fixed(_)) => Some(fallback),
+        _ => None,
+    };
+    match (absolute(min, 0.0), absolute(max, f32::INFINITY)) {
+        (Some(min), Some(max)) => flex::limit(size, min, max),
+        _ => size.max(0.0),
     }
 }
 
@@ -122,13 +135,15 @@ impl Walk<'_, '_, '_, '_> {
         let mut look = Look::of(widget, probe.style, self.pixel, font);
         look.bound_text = self.bound_text(probe.canvas, probe.index);
         let shaped = self.cx.texts.shape(widget, &look, parent);
-        let Some([width, height]) = shaped
-            .prepared
-            .as_ref()
-            .and_then(|prepared| self.cx.texts.measure(prepared, parent))
-        else {
+        let Some(prepared) = shaped.prepared.as_ref() else {
             return [None; 2];
         };
+        let Some([width, height]) = self.cx.texts.measure(prepared, parent) else {
+            return [None; 2];
+        };
+        if let (Some(inputs), Some(input)) = (self.cx.inputs.as_mut(), prepared.input.as_ref()) {
+            inputs.text_layout.insert(input.clone());
+        }
         if let Some(key) = keep {
             self.shaped.insert(key, shaped);
         }
@@ -156,7 +171,7 @@ impl Walk<'_, '_, '_, '_> {
             (probe.kids, probe.own),
         );
         let mut extents = [Extent::default(); 2];
-        let mut flowing = 0_u16;
+        let mut flowing = 0_usize;
         for (position, &kid) in probe.kids.iter().enumerate() {
             let instance = position >= probe.own;
             if instance {
@@ -169,7 +184,7 @@ impl Walk<'_, '_, '_, '_> {
             let Some(outer) = outer else {
                 continue;
             };
-            flowing = flowing.saturating_add(1);
+            flowing += 1;
             for (extent, size) in extents.iter_mut().zip(outer) {
                 if let Some(size) = size {
                     extent.add(size);
@@ -183,14 +198,7 @@ impl Walk<'_, '_, '_, '_> {
         self.chain.pop();
         let flex = probe.geometry.flex;
         let column = flex.is_some_and(|flex| flex.column);
-        let gap = flex.map_or(0.0, |flex| {
-            if column {
-                flex.row_gap
-            } else {
-                flex.column_gap
-            }
-        });
-        let spacing = gap * f32::from(flowing.saturating_sub(1));
+        let spacing = flex.map_or(0.0, |policy| policy.main_gap() * flex::gap_count(flowing));
         let mut size = [None; 2];
         for (axis, (slot, extent)) in size.iter_mut().zip(extents).enumerate() {
             if !extent.seen {
@@ -240,19 +248,19 @@ impl Walk<'_, '_, '_, '_> {
         };
         let content = self.content_of(&child, parent, (depth + 1, false));
         let mut outer = [None; 2];
-        for (axis, (slot, (dim, content))) in outer
-            .iter_mut()
-            .zip(geometry.size.into_iter().zip(content))
-            .enumerate()
+        let sizes = geometry.size.into_iter().zip(content);
+        let bounds = geometry.bounds.min.into_iter().zip(geometry.bounds.max);
+        for (axis, ((slot, (dim, content)), (min, max))) in
+            outer.iter_mut().zip(sizes).zip(bounds).enumerate()
         {
             let own = match dim {
                 Dim::Fixed(value) => Some(value),
-                Dim::Auto => content,
+                Dim::Auto => content.or_else(|| (!child.has_children).then_some(0.0)),
                 Dim::Percent(_) | Dim::OfWidth(_) | Dim::OfHeight(_) => None,
             };
             *slot = own
                 .filter(|own| own.is_finite())
-                .map(|own| own.max(0.0) + edges(&geometry, axis).1);
+                .map(|own| limit_intrinsic(own, min, max) + edges(&geometry, axis).1);
         }
         Some(outer)
     }

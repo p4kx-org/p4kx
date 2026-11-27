@@ -19,8 +19,16 @@ pub enum ModelInfoText {
     Lods,
     /// The key of the material library.
     Materials,
+    /// The label of the library status in its origin tooltip.
+    MaterialsStatus,
+    /// The label of the sub-material count in its origin tooltip.
+    MaterialCount,
+    /// The label of the single-material selection in its origin tooltip.
+    MaterialSingle,
     /// The key of the material IDs the submeshes use.
     MaterialIds,
+    /// The source tooltip of the listed material IDs.
+    ListedMaterialIds,
     /// The model has no submesh with a material ID.
     MaterialIdsNone,
     /// The key of the number of bones.
@@ -34,6 +42,14 @@ pub enum ModelInfoText {
     AnimationsReading,
     /// The key of the chunks.
     Chunks,
+    /// The label of the total chunk count in its origin tooltip.
+    ChunksTotal,
+    /// The label of the read chunk count.
+    ChunksRead,
+    /// The label of the skipped known chunk count.
+    ChunksSkipped,
+    /// The label of the unknown chunk count.
+    ChunksUnknown,
     /// The counts of the chunks; takes `total`, `read`, `skipped` and `unknown`.
     ChunksValue,
     /// The model names no material library.
@@ -77,13 +93,15 @@ pub enum ModelInfoText {
     FileGeometry,
     /// The chunk is in the companion of a level of detail; takes `level`.
     FileLod,
+    /// The chunk is in the model file of a level of detail; takes `level`.
+    FileLodModel,
     /// The type of a chunk has no name.
     TypeUnknown,
 }
 
 impl ModelInfoText {
     /// Every text of the Info tab.
-    pub(crate) const ALL: [Self; 36] = [
+    pub(crate) const ALL: [Self; 45] = [
         Self::Tab,
         Self::Geometry,
         Self::GeometryInFile,
@@ -91,13 +109,21 @@ impl ModelInfoText {
         Self::Meshes,
         Self::Lods,
         Self::Materials,
+        Self::MaterialsStatus,
+        Self::MaterialCount,
+        Self::MaterialSingle,
         Self::MaterialIds,
+        Self::ListedMaterialIds,
         Self::MaterialIdsNone,
         Self::Bones,
         Self::Animations,
         Self::AnimationsUnread,
         Self::AnimationsReading,
         Self::Chunks,
+        Self::ChunksTotal,
+        Self::ChunksRead,
+        Self::ChunksSkipped,
+        Self::ChunksUnknown,
         Self::ChunksValue,
         Self::MaterialsUnnamed,
         Self::MaterialsLoaded,
@@ -119,6 +145,7 @@ impl ModelInfoText {
         Self::FileModel,
         Self::FileGeometry,
         Self::FileLod,
+        Self::FileLodModel,
         Self::TypeUnknown,
     ];
 
@@ -133,13 +160,21 @@ impl ModelInfoText {
             Self::Meshes => "model-info-meshes",
             Self::Lods => "model-info-lods",
             Self::Materials => "model-info-materials",
+            Self::MaterialsStatus => "model-info-materials-status",
+            Self::MaterialCount => "model-info-material-count",
+            Self::MaterialSingle => "model-info-material-single",
             Self::MaterialIds => "model-info-material-ids",
+            Self::ListedMaterialIds => "model-info-material-ids-listed",
             Self::MaterialIdsNone => "model-info-material-ids-none",
             Self::Bones => "model-info-bones",
             Self::Animations => "model-info-animations",
             Self::AnimationsUnread => "model-info-animations-unread",
             Self::AnimationsReading => "model-info-animations-reading",
             Self::Chunks => "model-info-chunks",
+            Self::ChunksTotal => "model-info-chunks-total",
+            Self::ChunksRead => "model-info-chunks-read",
+            Self::ChunksSkipped => "model-info-chunks-skipped",
+            Self::ChunksUnknown => "model-info-chunks-unknown",
             Self::ChunksValue => "model-info-chunks-value",
             Self::MaterialsUnnamed => "model-info-materials-unnamed",
             Self::MaterialsLoaded => "model-info-materials-loaded",
@@ -161,6 +196,7 @@ impl ModelInfoText {
             Self::FileModel => "model-info-file-model",
             Self::FileGeometry => "model-info-file-geometry",
             Self::FileLod => "model-info-file-lod",
+            Self::FileLodModel => "model-info-file-lod-model",
             Self::TypeUnknown => "model-info-type-unknown",
         }
     }

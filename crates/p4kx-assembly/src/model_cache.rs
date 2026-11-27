@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model, RigLogicBytes};
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, EntryOrigin};
 
 use crate::provider::{ModelFailure, ModelProvider, ProvidedModel};
 
@@ -136,11 +137,23 @@ impl ModelCache {
             .fold(bytes_of(&model.model), |sum, attached| {
                 sum.saturating_add(bytes_of(&attached.model))
             });
+        let bytes = bytes.saturating_add(
+            model
+                .declared_rig
+                .as_ref()
+                .map_or(0, |rig| bytes_of(&rig.model)),
+        );
         if bytes > self.limit {
             return;
         }
         let level = model.model.lods.first().map_or(lod, |found| found.level);
-        let lowest = if level <= lod { level } else { 0 };
+        let lowest = if model.declared_rig.is_some() {
+            lod
+        } else if level <= lod {
+            level
+        } else {
+            0
+        };
         let copy = Arc::new(model.clone());
         let mut state = self.state();
         state.clock += 1;
@@ -246,12 +259,28 @@ impl ModelProvider for CachedModels<'_> {
         self.inner.library(entry, name)
     }
 
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        self.inner.library_observed(entry, name)
+    }
+
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        self.inner.default_material()
+    }
+
     fn layer_budget(&self) -> LayerBudget {
         self.inner.layer_budget()
     }
 
     fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
         self.inner.layer_library(path, budget)
+    }
+
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        self.inner.layer_library_observed(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

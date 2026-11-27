@@ -1,58 +1,69 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::StructValue;
+use p4kx_extraction::{SourcedValue, StructValue};
 
+use crate::CatalogError;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_text_contract::GameTextRef;
 use crate::contract_facts::ContractFacts;
 use crate::contract_missions::{ContractFaction, PickupPlace, ReputationGain};
 use crate::contract_offer::{BlueprintReward, GiverFaction, OfferedAt};
 use crate::contract_reward::{FixedReward, fixed_rewards};
+use crate::guid_text::CatalogGuid;
 use crate::mission_blueprints::{Overrides, blueprint_rewards};
-use crate::mission_cooldown::CooldownDefaults;
+use crate::mission_cooldown::ContractCooldown;
 use crate::mission_facts::SharedFacts;
+use crate::mission_generator::item_reward_results;
 use crate::mission_giver::giver;
 use crate::mission_index::MissionIndex;
 use crate::mission_layers::one;
 use crate::mission_results::{entry_results, gains};
 use crate::mission_standing::{Standing, required_faction};
+use crate::record_read::ReadError;
+use crate::source_value_catalog::SourceValueRef;
 use crate::spawn_layers::Resolved;
-use crate::texts::Texts;
 
 /// What an entry is resolved to besides its layers: its places, facts and spawn descriptions.
 pub(crate) struct Found<'f> {
     pub(crate) pickup: Vec<PickupPlace<'f>>,
     pub(crate) offered_at: OfferedAt<'f>,
+    pub(crate) contractor: SourcedValue<GameTextRef>,
     pub(crate) facts: ContractFacts,
+    pub(crate) cooldown: ContractCooldown,
     pub(crate) spawns: Resolved,
+    pub(crate) property_set_guids: Vec<CatalogGuid>,
 }
 
-/// What the entries of one contract share: the standing it requires, the cooldown defaults of its
-/// handler, its facts and its fixed rewards.
+/// The standing, facts and fixed rewards shared by a contract and its sub contracts.
 pub(crate) struct Shared<'f> {
     pub(crate) standing: Standing,
-    pub(crate) cooldown: CooldownDefaults,
     pub(crate) facts: SharedFacts,
-    pub(crate) fixed_rewards: Vec<FixedReward<'f>>,
+    pub(crate) fixed_rewards: SourcedValue<Vec<FixedReward<'f>>>,
 }
 
 impl<'f> Shared<'f> {
     /// Reads what the entries of `contract` of `handler` share.
-    pub(crate) fn read(handler: &StructValue<'f>, contract: &StructValue<'f>) -> Self {
-        Self {
+    pub(crate) fn read(
+        fields: &OriginalFlowFields<'_, '_, 'f>,
+        handler: &StructValue<'f>,
+        contract: &StructValue<'f>,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
             standing: Standing::read(handler, contract),
-            cooldown: CooldownDefaults::read(handler),
-            facts: SharedFacts::read(handler, contract),
-            fixed_rewards: fixed_rewards(contract),
-        }
+            facts: SharedFacts::read(fields, handler, contract)?,
+            fixed_rewards: fixed_rewards(fields, contract)?,
+        })
     }
 }
 
-/// What an entry's own resolved results and overrides grant: reputation, the giver faction that
-/// follows from it and the blueprint pools.
+/// The giver faction and blueprint pools resolved from the entry's results and overrides.
 pub(crate) struct Rewards<'f> {
-    pub(crate) gains: Vec<ReputationGain<'f>>,
+    pub(crate) gains: SourcedValue<Vec<ReputationGain<'f>>>,
     pub(crate) giver_faction: Option<GiverFaction<'f>>,
     pub(crate) blueprints: Vec<BlueprintReward>,
+    pub(crate) item_results: Vec<SourcedValue<SourceValueRef>>,
 }
 
 impl<'f> Rewards<'f> {
@@ -61,25 +72,28 @@ impl<'f> Rewards<'f> {
     pub(crate) fn read(
         (handler, contract, sub): (&StructValue<'f>, &StructValue<'f>, Option<&StructValue<'f>>),
         handler_faction: Option<&ContractFaction<'f>>,
-        (index, texts): (&MissionIndex<'f>, &Texts<'f>),
-    ) -> Self {
+        index: &MissionIndex<'f>,
+        (fields, projection): (&OriginalFlowFields<'_, '_, 'f>, &CatalogProjection<'_, 'f>),
+    ) -> Result<Self, ReadError> {
         let block = entry_results(contract, sub);
-        let gains = gains(block, index);
+        let gains = gains(fields, projection.original(), index, contract, sub)?;
         let giver_faction = giver(
             handler_faction,
-            &gains,
+            gains.value().map_or(&[], Vec::as_slice),
             required_faction(handler, contract, sub),
-            (index, texts),
-        );
+            index,
+            projection,
+        )?;
         let overrides = Overrides {
             sub: sub.and_then(|sub| one(Some(sub), "paramOverrides").or(Some(sub))),
             contract: one(Some(contract), "paramOverrides"),
             handler: one(Some(handler), "contractParams"),
         };
-        Self {
+        Ok(Self {
             gains,
             giver_faction,
             blueprints: blueprint_rewards(block, &overrides),
-        }
+            item_results: item_reward_results::links::read(fields, contract, sub)?,
+        })
     }
 }

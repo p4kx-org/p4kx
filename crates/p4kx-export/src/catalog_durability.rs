@@ -1,0 +1,243 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::{DataForge, RecordTree, SourcedValue, Value};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use super::item_component_owner::ComponentOwner;
+use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
+use crate::catalog_table::CatalogTable;
+use crate::record_fields::number_value;
+use crate::resource_float::ResourceFloat32;
+use crate::schema_fields::every_field_required;
+use crate::source_fields::FieldError;
+use crate::{CatalogError, ExportAccountingError};
+
+use super::{authored_damage as damage, authored_fields as observed, authored_link as link};
+
+#[path = "durability_degradation.rs"]
+mod degradation;
+#[path = "durability_distortion.rs"]
+mod distortion;
+#[path = "durability_event_actions.rs"]
+mod event_actions;
+#[path = "durability_health_fields.rs"]
+mod health_fields;
+#[path = "durability_initial_damage.rs"]
+mod initial_damage;
+#[path = "durability_lifecycle.rs"]
+mod lifecycle;
+#[path = "durability_resistance.rs"]
+pub(in crate::catalog_v3) mod resistance;
+#[path = "durability_wear.rs"]
+mod wear;
+
+use degradation::DegradationFields;
+use distortion::DistortionFields;
+use health_fields::HealthFields;
+use observed::Observed;
+
+const HEALTH: &str = "SHealthComponentParams";
+const DEGRADATION: &str = "SDegradationParams";
+const DISTORTION: &str = "SDistortionParams";
+
+/// One original Health component on a selected item.
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
+pub struct Durability<'source> {
+    #[serde(flatten)]
+    owner: ComponentOwner,
+    #[serde(flatten)]
+    fields: HealthFields<'source>,
+}
+
+/// One original degradation component on a selected item.
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
+pub struct Degradation {
+    #[serde(flatten)]
+    owner: ComponentOwner,
+    #[serde(flatten)]
+    fields: DegradationFields,
+}
+
+/// One original distortion component on a selected item.
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
+pub struct Distortion {
+    #[serde(flatten)]
+    owner: ComponentOwner,
+    #[serde(flatten)]
+    fields: DistortionFields,
+}
+
+impl Durability<'_> {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored Health value.
+    #[must_use]
+    pub const fn health(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.fields.health
+    }
+}
+
+impl Degradation {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored flag for stopping degradation on destruction.
+    #[must_use]
+    pub const fn stop_degrading_if_destroyed(&self) -> &SourcedValue<bool> {
+        &self.fields.stop_degrading_if_destroyed
+    }
+}
+
+impl Distortion {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored maximum distortion.
+    #[must_use]
+    pub const fn maximum(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.fields.maximum
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct DurabilityRows<'source> {
+    pub(super) health: Vec<Durability<'source>>,
+    pub(super) degradation: Vec<Degradation>,
+    pub(super) distortion: Vec<Distortion>,
+}
+
+impl<'source> DurabilityRows<'source> {
+    pub(super) fn push(
+        &mut self,
+        kind: DurabilityComponent,
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
+        match kind {
+            DurabilityComponent::Health => self.health.push(Durability {
+                owner,
+                fields: HealthFields::read(source, notes)?,
+            }),
+            DurabilityComponent::Degradation => self.degradation.push(Degradation {
+                owner,
+                fields: DegradationFields::read(source, notes)?,
+            }),
+            DurabilityComponent::Distortion => self.distortion.push(Distortion {
+                owner,
+                fields: DistortionFields::read(source, notes)?,
+            }),
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stage_health(
+        &mut self,
+        staging: &mut OrderedComponentRows<'_>,
+    ) -> Result<(), CatalogError> {
+        for row in std::mem::take(&mut self.health) {
+            staging.append(row.owner.key(), &row)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn extend(&mut self, other: Self) {
+        self.health.extend(other.health);
+        self.degradation.extend(other.degradation);
+        self.distortion.extend(other.distortion);
+    }
+}
+
+/// Projects the first Health component for variant-only reads without a catalog source scope.
+pub(crate) fn legacy_health(tree: &RecordTree<'_>) -> Option<f32> {
+    let Value::Array(components) = tree.field("Components")? else {
+        return None;
+    };
+    let source = components.iter().find_map(|value| match value {
+        Value::Struct(source) if source.type_name() == HEALTH => Some(source),
+        _ => None,
+    })?;
+    source.field("Health").and_then(number_value)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DurabilityComponent {
+    Health,
+    Degradation,
+    Distortion,
+}
+
+impl DurabilityComponent {
+    pub(crate) const fn source_types(self) -> &'static [&'static str] {
+        match self {
+            Self::Health => &[HEALTH],
+            Self::Degradation => &[DEGRADATION],
+            Self::Distortion => &[DISTORTION],
+        }
+    }
+
+    pub(super) fn of(source_type: &str) -> Option<Self> {
+        match source_type {
+            HEALTH => Some(Self::Health),
+            DEGRADATION => Some(Self::Degradation),
+            DISTORTION => Some(Self::Distortion),
+            _ => None,
+        }
+    }
+}
+
+pub(crate) struct DurabilityTables {
+    pub(crate) degradation: CatalogTable<Degradation>,
+    pub(crate) distortion: CatalogTable<Distortion>,
+}
+
+/// Completes the Health table with the original source-family availability.
+pub(crate) fn finish_health(
+    staging: OrderedComponentRows<'_>,
+    forge: &DataForge<'_>,
+) -> Result<StagedCatalogTable, CatalogError> {
+    staging.finish(forge, DurabilityComponent::Health.source_types())
+}
+
+/// Orders the resident component families by physical Record and slot.
+pub(crate) fn tables(
+    forge: &DataForge<'_>,
+    mut rows: DurabilityRows<'_>,
+) -> Result<DurabilityTables, CatalogError> {
+    if !rows.health.is_empty() {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    rows.degradation.sort_by_key(|row| row.owner.key());
+    rows.distortion.sort_by_key(|row| row.owner.key());
+    Ok(DurabilityTables {
+        degradation: CatalogTable::new(
+            forge,
+            DurabilityComponent::Degradation.source_types(),
+            rows.degradation,
+        ),
+        distortion: CatalogTable::new(
+            forge,
+            DurabilityComponent::Distortion.source_types(),
+            rows.distortion,
+        ),
+    })
+}
+
+#[cfg(test)]
+#[path = "catalog_durability_staging_tests.rs"]
+mod staging_tests;

@@ -1,0 +1,61 @@
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'linux-window-smoke-report.ps1')
+
+$runtime = Join-Path $env:RUNNER_TEMP 'p4kx-wayland'
+New-Item -ItemType Directory -Path $runtime | Out-Null
+[IO.File]::SetUnixFileMode($runtime,
+    ([IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite -bor [IO.UnixFileMode]::UserExecute))
+
+$display = 'wayland-0'
+$socket = Join-Path $runtime $display
+$log = Join-Path $runtime 'weston.log'
+$compositor = [Diagnostics.ProcessStartInfo]::new('weston')
+$compositor.UseShellExecute = $false
+$compositor.Environment['XDG_RUNTIME_DIR'] = $runtime
+foreach ($name in @('DISPLAY', 'WAYLAND_DISPLAY', 'WAYLAND_SOCKET')) {
+    [void]$compositor.Environment.Remove($name)
+}
+foreach ($argument in @('--backend=headless', '--renderer=pixman', '--shell=kiosk', '--no-config',
+    '--idle-time=0', '--width=1280', '--height=800', '--scale=2', "--socket=$display", "--log=$log")) {
+    $compositor.ArgumentList.Add($argument)
+}
+
+$weston = [Diagnostics.Process]::Start($compositor)
+try {
+    $deadline = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-Path -LiteralPath $socket)) {
+        if ($weston.HasExited -or $deadline.Elapsed.TotalSeconds -ge 15) {
+            throw 'The isolated Weston compositor did not open its Wayland socket.'
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    $env:WAYLAND_DISPLAY = $null
+    $env:WAYLAND_SOCKET = $null
+    $env:P4KX_TEST_WAYLAND_RUNTIME_DIR = $runtime
+    $reportPath = 'target/nextest/linux-window-smoke/junit.xml'
+    if (Test-Path -LiteralPath $reportPath -PathType Leaf) {
+        Remove-Item -LiteralPath $reportPath
+    }
+    $cases = (Get-P4kxLinuxWindowSmokeCases | ForEach-Object { "test(=$_)" }) -join ' | '
+    $filter = "binary_id(p4kx-gui::smoke_window) & ($cases)"
+    $nextest = @('nextest', 'run', '--profile', 'linux-window-smoke', '--archive-file', 'nextest-archive.tar.zst',
+        '--workspace-remap', '.', '--extract-to', '.', '--extract-overwrite', '--run-ignored', 'only',
+        '--no-tests', 'fail', '-E', $filter)
+    & xvfb-run --auto-servernum cargo @nextest
+    if ($LASTEXITCODE -ne 0) { throw 'Native Linux X11 or HiDPI Wayland window smoke failed.' }
+    $report = [xml](Get-Content -Raw -LiteralPath $reportPath)
+    Assert-P4kxLinuxWindowSmokeReport $report
+}
+finally {
+    try {
+        if (-not $weston.HasExited) {
+            $weston.Kill($true)
+            $weston.WaitForExit()
+        }
+    }
+    finally {
+        $weston.Dispose()
+        if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log }
+    }
+}

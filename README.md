@@ -6,7 +6,7 @@
 
 P4KX opens, browses, searches, compares and extracts the `Data.p4k` Archives of Star Citizen, and
 turns their internal formats into readable or importable data: XML, JSON, PNG, OpenEXR, Ogg, WAV,
-glTF and Blender packages. It comes as a Windows window (`p4kx-gui`), a command line (`p4kx`), a
+glTF and Blender packages. It includes a desktop application (`p4kx-gui`), a command line (`p4kx`), a
 read-only [MCP server](#mcp-server) (`p4kx-mcp`) and a [Blender add-on](#blender-add-on).
 
 The current version is **[0.4.2](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2)**. P4KX is
@@ -40,6 +40,10 @@ Copyright (c) 2026 the P4KX contributors
   names valid on both Linux and Windows. `--convert` turns CryXml into XML, the DataForge into one
   XML file per Record, textures into PNG, DDS or OpenEXR and sounds into Ogg or WAV on the way;
   `p4kx convert` does the same for a folder extracted earlier.
+- **Versioned media inventory.** `media export` streams physical source identities, retained raw
+  payloads, scoped hashes and provider metadata into atomic generations with a shared JSON Schema.
+  The initial provider exports Archive metadata; see [the media contract](docs/media-export.md)
+  for supported kinds, explicit capability refusals and resource bounds.
 - **DataForge and Records.** Reads DataForge versions 6 and 8, from an Archive or from a
   `Game2.dcb` file on disk, as a canonical Record tree, exports it as Record XML, Record JSON,
   NDJSON or flat CSV, and answers Queries, References, tag trees and field statistics over it.
@@ -68,17 +72,17 @@ Copyright (c) 2026 the P4KX contributors
 - **Blender package.** Writes an Entity (a creature as one skinned rig), an Interior or a Character
   as a folder (`scene.json`, GLB parts, textures) that the Blender add-on imports with node-tree
   materials for layered surfaces, glass, stencil decals and liveries.
-- **Basetool catalog and ship base data.** Writes the versioned JSON catalog of manufacturers,
+- **P4KX catalog and ship base data.** Writes the versioned JSON catalog of manufacturers,
   items, ships, commodities, blueprints, loadouts, paints, shops, the starmap, contracts with their
-  templates, broker entries, spawns and hauling orders, reputation, mining, refining and loot that
-  the Basetool imports, and the base data of every ship.
+  templates, broker entries, spawns and hauling orders, reputation, mining, refining and loot.
+  Also exports the base data of every ship.
 
 ## The window
 
 `p4kx-gui` has the tabs **Browse**, **Comparison**, **Query**, **Localisation**, **Tags**,
 **Search**, **Entities**, **Sounds**, **Characters** and **UI**, a sidebar with the detected
 Channels and an Export menu. It previews text, hex, textures, models, sounds and Records, runs
-Queries, exports Records and the Basetool catalog, converts a folder of extracted files, opens a
+Queries, exports Records and the P4KX catalog, converts a folder of extracted files, opens a
 `Game2.dcb` on its own, and fits down to a window of 640 by 400 points. On Windows its 3D view
 opens Direct3D 12 first and falls back to the default backends; `WGPU_BACKEND` overrides that.
 The look is P4KX's own dark theme, and the language is German or British English. See
@@ -88,17 +92,24 @@ The look is P4KX's own dark theme, and the language is German or British English
 
 `p4kx <command> --help` documents every command and option; [docs/commands.md](docs/commands.md)
 describes them in full, the JSON shapes are in [docs/cli-json.md](docs/cli-json.md), and the exit
-codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<archive>`.
+codes are in `p4kx --help`. For an Archive input, pass the path of `Data.p4k` as `<archive>`. The
+command reference describes standalone file inputs and operations such as schema generation.
 
 | Area | Commands |
 |---|---|
 | Archive | `list`, `search`, `grep`, `info`, `verify`, `extract`, `convert`, `channels`, `socpak`, `key` |
 | DataForge | `dcb info`, `dcb export`, `dcb query`, `dcb refs`, `dcb tags`, `dcb fields`, `prefab` |
-| Exports | `catalog`, `ships`, `actionmap export`, `loc`, `coverage` |
+| Exports | `catalog`, `ships`, `media export\|schema`, `actionmap export`, `loc`, `coverage` |
 | Comparison | `compare` (`--entries`, `--records`, `--schema`, `--diff`) |
 | Formats | `cryxml`, `texture`, `audio`, `bnk`, `chunks`, `model`, `ui assets\|extract\|render` |
 | 3D and Blender | `entity loadout\|glb\|package`, `interior glb\|package`, `armour`, `character package`, `chf`, `ui hologram\|screens` |
 | Audio resolution | `wwise resolve\|events\|extract`, `entity audio` |
+
+`p4kx catalog schema` prints the default marker document schema. Use
+`p4kx catalog schema --provenance full` for the standalone v3 schema.
+The [Rust Catalog SDK](docs/catalog-sdk.md) covers document creation and selective domain queries.
+Its client-profile readers default to encryption markers and offer full source evidence.
+[Client profile SDK](docs/catalog-sdk.md#client-profile-documents)
 
 ## MCP server
 
@@ -111,26 +122,52 @@ Claude Desktop.
 ## Blender add-on
 
 The add-on `p4kx_importer` imports the packages written by `entity package`,
-`interior package` and `character package` (package format 1.8) into Blender 5.2 LTS (File >
+`interior package` and `character package` (package format 1.8) into Blender 5.2 LTS or 5.3 (File >
 Import > P4KX Package (scene.json)). See [blender_addon/README.md](blender_addon/README.md) and
 [docs/blender-package.md](docs/blender-package.md).
 
 ## Install
 
-Windows on 64-bit x86 (x86_64). Each [GitHub Release](https://github.com/p4kx-org/p4kx/releases)
-offers:
+### v0.4.2 packages
 
-- `P4KX-<version>-x86_64.msi`: installs for the current user, without administrator rights, into
-  `%LOCALAPPDATA%\Programs\P4KX`, adds the Start menu entry and puts the folder on your `PATH`.
-- `P4KX-<version>-x86_64-portable.zip`: `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe` to run from
-  any folder.
-- `p4kx_importer-<version>.zip`: the Blender add-on (Edit > Preferences > Get Extensions >
+The [v0.4.2 Release](https://github.com/p4kx-org/p4kx/releases/tag/v0.4.2) provides Windows AMD64 packages.
+
+- `P4KX-0.4.2-x86_64.msi` installs for the current user, without administrator rights, into
+  `%LOCALAPPDATA%\Programs\P4KX`. It adds the Start menu entry and puts the folder on your `PATH`.
+- `P4KX-0.4.2-x86_64-portable.zip` contains `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`.
+- `p4kx_importer-0.4.2.zip` is the Blender add-on (Edit > Preferences > Get Extensions >
   Install from Disk).
-- `SHA256SUMS.txt` and `SHA3-512SUMS.txt`: the checksums of the other files, to check a download
-  (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+- `SHA256SUMS.txt` and `SHA3-512SUMS.txt` verify downloads (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Settings live in `%APPDATA%\P4KX`. The window can check GitHub once at start for a newer Release
-if you switch that on in the Help menu; it is off by default, and nothing else touches the network.
+if you switch that on in the Help menu. It is off by default.
+
+### v0.5.0 package names and requirements
+
+Check the [Release listing](https://github.com/p4kx-org/p4kx/releases) for available downloads and select the package for your operating system and CPU.
+
+Windows targets AMD64 (`x86_64-pc-windows-msvc`) and ARM64 (`aarch64-pc-windows-msvc`). Choose the
+matching `P4KX-<version>-<target>.msi` or `P4KX-<version>-<target>-portable.zip`.
+Both CPUs share one per-user MSI installation. An explicitly chosen same-version package replaces
+it, and settings and the stored Archive key survive uninstall. The CLI and MCP also offer explicit
+update checks. [Windows packages](docs/windows-packages.md) defines supported-system evidence,
+runtime DLLs and installer verification.
+
+For Linux, choose `x86_64-unknown-linux-gnu` on AMD64 or `aarch64-unknown-linux-gnu` on ARM64.
+For either target, append `.tar.gz`, `.AppImage`, `.deb` or `.flatpak` to
+`P4KX-<version>-<target>`. Each format provides `p4kx-gui`, `p4kx` and `p4kx-mcp`.
+Native tar.gz, AppImage and deb require Ubuntu 24.04 / glibc 2.39. Flatpak uses Freedesktop
+Platform 25.08 and requires host Documents-portal API 5 or later with authenticated
+host-path lookup.
+[Linux installation and launch commands](docs/linux-packages.md#install-and-start)
+[Linux-Hilfe auf Deutsch](docs/linux-packages.md#linux-hilfe-auf-deutsch)
+explains setup, archive discovery and profile folders in German.
+
+For macOS 26 or later on Apple Silicon, open `P4KX-<version>-aarch64-apple-darwin.dmg` and drag
+`P4KX.app` to Applications. Launch the window from Finder. With the app in Applications, run
+`/Applications/P4KX.app/Contents/MacOS/p4kx --help` in Terminal and point an MCP client to
+`/Applications/P4KX.app/Contents/MacOS/p4kx-mcp`. Use the corresponding path if you move the app.
+The Release notes identify the signing mode and any required first-launch approval.
 
 ## First run: the Archive key
 
@@ -173,7 +210,8 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 | Commands and the MCP server | [docs/commands.md](docs/commands.md), [docs/cli-json.md](docs/cli-json.md) |
 | Queries | [docs/query.md](docs/query.md) |
 | Record formats | [docs/record-xml.md](docs/record-xml.md), [docs/record-json.md](docs/record-json.md), [docs/record-flat.md](docs/record-flat.md) |
-| Basetool catalog and ship base data | [docs/basetool-catalog.md](docs/basetool-catalog.md), [docs/ship-base-data.md](docs/ship-base-data.md) |
+| P4KX catalog and ship base data | [docs/catalog.md](docs/catalog.md), [docs/ship-base-data.md](docs/ship-base-data.md) |
+| Rust Catalog SDK | [docs/catalog-sdk.md](docs/catalog-sdk.md) |
 | Blender package | [docs/blender-package.md](docs/blender-package.md) |
 | Plan and decisions | [docs/ROADMAP.md](docs/ROADMAP.md), [docs/adr/](docs/adr/) |
 | The terms used | [CONTEXT.md](CONTEXT.md) |
@@ -181,15 +219,18 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 ## Build
 
-Requires the stable Rust toolchain (1.99 or newer).
+The repository pins Rust 1.100.0 in [rust-toolchain.toml](rust-toolchain.toml).
+Rustup selects it automatically. The minimum supported Rust version is also 1.100.0.
+The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64,
+and macOS 26 or later on Apple Silicon. See [native platforms and release verification](docs/supported-platforms.md).
 
 ```powershell
 cargo build --release
 .\target\release\p4kx.exe list "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k"
 ```
 
-The release build produces `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`. The code is platform
-neutral and CI also builds it on Linux, but only Windows is shipped.
+The release build produces `p4kx-gui`, `p4kx` and `p4kx-mcp`, with `.exe` on Windows.
+The v0.5.0 package contract requires native execution evidence for both CPUs on both systems.
 
 ## Contributing
 

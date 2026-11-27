@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_character::Dna;
+use std::sync::Arc;
 
-use super::{Expressions, Look, Wearable};
-use crate::PortTransform;
+use p4kx_character::Dna;
+use p4kx_extraction::{DataForgeOrigin, SourceLocation};
+
+use super::layered_worn::OverlayMount;
+use super::{Expressions, HeadMaterial, Look, Wearable};
 use crate::bespoke::Bespoke;
+use crate::{PortDefinition, PortDefinitionPosition, PortHelperDiagnostic, PortTransform};
 
 /// The port an unskinned piece hangs on: the helper of the holder it is placed at, the offset from
 /// it and the helper of the piece that goes there. The offset is kept as the bits of its numbers
@@ -14,19 +18,34 @@ use crate::bespoke::Bespoke;
 pub(crate) struct Mount {
     /// The name of the piece whose model holds the helper; `None` for the body.
     pub(crate) holder: Option<String>,
+    pub(crate) holder_index: Option<usize>,
+    pub(crate) port: PortDefinitionPosition,
+    pub(super) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) helper: String,
     pub(crate) offset_helper: String,
+    pub(crate) helper_diagnostic: Option<Box<PortHelperDiagnostic>>,
+    pub(super) offset_fields: [bool; 2],
     position: [u32; 3],
     rotation: [u32; 3],
 }
 
 impl Mount {
     /// Returns the mount of an item at the port `port` of `holder`.
-    pub(crate) fn new(holder: Option<String>, port: &PortTransform) -> Self {
+    pub(crate) fn new(
+        holder: Option<(usize, String)>,
+        definition: &PortDefinition,
+        port: &PortTransform,
+        diagnostic: Option<PortHelperDiagnostic>,
+    ) -> Self {
         Self {
-            holder,
+            holder_index: holder.as_ref().map(|(index, _)| *index),
+            holder: holder.map(|(_, label)| label),
+            port: definition.position(),
+            forge_origin: definition.forge_origin.clone(),
             helper: port.helper().to_owned(),
             offset_helper: port.offset_helper().to_owned(),
+            helper_diagnostic: diagnostic.map(Box::new),
+            offset_fields: port.offset_fields(),
             position: port.position().map(f32::to_bits),
             rotation: port.rotation().map(f32::to_bits),
         }
@@ -87,12 +106,16 @@ pub struct Piece {
     pub(crate) expressions: Expressions,
     pub(crate) look: Option<Look>,
     pub(crate) material: Option<String>,
+    pub(crate) material_source: Option<SourceLocation>,
     pub(crate) follows_head: bool,
     pub(crate) notes: Vec<Note>,
     pub(crate) selecting: Vec<String>,
     pub(crate) variant_tags: Vec<String>,
     pub(crate) bespoke: Option<Bespoke>,
     pub(crate) mount: Option<Mount>,
+    pub(super) unresolved_mount_helper: Option<Box<PortHelperDiagnostic>>,
+    pub(super) overlay_mount: OverlayMount,
+    pub(super) overlay_index: Option<usize>,
     pub(crate) port: Option<String>,
 }
 
@@ -105,12 +128,16 @@ impl Piece {
             expressions: Expressions::None,
             look: None,
             material: None,
+            material_source: None,
             follows_head: false,
             notes: Vec::new(),
             selecting: Vec::new(),
             variant_tags: Vec::new(),
             bespoke: None,
             mount: None,
+            unresolved_mount_helper: None,
+            overlay_mount: OverlayMount::Original,
+            overlay_index: None,
             port: None,
         }
     }
@@ -139,6 +166,12 @@ impl Piece {
         }
     }
 
+    /// Returns whether the Piece has an authored port used for rigid placement.
+    #[must_use]
+    pub const fn has_port_mount(&self) -> bool {
+        self.mount.is_some()
+    }
+
     pub(crate) fn mounted(mut self, mount: Mount) -> Self {
         self.mount = Some(mount);
         self
@@ -152,7 +185,7 @@ impl Piece {
         self
     }
 
-    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`]; the
+    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`](crate::MaterialVariant::resolve); the
     /// body variant's tag is always among them.
     #[must_use]
     pub fn with_material_tags(mut self, tags: Vec<String>) -> Self {
@@ -224,8 +257,13 @@ impl Piece {
     /// Draws the piece with the material library at `path`, a path below `Data`, instead of the
     /// one its Record or its model names.
     #[must_use]
-    pub fn with_material(mut self, path: impl Into<String>) -> Self {
-        self.material = Some(path.into());
+    pub fn with_material(self, path: impl Into<String>) -> Self {
+        self.with_material_source(HeadMaterial::new(path.into(), None))
+    }
+
+    pub(super) fn with_material_source(mut self, material: HeadMaterial) -> Self {
+        self.material = Some(material.path);
+        self.material_source = material.source;
         self
     }
 

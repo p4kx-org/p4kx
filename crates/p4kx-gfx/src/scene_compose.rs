@@ -1,39 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "scene_definitions.rs"]
+mod definitions;
+#[path = "scene_composition_inputs.rs"]
+mod inputs;
+
 use std::collections::HashMap;
+
+use self::definitions::{Definition, definitions};
+pub use self::inputs::{
+    ObservedScene, SceneDefinitionOrigin, SceneDrawOrigin, SceneGlyphOrigin, SceneMaskOrigin,
+    SceneOrigins, ScenePlacementOrigin, SceneTextMeasureOrigin,
+};
 
 use crate::assets::Assets;
 use crate::geometry::Rect;
-use crate::morph::MorphShape;
 use crate::morph_frame::morph_at;
 use crate::place::{ColorTransform, Placement};
 use crate::scene::{
     Affine, MAX_SCENE_MASKS, MAX_SCENE_PATHS, MAX_SCENE_PLACEMENTS, MAX_SCENE_RECORDS,
     MAX_SCENE_SEGMENTS, Origin, Scene, SceneItem, SceneMask, SceneShape,
 };
-use crate::scene_report::{SkipReason, Skipped};
+use crate::scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 use crate::scene_shape::ShapeBuilder;
 use crate::scene_text::{MAX_SCENE_GLYPHS, TextState};
-use crate::shape::Shape;
-use crate::text::{EditText, StaticText};
 use crate::text_fonts::TextOptions;
-use crate::timeline::Sprite;
-use crate::walker::MAX_SPRITE_DEPTH;
-
-const TAG_DEFINE_BITS: u16 = 6;
-const TAG_DEFINE_FONT: u16 = 10;
-
-/// A definition a placement may name.
-#[derive(Clone, Copy)]
-enum Definition<'b> {
-    Shape(&'b Shape),
-    Morph(&'b MorphShape),
-    Sprite(&'b Sprite),
-    StaticText(&'b StaticText),
-    EditText(&'b EditText),
-    Other(u16),
-}
 
 /// Where the shapes of a timeline go: drawn, or into a mask.
 #[derive(Clone, Copy)]
@@ -51,12 +43,35 @@ pub(crate) struct Context {
     target: Target,
     pub(crate) sprite: Option<u16>,
     depth: u32,
+    timeline: Option<usize>,
+    placement: Option<usize>,
+    declaration: Option<SceneDefinitionOrigin>,
+    localised: bool,
+    layout_prefix: Option<usize>,
 }
 
 impl Context {
     /// Returns the context with another transform.
     pub(crate) const fn with_transform(self, transform: Affine) -> Self {
         Self { transform, ..self }
+    }
+
+    pub(crate) const fn with_localisation(self, localised: bool) -> Self {
+        Self { localised, ..self }
+    }
+
+    pub(crate) const fn with_layout_prefix(self, inspected: usize) -> Self {
+        Self {
+            layout_prefix: Some(inspected),
+            ..self
+        }
+    }
+
+    pub(crate) const fn edit_definition(self) -> Option<usize> {
+        match self.declaration {
+            Some(SceneDefinitionOrigin::EditText(ordinal)) => Some(ordinal),
+            _ => None,
+        }
     }
 }
 
@@ -82,52 +97,6 @@ impl SceneLimits {
     };
 }
 
-/// Indexes the definitions of a movie by ID; the first definition of an ID wins.
-fn definitions<'b>(assets: &'b Assets<'_>) -> HashMap<u16, Definition<'b>> {
-    let mut definitions = HashMap::new();
-    for other in &assets.other_definitions {
-        definitions
-            .entry(other.id)
-            .or_insert(Definition::Other(other.code));
-    }
-    for text in &assets.static_texts {
-        definitions
-            .entry(text.id)
-            .or_insert(Definition::StaticText(text));
-    }
-    for text in &assets.edit_texts {
-        definitions
-            .entry(text.id)
-            .or_insert(Definition::EditText(text));
-    }
-    for font in &assets.fonts {
-        definitions
-            .entry(font.id)
-            .or_insert(Definition::Other(TAG_DEFINE_FONT));
-    }
-    for bitmap in &assets.bitmaps {
-        definitions
-            .entry(bitmap.id)
-            .or_insert(Definition::Other(TAG_DEFINE_BITS));
-    }
-    for sprite in &assets.sprites {
-        definitions
-            .entry(sprite.id)
-            .or_insert(Definition::Sprite(sprite));
-    }
-    for morph in &assets.morph_shapes {
-        definitions
-            .entry(morph.id)
-            .or_insert(Definition::Morph(morph));
-    }
-    for shape in &assets.shapes {
-        definitions
-            .entry(shape.id)
-            .or_insert(Definition::Shape(shape));
-    }
-    definitions
-}
-
 /// Composes the first frame of a movie into a [`Scene`].
 pub(crate) struct Composer<'b> {
     pub(crate) limits: SceneLimits,
@@ -141,19 +110,32 @@ pub(crate) struct Composer<'b> {
     segments: usize,
     pub(crate) stopped: bool,
     pub(crate) text: TextState<'b>,
+    pub(crate) origins: Option<SceneOrigins>,
 }
 
 impl<'b> Composer<'b> {
     /// Composes the display list of the main timeline's first frame.
     pub(crate) fn compose(assets: &'b Assets<'_>, stage: Rect, options: &TextOptions<'b>) -> Scene {
-        Self::compose_within(assets, stage, SceneLimits::DEFAULT, options)
+        Self::compose_within(assets, stage, SceneLimits::DEFAULT, options, false).scene
+    }
+
+    pub(crate) fn compose_observed(
+        assets: &'b Assets<'_>,
+        stage: Rect,
+        options: &TextOptions<'b>,
+    ) -> ObservedScene {
+        let composer = Self::compose_within(assets, stage, SceneLimits::DEFAULT, options, true);
+        ObservedScene {
+            scene: composer.scene,
+            origins: composer.origins.unwrap_or_default(),
+        }
     }
 
     /// Composes the display list as [`Composer::compose`] does within `limits`, without
     /// localisation or fonts beyond the movie.
     #[cfg(test)]
     pub(crate) fn compose_with(assets: &'b Assets<'_>, stage: Rect, limits: SceneLimits) -> Scene {
-        Self::compose_within(assets, stage, limits, &TextOptions::default())
+        Self::compose_within(assets, stage, limits, &TextOptions::default(), false).scene
     }
 
     fn compose_within(
@@ -161,7 +143,8 @@ impl<'b> Composer<'b> {
         stage: Rect,
         limits: SceneLimits,
         options: &TextOptions<'b>,
-    ) -> Scene {
+        observe: bool,
+    ) -> Self {
         let definitions = definitions(assets);
         let mut composer = Self {
             limits,
@@ -178,6 +161,7 @@ impl<'b> Composer<'b> {
             paths: 0,
             segments: 0,
             stopped: false,
+            origins: observe.then(SceneOrigins::default),
             text: TextState::new(&assets.fonts, &assets.imports, options),
         };
         let root = Context {
@@ -187,9 +171,14 @@ impl<'b> Composer<'b> {
             target: Target::Items,
             sprite: None,
             depth: 0,
+            timeline: None,
+            placement: None,
+            declaration: None,
+            localised: false,
+            layout_prefix: None,
         };
         composer.timeline(&assets.timeline.first_frame, root);
-        composer.scene
+        composer
     }
 
     pub(crate) fn skip(&mut self, placement: &Placement, context: Context, reason: SkipReason) {
@@ -228,6 +217,9 @@ impl<'b> Composer<'b> {
                 transform: context.transform.then(&placement.matrix.into()),
                 color_transform: context.color_transform.compose(&placement.color_transform),
                 mask,
+                placement: self.origins.as_mut().map(|origins| {
+                    origins.place(context.placement, context.timeline, placement.depth)
+                }),
                 ..context
             };
             if let Some(clip) = placement.clip_depth {
@@ -244,6 +236,9 @@ impl<'b> Composer<'b> {
                     shapes: Vec::new(),
                     parent: mask,
                 });
+                if let Some(origins) = &mut self.origins {
+                    origins.mask(inner.placement);
+                }
                 masks.push((index, clip));
                 inner.target = Target::Mask(index);
             }
@@ -251,9 +246,11 @@ impl<'b> Composer<'b> {
         }
     }
 
-    fn place(&mut self, placement: &Placement, context: Context, inner: Context) {
-        match self.definitions.get(&placement.id).copied() {
-            Some(Definition::Shape(shape)) => {
+    fn place(&mut self, placement: &Placement, context: Context, mut inner: Context) {
+        let definition = self.definitions.get(&placement.id).copied();
+        inner.declaration = definition.and_then(Definition::origin);
+        match definition {
+            Some(Definition::Shape(_, shape)) => {
                 let cost = shape.records.len() + shape.fill_styles.len() + shape.line_styles.len();
                 let converted = self.shape(placement, context, (shape.id, 0), cost, |id| {
                     ShapeBuilder::convert(
@@ -267,7 +264,7 @@ impl<'b> Composer<'b> {
                     self.draw(placement, context, inner, index);
                 }
             }
-            Some(Definition::Morph(morph)) => {
+            Some(Definition::Morph(_, morph)) => {
                 let cost = morph.start_records.len()
                     + morph.start_fill_styles.len()
                     + morph.start_line_styles.len();
@@ -285,22 +282,25 @@ impl<'b> Composer<'b> {
                     self.draw(placement, context, inner, index);
                 }
             }
-            Some(Definition::Sprite(sprite)) => {
+            Some(Definition::Sprite(ordinal, sprite)) => {
                 if inner.depth >= MAX_SPRITE_DEPTH {
                     self.skip(placement, context, SkipReason::SpriteDepth);
                     return;
                 }
                 let nested = Context {
                     sprite: Some(sprite.id),
+                    timeline: Some(ordinal),
                     depth: inner.depth + 1,
                     ..inner
                 };
                 self.timeline(&sprite.timeline.first_frame, nested);
             }
-            Some(Definition::StaticText(text)) => {
+            Some(Definition::StaticText(_, text)) => {
                 self.static_text(placement, context, inner, text);
             }
-            Some(Definition::EditText(text)) => self.edit_text(placement, context, inner, text),
+            Some(Definition::EditText(_, text)) => {
+                self.edit_text(placement, context, inner, text);
+            }
             Some(Definition::Other(code)) => {
                 self.skip(placement, context, SkipReason::NotDrawn { code });
             }
@@ -364,20 +364,28 @@ impl<'b> Composer<'b> {
             return;
         }
         match inner.target {
-            Target::Items => self.scene.items.push(SceneItem {
-                shape: index,
-                transform: inner.transform,
-                color_transform: inner.color_transform,
-                mask: inner.mask,
-                origin: Origin {
-                    id: placement.id,
-                    depth: placement.depth,
-                    sprite: context.sprite,
-                },
-            }),
+            Target::Items => {
+                self.scene.items.push(SceneItem {
+                    shape: index,
+                    transform: inner.transform,
+                    color_transform: inner.color_transform,
+                    mask: inner.mask,
+                    origin: Origin {
+                        id: placement.id,
+                        depth: placement.depth,
+                        sprite: context.sprite,
+                    },
+                });
+                if let Some(origins) = &mut self.origins {
+                    origins.item(inner, index);
+                }
+            }
             Target::Mask(mask) => {
-                if let Some(mask) = self.scene.masks.get_mut(mask) {
-                    mask.shapes.push((index, inner.transform));
+                if let Some(mask_shape) = self.scene.masks.get_mut(mask) {
+                    mask_shape.shapes.push((index, inner.transform));
+                    if let Some(origins) = &mut self.origins {
+                        origins.mask_item(mask, inner, index);
+                    }
                 }
             }
         }

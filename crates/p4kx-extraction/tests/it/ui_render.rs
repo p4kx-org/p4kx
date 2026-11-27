@@ -8,7 +8,7 @@ use std::error::Error;
 use std::path::Path;
 
 use p4kx_extraction::gfx::{Background, CanvasSize, RasterOptions, SkipReason};
-use p4kx_extraction::{Archive, ConversionError, Texture, UiMovie};
+use p4kx_extraction::{Archive, CancelToken, ConversionError, Texture, UiMovie};
 use p4kx_testkit::{
     ArchiveBuilder, SplitDds, TestEntry, TestFill, TestMovie, TestPlace, TestShape,
     TestShapeRecord, TestSignature, TestTextureFormat, external_image_body, sub_image_body,
@@ -96,6 +96,65 @@ fn archive(dir: &Path) -> Result<Archive, Box<dyn Error>> {
 }
 
 #[test]
+fn cancelled_movie_publication_preserves_the_previous_artifact_and_companion() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let movie = UiMovie::from_archive(&archive, MOVIE)?;
+    let options = RasterOptions {
+        size: CanvasSize::Stage,
+        background: Background::Transparent,
+    };
+    let changed = RasterOptions {
+        size: CanvasSize::Width(29),
+        ..options
+    };
+    let cancel = CancelToken::new();
+    cancel.cancel();
+
+    for (output, companion) in [
+        ("panel.png", "panel.png.p4kx-origin.jsonl"),
+        ("panel.svg", "panel.svg.p4kx-origin.jsonl"),
+    ] {
+        let file = dir.path().join(output);
+        let receipt = dir.path().join(companion);
+        let svg = Path::new(output)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("svg"));
+        if svg {
+            movie.render_svg_to_file(&options, &file)?;
+        } else {
+            movie.render_to_file(&options, &file)?;
+        }
+        let prior_file = std::fs::read(&file)?;
+        let prior_receipt = std::fs::read(&receipt)?;
+        let result = if svg {
+            movie
+                .render_svg_to_file_with_origin_until(&changed, &file, &cancel)
+                .map(|_| ())
+        } else {
+            movie
+                .render_to_file_with_origin_until(&changed, &file, &cancel)
+                .map(|_| ())
+        };
+        assert!(
+            result.is_err(),
+            "{output}: cancellation refuses publication"
+        );
+        assert_eq!(
+            std::fs::read(&file)?,
+            prior_file,
+            "{output}: original payload"
+        );
+        assert_eq!(
+            std::fs::read(&receipt)?,
+            prior_receipt,
+            "{output}: original receipt"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn external_images_and_sub_images_fill_shapes_and_missing_ones_are_listed() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(dir.path())?;
@@ -152,5 +211,123 @@ fn external_images_and_sub_images_fill_shapes_and_missing_ones_are_listed() -> T
         "its fill skipped"
     );
     assert!(!render.is_complete(), "incomplete");
+    Ok(())
+}
+
+#[test]
+fn only_painted_bitmaps_bind_the_actual_selected_movie_and_dds_entries() -> TestResult {
+    const ATLAS: &str = "Data/UI/atlas.dds";
+    const OFFSCREEN: &str = "Data/UI/outside.dds";
+    const MOVIE: &str = "Data/UI/paint.gfx";
+
+    let folder = tempfile::tempdir()?;
+    let data = folder.path().join("synthetic.p4k");
+    let movie = painted_movie();
+    let mut archive = ArchiveBuilder::new().entry(TestEntry::stored(MOVIE, movie));
+    let atlas = SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 4)
+        .split(2)
+        .alpha(TestTextureFormat::R8);
+    for entry in atlas.entries(ATLAS) {
+        let encrypt = entry.path() == "Data/UI/atlas.dds.2a";
+        archive = archive.entry(if encrypt { entry.encrypted() } else { entry });
+    }
+    for entry in SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 4).entries(OFFSCREEN) {
+        archive = archive.entry(entry.encrypted());
+    }
+    archive.write_to(&data)?;
+
+    let archive = Archive::open_with_key(&data, Some(p4kx_testkit::test_key()))?;
+    let movie = UiMovie::from_archive(&archive, MOVIE)?;
+    let options = RasterOptions {
+        size: CanvasSize::Stage,
+        background: Background::Transparent,
+    };
+    let ordinary = movie.render(&options)?;
+    let observed = movie.render_with_bitmap_sources(&options)?;
+    assert_eq!(ordinary.image, observed.render.image);
+    assert_eq!(ordinary.skipped, observed.render.skipped);
+    assert!(ordinary.bitmap_failures.is_empty());
+    assert!(observed.render.bitmap_failures.is_empty());
+    assert_eq!(observed.bitmaps.len(), 1);
+    let painted = observed.bitmaps.first().ok_or("on-canvas paint")?;
+    assert_eq!(painted.id, 3);
+    assert_eq!(painted.origin.contains_encrypted_source(), Some(true));
+    assert!(painted.origin.source_set_complete());
+    assert_eq!(
+        observed.movie_geometry.contains_encrypted_source(),
+        Some(false),
+        "the unencrypted movie geometry has a different origin from the painted pixels"
+    );
+    assert!(
+        observed.movie_geometry.source_set_complete(),
+        "the actually drawn movie declarations are bound"
+    );
+    check_bitmap_sources(&observed.provenance)
+}
+
+fn painted_movie() -> Vec<u8> {
+    let cut = filled(11, 3, (80, 40));
+    let outside = filled(12, 4, (80, 40));
+    TestMovie::new(TestSignature::Cfx)
+        .stage(16, 8)
+        .tag(
+            1009,
+            &external_image_body(2, 2, 19, (8, 4), ("atlas", "atlas.tif")),
+        )
+        .tag(1008, &sub_image_body(3, 2, [2, 1, 6, 3]))
+        .tag(
+            1009,
+            &external_image_body(2, 2, 19, (8, 4), ("duplicate", "outside.dds")),
+        )
+        .tag(
+            1009,
+            &external_image_body(4, 2, 19, (8, 4), ("outside", "outside.dds")),
+        )
+        .tag(cut.code(), &cut.body())
+        .tag(outside.code(), &outside.body())
+        .tag(26, &TestPlace::new(1, 11).body2())
+        .tag(26, &TestPlace::new(2, 12).at(10_000, 0).body2())
+        .tag(1, &[])
+        .bytes()
+}
+
+fn check_bitmap_sources(provenance: &p4kx_extraction::SourceInventory) -> TestResult {
+    let inventory = serde_json::to_value(provenance)?;
+    let mut paths: Vec<_> = inventory
+        .get("sources")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("physical sources")?
+        .iter()
+        .filter_map(|input| {
+            input
+                .pointer("/path/value")
+                .and_then(serde_json::Value::as_str)
+        })
+        .collect();
+    paths.sort_unstable();
+    assert_eq!(
+        paths,
+        [
+            "Data/UI/atlas.dds",
+            "Data/UI/atlas.dds.2",
+            "Data/UI/atlas.dds.2a",
+            "Data/UI/atlas.dds.a",
+            "Data/UI/paint.gfx",
+        ],
+        "only the physically selected atlas, its alpha and their mip parts are used"
+    );
+    let uses = inventory
+        .get("uses")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("source uses")?;
+    assert!(
+        uses.iter().any(|usage| {
+            usage
+                .pointer("/location/field")
+                .and_then(serde_json::Value::as_str)
+                == Some("cropRectangle")
+        }),
+        "the authored crop chooses the emitted bitmap's pixels"
+    );
     Ok(())
 }

@@ -2,58 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::ffi::OsString;
-use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-
-use p4kx_texture::DdsHeader;
-
-use crate::CUBE_FACE_NAMES;
-
-const CUBE_FACES: u32 = 6;
-
-/// Returns the file name suffix of every image of mip `level` in the order of its data, `_layerN`
-/// for an array element, `_posx` … `_negz` for a cubemap face, `_sliceN` for a volume slice, in
-/// that order; the suffix of a texture with one image is empty. With `cross`, a cubemap's six
-/// faces are one image.
-pub(crate) fn image_suffixes(header: &DdsHeader, level: u32, cross: bool) -> Vec<String> {
-    let layers = header.array_size();
-    let slices = header.slices(level);
-    let faces = if cross && header.faces() == CUBE_FACES {
-        1
-    } else {
-        header.faces()
-    };
-    let mut suffixes = Vec::new();
-    for layer in 0..layers {
-        for face in 0..faces {
-            for slice in 0..slices {
-                let mut suffix = String::new();
-                if layers > 1 {
-                    numbered(&mut suffix, "layer", layer, layers);
-                }
-                if faces > 1 {
-                    match CUBE_FACE_NAMES.get(face as usize) {
-                        Some(name) if header.faces() == CUBE_FACES => {
-                            suffix.push('_');
-                            suffix.push_str(name);
-                        }
-                        _ => numbered(&mut suffix, "face", face, faces),
-                    }
-                }
-                if slices > 1 {
-                    numbered(&mut suffix, "slice", slice, slices);
-                }
-                suffixes.push(suffix);
-            }
-        }
-    }
-    suffixes
-}
-
-fn numbered(suffix: &mut String, name: &str, index: u32, count: u32) {
-    let width = count.saturating_sub(1).to_string().len();
-    let _written = write!(suffix, "_{name}{index:0width$}");
-}
 
 /// Returns `out` with `suffix` appended to its file stem.
 pub(crate) fn suffixed_path(out: &Path, suffix: &str) -> PathBuf {
@@ -71,10 +20,24 @@ pub(crate) fn suffixed_path(out: &Path, suffix: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use p4kx_testkit::{SplitDds, TestTextureFormat};
 
-    use super::{image_suffixes, suffixed_path};
-    use std::path::Path;
+    use super::suffixed_path;
+    use crate::{CubemapLayout, TextureImageFormat, TextureImagePlan};
+
+    fn image_suffixes(header: &p4kx_texture::DdsHeader, level: u32, cross: bool) -> Vec<String> {
+        let layout = if cross {
+            CubemapLayout::Cross
+        } else {
+            CubemapLayout::Faces
+        };
+        TextureImagePlan::new(header, level, layout, TextureImageFormat::Png)
+            .expect("a valid image plan")
+            .map(|image| image.suffix)
+            .collect()
+    }
 
     fn header(dds: &SplitDds) -> p4kx_texture::DdsHeader {
         p4kx_texture::DdsHeader::parse(&dds.header_bytes()).expect("a valid header")

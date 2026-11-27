@@ -12,6 +12,32 @@ expression: "serde_json::to_string_pretty(&value)?"
       "path": "..\\escaped.txt"
     }
   ],
+  "raw_artifacts": [
+    {
+      "digest": {
+        "byteLength": "21",
+        "sha256": "4db4dbe277086c71a8b0f5a5cb529791853b8112a6eda6a84988183ec3f438fa"
+      },
+      "origin_receipt": "ship_interior/entdata/2002.entxml.p4kx-origin.jsonl",
+      "path": "ship_interior/entdata/2002.entxml"
+    },
+    {
+      "digest": {
+        "byteLength": "307",
+        "sha256": "e32ab30f5c37dbb7a959282a79f1adbbe8cfaecbdb12de1e4eb372c18837c7a5"
+      },
+      "origin_receipt": "ship_interior/modules/cockpit.socpak.p4kx-origin.jsonl",
+      "path": "ship_interior/modules/cockpit.socpak"
+    },
+    {
+      "digest": {
+        "byteLength": "30",
+        "sha256": "05b553b4d7fd9d2d00754bb3a9328e8f3b3030f4aa54184c942add416905bc51"
+      },
+      "origin_receipt": "ship_interior/ship_interior.xml.p4kx-origin.jsonl",
+      "path": "ship_interior/ship_interior.xml"
+    }
+  ],
   "skipped": [],
   "target": "[DIR]/out"
 }

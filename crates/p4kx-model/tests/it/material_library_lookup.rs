@@ -88,7 +88,8 @@ fn a_missing_library_is_a_status_and_the_model_still_reads() -> TestResult {
     assert_eq!(
         model.materials,
         MaterialStatus::Missing {
-            path: CUBE_MATERIAL_LIBRARY.to_owned()
+            path: CUBE_MATERIAL_LIBRARY.to_owned(),
+            target: None,
         },
         "missing"
     );
@@ -148,6 +149,7 @@ fn paths_that_leave_the_data_folder_are_never_asked_for() -> TestResult {
         "../../secret",
         "objects/../../secret",
         "/etc/passwd",
+        "//authoring-host/branch/Data/Objects/Test/paint.mtl",
         "C:/secret",
         "objects//cube",
         "objects/./cube",

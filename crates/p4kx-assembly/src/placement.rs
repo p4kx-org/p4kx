@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, Transform, chained_world_poses};
+use p4kx_model::{Bone, Lod, Model, ModelFile, Transform, chained_world_poses};
 
-/// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
-/// about X first, then Y, then Z, and the translation `position` in metres.
-pub(crate) fn offset(position: [f32; 3], rotation: [f32; 3]) -> Transform {
+use crate::{IssueKind, ItemOffsetDiagnostic};
+
+/// Converts an authored offset with translation in metres and rotation in X, Y, Z degrees.
+#[must_use]
+pub fn offset_transform(position: [f32; 3], rotation: [f32; 3]) -> Transform {
     let [x, y, z] = rotation.map(|degrees| f64::from(degrees).to_radians());
     let (sx, cx) = x.sin_cos();
     let (sy, cy) = y.sin_cos();
@@ -37,23 +39,59 @@ const fn row([a, b, c]: [f64; 3], shift: f32) -> [f32; 4] {
     [a as f32, b as f32, c as f32, shift]
 }
 
-/// Returns the transform from the space of the node of `model` named `name`, ignoring ASCII
-/// case, to the model's space, or `None` when the model has no such node.
-pub(crate) fn node_transform(model: &Model, name: &str) -> Option<Transform> {
-    let mut at = model
+#[derive(Clone, Copy)]
+pub(crate) struct NodePlacement {
+    pub(crate) transform: Transform,
+    pub(crate) node: usize,
+}
+
+pub(crate) fn node_placement(model: &Model, name: &str) -> Option<NodePlacement> {
+    placement_at(model, named_node(model, name)?)
+}
+
+fn named_node(model: &Model, name: &str) -> Option<usize> {
+    model
         .nodes
         .iter()
-        .position(|node| node.name.eq_ignore_ascii_case(name))?;
+        .position(|node| node.name.eq_ignore_ascii_case(name))
+}
+
+fn placement_at(model: &Model, node: usize) -> Option<NodePlacement> {
     let mut transform = Transform::IDENTITY;
-    for _ in 0..=model.nodes.len() {
-        let node = model.nodes.get(at)?;
-        transform = node.transform.then(&transform);
-        match node.parent {
-            Some(parent) => at = parent,
-            None => return Some(transform),
+    for (_, ancestor) in model.node_ancestors(node) {
+        transform = ancestor.transform.then(&transform);
+        if ancestor.parent.is_none() {
+            return Some(NodePlacement { transform, node });
         }
     }
     None
+}
+
+pub(crate) struct ItemOffsetPlacement {
+    pub(crate) node: usize,
+    pub(crate) inverse: Transform,
+}
+
+pub(crate) fn item_offset_placement(
+    model: Option<&Model>,
+    helper: &str,
+) -> Result<Option<ItemOffsetPlacement>, IssueKind> {
+    let Some(model) = model.filter(|_| !helper.is_empty()) else {
+        return Ok(None);
+    };
+    let node = named_node(model, helper).ok_or_else(|| ItemOffsetDiagnostic::NotFound {
+        helper: helper.to_owned(),
+    })?;
+    let inverse = placement_at(model, node)
+        .ok_or_else(|| ItemOffsetDiagnostic::InvalidPlacement {
+            helper: helper.to_owned(),
+        })?
+        .transform
+        .inverse()
+        .ok_or_else(|| ItemOffsetDiagnostic::NotInvertible {
+            helper: helper.to_owned(),
+        })?;
+    Ok(Some(ItemOffsetPlacement { node, inverse }))
 }
 
 /// Returns whether the model has a level of detail near `level` and none of its meshes is skinned;
@@ -75,34 +113,98 @@ pub(crate) fn is_character_item(item_type: &str) -> bool {
         .is_some_and(|start| start.eq_ignore_ascii_case(CHARACTER_PREFIX))
 }
 
-/// Returns the transform from the bind-pose space of the bone of `model` named `name`, ignoring
-/// ASCII case, to the model's space, or `None` when the model has no such bone or its pose is
-/// not finite.
-///
-/// Only the bones of the first level of detail count, and of several bones with the same name the
-/// first wins.
-pub(crate) fn bone_transform(model: &Model, name: &str) -> Option<Transform> {
-    let bones = model
-        .lods
-        .first()
-        .map_or(model.bones.as_slice(), |lod| model.bones_of(lod));
-    bone_pose(bones, name)
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BoneSelection {
+    pub(crate) file: ModelFile,
+    pub(crate) ordinal: usize,
 }
 
-/// Returns the bind pose of the bone of `bones` named `name`, ignoring ASCII case, in the space of
-/// the skeleton, or `None` when there is no such bone or its pose is not finite.
-pub(crate) fn bone_pose(bones: &[Bone], name: &str) -> Option<Transform> {
+#[derive(Clone, Copy)]
+pub(crate) struct BonePlacement {
+    pub(crate) transform: Transform,
+    pub(crate) selection: BoneSelection,
+}
+
+pub(crate) fn bone_placement(model: &Model, name: &str) -> Option<BonePlacement> {
+    PlacementSkeleton::of(model, model.lods.first()).find(name)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct PlacementSkeleton<'a> {
+    file: ModelFile,
+    bones: &'a [Bone],
+}
+
+impl<'a> PlacementSkeleton<'a> {
+    pub(crate) fn of(model: &'a Model, lod: Option<&'a Lod>) -> Self {
+        lod.and_then(|lod| {
+            Some(Self {
+                file: ModelFile::LodModel(lod.level),
+                bones: lod.bones.as_deref()?,
+            })
+        })
+        .unwrap_or(Self {
+            file: ModelFile::Model,
+            bones: model.bones.as_slice(),
+        })
+    }
+
+    pub(crate) const fn bones(self) -> &'a [Bone] {
+        self.bones
+    }
+
+    pub(crate) fn find(self, name: &str) -> Option<BonePlacement> {
+        let (ordinal, transform) = named_bone_pose(self.bones, name)?;
+        Some(BonePlacement {
+            transform,
+            selection: BoneSelection {
+                file: self.file,
+                ordinal,
+            },
+        })
+    }
+}
+
+/// Returns the selected original bone ordinal and its pose in skeleton space.
+fn named_bone_pose(bones: &[Bone], name: &str) -> Option<(usize, Transform)> {
     let at = bones
         .iter()
         .position(|bone| bone.name.eq_ignore_ascii_case(name))?;
     let pose = *chained_world_poses(bones).get(at)?;
     let [x, y, z, w] = pose.rotation.map(f64::from);
-    Transform::from_quaternion([w, x, y, z], pose.translation.map(f64::from))
+    let transform = Transform::from_quaternion([w, x, y, z], pose.translation.map(f64::from))?;
+    Some((at, transform))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::offset;
+    use std::error::Error;
+
+    use p4kx_chunks::ChunkFile;
+    use p4kx_model::{CompanionError, CompanionPath, Model};
+    use p4kx_testkit::TestModel;
+
+    use super::{item_offset_placement, offset_transform};
+    use crate::{IssueKind, ItemOffsetDiagnostic};
+
+    #[test]
+    fn an_item_offset_helper_with_a_cyclic_parent_has_no_placement() -> Result<(), Box<dyn Error>> {
+        let bytes = TestModel::cube().single_file().cgf();
+        let file = ChunkFile::parse(bytes)?;
+        let mut companions =
+            |_: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> { Ok(None) };
+        let mut model = Model::read("item.cgf", &file, &mut companions)?;
+        let node = model.nodes.first_mut().ok_or("item node")?;
+        node.parent = Some(0);
+        let name = node.name.clone();
+        assert!(!name.is_empty(), "the cyclic node has a selectable name");
+        assert!(
+            matches!(item_offset_placement(Some(&model), &name),
+                Err(IssueKind::ItemOffsetHelper(ItemOffsetDiagnostic::InvalidPlacement { helper })) if helper == name),
+            "a named cyclic node has no placement"
+        );
+        Ok(())
+    }
 
     fn close(actual: [f32; 4], expected: [f32; 4]) {
         for (a, e) in actual.iter().zip(expected) {
@@ -112,7 +214,7 @@ mod tests {
 
     #[test]
     fn a_quarter_turn_about_z_maps_x_to_y() {
-        let transform = offset([1.0, 2.0, 3.0], [0.0, 0.0, 90.0]);
+        let transform = offset_transform([1.0, 2.0, 3.0], [0.0, 0.0, 90.0]);
         close(transform.rows[0], [0.0, -1.0, 0.0, 1.0]);
         close(transform.rows[1], [1.0, 0.0, 0.0, 2.0]);
         close(transform.rows[2], [0.0, 0.0, 1.0, 3.0]);
@@ -120,7 +222,7 @@ mod tests {
 
     /// The local axes of a part placed with `rotation`, as the columns of its rotation matrix.
     fn axes(rotation: [f32; 3]) -> [[f32; 3]; 3] {
-        let rows = offset([0.0; 3], rotation).rows;
+        let rows = offset_transform([0.0; 3], rotation).rows;
         [0, 1, 2].map(|column| rows.map(|row| row[column]))
     }
 
@@ -148,7 +250,7 @@ mod tests {
 
     #[test]
     fn rotations_apply_x_before_y_before_z() {
-        let transform = offset([0.0; 3], [90.0, 0.0, 90.0]);
+        let transform = offset_transform([0.0; 3], [90.0, 0.0, 90.0]);
         let up = transform.rows.map(|row| row[2]);
         for (actual, expected) in up.iter().zip([1.0, 0.0, 0.0]) {
             assert!((actual - expected).abs() < 1e-5, "{up:?}");

@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::every_field_required;
-
 /// The suit armour of an item, raw facts of `SCItemSuitArmorParams` (ADR-0072).
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ArmorStats {
     /// `integrityMilestoneToBreak`.
     pub(crate) integrity_milestone_to_break: Option<f32>,
@@ -19,9 +15,8 @@ pub(crate) struct ArmorStats {
 }
 
 /// The resistances of a `DamageResistanceMacro`, one entry per damage type.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct DamageResistance {
     /// `IgnoreMeleeDamage`.
     pub(crate) ignore_melee_damage: Option<bool>,
@@ -41,9 +36,8 @@ pub(crate) struct DamageResistance {
 
 /// The resistance to one damage type, as stored: the multiplier is the factor damage is scaled
 /// by, not a mitigation.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ResistanceEntry {
     /// `Multiplier`.
     pub(crate) multiplier: Option<f32>,
@@ -56,9 +50,8 @@ pub(crate) struct ResistanceEntry {
 }
 
 /// The worn properties of an item, raw facts of `SCItemClothingParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ClothingStats {
     /// `TemperatureResistance.MinResistance`, in degrees Celsius.
     pub(crate) temperature_resistance_min: Option<f32>,
@@ -73,9 +66,8 @@ pub(crate) struct ClothingStats {
 }
 
 /// A radar, raw facts of `SCItemRadarComponentParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct RadarStats {
     /// `aimAssist.distanceMinAssignment`, in metres.
     pub(crate) aim_assist_distance_min: Option<f32>,
@@ -88,9 +80,8 @@ pub(crate) struct RadarStats {
 }
 
 /// A tractor beam, from its `SWeaponActionFireTractorBeamParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct TractorBeamStats {
     /// `minForce`.
     pub(crate) min_force: Option<f32>,
@@ -110,9 +101,8 @@ pub(crate) struct TractorBeamStats {
 
 /// The tractor and salvage multipliers an attachment applies, from the `weaponStats` of its
 /// `EntityComponentAttachableModifierParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct WeaponModifierStats {
     /// The `salvageModifier`; `null` without one.
     pub(crate) salvage: Option<SalvageModifier>,
@@ -121,9 +111,8 @@ pub(crate) struct WeaponModifierStats {
 }
 
 /// An `SSalvageModifier`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct SalvageModifier {
     /// `radiusMultiplier`.
     pub(crate) radius_multiplier: Option<f32>,
@@ -134,9 +123,8 @@ pub(crate) struct SalvageModifier {
 }
 
 /// An `STractorModifier`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 #[expect(
     clippy::struct_field_names,
     reason = "each field is named after the stored multiplier"

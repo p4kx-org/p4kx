@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::context::Context;
+use crate::picture::RUNTIME_IMAGE_SOURCE;
+use crate::report::{ContentOmissionCode, OmissionInput};
 use crate::widget::Widget;
 
 pub(crate) const RUNTIME_IMAGE: &str = "BuildingBlocks_WidgetRuntimeImage";
@@ -35,11 +37,26 @@ pub(crate) fn is_silent(type_name: &str) -> bool {
 /// of the widget is drawn as for every widget.
 pub(super) fn image(cx: &mut Context<'_>, widget: &Widget) {
     cx.report.images_left_out += 1;
-    cx.report.note(
-        &widget.type_name,
-        "the image is rendered by the game at run time; the Record field imageSource names it",
-        &widget.name,
+    let source = widget.picture.runtime_source.as_deref();
+    let (code, reason) = if source.is_some() {
+        (
+            ContentOmissionCode::RuntimeTarget,
+            "the image is rendered by the game at run time; the Record field imageSource names it",
+        )
+    } else {
+        (
+            ContentOmissionCode::SourceMissing,
+            "the Record field imageSource names no run time render target",
+        )
+    };
+    cx.content_omission(
+        widget,
+        RUNTIME_IMAGE_SOURCE,
+        source,
+        code,
+        OmissionInput::WidgetField(RUNTIME_IMAGE_SOURCE),
     );
+    cx.report.note(&widget.type_name, reason, &widget.name);
 }
 
 /// Lists a widget that shows 3D content the game draws at run time.

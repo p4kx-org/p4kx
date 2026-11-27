@@ -32,7 +32,9 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
   | Random container, switch container, music switch | `group = -R<n>>1` |
 
   A group of one child is the child. A random or switch container is settled at run time in the
-  game; the file selects its first child, and the `group` line says how to select another.
+  game. A rendered group of several alternatives selects its first child. The header names
+  this behavior with `# approximation: select-first-alternative`. The same code appears in the
+  file's JSON `approximations` array after writing or verifying the retained bytes.
 - **Loops come from the WEM.** The loop of the WEM (`smpl` chunk, issue #95) is written as
   `#I <start> <end>` in frames, the values the sound file carries as `smpl` or `LOOPSTART` too.
   `ExportedSound` gains `loop_points` and `prefetch_only` for this; the header of the WEM is
@@ -48,11 +50,24 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
 - **Names from the Archive stay in comments.** The header comment holds the event and trigger
   name with control characters replaced, so a name cannot start a TXTP line of its own.
 
+## Traversal and rendering
+
+The sound and TXTP exporters preflight the resolved triggers for traversal cutoffs. A cutoff
+aborts the requested batch before file creation or replacement. The error carries the trigger,
+event and limit. Ordinary broken links remain visible in the TXTP report and header.
+
+TXTP stores group links as indices and visits them in postorder with an explicit stack of group
+cursors. Tree construction and destruction use the same flat representation. Group boundaries,
+single-child collapse, command order and byte addresses follow the resolved paths.
+
 ## Consequences
 
-- Music timing (clip positions, trims, transitions, the loop counts of containers and playlist
-  items) is not reproduced; a music event plays its tracks as layers. The map above is a faithful
-  rendition for events of sounds and containers and an approximation for music.
+- TXTP arranges the resolved sound files. Music clip positions, trims, transitions and authored
+  container or playlist loop counts remain source metadata. A music event plays its tracks as
+  layers in the generated TXTP.
+- The `approximations` array describes the generated commands for each file. An empty array
+  means the writer emitted none of the reported approximation codes. A `null` value means the
+  retained bytes were unchecked or differed from the generated text.
 - The segments of an `-S` group are decoded by vgmstream one after another: it takes the highest
   sample rate of them, and segments of different channel counts may need mixing (a mono segment
   next to a stereo one will not sound right without it), so a sequence of sounds with unequal
@@ -68,3 +83,88 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
   section; not done.
 - Writing a silent `?.` entry for a source without a file: plays a rendition that differs from
   the game without saying so; not done.
+
+The render tree groups sounds by the open visits of the resolved source
+walk. Repeated authored edges contribute distinct visits in source order.
+Separate physical holders of one logical Event contribute independent groups.
+
+MusicTrack leaves carry the observed clip features of their owning track.
+The report and header identify omitted finite nonzero start and trim times
+in milliseconds, omitted posted Events and nonfinite timing words. The
+source duration is a separate authored value.
+
+A rendered path carries observed fade and transition-segment features
+from its MusicPlaylist and MusicSwitch ancestors. A Switch MusicTrack
+contributes its source or destination fade timing when time or offset is nonzero.
+Random/Sequence transition modes other than zero produce `omit-container-transitions`,
+including an unrecognised nonzero mode. Mode zero leaves the timing words inactive.
+[wwiser transition mode table](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py)
+
+A Blend owner with original checked association curve points produces `omit-blend-curves`,
+even when the authored points have zero values. The writer reports each omitted
+feature in the header and JSON.
+
+Each resolved path carries omissions from its checked owners. The report adds
+`omit-container-loops` for Random/Sequence and MusicPlaylist loop controls when
+the count differs from one or an authored range bound is nonzero.
+`omit-container-conditions` covers checked Switch membership, a default
+selection, MusicSwitch decision data and MusicTrack switch membership or default.
+`omit-music-track-automation` reports a nonempty original point table.
+`omit-music-track-subtrack-selection` reports an original Random or Sequence track kind
+with more than one declared subtrack. The diagnostic uses the original kind byte and
+subtrack count. The TXTP continues to layer the files the source list supplies.
+Playlist loop and automation evidence is scoped to the owning playlist or
+track along that path. An automation clip index remains an authored field.
+The codes are emitted once per generated file in JSON and the TXTP header.
+The render commands and the WEM loop marker retain their own meaning.
+
+`omit-music-transition-scheduling` reports a MusicPlaylist or MusicSwitch rule
+with a known non-immediate source sync control, active destination entry or
+jump selector, or enabled source post-exit, destination pre-entry or
+match-source-cue flag. A Switch MusicTrack can supply the same code from its
+transition sync word. These controls can apply with zero fade timing.
+
+`omit-music-stinger-scheduling` reports a known non-immediate sync control
+in the stinger declaration followed by a rendered Trigger route. It cites
+the declaring object and the original trigger, segment and sync words.
+
+The CLI records approximation origins in the portable companion specified by ADR-0357.
+`textBytes` addresses cover the code token alone. The file row and companion share the source
+inventory and the immediate encryption and completeness flag at `/approximations/{index}`.
+The first positive owner in render order accounts for a deduplicated code. Its checked evidence
+contains the original transition mode, Blend or automation point count, non-neutral loop control,
+switch default or membership, clip time or event, or music transition word that triggered the
+code. A music decision tree requires the checked group count and tree size. An allocated
+transition segment or its fade cites the allocation flag as well as the original field. The bank
+version word establishes the decoded layout. The receipts describe declared controls observed on
+rendered paths.
+
+`select-first-alternative` describes the first rendered multi-child choice in postorder. Its
+command range identifies the actual variants that contribute. Their paths provide the entered
+child links of Random, Sequence, Switch, Blend, MusicSegment, MusicSwitch and MusicPlaylist
+objects, including ancestors and collapsed single-child groups. Each link cites its owner type,
+bank layout, child count and the physical ordinal and range of the original child ID. Random
+and Sequence links also cite their mode. The MusicPlaylist resolver follows the original child
+list. Broken or unrendered child occurrences supply no ID use.
+The variants under that group carry their entered Event and Action links. The proof includes
+the original Event action count, each used action ID at its physical ordinal, the Action type
+and target ID, and the explicit bank ID when used to enter a foreign bank. These words and
+layout versions belong to the bank that supplied the link. The first rendered choice uses
+the first corresponding action occurrence even when another occurrence has the same ID.
+Each file line inside that group's rendered command range also uses the WEM that supplied its
+newly written audio. The checked WEM payload range and, for embedded sound, the physical DIDX
+and DATA selectors contribute to the choice. This works for audio without a loop and for raw
+fallback that supplied the bytes of the written file. Kept audio has no new physical receipt.
+The remaining routing and media eligibility evidence keeps the contributor set incomplete.
+The direct marker reports any proven encrypted contributor.
+
+The decimal `#I` tokens have separate `textBytes` addresses at `/commands/{index}/loop/start`
+and `/commands/{index}/loop/end`. The index counts rendered file lines. The evidence reuses the
+selected WEM parse's separate start and end plans. An embedded source uses the exact written
+WEM's DIDX and DATA routing and prefixes WEM coordinates with its physical DIDX occurrence.
+An authored zero end word selects the parsed frame count. A retained sound has unknown loop
+origins in a newly generated TXTP, since its audio has no verified contributor binding.
+
+A replacement binds the companion to the complete TXTP digest. A kept file preserves its
+existing companion. The current report exposes unknown origins for byte-verified retained text
+without a verified contributor binding for that occurrence.

@@ -1,0 +1,185 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::sync::Arc;
+
+use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::CatalogError;
+use crate::catalog_read::original::{EntryCapture, PhysicalEntryRef};
+use crate::schema_fields::every_field_required;
+use crate::starmap::millimetres;
+use crate::starmap_containers::instance::{ContainerFile, ContainerInstanceKey};
+use crate::starmap_containers::location_declaration::ChildLocation;
+use crate::starmap_containers::proof::PlacementStep;
+use crate::starmap_transform::Transform;
+use crate::starmap_xml::AuthoredPose;
+
+/// One typed Child reached through a physical container route.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct LocationInstance {
+    instance_id: SourcedValue<ContainerInstanceKey>,
+    parent_location_id: SourcedValue<ContainerInstanceKey>,
+    container_instance_id: SourcedValue<ContainerInstanceKey>,
+    container: SourcedValue<PhysicalEntryRef>,
+    local_position: SourcedValue<[f64; 3]>,
+    local_rotation: SourcedValue<[f64; 4]>,
+    world_position: SourcedValue<[f64; 3]>,
+    world_rotation: SourcedValue<[f64; 4]>,
+    #[serde(serialize_with = "ChildLocation::serialize")]
+    #[schemars(with = "ChildLocation")]
+    declaration: Arc<ChildLocation>,
+}
+
+impl LocationInstance {
+    /// Returns this occurrence's key in the system root.
+    #[must_use]
+    pub const fn instance_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.instance_id
+    }
+
+    /// Returns the nearest authored location ancestor.
+    #[must_use]
+    pub const fn parent_location_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.parent_location_id
+    }
+
+    /// Returns the enclosing container occurrence.
+    #[must_use]
+    pub const fn container_instance_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.container_instance_id
+    }
+
+    /// Returns the physical container holding the declaration.
+    #[must_use]
+    pub const fn container(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.container
+    }
+
+    /// Returns the authored position in metres.
+    #[must_use]
+    pub const fn local_position(&self) -> &SourcedValue<[f64; 3]> {
+        &self.local_position
+    }
+
+    /// Returns the authored quaternion in W, X, Y, Z order.
+    #[must_use]
+    pub const fn local_rotation(&self) -> &SourcedValue<[f64; 4]> {
+        &self.local_rotation
+    }
+
+    /// Returns the composed system position in metres.
+    #[must_use]
+    pub const fn world_position(&self) -> &SourcedValue<[f64; 3]> {
+        &self.world_position
+    }
+
+    /// Returns the composed system quaternion in W, X, Y, Z order.
+    #[must_use]
+    pub const fn world_rotation(&self) -> &SourcedValue<[f64; 4]> {
+        &self.world_rotation
+    }
+
+    /// Returns the original Child declaration and same-container companions.
+    #[must_use]
+    pub fn declaration(&self) -> &ChildLocation {
+        &self.declaration
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn declaration_for_test(&self) -> &Arc<ChildLocation> {
+        &self.declaration
+    }
+    #[cfg(test)]
+    pub(crate) fn matches_body_child(&self, root: u32, body: &[u32], child: u32) -> bool {
+        self.container_instance_id.value().is_some_and(|key| {
+            key.root_entry_index() == root
+                && key.child_node_indices() == body
+                && key.external_child_step_indices().is_empty()
+        }) && self.instance_id.value().is_some_and(|key| {
+            key.matches_route(root, body, child)
+                && key.external_child_step_indices() == [body.len()]
+        })
+    }
+}
+
+pub(crate) struct LocationOccurrence<'route> {
+    pub(crate) root_entry: u32,
+    pub(crate) root_inputs: &'route [SourceUse],
+    pub(crate) route: &'route PlacementStep,
+    pub(crate) parent_location: Option<&'route PlacementStep>,
+    pub(crate) container_route: Option<&'route PlacementStep>,
+    pub(crate) local: AuthoredPose,
+    pub(crate) world: Transform,
+}
+
+impl LocationOccurrence<'_> {
+    pub(crate) fn project(
+        self,
+        location: &Arc<ChildLocation>,
+        file: &ContainerFile,
+        capture: &EntryCapture<'_>,
+    ) -> Result<LocationInstance, CatalogError> {
+        let sources = capture.source_uses();
+        let mut inputs = self.root_inputs.to_vec();
+        let mut complete = true;
+        for step in self.route.steps() {
+            complete &= step.selection(&mut inputs)?;
+        }
+        let shared = sources.shared_origin(&inputs, complete);
+        let position = self.route.position(SourceUseRole::Payload)?;
+        let rotation = self.route.rotation(SourceUseRole::Payload)?;
+        let world_rotations = self
+            .route
+            .steps()
+            .map(|step| step.rotation(SourceUseRole::Conversion))
+            .collect::<Result<Vec<_>, _>>()?;
+        let route_key = |route| ContainerInstanceKey::from_route(self.root_entry, route);
+        Ok(LocationInstance {
+            instance_id: sources.value_with_shared_origin(
+                SourceValue::Present(route_key(Some(self.route))),
+                &shared,
+                &[],
+                true,
+            )?,
+            parent_location_id: sources.value_with_shared_origin(
+                self.parent_location.map_or(SourceValue::Absent, |parent| {
+                    SourceValue::Present(route_key(Some(parent)))
+                }),
+                &shared,
+                &[],
+                true,
+            )?,
+            container_instance_id: sources.value_with_shared_origin(
+                SourceValue::Present(route_key(self.container_route)),
+                &shared,
+                &[],
+                true,
+            )?,
+            container: file.reference().clone(),
+            local_position: sources.value(state(self.local.position), &[position], true),
+            local_rotation: sources.value(state(self.local.rotation), &[rotation], true),
+            world_position: sources.value_with_shared_origin(
+                SourceValue::Present(self.world.position.map(millimetres)),
+                &shared,
+                &self.route.position_uses()?,
+                true,
+            )?,
+            world_rotation: sources.value_with_shared_origin(
+                SourceValue::Present(self.world.rotation.parts()),
+                &shared,
+                &world_rotations,
+                true,
+            )?,
+            declaration: Arc::clone(location),
+        })
+    }
+}
+
+fn state<T>(value: Option<T>) -> SourceValue<T> {
+    value.map_or(SourceValue::Absent, SourceValue::Present)
+}

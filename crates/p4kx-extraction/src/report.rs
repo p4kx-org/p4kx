@@ -1,19 +1,36 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::TryReserveError;
 use std::io;
 use std::path::PathBuf;
 
 use p4kx_archive::{ArchiveError, Checksum, DataError};
 use p4kx_cryxml::CryXmlError;
 use p4kx_dataforge::DataForgeError;
+use serde::Serialize;
 use thiserror::Error;
 
-use crate::{ConversionError, NameRule, PathLimit, RecordExportReport};
+use crate::{
+    ConversionError, ConvertedSoundArtifact, ExtractedFileArtifact, NameRule, OriginArtifactDigest,
+    PathLimit, RawEntryArtifact, RecordExportReport, SourceEvidenceError, TextureArtifacts,
+};
 
 /// Why one Entry of an Extraction was not written.
 #[derive(Debug, Error)]
 pub enum ExtractionError {
+    /// Ownership capture or verified cleanup failed without losing its typed cause.
+    #[error(transparent)]
+    OwnedOutput(Box<p4kx_guard::OwnedOutputError>),
+    /// An unpublished output could not be removed after completion or failure.
+    #[error("owned output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original failure when one preceded cleanup.
+        #[source]
+        primary: Option<Box<dyn std::error::Error + Send + Sync>>,
+        /// The separate cleanup failure.
+        cleanup: Box<p4kx_guard::OwnedOutputCleanupError>,
+    },
     /// The path would leave the target folder, or a folder on the way is a link.
     #[error("the path would leave the target folder")]
     UnsafePath,
@@ -52,13 +69,19 @@ pub enum ExtractionError {
         #[source]
         source: io::Error,
     },
-    /// The target lies inside a Star Citizen installation; nothing is written there.
+    /// A directory or redirected object occupies the reserved publication lock.
+    #[error("the origin publication lock {path} must be a regular, non-redirected file")]
+    OriginLockCollision {
+        /// The unmodified reserved path.
+        path: PathBuf,
+    },
+    /// Source or target protection refused the write.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The Entry is `CryXml` that could not be converted.
     #[error("cannot convert the CryXml")]
     Convert(#[source] CryXmlError),
-    /// The Entry is `CryXml` or DataForge larger than a Conversion reads into memory.
+    /// The Entry exceeds the conversion limit or the platform's byte-vector capacity.
     #[error("cannot convert the Entry: {size} bytes are more than the limit of {limit}")]
     TooLargeToConvert {
         /// The size of the Entry.
@@ -66,9 +89,21 @@ pub enum ExtractionError {
         /// The largest size converted.
         limit: u64,
     },
+    /// The allocator refused the decoded conversion buffer.
+    #[error("cannot reserve {requested} bytes for the decoded Entry")]
+    ConversionAllocation {
+        /// The requested buffer capacity.
+        requested: usize,
+        /// The allocator error.
+        #[source]
+        source: TryReserveError,
+    },
     /// The texture could not be converted.
     #[error("cannot convert the texture")]
     Texture(#[source] ConversionError),
+    /// The converted image's contributor inventory could not be built.
+    #[error("cannot record texture contributors")]
+    TextureEvidence(#[from] SourceEvidenceError),
     /// The sound, or a WEM the soundbank embeds, could not be converted, naming its codec when no
     /// decoder exists, or the soundbank could not be read.
     #[error("cannot convert the sound")]
@@ -150,6 +185,12 @@ impl EntryFailure {
         &self.error
     }
 
+    /// Returns the original typed failure without copying or decoding the source again.
+    #[must_use]
+    pub fn into_error(self) -> ExtractionError {
+        self.error
+    }
+
     /// Returns the stored and the computed checksum when the Entry failed because its data does
     /// not match the checksum of the directory.
     #[must_use]
@@ -159,6 +200,18 @@ impl EntryFailure {
             _ => None,
         }
     }
+}
+
+/// A committed merged DDS and its portable source-origin companion.
+#[derive(Debug, Serialize)]
+#[non_exhaustive]
+pub struct MergedTextureArtifact {
+    /// The DDS path relative to the extraction target, with forward slash separators.
+    pub path: String,
+    /// The companion path relative to the extraction target, with forward slash separators.
+    pub origin_receipt: String,
+    /// The byte length and SHA-256 of the committed DDS.
+    pub digest: OriginArtifactDigest,
 }
 
 /// The outcome of an Extraction.
@@ -175,9 +228,44 @@ pub struct ExtractionReport {
     pub(crate) records: Option<RecordExportReport>,
     pub(crate) records_entry: Option<String>,
     pub(crate) dataforge_left_out: Vec<String>,
+    pub(crate) texture_artifacts: Vec<TextureArtifacts>,
+    pub(crate) merged_texture_artifacts: Vec<MergedTextureArtifact>,
+    pub(crate) sound_artifacts: Vec<ConvertedSoundArtifact>,
+    pub(crate) raw_artifacts: Vec<RawEntryArtifact>,
+    pub(crate) cryxml_artifacts: Vec<ExtractedFileArtifact>,
 }
 
 impl ExtractionReport {
+    /// Returns receipts of the converted images this extraction committed.
+    #[must_use]
+    pub fn texture_artifacts(&self) -> &[TextureArtifacts] {
+        &self.texture_artifacts
+    }
+
+    /// Returns the DDS files that were committed with their source-origin companions.
+    #[must_use]
+    pub fn merged_texture_artifacts(&self) -> &[MergedTextureArtifact] {
+        &self.merged_texture_artifacts
+    }
+
+    /// Returns the sounds committed with their source-origin companions.
+    #[must_use]
+    pub fn sound_artifacts(&self) -> &[ConvertedSoundArtifact] {
+        &self.sound_artifacts
+    }
+
+    /// Returns unchanged files installed by this extraction and their current receipts.
+    #[must_use]
+    pub fn raw_artifacts(&self) -> &[RawEntryArtifact] {
+        &self.raw_artifacts
+    }
+
+    /// Borrows the XML files produced from binary CryXml and their committed companions.
+    #[must_use]
+    pub fn cryxml_artifacts(&self) -> &[ExtractedFileArtifact] {
+        &self.cryxml_artifacts
+    }
+
     /// Returns the number of Entries written.
     #[must_use]
     pub const fn extracted(&self) -> usize {
@@ -198,10 +286,17 @@ impl ExtractionReport {
         &self.skipped
     }
 
-    /// Returns the Entries that failed, with the reason.
+    /// Borrows the extraction and companion failures.
+    /// A companion failure can refer to an Entry whose payload was written.
     #[must_use]
     pub fn failures(&self) -> &[EntryFailure] {
         &self.failures
+    }
+
+    /// Returns the owned Entry failures, preserving their original typed causes.
+    #[must_use]
+    pub fn into_failures(self) -> Vec<EntryFailure> {
+        self.failures
     }
 
     /// Returns the Entries among the [`failures`](Self::failures) whose data did not match the
@@ -262,12 +357,16 @@ impl ExtractionReport {
         self.records.as_ref()
     }
 
-    /// Returns whether no Entry or Record failed, every texture was converted, the run was not
-    /// cancelled and the Archive did not change.
+    /// Returns whether Entries, Records and their companions completed without cancellation or
+    /// an Archive change.
     #[must_use]
     pub const fn is_complete(&self) -> bool {
         let records = match &self.records {
-            Some(records) => records.is_complete(),
+            Some(records) => {
+                records.is_complete()
+                    && records.origin_failures.is_empty()
+                    && !matches!(records.written_provenance.as_ref(), Some(Err(_)))
+            }
             None => true,
         };
         records

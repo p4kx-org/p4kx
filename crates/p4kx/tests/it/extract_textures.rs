@@ -9,7 +9,11 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
-use predicates::prelude::{PredicateBooleanExt, predicate};
+use predicates::prelude::predicate;
+use serde_json::Value;
+
+#[path = "extract_texture_origins.rs"]
+mod origins;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -117,9 +121,12 @@ fn convert_merges_textures_and_exports_png_once_per_texture() -> TestResult {
         files(&fixture.out)?,
         [
             "Data/Textures/broken_ddna.dds",
+            "Data/Textures/broken_ddna.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.dds",
+            "Data/Textures/panel_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.png",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "one DDS and one PNG for the texture, the raw header of the broken one"
     );
@@ -152,12 +159,17 @@ fn textures_and_mip_choose_the_outputs() -> TestResult {
         files(&fixture.out)?,
         [
             "Data/Textures/broken_ddna.dds",
+            "Data/Textures/broken_ddna.dds.p4kx-origin.jsonl",
             "Data/Textures/broken_ddna.png",
             "Data/Textures/panel_diff.dds",
             "Data/Textures/panel_diff.dds.1",
+            "Data/Textures/panel_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.dds.2",
+            "Data/Textures/panel_diff.dds.2.p4kx-origin.jsonl",
+            "Data/Textures/panel_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.png",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "the raw Entries and the PNGs; mip 1 of the broken texture needs no part"
     );
@@ -198,7 +210,25 @@ fn the_json_report_lists_textures_that_were_not_converted() -> TestResult {
         .stdout
         .clone();
 
-    let report: serde_json::Value = serde_json::from_slice(&output)?;
+    let report: Value = serde_json::from_slice(&output)?;
+    let merged = report["merged_texture_artifacts"]
+        .as_array()
+        .ok_or("merged DDS report")?;
+    let [artifact] = merged.as_slice() else {
+        return Err("only the completed DDS has a provenance receipt".into());
+    };
+    assert_eq!(
+        artifact["path"], "Data/Textures/panel_diff.dds",
+        "the summary identifies the actual output"
+    );
+    let relative = artifact["origin_receipt"]
+        .as_str()
+        .ok_or("portable receipt path")?;
+    assert!(
+        fixture.out.join(relative).is_file(),
+        "the receipt remains next to the DDS"
+    );
+
     assert_eq!(
         report["converted"], 3,
         "the Entries of the converted texture"
@@ -222,9 +252,15 @@ fn without_convert_textures_are_written_raw() -> TestResult {
     extract(&fixture)?
         .assert()
         .code(0)
-        .stdout(predicate::str::contains("converted").not());
+        .stdout(predicate::str::contains(
+            "extracted 5, skipped 0, failed 0, cancelled 0",
+        ));
 
-    assert_eq!(files(&fixture.out)?.len(), 5, "the raw Entries");
+    assert_eq!(
+        files(&fixture.out)?.len(),
+        10,
+        "five raw Entries and their companions"
+    );
     Ok(())
 }
 
@@ -257,8 +293,10 @@ fn convert_merges_an_alpha_tail_into_the_png_and_writes_cubemap_faces() -> TestR
 
     let mut expected = vec![
         "Data/glass.dds".to_owned(),
+        "Data/glass.dds.p4kx-origin.jsonl".to_owned(),
         "Data/glass.png".to_owned(),
         "Data/sky.dds".to_owned(),
+        "Data/sky.dds.p4kx-origin.jsonl".to_owned(),
     ];
     expected.extend(
         ["posx", "negx", "posy", "negy", "posz", "negz"]

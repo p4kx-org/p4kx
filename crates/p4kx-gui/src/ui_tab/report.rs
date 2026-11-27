@@ -3,10 +3,14 @@
 
 use p4kx_extraction::gfx::{Skipped, TagFailure};
 use p4kx_extraction::{ImportReport, UiBitmapFailure};
-use p4kx_screens::Still;
+use p4kx_screens::{ContentOmission, Still};
 
 use crate::UiText;
 use crate::model::describe;
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod tests;
 
 /// One thing a render left out or could not do: what kind of thing it is, and the details the
 /// renderer gives, which are the words `p4kx ui render` prints.
@@ -23,25 +27,32 @@ pub struct ReportLine {
 pub struct UiReport {
     lines: Vec<ReportLine>,
     counts: Vec<(UiText, usize)>,
+    content_omissions: Vec<ContentOmission>,
 }
 
 impl UiReport {
-    /// Returns the elements and features left out, in the order of the renderer's report.
+    /// Returns the grouped diagnostics in the order of the renderer's report.
     #[must_use]
     pub fn lines(&self) -> &[ReportLine] {
         &self.lines
     }
 
-    /// Returns how many things were left out.
+    /// Returns the number of grouped diagnostic lines.
     #[must_use]
     pub const fn len(&self) -> usize {
         self.lines.len()
     }
 
-    /// Returns whether nothing was left out.
+    /// Returns whether there are any grouped diagnostic lines.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.lines.is_empty()
+    }
+
+    /// Returns the content omissions with their original widget and source fields.
+    #[must_use]
+    pub fn content_omissions(&self) -> &[ContentOmission] {
+        &self.content_omissions
     }
 
     /// Returns the counts of a screen: its widgets, the shapes drawn, and the texts drawn and
@@ -111,6 +122,7 @@ impl UiReport {
         Self {
             lines,
             counts: Vec::new(),
+            content_omissions: Vec::new(),
         }
     }
 
@@ -163,6 +175,7 @@ impl UiReport {
                 (UiText::FactTextsDrawn, report.texts_drawn),
                 (UiText::FactTextsLeftOut, report.texts_left_out),
             ],
+            content_omissions: report.content_omissions.clone(),
         }
     }
 }

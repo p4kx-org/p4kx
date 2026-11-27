@@ -22,7 +22,7 @@ fn flag(name: &str, value: bool) -> (String, TestValue) {
 }
 
 /// An empty entry; the deadline is a class every Record of the struct states.
-fn entry(guid: u128, name: &str, path: &str) -> TestRecord {
+pub(super) fn entry(guid: u128, name: &str, path: &str) -> TestRecord {
     TestRecord::new(
         guid,
         "MissionBrokerEntry",
@@ -123,6 +123,7 @@ fn with_parts(record: TestRecord) -> TestRecord {
                 parts::named(location("Place_BP", "Place", None), "bprop_place"),
                 npc::npcs("Crew_BP", "", Some(("Squad", NpcKind::Full))),
                 npc::entities("Loot_BP", "", Some("Crate")),
+                super::template_values::item_property(),
             ]),
         )
         .value("objectiveTokens", objectives())

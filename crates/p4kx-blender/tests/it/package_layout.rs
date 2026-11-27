@@ -4,15 +4,17 @@
 //! The layout of a package written from the synthetic ship `TEST_Livery`: files, manifest,
 //! schema, shared meshes and textures.
 
+mod nodes;
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use p4kx_blender::{
-    AlphaMeaning, Basis, BuildInfo, ColourSpace, FORMAT_VERSION, Format, IssueOrigin, Manifest,
-    NodeKind, PackageInfo, TextureFormat, Unit, manifest_schema, write_package,
+    AlphaMeaning, Basis, BuildInfo, ColourSpace, Format, IssueOrigin, Manifest, PackageInfo,
+    TextureFormat, Unit, manifest_schema, write_package,
 };
 use p4kx_extraction::Archive;
-use p4kx_testkit::{check_glb, livery_entries};
+use p4kx_testkit::{TestEntry, check_glb, livery_entries};
 
 use crate::support::{TestResult, assemble, fixture, glb_options, names_in, never};
 
@@ -25,9 +27,17 @@ struct Written {
 }
 
 fn write(mip: u32) -> Result<Written, Box<dyn std::error::Error>> {
-    let fixture = fixture(livery_entries())?;
+    write_entries(livery_entries(), "TEST_Livery", mip)
+}
+
+fn write_entries(
+    entries: Vec<TestEntry>,
+    entity: &str,
+    mip: u32,
+) -> Result<Written, Box<dyn std::error::Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
-    let assembly = assemble(&archive, "TEST_Livery")?;
+    let assembly = assemble(&archive, entity)?;
     let models = p4kx_assembly::ArchiveModels::new(&archive);
     let dir = tempfile::tempdir()?;
     let out = dir.path().join("ship");
@@ -70,7 +80,13 @@ fn the_package_is_a_folder_of_a_manifest_meshes_and_textures() -> TestResult {
 
     assert_eq!(
         names_in(&written.out)?,
-        ["meshes", "scene.json", "textures"],
+        [
+            "material-sources",
+            "meshes",
+            "receipt.json",
+            "scene.json",
+            "textures"
+        ],
         "nothing else is in the folder"
     );
     assert_eq!(
@@ -78,22 +94,67 @@ fn the_package_is_a_folder_of_a_manifest_meshes_and_textures() -> TestResult {
         ["m0001.glb", "m0002.glb", "m0003.glb", "m0004.glb"]
     );
     assert_eq!(names_in(&written.out.join("textures"))?, ["t0001.png"]);
-    assert_eq!(written.summary.files, 6);
-    let on_disk: u64 = [
-        "scene.json",
-        "meshes/m0001.glb",
-        "meshes/m0002.glb",
-        "meshes/m0003.glb",
-        "meshes/m0004.glb",
-        "textures/t0001.png",
-    ]
-    .iter()
-    .map(|path| std::fs::metadata(written.out.join(path)).map(|metadata| metadata.len()))
-    .sum::<Result<u64, _>>()?;
+    let mut expected = declared_files(&written.manifest);
+    expected.push("receipt.json".into());
+    assert_eq!(
+        written.summary.files,
+        expected.len(),
+        "summary counts sidecars"
+    );
+    let on_disk = expected
+        .iter()
+        .map(|path| std::fs::metadata(written.out.join(path)).map(|metadata| metadata.len()))
+        .sum::<Result<u64, _>>()?;
     assert_eq!(
         written.summary.bytes, on_disk,
         "the summary counts every file"
     );
+    Ok(())
+}
+
+fn declared_files(manifest: &Manifest) -> Vec<String> {
+    let mut paths = vec!["scene.json".to_owned()];
+    paths.extend(manifest.meshes.iter().map(|mesh| mesh.file.clone()));
+    paths.extend(manifest.textures.iter().map(|texture| texture.file.clone()));
+    paths.extend(
+        manifest
+            .material_libraries
+            .iter()
+            .filter_map(|material| material.authored_file.as_ref())
+            .map(|source| source.file.clone()),
+    );
+    paths.sort_unstable();
+    paths
+}
+
+#[test]
+fn independent_writes_have_the_same_receipt_with_every_declared_file() -> TestResult {
+    let first = write(2)?;
+    let second = write(2)?;
+    let receipt = read(&first.out.join("receipt.json"))?;
+    assert_eq!(receipt, read(&second.out.join("receipt.json"))?);
+    let receipt: serde_json::Value = serde_json::from_slice(&receipt)?;
+    let files = receipt["files"].as_array().ok_or("receipt files")?;
+    assert_eq!(receipt["schema"], 1);
+    assert_eq!(receipt["archive_build"], first.raw["source"]["build"]);
+    assert_eq!(receipt["generator"]["name"], first.raw["generator"]["name"]);
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file["path"].as_str())
+            .collect::<Vec<_>>(),
+        declared_files(&first.manifest)
+            .iter()
+            .map(|path| Some(path.as_str()))
+            .collect::<Vec<_>>(),
+        "every declared file has a deterministic digest"
+    );
+    for row in files {
+        let path = row["path"].as_str().ok_or("relative file")?;
+        let mut digest = p4kx_extraction::OriginDigestWriter::new(std::io::sink());
+        std::io::copy(&mut std::fs::File::open(first.out.join(path))?, &mut digest)?;
+        assert_eq!(row["sha256"], digest.finish()?.sha256());
+    }
     Ok(())
 }
 
@@ -103,7 +164,7 @@ fn the_manifest_states_version_source_and_axes() -> TestResult {
     let manifest = &written.manifest;
 
     assert_eq!(manifest.format, Format::P4kxBlenderPackage);
-    assert_eq!(manifest.version, FORMAT_VERSION);
+    assert_eq!(manifest.version, "1.25");
     assert_eq!(manifest.generator.name, "p4kx");
     assert_eq!(manifest.source.channel.as_deref(), Some("LIVE"));
     assert_eq!(
@@ -159,45 +220,6 @@ fn the_schema_rejects_what_a_reader_must_refuse() -> TestResult {
     assert!(broken("/textures/0/colour_space", "aces".into()));
     assert!(broken("/textures/0/alpha", "mask".into()));
     assert!(broken("/nodes/0/kind", "portal".into()));
-    Ok(())
-}
-
-#[test]
-fn nodes_keep_the_hierarchy_and_names_of_the_assembly() -> TestResult {
-    let written = write(0)?;
-    let nodes = &written.manifest.nodes;
-
-    let names: Vec<&str> = nodes.iter().map(|node| node.name.as_str()).collect();
-    assert_eq!(
-        names,
-        [
-            "TEST_Livery",
-            "hardpoint_painted/TEST_Painted",
-            "hardpoint_twin/TEST_Painted",
-            "hardpoint_default/TEST_Default",
-            "hardpoint_lost/TEST_Lost",
-            "hardpoint_child/TEST_Child",
-            "hardpoint_plain/TEST_Plain",
-        ]
-    );
-    assert!(nodes.iter().all(|node| node.kind == NodeKind::Entity));
-    assert!(nodes.iter().all(|node| node.entity.is_some()));
-    assert_eq!(nodes.first().and_then(|node| node.parent), None);
-    assert!(
-        nodes.iter().skip(1).all(|node| node.parent == Some(0)),
-        "every part hangs below the ship"
-    );
-    assert_eq!(
-        nodes.get(1).map(|node| node.path.as_str()),
-        Some("hardpoint_painted")
-    );
-    assert!(
-        nodes.iter().all(
-            |node| node.scale.iter().all(|s| (s.abs() - 1.0).abs() < 1e-5)
-                && (node.rotation.iter().map(|q| q * q).sum::<f32>() - 1.0).abs() < 1e-4
-        ),
-        "unit scale and unit quaternions"
-    );
     Ok(())
 }
 

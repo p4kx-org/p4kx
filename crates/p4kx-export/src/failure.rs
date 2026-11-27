@@ -22,25 +22,11 @@ pub struct CatalogFailure {
 impl CatalogFailure {
     /// Returns the failure of `record`, which cannot be read because of `error`.
     pub(crate) fn of(record: &Record<'_>, error: &dyn Error) -> Self {
-        let mut reason = error.to_string();
-        let mut source = error.source();
-        while let Some(cause) = source {
-            reason.push_str(": ");
-            reason.push_str(&cause.to_string());
-            source = cause.source();
-        }
+        let reason = crate::failure_text::render(error);
         Self {
             guid: record.guid(),
-            record_path: record.record_path().map(str::to_owned).unwrap_or_default(),
+            record_path: record.record_path().map_or_default(str::to_owned),
             reason,
         }
-    }
-
-    /// Returns the failure of the loadout of `record`, which cannot be resolved because of
-    /// `error`.
-    pub(crate) fn of_loadout(record: &Record<'_>, error: &dyn Error) -> Self {
-        let mut failure = Self::of(record, error);
-        failure.reason.insert_str(0, "loadout: ");
-        failure
     }
 }

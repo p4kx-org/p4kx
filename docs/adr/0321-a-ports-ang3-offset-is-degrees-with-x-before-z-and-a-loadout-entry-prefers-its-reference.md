@@ -39,9 +39,12 @@ sideways along X. A part at `[30, 0, 90]` keeps its right axis level.
   attachments have none, and an entity attachment has no helper offset of its own.
 - `detach_direction`: the `detachDirection` vector every port has (68,597 ports in 13,704 Records).
 
-Neither changes a placement yet: they are read so that a front-end can show them and a later change
-can keep a gimbal or turret in its own orientation (`no_rotation`) without reading the Record
-again. `PortTags` and `RequiredPortTags` were read already; the port container holds no tags of its
+Static placement applies the complete helper transform. A rotated relay fixture
+distinguishes that rule from translation-only placement. The stored
+`no_rotation` flag remains available to consumers. The entity loadout JSON retains its
+authored value and source state alongside the unresolved animation interpretation.
+`PortTags` and
+`RequiredPortTags` were read already; the port container holds no tags of its
 own in LIVE, only `PortFlags`.
 
 ## Sub-geometry selection
@@ -64,7 +67,34 @@ the part that holds it (a gimbal). Of 155,900 ports of the 1,144 ships and vehic
 Entity, 860 in 357 vehicles are filled only by a `defaultItem`. Ambiguous class names take the
 first Entity in definition order.
 
-## Not decided here
+## Installed standard loadouts
 
-Applying `no_rotation` to placements, and the Loadouts of XML files, whose entries carry no
-Reference.
+The packaged Windows AMD64 CLI from merge
+`8e2ab5df97cf7c08bd6378606ed232930875586e` ran
+`entity loadout --stop-at-docked-vehicles --json` on two installed Builds. Each
+Archive stamp remained stable. The following counts use the attachment
+visibility rules of the Assembly output.
+
+| Build and vehicle | Ports | Attached ports | Visible attachments with authored `no_rotation = true` |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821`, Hammerhead GS | 459 | 240 | 14 |
+| PTU `13284307`, Ursa Medivac | 101 | 45 | 3 |
+
+The JSON carries complete field origins for all 17 selected attachments.
+Neither loadout reported an unreadable attachment branch. The two front
+airlock control panels on the Hammerhead share an Entity-space door helper.
+
+The authored door action resolves from the Open fragment, through the model's
+animation list, to one clip in its animation database. The packaged GLB export
+decoded one clip with two mapped channels and no unread animations or
+unmapped controllers. The shared helper has no animation channel. Both leaf
+nodes have 32 translation keys along the same local axis over 1.667 seconds,
+with opposite directions and travel of 0.688 m and 1.415 m. The modeled
+opening leaves the panel helper at its bind orientation.
+
+## Runtime interpretation
+
+The meaning of `no_rotation` during animation is unresolved. A discriminating
+reference must track an attached part while its helper rotates relative to the
+model. The Hammerhead opening only translates its two leaves. XML Loadout
+entries have no Reference and use a separate identity rule.

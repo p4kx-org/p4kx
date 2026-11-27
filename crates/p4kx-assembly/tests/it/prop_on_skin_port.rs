@@ -6,11 +6,12 @@
 
 use crate::assembly_support::{TestResult, assemble, fixture};
 
-use p4kx_assembly::{Assembly, Placement};
+use p4kx_assembly::{Assembly, IssueKind, Part, Placement, PortHelperProblem, PortPlacementField};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
     GARMENT_ON_SKIN_PORT, PROP_ON_BONE_PORT, PROP_ON_LOST_PORT, PROP_ON_SKIN_PORT,
     PROP_RIG_CREATURE, PROP_RIG_HUMAN, PROP_RIG_STATIC, SKINNED_ON_SKIN_PORT, prop_rig_entries,
+    prop_rig_unresolved_helper_entries,
 };
 
 const BODY: &str = "Body_ItemPort";
@@ -24,7 +25,7 @@ fn build(class: &str) -> Result<Assembly, Box<dyn std::error::Error>> {
 fn placement<'a>(assembly: &'a Assembly, port: &str) -> Result<&'a Placement, &'static str> {
     assembly
         .part_at(&format!("{BODY}/{port}"))
-        .map(p4kx_assembly::Part::placement)
+        .map(Part::placement)
         .ok_or("the part")
 }
 
@@ -47,6 +48,111 @@ fn a_rigid_prop_on_a_skin_port_hangs_on_the_bone_of_a_human_skeleton() -> TestRe
             "helper_not_found" | "bones_not_in_skeleton"
         )
     }));
+    Ok(())
+}
+
+#[test]
+fn a_skin_port_reports_helper_selection_only_when_its_rigid_anchor_is_used() -> TestResult {
+    let fixture = fixture(prop_rig_unresolved_helper_entries())?;
+    let archive = Archive::open(&fixture.path)?;
+    let assembly = assemble(&archive, PROP_RIG_HUMAN, 0)?;
+    let baseline = build(PROP_RIG_HUMAN)?;
+    let rigid_path = format!("{BODY}/{PROP_ON_SKIN_PORT}");
+    let weighted_path = format!("{BODY}/{SKINNED_ON_SKIN_PORT}");
+    let rigid = assembly
+        .part_at(&rigid_path)
+        .ok_or("the rigid attachment")?;
+    let weighted = assembly
+        .part_at(&weighted_path)
+        .ok_or("the weighted attachment")?;
+    for (part, path, expected) in [
+        (rigid, rigid_path.as_str(), pelvis()),
+        (weighted, weighted_path.as_str(), Placement::Skin),
+    ] {
+        let original = baseline
+            .part_at(path)
+            .ok_or("the corresponding ordinary port")?;
+        assert_eq!(part.placement(), &expected, "{path}: original placement");
+        assert_eq!(
+            part.parent(),
+            original.parent(),
+            "{path}: original hierarchy"
+        );
+        assert_eq!(
+            part.local().rows,
+            original.local().rows,
+            "{path}: original local pose"
+        );
+        assert_eq!(
+            part.world().rows,
+            original.world().rows,
+            "{path}: original world pose"
+        );
+    }
+
+    verify_helper_diagnostic(&assembly, &rigid_path, rigid, weighted)
+}
+
+fn verify_helper_diagnostic(
+    assembly: &Assembly,
+    rigid_path: &str,
+    rigid: &Part,
+    weighted: &Part,
+) -> TestResult {
+    let mut diagnostics = assembly
+        .issues()
+        .iter()
+        .filter_map(|issue| match issue.kind() {
+            IssueKind::PortHelperUnresolved(diagnostic) => Some((issue.path(), diagnostic)),
+            _ => None,
+        });
+    let (path, diagnostic) = diagnostics
+        .next()
+        .ok_or("the applied rigid helper's diagnostic")?;
+    assert_eq!(
+        path, rigid_path,
+        "only the actual rigid anchor uses a helper"
+    );
+    let additional: Vec<_> = diagnostics.collect();
+    assert!(
+        additional.is_empty(),
+        "only the anchored port has a helper diagnostic: {additional:?}"
+    );
+    let placement = rigid
+        .port_placement_source()
+        .ok_or("the applied rigid helper fields")?;
+    assert_eq!(
+        diagnostic.port(),
+        placement.port(),
+        "the same original physical port"
+    );
+    assert!(
+        diagnostic.attached_record_index().is_some(),
+        "the diagnostic has a physical attachment Record"
+    );
+    assert_eq!(
+        diagnostic.attached_record_index(),
+        rigid.entity_record_index(),
+        "the same actual attached entity"
+    );
+    assert_eq!(
+        diagnostic.helper_ordinals(),
+        [1, 0],
+        "the exact authored alternative"
+    );
+    assert_eq!(
+        diagnostic.problem(),
+        PortHelperProblem::UnsupportedSelector,
+        "the helper selector remains unresolved"
+    );
+    let weighted_source = weighted
+        .port_placement_source()
+        .ok_or("the bind-pose selector")?;
+    assert_eq!(
+        weighted_source.fields().collect::<Vec<_>>(),
+        [PortPlacementField::AttachmentType],
+        "the weighted attachment uses only the skin declaration"
+    );
     Ok(())
 }
 

@@ -5,11 +5,12 @@
 //! counts and budget use whether those steps are walked once or once per column.
 
 use std::error::Error;
+use std::sync::Mutex;
 
 use crate::fleet::database as fleet_database;
 use crate::ships::{database, schema};
 use p4kx_dataforge::DataForge;
-use p4kx_dataforge::query::{MAX_PATH_VALUES, Query};
+use p4kx_dataforge::query::{MAX_PATH_VALUES, Query, QuerySource, Row};
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -19,7 +20,7 @@ fn outcome(forge: &DataForge<'_>, text: &str, share: bool) -> Result<Vec<String>
     if !share {
         compiled = compiled.without_shared_prefixes();
     }
-    let run = compiled.run();
+    let run = compiled.run()?;
     Ok(run
         .rows(0..run.len())
         .iter()
@@ -100,6 +101,100 @@ fn followed_links_count_the_same_unresolved_ones_shared_or_alone() -> TestResult
         "from Ship select escorts[*]->escorts[*]->name, escorts[*]->escorts[*]->mass, mass",
     ] {
         assert_same(&forge, text)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn observed_shared_links_keep_the_same_original_operands_as_where() -> TestResult {
+    let bytes = fleet_database();
+    let forge = DataForge::open(&bytes)?;
+    let query = Query::parse(
+        r#"from Ship at "libs/ships/beta" select escorts[*]->maker->home->name,
+           escorts[*]->maker->home->mass where escorts[*]->maker->home->mass = 5.5"#,
+    )?;
+    let shared = query.compile(&forge)?;
+    assert!(
+        !shared.shared_prefixes().is_empty(),
+        "the fixture exercises replay"
+    );
+
+    let operands = Mutex::new(Vec::new());
+    let run = shared
+        .run_observing_records(
+            || true,
+            |operand| operands.lock().expect("predicate operands").push(operand),
+            |_| {},
+        )?
+        .ok_or("selection completed")?;
+    let observed = run.rows_observed(0..run.len());
+    let [row] = observed.as_slice() else {
+        return Err("exactly one observed Record matches".into());
+    };
+    let fallback = query.compile(&forge)?.without_shared_prefixes();
+    let separate = fallback
+        .physical_row_observed(row.record().index(), 32)
+        .ok_or("the independent walk keeps the same Record")?;
+    assert_observed_operands(row, &separate, &operands.into_inner()?)?;
+
+    let plain = run.rows(0..run.len());
+    let [plain] = plain.as_slice() else {
+        return Err("exactly one unobserved Record matches".into());
+    };
+    assert!(plain.root_sources().is_none() && plain.cell_sources().is_none());
+
+    let stopped = shared.run_observing_records(
+        || false,
+        |_| panic!("a cancelled query must not examine predicate operands"),
+        |_| panic!("a cancelled query must not examine a Record admission"),
+    )?;
+    assert!(stopped.is_none(), "initial cancellation emits no rows");
+    Ok(())
+}
+
+fn assert_observed_operands(
+    row: &Row<'_>,
+    separate: &Row<'_>,
+    operands: &[QuerySource],
+) -> TestResult {
+    let both = row.cell_sources().ok_or("observed shared cells")?;
+    let independent = separate
+        .cell_sources()
+        .ok_or("observed independent cells")?;
+    assert_eq!(both.len(), 2, "both selected columns are observed");
+    assert_eq!(both.len(), independent.len(), "walks emit the same columns");
+    let actual = operands.iter().filter(|event| {
+        matches!(
+            event,
+            QuerySource::ReferenceTarget { .. } | QuerySource::RecordLookup { .. }
+        )
+    });
+    for (shared, independent) in both.iter().zip(independent) {
+        let sources = shared.traversed().collect::<Vec<_>>();
+        assert_eq!(
+            sources,
+            independent.traversed().collect::<Vec<_>>(),
+            "the replay keeps all and only the independent walk's inputs"
+        );
+        assert_eq!(
+            shared.values(),
+            independent.values(),
+            "value input paths match"
+        );
+        assert!(
+            actual.clone().count() >= 4,
+            "the predicate followed all three references"
+        );
+        assert!(
+            actual.clone().all(|source| sources.contains(source)),
+            "both selected columns keep the same original GUID lookup operands as the predicate"
+        );
+        assert!(
+            sources
+                .iter()
+                .any(|source| matches!(source, QuerySource::InstanceExtent { resolved: true, .. })),
+            "the visited target opened a readable physical instance"
+        );
     }
     Ok(())
 }

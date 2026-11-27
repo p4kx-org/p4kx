@@ -10,7 +10,7 @@ mapping describes, and the basic setup for materials without a description.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import bpy
 
@@ -21,11 +21,14 @@ from .material_basic import basic_description
 from .material_model import Palette
 from .material_pairing import INDEX_PROPERTY, index_of, pair_by_index
 from .package import Mesh, Package, PackageError, Texture, resolve_file
+from .package_digests import file_sha256
 
-if TYPE_CHECKING:
-    from .package import MeshMaterial
-
-_COLOUR_SPACE_NAMES = {"srgb": "sRGB", "linear": "Non-Color"}
+_COLOUR_SPACE_NAMES = {
+    "srgb": "sRGB",
+    "linear": "Non-Color",
+    "data": "Non-Color",
+    "linear_colour": "Linear Rec.709",
+}
 _ALPHA_MODES = {"opacity": "STRAIGHT", "smoothness": "CHANNEL_PACKED", "none": "NONE"}
 _COLUMN = 280.0
 _ROW = 260.0
@@ -52,11 +55,19 @@ class ImageCache:
     def _load(self, texture: Texture) -> bpy.types.Image | None:
         try:
             path = resolve_file(self._package.root, texture.file)
+            if texture.format == "dds" and (
+                path.stat().st_size != texture.byte_length or file_sha256(path) != texture.sha256
+            ):
+                raise PackageError("DDS file differs from its package byte binding.")
             image = bpy.data.images.load(str(path), check_existing=True)
-        except (PackageError, RuntimeError):
+            if texture.format == "dds":
+                pixels = image.pixels[:4]
+                if len(pixels) != 4 or tuple(image.size) != texture.dimensions or not image.has_data:
+                    raise PackageError("Blender cannot decode the declared DDS mip.")
+        except (OSError, PackageError, RuntimeError):
             self._package.warnings.append(f"Texture {texture.id} could not be loaded.")
             return None
-        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.colour_space]
+        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.encoding or texture.colour_space]
         image.alpha_mode = _ALPHA_MODES[texture.alpha]
         return image
 
@@ -66,9 +77,9 @@ def apply_materials(
 ) -> None:
     """Builds the node trees of the glTF materials one mesh import created.
 
-    A glTF material is paired with the mesh's entry by its ``p4kx_index`` custom property, else
-    by name. An entry with a description gets the node tree of that description; an entry
-    without one, or a 1.0 package, gets the basic setup from the textures of the entry.
+    Every material with the same ``p4kx_index`` receives its slot's node graph. Unindexed
+    materials use the legacy name pairing. Slots without a description use their textures
+    on the basic material graph when available.
     """
     materials = {material.name: material for material in created}
     pairs = pair_by_index(
@@ -79,18 +90,21 @@ def apply_materials(
         package, images, package.palettes.get(mesh.palette_id) if mesh.palette_id else None
     )
     for entry in mesh.materials:
-        blender = materials.get(pairs.get(entry.index, ""))
-        if blender is None:
+        names = pairs.get(entry.index)
+        if not names:
             continue
         description = package.material_descriptions.get(entry.material or "")
         if description is not None:
             spec = build_graph(description, context)
-            for warning in spec.warnings:
-                if warning not in package.warnings:
-                    package.warnings.append(warning)
-            build_tree(blender, spec, images)
         elif entry.textures:
-            apply_textures(blender, entry, package, images)
+            spec = build_graph(basic_description(entry, package), _context(package, images))
+        else:
+            continue
+        for warning in spec.warnings:
+            if warning not in package.warnings:
+                package.warnings.append(warning)
+        for name in names:
+            build_tree(materials[name], spec, images)
 
 
 def build_tree(material: bpy.types.Material, spec: GraphSpec, images: ImageCache) -> None:
@@ -182,23 +196,15 @@ def _layout(nodes: dict[str, bpy.types.Node], spec: GraphSpec) -> None:
         node.location = (column * _COLUMN, -row * _ROW)
 
 
-def apply_textures(
-    material: bpy.types.Material, described: MeshMaterial, package: Package, images: ImageCache
-) -> None:
-    """Connects the textures of ``described`` to the Principled BSDF of ``material``.
-
-    This is the basic setup of format 1.0 packages and of materials without a description. It
-    is the graph of a neutral ``Illum`` material with those textures, so a specular map follows
-    the same rule as everywhere else.
-    """
-    spec = build_graph(basic_description(described, package), _context(package, images))
-    build_tree(material, spec, images)
-
-
 def _context(package: Package, images: ImageCache, palette: Palette | None = None) -> BuildContext:
     return BuildContext(
         package.material_descriptions,
         palette,
         {texture.id: texture.alpha for texture in package.textures.values()},
         images.loads,
+        {
+            texture.id: texture.ddna.smoothness
+            for texture in package.textures.values()
+            if texture.ddna is not None
+        },
     )

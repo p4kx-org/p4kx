@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog of the window driven headless: availability, the written file and its
+//! The P4KX catalog of the window driven headless: availability, the written file and its
 //! summary, cancel, and the DataForge shared with the Record export.
 
 use crate::cataloging;
@@ -9,36 +9,31 @@ use crate::cataloging;
 use std::fs;
 use std::io::Read;
 
-use cataloging::{TestResult, building, ended, files_in, makers, many, opened, wait_until};
+use cataloging::{
+    TestResult, building, ended, files_in, makers, many, opened, start_full_catalog, wait_until,
+};
 use p4kx_export::{Kind, Language as TextLanguage, SizeWarning};
 use p4kx_gui::{Browser, CATALOG_FILE, CatalogExportStatus, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 #[test]
-fn an_unreadable_record_is_counted_as_a_failure_and_the_catalog_is_written() -> TestResult {
+fn an_unreadable_record_refuses_a_normal_catalog_without_writing() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
-    let file = out.join("basetool-catalog.json");
+    let file = out.join("p4kx-catalog.json");
 
     assert!(model.start_catalog(file.clone(), || {}), "started");
-    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
-        return Err("no summary".into());
+    let CatalogExportStatus::Incomplete(health) = ended(&mut model)? else {
+        return Err("no incomplete publication refusal".into());
     };
-    let summary = outcome.summary();
-
-    assert!(!summary.is_complete(), "a Record failed");
-    let failures = summary.failures();
-    assert_eq!(failures.len(), 1, "the broken blueprint");
-    assert_eq!(
-        failures.first().map(|failure| failure.guid.to_string()),
-        Some("90000000-0000-4000-8000-000000000009".to_owned()),
-        "its GUID"
+    assert!(!health.is_complete(), "a selected source failed");
+    assert!(
+        health.failed_records().iter().any(|record| record
+            .guid()
+            .value()
+            .is_some_and(|guid| guid.as_str() == "90000000-0000-4000-8000-000000000009")),
+        "the failed source identity is retained"
     );
-    let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
-        Some(1),
-        "the readable manufacturer is written"
-    );
+    assert!(!file.exists(), "normal publication creates no snapshot");
     Ok(())
 }
 
@@ -60,9 +55,9 @@ fn a_catalog_needs_an_archive_with_a_dataforge() -> TestResult {
 #[test]
 fn the_catalog_is_written_and_summarised() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
-    let file = out.join("basetool-catalog.json");
+    let file = out.join("p4kx-catalog.json");
 
-    assert!(model.start_catalog(file.clone(), || {}), "started");
+    assert!(start_full_catalog(&mut model, file.clone()), "started");
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
         return Err("no summary".into());
     };
@@ -82,17 +77,37 @@ fn the_catalog_is_written_and_summarised() -> TestResult {
     assert_eq!(german.unresolved, 1, "DRAK has no German name");
     assert_eq!(summary.size_warning(), None, "small");
     let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(json["schemaVersion"], 2, "a Basetool catalog");
     assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
+        json["schemaVersion"],
+        p4kx_export::SCHEMA_VERSION,
+        "a P4KX catalog"
+    );
+    assert_eq!(
+        json["definitions"]["manufacturers"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(2),
         "two"
     );
+    assert!(json.get("manufacturers").is_none(), "no legacy array");
     assert_eq!(
-        files_in(&out)?,
-        ["basetool-catalog.json"],
-        "no temporary file"
+        json["definitions"]["manufacturers"]["availability"],
+        "available"
     );
+    let row = &json["definitions"]["manufacturers"]["rows"][0];
+    for (field, domain) in [("name", "publicNames"), ("description", "gameTexts")] {
+        let reference = &row["localization"]["value"][field];
+        assert_eq!(reference["state"], "present");
+        let texts = json["texts"][domain]
+            .as_array()
+            .ok_or("canonical text table")?;
+        assert!(
+            texts
+                .iter()
+                .any(|text| text["id"]["value"] == reference["value"])
+        );
+    }
+    assert_eq!(files_in(&out)?, ["p4kx-catalog.json"], "no temporary file");
     Ok(())
 }
 
@@ -118,7 +133,7 @@ fn only_one_catalog_runs_at_a_time() -> TestResult {
 #[test]
 fn cancelling_while_dataforge_is_read_ends_at_once_and_writes_nothing() -> TestResult {
     let (_dir, mut model, out) = opened(&many(20_000))?;
-    let file = out.join("basetool-catalog.json");
+    let file = out.join("p4kx-catalog.json");
     fs::write(&file, "old")?;
 
     model.start_catalog(file.clone(), || {});
@@ -130,11 +145,7 @@ fn cancelling_while_dataforge_is_read_ends_at_once_and_writes_nothing() -> TestR
     assert!(ended_at_once, "the window does not wait for the read");
     assert!(cancelled, "the outcome says so");
     assert_eq!(fs::read_to_string(&file)?, "old", "the file is untouched");
-    assert_eq!(
-        files_in(&out)?,
-        ["basetool-catalog.json"],
-        "no partial file"
-    );
+    assert_eq!(files_in(&out)?, ["p4kx-catalog.json"], "no partial file");
     Ok(())
 }
 
@@ -143,7 +154,7 @@ fn cancelling_while_records_are_checked_writes_nothing() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
     let hold = model.hold_catalog();
 
-    model.start_catalog(out.join("basetool-catalog.json"), || {});
+    model.start_catalog(out.join("p4kx-catalog.json"), || {});
     building(&mut model)?;
     model.cancel_catalog();
     let status = ended(&mut model)?;
@@ -180,9 +191,16 @@ fn the_dataforge_read_for_a_catalog_is_kept_for_the_record_export() -> TestResul
     assert!(exported, "the Record export starts");
     assert_eq!(reads(&model), Some(1), "DataForge read once for both");
     assert_eq!(
-        files_in(&out.join("records/libs/foundry/records/scitemmanufacturer"))?.len(),
-        3,
-        "the Record export used it"
+        files_in(&out.join("records/libs/foundry/records/scitemmanufacturer"))?,
+        [
+            "ACAS.json",
+            "ACAS.json.p4kx-origin.jsonl",
+            "DRAK.json",
+            "DRAK.json.p4kx-origin.jsonl",
+            "Test_Maker.json",
+            "Test_Maker.json.p4kx-origin.jsonl",
+        ],
+        "the Record export writes the cached definitions and their companions"
     );
     Ok(())
 }
@@ -228,7 +246,7 @@ fn an_archive_change_during_a_catalog_fails_it_and_writes_nothing() -> TestResul
     let (dir, mut model, out) = opened(&makers())?;
     let hold = model.hold_catalog();
 
-    model.start_catalog(out.join("basetool-catalog.json"), || {});
+    model.start_catalog(out.join("p4kx-catalog.json"), || {});
     building(&mut model)?;
     cataloging::wordy(2, 10).write_to(dir.path().join("Data.p4k"))?;
     drop(hold);
@@ -246,7 +264,7 @@ fn an_archive_change_during_a_catalog_fails_it_and_writes_nothing() -> TestResul
 fn a_gz_file_name_is_refused_and_nothing_is_written() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
 
-    let started = model.start_catalog(out.join("basetool-catalog.json.gz"), || {});
+    let started = model.start_catalog(out.join("p4kx-catalog.json.gz"), || {});
 
     assert!(!started, "nothing starts");
     assert!(
@@ -280,7 +298,7 @@ fn the_file_name_of_the_dialog_is_normalised_before_the_catalog_is_written() -> 
 fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
     let plain = out.join("plain.json");
-    let packed = out.join("basetool-catalog.json.zst");
+    let packed = out.join("p4kx-catalog.json.zst");
 
     model.start_catalog(plain.clone(), || {});
     ended(&mut model)?;
@@ -294,7 +312,11 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
     zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut decoded)?;
     let without_time = |bytes: &[u8]| -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         let mut json: serde_json::Value = serde_json::from_slice(bytes)?;
-        let source = json["source"].as_object_mut().ok_or("no source")?;
+        assert_eq!(json["format"], "p4kx-catalog-markers");
+        let source = json
+            .pointer_mut("/catalog/source")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or("no source")?;
         source.remove("exportedAt").ok_or("no export time")?;
         Ok(json)
     };
@@ -309,7 +331,7 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
     );
     assert_eq!(
         files_in(&out)?,
-        ["basetool-catalog.json.zst", "plain.json"],
+        ["p4kx-catalog.json.zst", "plain.json"],
         "no temporary file"
     );
     Ok(())
@@ -317,7 +339,7 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
 
     model.start_catalog(out.join("catalog.json"), || {});
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
@@ -335,5 +357,42 @@ fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
 
 #[test]
 fn the_suggested_catalog_file_is_the_compressed_one() {
-    assert_eq!(CATALOG_FILE, "basetool-catalog.json.zst", "the upload form");
+    assert_eq!(
+        CATALOG_FILE, "p4kx-catalog.json.zst",
+        "the default compressed file"
+    );
+}
+
+#[test]
+fn an_independent_resource_has_its_own_written_kind_and_source_health() -> TestResult {
+    let (_dir, mut model, out) = opened(&cataloging::resources())?;
+    let file = out.join("resources.json");
+    start_full_catalog(&mut model, file.clone());
+    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
+        return Err("the resource catalog did not finish".into());
+    };
+    let summary = outcome.summary();
+    let resources = summary
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource kind")?;
+    assert_eq!(
+        (resources.count, resources.skipped, resources.complete),
+        (1, 0, true),
+        "the selected resource is independently written"
+    );
+    let health = summary
+        .export_health()
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource health")?;
+    assert_eq!(
+        health.source_records.selected, 1,
+        "one physical resource source"
+    );
+    assert!(
+        summary.export_health().is_complete(),
+        "the source and projection completed"
+    );
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(file)?)?;
+    crate::catalog_resource_wire::assert_written_resource(&document, resources.count)?;
+    Ok(())
 }

@@ -245,8 +245,9 @@ fn export_bar(
                     }
                     let enabled = !result.is_empty();
                     for (format, label) in [
-                        (QueryExportFormat::Json, &notes.export_json),
-                        (QueryExportFormat::Csv, &notes.export_csv),
+                        (QueryExportFormat::Json, notes.export_json.as_ref()),
+                        (QueryExportFormat::Csv, notes.export_csv.as_ref()),
+                        (QueryExportFormat::CsvStrict, "CSV (RFC 4180)"),
                     ] {
                         if button::button(ui, Kind::Ghost, Size::Normal, label, enabled).clicked() {
                             requests.dialog = Some(Dialog::QueryExport(format));

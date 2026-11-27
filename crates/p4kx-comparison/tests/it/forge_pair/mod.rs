@@ -7,7 +7,8 @@ use std::error::Error;
 use std::path::Path;
 
 use p4kx_comparison::{
-    Archive, CompareOptions, Comparison, DataForgeEntry, DataForges, Levels, compare,
+    Archive, CompareOptions, Comparison, DataForgeEntry, DataForges, Levels,
+    compare_with_dataforge_entries,
 };
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 
@@ -60,13 +61,14 @@ impl ForgePair {
         check: impl FnOnce(&Comparison<'_>) -> R,
     ) -> Result<R, Box<dyn Error>> {
         let (old, new) = (self.old_entry.open()?, self.new_entry.open()?);
-        let comparison = compare(
+        let comparison = compare_with_dataforge_entries(
             &self.old,
             &self.new,
-            Some(DataForges {
+            DataForges {
                 old: &old,
                 new: &new,
-            }),
+            },
+            [&self.old_entry, &self.new_entry],
             options,
         )?;
         Ok(check(&comparison))

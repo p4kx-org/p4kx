@@ -4,8 +4,12 @@
 //! Record XML of nested structs, arrays, References and nulls.
 
 use std::error::Error;
+use std::{io, ptr};
 
-use p4kx_dataforge::{DataForge, RecordXml};
+use p4kx_dataforge::{
+    Annotations, DataForge, Field, RecordTree, RecordXml, RecordXmlHeaderMember, RecordXmlSite,
+    RecordXmlSpan, RecordXmlValueMember, Value,
+};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -230,5 +234,157 @@ fn a_wrapped_element_leaves_the_namespace_to_its_wrapper() -> TestResult {
         "<records xmlns:p4kx=\"https://github.com/p4kx-org/p4kx/record-xml\">\n{xml}</records>\n"
     );
     roxmltree::Document::parse(&wrapped)?;
+    Ok(())
+}
+
+#[test]
+fn observed_xml_is_byte_identical_and_addresses_exact_values() -> TestResult {
+    let bytes = car().build();
+    let forge = DataForge::open(&bytes)?;
+    let tree = forge.records().next().ok_or("Car Record")?.tree()?;
+    let mut writer = RecordXml::new();
+    let mut plain = Vec::new();
+    let mut observed = Vec::new();
+    let mut spans = Vec::new();
+    writer.write(&tree, &mut plain)?;
+    writer.write_observed(&tree, Annotations::none(), &mut observed, &mut |span| {
+        spans.push(span);
+        Ok(())
+    })?;
+    assert_eq!(observed, plain, "observation preserves every XML byte");
+    assert!(
+        spans.windows(2).all(|pair| {
+            pair.first()
+                .zip(pair.last())
+                .is_some_and(|(left, right)| left.bytes.end <= right.bytes.start)
+        }),
+        "fragments are in nonoverlapping output order"
+    );
+    assert_eq!(
+        fragments(&observed, &spans, |site| matches!(
+            site,
+            RecordXmlSite::Header(RecordXmlHeaderMember::Type)
+        )),
+        ["Car", "Car"],
+        "both root tag names"
+    );
+    assert_array_origins(&tree, &observed, &spans)?;
+    assert_value_origins(&tree, &observed, &spans)
+}
+
+fn field<'record, 'source>(
+    tree: &'record RecordTree<'source>,
+    name: &str,
+) -> Result<&'record Value<'source>, Box<dyn Error>> {
+    tree.fields()
+        .iter()
+        .find(|field| field.name() == name)
+        .map(Field::value)
+        .ok_or_else(|| format!("missing field {name}").into())
+}
+
+fn assert_array_origins(
+    tree: &RecordTree<'_>,
+    xml: &[u8],
+    spans: &[RecordXmlSpan<'_, '_>],
+) -> TestResult {
+    let owner = field(tree, "tags")?;
+    let Value::Array(tags) = owner else {
+        return Err("tags array".into());
+    };
+    let first_tag = tags.first().ok_or("first array value")?;
+    let second_tag = tags.get(1).ok_or("second array value")?;
+    assert_eq!(
+        value_fragments(xml, spans, first_tag, RecordXmlValueMember::Value),
+        ["a"],
+        "first array occurrence"
+    );
+    assert_eq!(
+        value_fragments(xml, spans, second_tag, RecordXmlValueMember::Value),
+        ["b"],
+        "second array occurrence"
+    );
+    assert_eq!(
+        value_fragments(xml, spans, owner, RecordXmlValueMember::Name),
+        ["tags", "tags"],
+        "start and end names refer to the same owning field"
+    );
+    Ok(())
+}
+
+fn assert_value_origins(
+    tree: &RecordTree<'_>,
+    xml: &[u8],
+    spans: &[RecordXmlSpan<'_, '_>],
+) -> TestResult {
+    use RecordXmlValueMember::{Guid, Path, Value};
+
+    assert_eq!(
+        value_fragments(xml, spans, field(tree, "missing")?, Value),
+        ["p4kx:null"],
+        "null derived from the stored pointer"
+    );
+    assert_eq!(
+        value_fragments(xml, spans, field(tree, "maker")?, Path),
+        ["libs/foundry/records/makers/aegis"],
+        "selected Reference target path"
+    );
+    assert_eq!(
+        value_fragments(xml, spans, field(tree, "lost")?, Guid),
+        ["00000001-0002-0003-0004-000000000005"],
+        "unresolved stored GUID"
+    );
+    Ok(())
+}
+
+fn value_fragments<'a>(
+    xml: &'a [u8],
+    spans: &[RecordXmlSpan<'_, '_>],
+    datum: &Value<'_>,
+    member: RecordXmlValueMember,
+) -> Vec<&'a str> {
+    fragments(
+        xml,
+        spans,
+        |site| matches!(site, RecordXmlSite::Value { value, member: part, .. } if ptr::eq(value, datum) && part == member),
+    )
+}
+
+fn fragments<'a>(
+    bytes: &'a [u8],
+    spans: &[RecordXmlSpan<'_, '_>],
+    matches: impl Fn(RecordXmlSite<'_, '_>) -> bool,
+) -> Vec<&'a str> {
+    spans
+        .iter()
+        .filter(|span| matches(span.site))
+        .filter_map(|span| {
+            let start = usize::try_from(span.bytes.start).ok()?;
+            let end = usize::try_from(span.bytes.end).ok()?;
+            std::str::from_utf8(bytes.get(start..end)?).ok()
+        })
+        .collect()
+}
+
+#[test]
+fn an_xml_observer_can_stop_the_writer_at_an_exact_fragment() -> TestResult {
+    let bytes = car().build();
+    let forge = DataForge::open(&bytes)?;
+    let tree = forge.records().next().ok_or("Car Record")?.tree()?;
+    let mut out = Vec::new();
+    let mut observed = 0;
+    let result = RecordXml::new().write_observed(&tree, Annotations::none(), &mut out, &mut |_| {
+        observed += 1;
+        Err(io::Error::from(io::ErrorKind::Interrupted))
+    });
+    assert!(
+        matches!(result, Err(error) if error.kind() == io::ErrorKind::Interrupted),
+        "observer failure reaches the original caller"
+    );
+    assert_eq!(observed, 1, "the first observer failure stops serializing");
+    assert!(
+        out.ends_with(b"<Car"),
+        "the reported range was fully written"
+    );
     Ok(())
 }

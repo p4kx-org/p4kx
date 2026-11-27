@@ -4,6 +4,7 @@
 //! Conversion of the DataForge Entry into Record XML files during an Extraction.
 
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -13,11 +14,13 @@ use p4kx_extraction::{
     Progress, extract,
 };
 use p4kx_testkit::{
-    ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, SplitDds, TestElement,
-    TestEntry, TestRecord, TestStruct, TestTextureFormat, TestType, TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "dataforge_conversion_origins.rs"]
+mod origins;
 
 fn database(count: u32) -> Vec<u8> {
     (0..count)
@@ -121,9 +124,13 @@ fn conversion_writes_one_record_file_per_record_instead_of_the_dcb() -> TestResu
         files(&fixture.target)?,
         [
             "Data/libs/foundry/records/items/n0.xml",
+            "Data/libs/foundry/records/items/n0.xml.p4kx-origin.jsonl",
             "Data/libs/foundry/records/items/n1.xml",
+            "Data/libs/foundry/records/items/n1.xml.p4kx-origin.jsonl",
             "Data/libs/foundry/records/items/n2.xml",
+            "Data/libs/foundry/records/items/n2.xml.p4kx-origin.jsonl",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "the Records go below the folder of the Entry, without the .dcb"
     );
@@ -171,7 +178,12 @@ fn without_conversion_the_dcb_is_written_as_before() -> TestResult {
     assert!(report.records().is_none(), "no Records: {report:?}");
     assert_eq!(
         files(&fixture.target)?,
-        ["Data/Game2.dcb", "Data/readme.txt"],
+        [
+            "Data/Game2.dcb",
+            "Data/Game2.dcb.p4kx-origin.jsonl",
+            "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
+        ],
         "raw Entries"
     );
     assert_eq!(
@@ -196,8 +208,11 @@ fn only_the_dataforge_the_archive_is_read_from_is_converted() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Game.dcb",
+            "Data/Game.dcb.p4kx-origin.jsonl",
             "Data/libs/foundry/records/items/n0.xml",
+            "Data/libs/foundry/records/items/n0.xml.p4kx-origin.jsonl",
             "Data/libs/foundry/records/items/n1.xml",
+            "Data/libs/foundry/records/items/n1.xml.p4kx-origin.jsonl",
         ],
         "Game2.dcb is converted, Game.dcb is written as it is"
     );
@@ -223,6 +238,11 @@ fn a_dataforge_that_cannot_be_opened_fails_the_entry() -> TestResult {
     assert!(files(&fixture.target)?.is_empty(), "nothing is written");
     Ok(())
 }
+
+#[path = "dataforge_conversion_checksum.rs"]
+mod checksum;
+#[path = "dataforge_conversion_extent.rs"]
+mod extent;
 
 #[test]
 fn the_conflict_policy_applies_to_each_record_file() -> TestResult {
@@ -337,51 +357,26 @@ fn cancelling_while_records_are_written_stops_the_run() -> TestResult {
         "not every Record is written: {records:?}"
     );
     assert!(!report.is_complete(), "a cancelled run is not complete");
-    assert!(
-        files(&fixture.target)?.iter().all(|file| Path::new(file)
-            .extension()
-            .is_some_and(|extension| extension == "xml")),
-        "no partial file remains"
-    );
-    Ok(())
-}
-
-#[test]
-fn cryxml_textures_and_the_dataforge_convert_in_one_run() -> TestResult {
-    let cryxml = TestElement::new("Ship")
-        .attribute("name", "Gladius")
-        .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
-    let mut entries = SplitDds::new(TestTextureFormat::LegacyDxt5, 32, 16)
-        .split(3)
-        .entries("Data\\Textures\\rock_diff.dds");
-    entries.push(TestEntry::stored("Data\\ship.xml", cryxml));
-    entries.push(TestEntry::stored("Data\\Game2.dcb", database(2)));
-    let fixture = fixture(entries)?;
-
-    let report = run(&fixture, &converting());
-
-    assert!(report.is_complete(), "complete: {report:?}");
+    let mut on_disk = std::collections::BTreeSet::new();
+    for file in files(&fixture.target)? {
+        let artifact = file.strip_suffix(".p4kx-origin.jsonl").unwrap_or(&file);
+        let ordinal = artifact
+            .rsplit('/')
+            .next()
+            .and_then(|name| name.strip_prefix('n'))
+            .and_then(|name| name.strip_suffix(".xml"))
+            .ok_or("written Record ordinal")?;
+        on_disk.insert(ordinal.parse()?);
+        assert!(
+            Path::new(artifact).extension() == Some(OsStr::new("xml"))
+                && fixture.target.join(artifact).is_file(),
+            "only committed Record files and companions remain: {file}"
+        );
+    }
     assert_eq!(
-        files(&fixture.target)?,
-        [
-            "Data/Textures/rock_diff.dds",
-            "Data/Textures/rock_diff.png",
-            "Data/libs/foundry/records/items/n0.xml",
-            "Data/libs/foundry/records/items/n1.xml",
-            "Data/ship.xml",
-        ],
-        "the texture merged and exported, the Records written, the CryXml converted"
-    );
-    assert!(
-        fs::read(fixture.target.join("Data/ship.xml"))?.starts_with(b"<?xml"),
-        "CryXml as XML"
-    );
-    assert_eq!(
-        report
-            .records()
-            .map(p4kx_extraction::RecordExportReport::written),
-        Some(2),
-        "both Records"
+        origins::committed_positions(records, Some(false))?,
+        on_disk,
+        "cancellation keeps exactly the original committed indices"
     );
     Ok(())
 }

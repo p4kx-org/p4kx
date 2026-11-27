@@ -38,8 +38,9 @@ packages, compared against the owner's in-game screenshot of the Hammerhead.
   It counts as a colourless decal, so `Material::hidden`, the GLB writer, the viewer and the add-on
   (`_relief_decal`) skip it. A decal with a colour of its own, a tint mode, no displacement map or
   no parallax mapping is drawn as before.
-- **Livery decal and hull number.** Not decided: the data names no switch, so `Custom_decal` and the
-  number stay drawn as the material file has them.
+- **Livery decal and hull number.** Issue #775 keeps the authored presentation in 0.5.0. The
+  export draws the selected material's authored emblem texture and the hull glyph from its
+  original UVs. A paint name alone does not hide the emblem or select another glyph.
 
 ## Consequences
 
@@ -47,5 +48,108 @@ packages, compared against the owner's in-game screenshot of the Hammerhead.
   material runs before any texture is read. A white, untinted parallax decal whose map holds
   colour would be hidden too. None of the parallax decal maps of the two ships has colour.
 - The relief itself (normal and displacement map) is not drawn, as for any colourless decal.
-- A later change may find where the game chooses the livery decal, for example in a Record we have
-  not read.
+- The selected installed LIVE and PTU comparison checked physical material entries and related
+  DataForge declarations. Both Builds retained the same emblem-bearing material set in scope.
+  Empty observed decal ports and paint palette changes establish no separate visibility rule.
+  The surveyed source also supplies no rule for selecting an alternative hull number. The
+  authored presentation is the release contract. A comparison with the game's runtime choices
+  would require independently verified selection evidence.
+- Issue #1181 covers the light grey panel shading and roughness comparison.
+
+## Factory Hammerhead bow comparison
+
+For #1181, registration of two factory-paint LIVE captures binds the exposed bow plate to nose
+mesh 2, subset 3, material slot 6. The registration residuals are 2.50 and 2.44 pixels. The
+stripe decals provide geometric anchors. Use the adjacent unmarked plate for surface comparison.
+
+The normal exporters produced the GLB and Blender package for the same physical subset on
+LIVE 13220821 and PTU 13248297. Blender 5.3.0 build `02f0899d78e3` sampled the imported
+Principled inputs at four original UVs with mip 2 inputs. The results agree across both Builds.
+
+| Imported input | Paired result at the four UVs |
+| --- | --- |
+| Roughness | Maximum absolute difference 0.001878 |
+| Linear base colour | Maximum absolute RGB component difference 0.000560 |
+| Normal | Maximum absolute signed component difference 0.000000120 on the same tangent frame |
+| IOR and metallic | 1.5 and 0 respectively in both imports |
+| Specular IOR Level | Package 0.08033–0.13823, GLB 0.5 |
+
+The package samples the original specular image using sRGB transfer, converts its linear RGB
+to luminance, and applies the material multiplier and clamp. The measured conservative bound
+for the admitted 512 × 512 mip is 0.007619–0.395728. At the repeat seam, filtering the encoded
+RGB before decoding differs from filtering preconverted linear coefficients. The GLB import
+uses Blender's default Specular IOR Level for this subset.
+
+These measurements establish a material-input difference between the exporters. The game
+captures provide display-space RGB under hangar lighting. Incident light, exposure, display
+transform and active material parameters are still required to attribute the reported
+appearance to a shader input. A matched linear material readback or calibrated runtime
+comparison remains the evidence gate for attributing the difference to the game shader.
+
+### Direct-sun game reference
+
+The follow-up LIVE sequence shows the factory bow in direct Pyro sunlight. The local client
+log and installed manifest agree on Change 13220821. In the two close views, held-out stripe
+contours and the one-stripe-shift control confirm the plate immediately left of the stripes
+as nose mesh 2, subset 3, slot 6. The snapshots use the same Vulkan renderer and reflection
+settings.
+
+Three unmarked regions were mapped between views using the plate's four orange triangle
+markers. The table reports median luma in JPEG code values on a 0–255 scale, with 81 samples
+per region. The nearby white stripe control uses the 80th percentile of the stripe window.
+The sampled stripe windows have zero clipped channels in these three frames.
+
+| View | Bare plate medians | Stripe control |
+| --- | --- | ---: |
+| 3 | 136.2, 137.2, 140.9 | 223.1 |
+| 4 | 117.7, 119.7, 123.7 | 201.8 |
+| 5 | 112.0, 112.0, 114.0 | 202.9 |
+
+Views 3 and 4 report the same camera direction while the position and framing change. Both
+the plate and the stripes become darker in view 4. In view 5 the stripe control is close to
+view 4 and the plate values fall further. A nominal reprojection of one bare point from view 4 into view 5 changes the viewing angle
+by 21.0°. In a 13 × 13 pixel window around that point, the median code value falls from
+116.0 to 111.0. The sequence provides a display-space range for the plate. The stripe
+reflectance and frame response are uncalibrated.
+Attribution of the appearance difference still requires a matched material readback or a
+calibrated lighting and display comparison.
+
+## Release projection for the factory bow
+
+Textured GLB export approximates the Blender package's dielectric reflection for the confirmed
+factory-painted bow material. The exporter verifies the library and palette pair, the physical
+slot, the foundation and wear declarations, the original specular binding and the texture
+transfer. The approximation uses the selected mip and the same UV0 mapping.
+
+The exporter decodes the original RGB samples with their declared transfer and computes linear
+luminance. It multiplies each value by the selected palette luminance and the package's factor
+of 12.5 to get the package's Specular IOR Level. At IOR 1.5, a neutral glTF specular colour
+equal to twice that level approximates the package's normal-incidence reflectance. The neutral
+colour saturates at 1 and is stored as an sRGB texture in the optional
+`KHR_materials_specular` extension. The extension retains full grazing reflectance and its
+8-bit encoding and filtering can cause small differences between texel centres.
+
+The existing core GLB material supplies the fallback when a consumer lacks the extension or
+the source requirements do not hold. Base colour, normal, roughness and metallic inputs use
+their established paths. The source comparison supports this interchange approximation. A
+matched material readback or calibrated lighting and display comparison remains required to
+attribute the game appearance to a particular shader operation.
+
+### Verified export results
+
+The normal textured GLB and Blender package paths were repeated for LIVE 13220821 and
+PTU 13248297. Blender 5.3.0 build `02f0899d78e3` sampled the dielectric normal-incidence
+reflectance at the four original UVs with mip 2. The GLB estimate differs from the package
+by at most 0.000066 on each Build. The previous GLB default differs by up to 0.033574.
+The effective metalness is zero at the measured points in both paths.
+
+At the default mip 0, the maximum difference at the same four UVs is 0.000016 on each
+Build. The previous GLB default differs by up to 0.034808. All four samples are below
+the glTF colour limit. The glTF Validator reported zero errors and warnings for both
+default-mip GLBs.
+
+The candidate GLBs carry identical geometry bytes, core material parameters, and base
+colour, normal and packed finish image bytes compared with the earlier paired outputs.
+Each adds one reflectance texture. The glTF Validator reported no errors or warnings for either
+GLB. Synthetic controls additionally cover the neighbouring slot, another paint, source
+transfer and availability, and saturation at the glTF colour limit.

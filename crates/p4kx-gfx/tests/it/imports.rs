@@ -234,3 +234,43 @@ fn a_font_imported_under_an_unknown_name_is_missing() {
     let raster = render(&importer("$Orbitron"), &TextOptions::default());
     assert_eq!(raster.skipped.len(), 1, "without the exporting movie");
 }
+
+#[test]
+fn every_export_item_keeps_the_accepted_occurrence_and_ordinal() {
+    let first = exports_body(&[(4, "OtherName"), (4, "Wanted")]);
+    let later = exports_body(&[(4, "Wanted")]);
+    let input = stage().tag(56, &first).tag(56, &later).bytes();
+    let movie = Movie::parse(input.clone()).expect("synthetic movie");
+    let observed = movie.assets_observed();
+    let items = &observed.origins.export_items;
+    let names: Vec<_> = observed
+        .assets
+        .exports
+        .iter()
+        .map(|record| record.name.as_str())
+        .collect();
+    assert_eq!(names, ["OtherName", "Wanted", "Wanted"], "accepted order");
+    let original: Vec<_> = items
+        .iter()
+        .map(|site| {
+            (
+                site.ordinal,
+                input.get(site.tag.body.offset..site.tag.body.end()),
+            )
+        })
+        .collect();
+    assert_eq!(
+        original,
+        [
+            (0, Some(first.as_slice())),
+            (1, Some(first.as_slice())),
+            (0, Some(later.as_slice())),
+        ],
+        "each alias and repeated name keeps its physical tag and item"
+    );
+    assert_eq!(
+        observed.origins.exports.get(&4),
+        items.first(),
+        "the existing first-export-per-ID lookup keeps its meaning"
+    );
+}

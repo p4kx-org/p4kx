@@ -20,6 +20,10 @@ The JSON is defined in [cli-json.md](cli-json.md). The exit code is 1 when a lis
 or folder is missing, unreadable or does not convert; candidates do not count. The ignored test
 prints the whole table before it asserts, and needs `P4KX_DATA_P4K`.
 
+Typed catalog field retention and same-Build published comparisons use the separate
+[development field verification](catalog-field-verification.md). Generic readability alone does
+not establish typed field coverage.
+
 ## What is checked
 
 - **Record type**: the DataForge defines it; how many Records it has, counting the types that
@@ -141,6 +145,14 @@ The ceilings in `crates/p4kx-extraction/tests/real_archive/coverage.rs` equal th
 a new dangling Reference or a repaired one fails the test. The survey that produced the table is
 the ignored test `error_values_of_the_reference_types_are_surveyed`; `p4kx dcb refs --unresolved`
 lists the same References.
+
+**Faction definitions** (#1066). The synthetic Catalog tests cover typed legal flags and
+friendly-fire overrides, authored relationship order and repetition, absent versus false,
+dangling and filtered GUIDs, legacy literal and localized text domains, and per-value encryption
+and original coordinates. The ignored
+`faction_definitions_and_incoming_scenario_links_match_the_original_records` test compares the
+unfiltered physical Faction inventory and original behavior fields, then checks the incoming
+scenario joins against the configured Archive.
 
 **Components** (`EntityClassDefinition` Records with the component or a struct deriving from it;
 instances equal Records on LIVE 4.10)

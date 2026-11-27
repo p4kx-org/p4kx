@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::GfxError;
 use crate::tag::Tag;
+use crate::{GfxError, RgbaImage};
 
 /// A bitmap a movie defines under an ID.
 #[derive(Debug, Clone, PartialEq)]
@@ -236,4 +236,23 @@ pub(crate) fn read_sub_image<'a>(tag: &Tag<'a>) -> Result<Bitmap<'a>, GfxError> 
             y2: reader.u16()?,
         }),
     })
+}
+
+/// A decoded embedded bitmap and the table input used by its decoder.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct DecodedBitmap {
+    /// Straight-alpha RGBA pixels.
+    pub image: RgbaImage,
+    /// Whether the decoder used the movie's admitted shared JPEG tables.
+    pub used_jpeg_tables: bool,
+}
+
+impl DecodedBitmap {
+    pub(crate) const fn without_tables(image: RgbaImage) -> Self {
+        Self {
+            image,
+            used_jpeg_tables: false,
+        }
+    }
 }

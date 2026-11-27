@@ -219,14 +219,13 @@ fn manually_added_folders_and_archives_are_stored_in_the_settings_and_listed() -
         channels
             .get(key)
             .and_then(toml::Value::as_array)
-            .map(|values| {
+            .map_or_default(|values| {
                 values
                     .iter()
                     .filter_map(toml::Value::as_str)
                     .map(str::to_owned)
                     .collect()
             })
-            .unwrap_or_default()
     };
     assert_eq!(
         strings("folders"),

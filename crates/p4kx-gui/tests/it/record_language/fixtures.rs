@@ -112,8 +112,9 @@ pub(crate) fn archive() -> Result<(TempDir, PathBuf), Box<dyn Error>> {
 
 /// An Archive with the English `global.ini`, a French one that cannot be read, and no German.
 pub(crate) fn archive_with_broken_french() -> Result<(TempDir, PathBuf), Box<dyn Error>> {
-    let broken = TestEntry::stored(FRENCH, b"vehicle_Cart=Charrette".to_vec())
-        .with_uncompressed_size(p4kx_extraction::MAX_GLOBAL_INI_SIZE + 1);
+    let text = b"vehicle_Cart=Charrette\n";
+    let broken = TestEntry::zstd(FRENCH, text.as_slice())
+        .with_uncompressed_size(u64::try_from(text.len())? - 1);
     archive_with(&[(ENGLISH, english())], vec![broken])
 }
 

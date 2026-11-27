@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Paints and their ship assignment in the Basetool catalog of a real Archive; runs with
+//! Paints and their ship assignment in the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::collections::{BTreeSet, HashSet};
@@ -21,8 +21,8 @@ const PAINT_100I_BLACK_ORANGE: &str = "bc3e5699-023e-4eda-95d9-202e48d7dd94";
 const ORIG_100I: &str = "6135a874-4cb1-4f49-9f29-5781e5991f2b";
 const ORIG_125A: &str = "e7eeba8d-b108-48a1-a332-d9edbab2b9c1";
 const ORIG_135C: &str = "2f231daa-95e5-4cb2-a32e-4db8f29a30d6";
-const PAINT_MUSTANG_OMEGA: &str = "de95879d-ebaf-49c6-8016-ebfbd1d8d7bb";
-const CNOU_MUSTANG_OMEGA: &str = "1164be4d-623e-4ef7-bc3d-4cdb45c22ec5";
+pub(super) const PAINT_MUSTANG_OMEGA: &str = "de95879d-ebaf-49c6-8016-ebfbd1d8d7bb";
+pub(super) const CNOU_MUSTANG_OMEGA: &str = "1164be4d-623e-4ef7-bc3d-4cdb45c22ec5";
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c [Value], Box<dyn Error>> {
     Ok(catalog[kind].as_array().ok_or("the kind is a list")?)
@@ -106,12 +106,12 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
 fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     let ships: HashSet<&str> = list(catalog, "ships")?
         .iter()
-        .filter_map(|ship| ship["guid"].as_str())
-        .collect();
+        .map(|ship| crate::catalog_v3_consumer::identity(ship, Kind::Ships))
+        .collect::<Result<_, _>>()?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
-        .collect();
+        .map(|item| crate::catalog_v3_consumer::identity(item, Kind::Items))
+        .collect::<Result<_, _>>()?;
     let mut used = HashSet::new();
     for paint in list(catalog, "paints")? {
         let item = paint["itemGuid"].as_str().ok_or("itemGuid")?;
@@ -150,7 +150,10 @@ fn check_known_paints(catalog: &Value) -> TestResult {
 fn the_paints_of_a_real_archive_fit_their_ships() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let started = Instant::now();
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let elapsed = started.elapsed();
     let catalog: Value = serde_json::from_slice(built.json())?;
     report(&built, elapsed);

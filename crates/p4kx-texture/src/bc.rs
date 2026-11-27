@@ -13,10 +13,8 @@ pub(crate) fn bc1(block: [u8; 8]) -> Texels {
 pub(crate) fn bc2(block: [u8; 16]) -> Texels {
     let (alpha, colour) = split(block);
     let mut texels = colour_block(colour, false);
-    let bits = u64::from_le_bytes(alpha);
-    for (texel, shift) in texels.iter_mut().zip((0..64).step_by(4)) {
-        let nibble = u8::try_from((bits >> shift) & 0xF).unwrap_or_default();
-        texel[3] = nibble * 17;
+    for (texel, value) in texels.iter_mut().zip(bc2_alpha(alpha)) {
+        texel[3] = value;
     }
     texels
 }
@@ -25,13 +23,56 @@ pub(crate) fn bc2(block: [u8; 16]) -> Texels {
 pub(crate) fn bc3(block: [u8; 16]) -> Texels {
     let (alpha, colour) = split(block);
     let mut texels = colour_block(colour, false);
-    let palette = alpha_palette(alpha[0], alpha[1]);
-    let bits = u64::from_le_bytes(alpha) >> 16;
-    for (texel, shift) in texels.iter_mut().zip((0..48).step_by(3)) {
-        let code = usize::try_from((bits >> shift) & 0x7).unwrap_or_default();
-        texel[3] = palette.get(code).copied().unwrap_or_default();
+    for (texel, value) in texels.iter_mut().zip(bc3_alpha(alpha)) {
+        texel[3] = value;
     }
     texels
+}
+
+pub(crate) fn bc1_alpha(block: [u8; 8]) -> [u8; 16] {
+    let [c0_low, c0_high, c1_low, c1_high, rows @ ..] = block;
+    let c0 = u16::from_le_bytes([c0_low, c0_high]);
+    let c1 = u16::from_le_bytes([c1_low, c1_high]);
+    if !bc1_has_transparent_selector(c0, c1) {
+        return [u8::MAX; 16];
+    }
+    let indices = u32::from_le_bytes(rows);
+    std::array::from_fn(|index| {
+        if (indices >> (index * 2)) & 0x3 == 0x3 {
+            0
+        } else {
+            u8::MAX
+        }
+    })
+}
+
+pub(crate) fn bc2_block_alpha(block: [u8; 16]) -> [u8; 16] {
+    bc2_alpha(split(block).0)
+}
+
+pub(crate) fn bc3_block_alpha(block: [u8; 16]) -> [u8; 16] {
+    bc3_alpha(split(block).0)
+}
+
+fn bc2_alpha(alpha: [u8; 8]) -> [u8; 16] {
+    let bits = u64::from_le_bytes(alpha);
+    std::array::from_fn(|index| {
+        let nibble = u8::try_from((bits >> (index * 4)) & 0xF).unwrap_or_default();
+        nibble * 17
+    })
+}
+
+fn bc3_alpha(alpha: [u8; 8]) -> [u8; 16] {
+    let palette = alpha_palette(alpha[0], alpha[1]);
+    let bits = u64::from_le_bytes(alpha) >> 16;
+    std::array::from_fn(|index| {
+        let code = usize::try_from((bits >> (index * 3)) & 0x7).unwrap_or_default();
+        palette.get(code).copied().unwrap_or_default()
+    })
+}
+
+const fn bc1_has_transparent_selector(c0: u16, c1: u16) -> bool {
+    c0 <= c1
 }
 
 const fn split(block: [u8; 16]) -> ([u8; 8], [u8; 8]) {
@@ -56,7 +97,7 @@ fn colour_block(block: [u8; 8], bc1_mode: bool) -> Texels {
 fn colour_palette(c0: u16, c1: u16, bc1_mode: bool) -> [[u8; 4]; 4] {
     let first = rgb565(c0);
     let second = rgb565(c1);
-    if bc1_mode && c0 <= c1 {
+    if bc1_mode && bc1_has_transparent_selector(c0, c1) {
         [
             first,
             second,

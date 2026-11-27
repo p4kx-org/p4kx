@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Ship spawns, location queries and location templates in the Basetool catalog.
+//! Ship spawns, location queries and location templates in the P4KX catalog.
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
 use crate::spawns_fixture;
+
+#[path = "catalog_mission_location_sdk.rs"]
+mod sdk;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -20,19 +23,11 @@ fn build() -> Result<Value, Box<dyn Error>> {
         spawns_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
-}
-
-fn entry(catalog: &Value, sub: bool) -> Result<&Value, String> {
-    catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["subContractGuid"].is_null() != sub)
-        .ok_or_else(|| "the contract entry".to_owned())
 }
 
 fn pool<'c>(catalog: &'c Value, kind: &str, guid: &Value) -> Result<&'c Value, String> {
@@ -70,12 +65,18 @@ fn the_nearest_level_that_states_a_variable_wins_and_an_empty_description_is_lef
 {
     let catalog = build()?;
     assert_eq!(
-        weights(&catalog, entry(&catalog, false)?)?,
+        weights(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, false)?
+        )?,
         [("Wave_BP@contract".to_owned(), 2.0)],
         "the empty Empty_BP of the contract hides the handler's and is itself left out"
     );
     assert_eq!(
-        weights(&catalog, entry(&catalog, true)?)?,
+        weights(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, true)?
+        )?,
         [("Wave_BP@subContract".to_owned(), 3.0)]
     );
     Ok(())
@@ -92,15 +93,36 @@ fn equal_ship_spawn_descriptions_share_one_entry() -> TestResult {
     );
     let option = &pools[0]["groups"][0]["slots"][0]["options"][0];
     assert_eq!(option["concurrentAmount"], 2);
+    assert_eq!(
+        option["crewInheritsLocationFaction"], false,
+        "the authored false crew-faction flag survives"
+    );
     assert_eq!(option["tags"], serde_json::json!(["ShipModel"]));
     assert_eq!(pools[0]["groups"][0]["name"], "Wave");
     Ok(())
 }
 
 #[test]
+fn ship_options_keep_the_crew_faction_flag_for_each_authored_alternative() -> TestResult {
+    let catalog = build()?;
+    let pools = catalog["contractShipSpawns"].as_array().ok_or("pools")?;
+    for pool in pools {
+        let option = pool
+            .pointer("/groups/0/slots/0/options/0")
+            .ok_or("option")?;
+        assert_eq!(
+            option["crewInheritsLocationFaction"],
+            option["weight"] == 3.0,
+            "the flag follows its source option independently of shared pool links"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn location_queries_are_exported_as_stored_with_tag_paths() -> TestResult {
     let catalog = build()?;
-    let contract = entry(&catalog, false)?;
+    let contract = crate::catalog_contracts::entry_by_level(&catalog, false)?;
     let links = contract["locationQueries"].as_array().ok_or("links")?;
     let names: Vec<(&str, &str)> = links
         .iter()
@@ -138,18 +160,98 @@ fn location_queries_are_exported_as_stored_with_tag_paths() -> TestResult {
 #[test]
 fn location_prerequisites_are_listed_per_level_as_stored() -> TestResult {
     let catalog = build()?;
-    let levels: Vec<(&str, &str)> = entry(&catalog, true)?["locationPrerequisites"]
-        .as_array()
-        .ok_or("prerequisites")?
-        .iter()
-        .map(|item| {
-            (
-                item["level"].as_str().unwrap_or_default(),
-                item["locationLevelType"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
+    let levels: Vec<(&str, &str)> =
+        crate::catalog_contracts::entry_by_level(&catalog, true)?["locationPrerequisites"]
+            .as_array()
+            .ok_or("prerequisites")?
+            .iter()
+            .map(|item| {
+                (
+                    item["level"].as_str().unwrap_or_default(),
+                    item["locationLevelType"].as_str().unwrap_or_default(),
+                )
+            })
+            .collect();
     assert_eq!(levels, [("handler", "System"), ("subContract", "Planet")]);
+    Ok(())
+}
+
+fn check_location_template_names(catalog: &Value, template: &Value) -> TestResult {
+    use crate::health_origin_assertions as proof;
+    use crate::text_forms_assertions::direct;
+
+    let [first, second, placeholder] = proof::rows(template, "/names/value")? else {
+        return Err("expected two named variants and one placeholder".into());
+    };
+    assert_eq!(
+        proof::at(first, "/value/tag/path/value")?.as_str(),
+        Some("Missions.Hijacked"),
+        "the first variant keeps its original tag",
+    );
+    assert_eq!(
+        proof::at(second, "/value/tag/path/value")?.as_str(),
+        Some("ShipModel"),
+        "the repeated key keeps its own tag",
+    );
+    let first = proof::at(first, "/value/displayName")?;
+    let second = proof::at(second, "/value/displayName")?;
+    let placeholder = proof::at(placeholder, "/value/displayName")?;
+    for reference in [first, second, placeholder] {
+        direct(reference)?;
+        assert_eq!(
+            proof::at(reference, "/containsEncryptedSource")?.as_bool(),
+            Some(true),
+            "each reference comes from the encrypted template",
+        );
+    }
+    assert_eq!(
+        proof::at(first, "/state")?.as_str(),
+        Some("present"),
+        "resolved name"
+    );
+    let identifier = proof::at(first, "/value")?;
+    assert_eq!(
+        identifier,
+        proof::at(second, "/value")?,
+        "repeated key shares a text row"
+    );
+    assert_ne!(
+        proof::at(first, "/sourceUsesRefs")?,
+        proof::at(second, "/sourceUsesRefs")?,
+        "the repeated key cites its distinct authored occurrence",
+    );
+    assert_eq!(
+        proof::at(placeholder, "/state")?.as_str(),
+        Some("absent"),
+        "placeholder state"
+    );
+    assert!(
+        proof::at(placeholder, "/value")?.is_null(),
+        "placeholder has no reference"
+    );
+    check_location_name_forms(catalog, identifier)?;
+    proof::closure(catalog)
+}
+
+fn check_location_name_forms(catalog: &Value, identifier: &Value) -> TestResult {
+    use crate::health_origin_assertions as proof;
+    use crate::text_forms_assertions::{forms, present};
+
+    let row = proof::rows(catalog, "/texts/gameTexts")?
+        .iter()
+        .find(|row| row.pointer("/id/value") == Some(identifier))
+        .ok_or("protected location name")?;
+    assert_eq!(
+        proof::at(row, "/key/value")?.as_str(),
+        Some("@place_name"),
+        "original key"
+    );
+    present(forms(row, "en")?, "displayText", "Hijacked Ship")?;
+    present(forms(row, "fr")?, "displayText", "Site de mission")?;
+    assert!(
+        row.pointer("/translations/value/de").is_none(),
+        "German has no source entry"
+    );
     Ok(())
 }
 
@@ -160,27 +262,13 @@ fn location_templates_carry_their_tags_and_leave_out_leftovers() -> TestResult {
         .as_array()
         .ok_or("templates")?;
     assert_eq!(templates.len(), 2, "the dev leftover is left out");
-    assert_eq!(
-        templates[0]["tags"],
-        serde_json::json!(["Missions.Hijacked"])
-    );
-    assert_eq!(
-        templates[0]["producesTags"]["positiveTags"],
-        serde_json::json!(["ShipModel"])
-    );
-    assert_eq!(
-        templates[0]["consumesTags"]["negativeTags"],
-        serde_json::json!(["Kill"])
-    );
-    assert_eq!(
-        templates[0]["aiSpawnTags"],
-        serde_json::json!(["ShipModel"])
-    );
-    assert_eq!(templates[0]["names"][0]["tag"], "Missions.Hijacked");
+    let first = templates.first().ok_or("first location template")?;
+    sdk::verify_wire_tags(&catalog, first)?;
+    check_location_template_names(&catalog, first)?;
     assert!(
         templates
             .iter()
-            .any(|template| template["disabled"] == true),
+            .any(|template| template.pointer("/disabled/value") == Some(&Value::Bool(true))),
         "the disabled flag is kept as stored"
     );
     Ok(())

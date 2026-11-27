@@ -4,6 +4,8 @@
 use std::path::PathBuf;
 
 use clap::{Args, Subcommand};
+use p4kx_assembly::audio::ResolveOptions;
+use p4kx_extraction::CancelToken;
 
 use crate::cli::{AudioOutput, Conflict};
 use crate::exit::EXIT_CODES_HELP;
@@ -42,7 +44,8 @@ pub(crate) enum WwiseAction {
     Events(WwiseEventsArgs),
     /// Writes the sounds of an audio trigger into --out as Ogg or WAV files named after the
     /// trigger: `<trigger>.<ext>` for a trigger with one sound, `<trigger>_<WEM ID>.<ext>` for
-    /// one with several; a WEM several variants lead to is written once. Names are cut to ASCII
+    /// one with several. Repeated variants share a file when they resolve to the same physical
+    /// WEM. Names are cut to ASCII
     /// letters, digits, `_` and `-`, and a name already taken, ignoring case, gets `_2`, `_3`, …
     /// appended. Resolves the trigger as `resolve` does, so --lang and --fallback-lang choose the
     /// language of localised sounds. A sound that cannot be decoded is reported and written
@@ -66,15 +69,16 @@ pub(crate) struct WwiseExtractArgs {
     #[command(flatten)]
     pub(crate) export: SoundExportArgs,
     /// Also writes one `<event>.txtp` per Wwise event of the trigger next to the sounds: a text
-    /// file that vgmstream plays as the event does, layering an Event's actions and blend
+    /// file for a selected playback approximation, layering an Event's actions and blend
     /// containers, chaining sequence containers and music playlists and picking the first child of
     /// a random or switch container (change `>1` in its `group` line to pick another). The loop of
-    /// a sound is written as `#I`. An event with a sound that has no whole file is listed instead.
+    /// a sound is written as `#I`. The output reports supported diagnostics for omitted authored
+    /// behavior. An event with a sound that has no whole file is listed instead.
     /// P4KX only writes the text; it does not run vgmstream.
     #[arg(long)]
     pub(crate) txtp: bool,
     #[command(flatten)]
-    pub(crate) language: AudioLanguageArgs,
+    pub(crate) resolve: AudioResolveArgs,
 }
 
 /// How exported sounds are written.
@@ -133,12 +137,12 @@ pub(crate) struct WwiseResolveArgs {
     /// The audio trigger as its ATL definition names it, e.g. `Play_QDrive_Spool`; ignores case.
     pub(crate) trigger: String,
     #[command(flatten)]
-    pub(crate) language: AudioLanguageArgs,
+    pub(crate) resolve: AudioResolveArgs,
 }
 
-/// The language the localised sounds are resolved in.
+/// Language selection and traversal controls for audio trigger resolution.
 #[derive(Debug, Args)]
-pub(crate) struct AudioLanguageArgs {
+pub(crate) struct AudioResolveArgs {
     /// The language folder below Data/Sounds/wwise to resolve localised sounds in, as the
     /// Archive spells it, e.g. English(US); ignores case. Without it, the fallback language.
     #[arg(long, value_name = "LANGUAGE")]
@@ -147,4 +151,17 @@ pub(crate) struct AudioLanguageArgs {
     /// English(US), or the first language folder when the Archive has none of that name.
     #[arg(long, value_name = "LANGUAGE")]
     pub(crate) fallback_lang: Option<String>,
+    /// Limits attempted HIRC objects and music track sources per trigger. Without it, full
+    /// traversal. A cut is reported by inspection and prevents extraction.
+    #[arg(long, value_name = "COUNT")]
+    max_visits: Option<usize>,
+}
+
+impl AudioResolveArgs {
+    /// Returns the caller's traversal options for one trigger.
+    pub(crate) fn options<'a>(&self, cancel: &'a CancelToken) -> ResolveOptions<'a> {
+        let options = ResolveOptions::default().with_cancel(cancel);
+        self.max_visits
+            .map_or(options, |limit| options.with_max_visits(limit))
+    }
 }

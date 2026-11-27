@@ -158,24 +158,32 @@ impl PlaceCommand {
     }
 
     /// Applies the command to the placement at its depth, `None` when the depth is empty.
-    pub(crate) fn apply(self, current: Option<Placement>) -> Option<Placement> {
-        let mut placement = match (current, self.id) {
-            (Some(current), None) if self.moves => current,
-            (Some(current), Some(id)) if self.moves => Placement { id, ..current },
-            (_, Some(id)) => Placement {
-                depth: self.depth,
-                id,
-                matrix: Matrix::IDENTITY,
-                color_transform: ColorTransform::IDENTITY,
-                ratio: 0,
-                name: None,
-                clip_depth: None,
-                blend_mode: 0,
-                filters: Vec::new(),
-                visible: true,
-            },
+    pub(crate) fn apply(
+        self,
+        current: Option<Placement>,
+        observe: impl FnOnce(bool, &Self),
+    ) -> Option<Placement> {
+        let (mut placement, retained) = match (current, self.id) {
+            (Some(current), None) if self.moves => (current, true),
+            (Some(current), Some(id)) if self.moves => (Placement { id, ..current }, true),
+            (_, Some(id)) => (
+                Placement {
+                    depth: self.depth,
+                    id,
+                    matrix: Matrix::IDENTITY,
+                    color_transform: ColorTransform::IDENTITY,
+                    ratio: 0,
+                    name: None,
+                    clip_depth: None,
+                    blend_mode: 0,
+                    filters: Vec::new(),
+                    visible: true,
+                },
+                false,
+            ),
             (current, None) => return current,
         };
+        observe(retained, &self);
         if let Some(matrix) = self.matrix {
             placement.matrix = matrix;
         }

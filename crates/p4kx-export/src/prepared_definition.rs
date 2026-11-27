@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::cell::RefCell;
+
+use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
+
+use super::authored_fields::Observed;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_number_capture::{CapturedNumber, NumberCapture};
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_row::CatalogRow;
+use crate::catalog_table::CatalogTable;
+use crate::guid_text::CatalogGuid;
+use crate::record_observation::RecordObservation;
+use crate::source_fields::FieldError;
+use crate::template_field_capture::TemplateFieldCapture;
+use crate::{CatalogError, Kind};
+
+/// An authored definition with its physical identity and numeric receipts.
+pub(crate) struct PreparedDefinition<'source, T> {
+    definition: T,
+    guid: Guid,
+    index: u32,
+    path: &'source str,
+    numbers: Vec<CapturedNumber>,
+}
+
+impl<'source, T> PreparedDefinition<'source, T> {
+    /// Projects a physical Record through the exact admitted source scope.
+    pub(super) fn read(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(
+            CanonicalRecordHeader<'source>,
+            Observed<'_, '_, '_, 'source>,
+            &CatalogProjection<'_, 'source>,
+            &mut Vec<FieldError>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        Self::read_original(
+            tree,
+            projection.original(),
+            admission,
+            cancel,
+            |source, fields, notes| project(source, fields, projection, notes),
+        )
+    }
+
+    pub(super) fn read_original(
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(
+            CanonicalRecordHeader<'source>,
+            Observed<'_, '_, '_, 'source>,
+            &mut Vec<FieldError>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        let scope = input.record_scope(admission.record(), tree)?;
+        let originals = OriginalFlowFields::read(&scope, cancel)?;
+        Self::read_with_fields(tree, input, admission, &originals, project)
+    }
+
+    pub(super) fn read_with_fields(
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        originals: &OriginalFlowFields<'_, '_, 'source>,
+        project: impl FnOnce(
+            CanonicalRecordHeader<'source>,
+            Observed<'_, '_, '_, 'source>,
+            &mut Vec<FieldError>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        admission.check_tree(tree)?;
+        let capture = TemplateFieldCapture::new(originals, input, admission)?;
+        let numbers = RefCell::new(Vec::new());
+        let fields = Observed::definition(originals, input, &capture, &numbers);
+        let mut notes = Vec::new();
+        let source = CanonicalRecordHeader::read(tree, input.origins())?;
+        let definition = project(source, fields, &mut notes)?;
+        Ok((
+            Self {
+                definition,
+                guid: tree.guid(),
+                index: tree.record_index(),
+                path: tree.record_path(),
+                numbers: NumberCapture::deduplicate(numbers.into_inner())?,
+            },
+            notes,
+        ))
+    }
+
+    /// Borrows the canonical definition used by dependent projections.
+    pub(super) const fn definition(&self) -> &T {
+        &self.definition
+    }
+
+    /// Moves the projected definition out of this prepared observation.
+    pub(crate) fn into_definition(self) -> T {
+        self.definition
+    }
+
+    pub(crate) fn order(rows: &mut [Self]) {
+        rows.sort_by_cached_key(|row| (CatalogGuid(row.guid).text(), row.index));
+    }
+
+    pub(super) fn table(
+        forge: &DataForge<'_>,
+        source_type: &str,
+        rows: Vec<Self>,
+    ) -> CatalogTable<T> {
+        CatalogTable::new(
+            forge,
+            &[source_type],
+            rows.into_iter().map(|row| row.definition).collect(),
+        )
+    }
+
+    pub(super) fn catalog_rows(rows: &[Self], kind: Kind) -> impl Iterator<Item = CatalogRow> + '_ {
+        rows.iter().map(move |row| CatalogRow {
+            kind,
+            guid: row.guid,
+            record_path: row.path.to_owned(),
+            record_index: Some(row.index),
+        })
+    }
+
+    pub(super) fn sources<'rows>(
+        kind: Kind,
+        rows: &'rows [Self],
+    ) -> impl Iterator<Item = (Kind, Guid, &'source str, &'rows [CapturedNumber])> {
+        rows.iter()
+            .map(move |row| (kind, row.guid, row.path, row.numbers.as_slice()))
+    }
+}

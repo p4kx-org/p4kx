@@ -1,24 +1,54 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::mem;
 
 use rayon::prelude::*;
 
+use crate::comparison::RecordSources;
+use crate::entry_change::EntryDecision;
 use crate::path_key::cmp_normalised;
 use crate::record_compare::compare_records;
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
-    DataForges, Entry, EntryChange, Side,
+    DataForgeEntry, DataForges, Entry, EntryChange, IncomparableEntry, Side,
 };
+
+#[path = "compare_collision.rs"]
+mod collision;
+
+pub(crate) use collision::CollisionEvidence;
 
 const PROGRESS_STEP: usize = 1 << 16;
 
-/// One changed Entry as positions in the Entry lists of both Archives.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct JoinResult {
+    pub(crate) changes: Vec<Joined>,
+    pub(crate) incomparables: Vec<Joined>,
+    pub(crate) collisions: Vec<CollisionEvidence>,
+    total: usize,
+}
+
+impl JoinResult {
+    pub(crate) fn extend(&mut self, outcomes: impl IntoIterator<Item = Joined>) {
+        for outcome in outcomes {
+            if matches!(outcome.decision, EntryDecision::Incomparable { .. }) {
+                self.incomparables.push(outcome);
+            } else {
+                self.changes.push(outcome);
+            }
+        }
+    }
+}
+
+/// One directory comparison outcome as positions in the two Archive entry lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Joined {
     pub(crate) old: Option<usize>,
     pub(crate) new: Option<usize>,
+    decision: EntryDecision,
 }
 
 impl Joined {
@@ -34,18 +64,30 @@ impl Joined {
             None => None,
         };
         match (before, after) {
-            (Some(before), Some(after)) => Some(EntryChange::changed(before, after)),
-            (Some(before), None) => Some(EntryChange::removed(before)),
-            (None, Some(after)) => Some(EntryChange::added(after)),
+            (Some(before), Some(after)) => Some(EntryChange::changed(before, after, self.decision)),
+            (Some(before), None) => Some(EntryChange::removed(before, self.decision)),
+            (None, Some(after)) => Some(EntryChange::added(after, self.decision)),
             (None, None) => None,
         }
+    }
+
+    pub(crate) fn resolve_incomparable<'archive>(
+        self,
+        old: &'archive Archive,
+        new: &'archive Archive,
+    ) -> Option<IncomparableEntry<'archive>> {
+        let before = old.entries().get(self.old?)?;
+        let after = new.entries().get(self.new?)?;
+        Some(IncomparableEntry::new(before, after, self.decision))
     }
 }
 
 /// Compares the `old` with the `new` Archive on the selected levels.
 ///
 /// Entries are joined by their path with ASCII case folded and `/` read as `\`; an Entry is
-/// changed when its uncompressed size or CRC-32C differs. Nothing is decompressed.
+/// changed when its uncompressed size or a comparable declared checksum differs. Equal-size
+/// pairs with different checksum algorithms are incomparable. Duplicate occurrences are reconciled
+/// using original spellings and declared content. Nothing is decompressed.
 ///
 /// Records of the `dataforges` are joined by GUID: a Record is moved when its record path
 /// differs, ignoring case and separator kind, and changed when its name, its type or the value
@@ -63,15 +105,26 @@ pub fn compare<'a>(
     dataforges: Option<DataForges<'a>>,
     options: &CompareOptions<'_>,
 ) -> Result<Comparison<'a>, ComparisonError> {
+    compare_inner(old, new, dataforges, options, RecordSources::default())
+}
+
+fn compare_inner<'a>(
+    old: &'a Archive,
+    new: &'a Archive,
+    dataforges: Option<DataForges<'a>>,
+    options: &CompareOptions<'_>,
+    record_sources: RecordSources,
+) -> Result<Comparison<'a>, ComparisonError> {
     check_levels(options, dataforges.is_some())?;
-    let (joined, entries_total) = join(old, new, options)?;
+    let joined = join(old, new, options)?;
+    let entries_total = joined.total;
     let progress = ComparisonProgress {
         entries_done: entries_total,
         entries_total,
         ..ComparisonProgress::default()
     };
     let records = match dataforges.filter(|_| options.levels.records) {
-        Some(forges) => compare_records(forges, options, progress)?,
+        Some(forges) => compare_records(forges, options, progress, &record_sources)?,
         None => Vec::new(),
     };
     Ok(Comparison {
@@ -80,11 +133,49 @@ pub fn compare<'a>(
         levels: options.levels,
         filter: options.filter.map(|filter| filter.as_str().to_owned()),
         entries: joined
+            .changes
             .iter()
             .filter_map(|joined| joined.resolve(old, new))
             .collect(),
+        incomparables: joined
+            .incomparables
+            .iter()
+            .filter_map(|joined| joined.resolve_incomparable(old, new))
+            .collect(),
+        entry_collisions: Cow::Owned(joined.collisions),
         records,
+        record_sources,
     })
+}
+
+/// Compares the Archives and retains the original input of each bound DataForge.
+///
+/// Evidence requires the exact opened bytes and the original Archive owner.
+///
+/// # Errors
+///
+/// Returns the same comparison errors as [compare].
+pub fn compare_with_dataforge_entries<'a>(
+    old: &'a Archive,
+    new: &'a Archive,
+    dataforges: DataForges<'a>,
+    entries: [&DataForgeEntry; 2],
+    options: &CompareOptions<'_>,
+) -> Result<Comparison<'a>, ComparisonError> {
+    let sources = if options.levels.records {
+        let [old_entry, new_entry] = entries;
+        RecordSources::new(
+            old_entry
+                .origin_of(dataforges.old)
+                .filter(|origin| origin.matches_archive(old)),
+            new_entry
+                .origin_of(dataforges.new)
+                .filter(|origin| origin.matches_archive(new)),
+        )
+    } else {
+        RecordSources::default()
+    };
+    compare_inner(old, new, Some(dataforges), options, sources)
 }
 
 /// Checks that a level is selected, that the Record level has DataForges, and that the
@@ -103,31 +194,40 @@ pub(crate) fn check_levels(
 }
 
 /// Joins the Entries of both Archives into the positions of the changed ones, ordered by
-/// normalised path, when the Entry level is selected; returns them with the number of Entries
-/// joined.
+/// normalised path, and retains physical evidence for collisions.
 pub(crate) fn join(
     old: &Archive,
     new: &Archive,
     options: &CompareOptions<'_>,
-) -> Result<(Vec<Joined>, usize), ComparisonError> {
+) -> Result<JoinResult, ComparisonError> {
     if options.levels.entries {
         join_entries(old, new, options)
     } else {
-        Ok((Vec::new(), 0))
+        Ok(JoinResult::default())
     }
 }
 
-const fn removed(position: usize) -> Joined {
+const fn removed(position: usize, decision: EntryDecision) -> Joined {
     Joined {
         old: Some(position),
         new: None,
+        decision,
     }
 }
 
-const fn added(position: usize) -> Joined {
+const fn added(position: usize, decision: EntryDecision) -> Joined {
     Joined {
         old: None,
         new: Some(position),
+        decision,
+    }
+}
+
+const fn changed(before: usize, after: usize, decision: EntryDecision) -> Joined {
+    Joined {
+        old: Some(before),
+        new: Some(after),
+        decision,
     }
 }
 
@@ -135,24 +235,26 @@ fn join_entries(
     old: &Archive,
     new: &Archive,
     options: &CompareOptions<'_>,
-) -> Result<(Vec<Joined>, usize), ComparisonError> {
+) -> Result<JoinResult, ComparisonError> {
     let (old, new) = rayon::join(
         || sorted_selection(old, options),
         || sorted_selection(new, options),
     );
     check_cancel(options)?;
+    merge_sorted_entries(&old, &new, options)
+}
+
+fn merge_sorted_entries(
+    old: &[(usize, &Entry)],
+    new: &[(usize, &Entry)],
+    options: &CompareOptions<'_>,
+) -> Result<JoinResult, ComparisonError> {
     let total = old.len() + new.len();
-    let report = |done| {
-        if let Some(progress) = options.progress {
-            progress(ComparisonProgress {
-                entries_done: done,
-                entries_total: total,
-                ..ComparisonProgress::default()
-            });
-        }
+    report_entry_progress(options, 0, total);
+    let mut result = JoinResult {
+        total,
+        ..JoinResult::default()
     };
-    report(0);
-    let mut changes = Vec::new();
     let (mut i, mut j) = (0, 0);
     let mut next_report = PROGRESS_STEP;
     loop {
@@ -160,42 +262,62 @@ fn join_entries(
             (None, None) => break,
             (Some(&(before, _)), None) => {
                 i += 1;
-                Some(removed(before))
+                Some(removed(before, EntryDecision::OppositeExhausted))
             }
             (None, Some(&(after, _))) => {
                 j += 1;
-                Some(added(after))
+                Some(added(after, EntryDecision::OppositeExhausted))
             }
             (Some(&(before, old_entry)), Some(&(after, new_entry))) => {
                 match cmp_normalised(old_entry.path(), new_entry.path()) {
                     Ordering::Less => {
                         i += 1;
-                        Some(removed(before))
+                        Some(removed(before, EntryDecision::OrderedAgainst(after)))
                     }
                     Ordering::Greater => {
                         j += 1;
-                        Some(added(after))
+                        Some(added(after, EntryDecision::OrderedAgainst(before)))
                     }
                     Ordering::Equal => {
-                        i += 1;
-                        j += 1;
-                        differs(old_entry, new_entry).then_some(Joined {
-                            old: Some(before),
-                            new: Some(after),
-                        })
+                        if let Some((old_count, new_count)) = collision::join_if_needed(
+                            old.split_at(i).1,
+                            new.split_at(j).1,
+                            old_entry.path(),
+                            &mut result,
+                            options,
+                        )? {
+                            i += old_count;
+                            j += new_count;
+                            None
+                        } else {
+                            i += 1;
+                            j += 1;
+                            difference(old_entry, new_entry)
+                                .map(|decision| changed(before, after, decision))
+                        }
                     }
                 }
             }
         };
-        changes.extend(change);
+        result.extend(change);
         if i + j >= next_report {
             check_cancel(options)?;
-            report(i + j);
+            report_entry_progress(options, i + j, total);
             next_report = i + j + PROGRESS_STEP;
         }
     }
-    report(total);
-    Ok((changes, total))
+    report_entry_progress(options, total, total);
+    Ok(result)
+}
+
+fn report_entry_progress(options: &CompareOptions<'_>, done: usize, total: usize) {
+    if let Some(progress) = options.progress {
+        progress(ComparisonProgress {
+            entries_done: done,
+            entries_total: total,
+            ..ComparisonProgress::default()
+        });
+    }
 }
 
 fn sorted_selection<'a>(
@@ -219,8 +341,20 @@ fn sorted_selection<'a>(
     entries
 }
 
-fn differs(old: &Entry, new: &Entry) -> bool {
-    old.uncompressed_size() != new.uncompressed_size() || old.checksum() != new.checksum()
+fn difference(old: &Entry, new: &Entry) -> Option<EntryDecision> {
+    if old.uncompressed_size() != new.uncompressed_size() {
+        return Some(EntryDecision::SizeDiffers);
+    }
+    let before = old.checksum();
+    let after = new.checksum();
+    if mem::discriminant(&before) == mem::discriminant(&after) {
+        (before != after).then_some(EntryDecision::ChecksumDiffers)
+    } else {
+        Some(EntryDecision::Incomparable {
+            collision: None,
+            ambiguous: false,
+        })
+    }
 }
 
 pub(crate) fn check_cancel(options: &CompareOptions<'_>) -> Result<(), ComparisonError> {

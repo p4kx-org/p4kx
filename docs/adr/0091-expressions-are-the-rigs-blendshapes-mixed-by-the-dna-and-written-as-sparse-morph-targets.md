@@ -64,7 +64,8 @@ morph targets (the same number on every primitive, a `POSITION` delta of the ver
 The Khronos glTF-Validator runs as the CI job `glb-validator`: the package `gltf-validator` at an
 exact version from a lockfile with its integrity hash (`.github/glb-validator`) validates the GLBs
 that the test `the_synthetic_glbs_are_written_for_the_validator` writes from synthetic fixtures (a
-head with morph targets, a skinned mesh, a mesh with per-primitive `COLOR_0`); any error fails the
+head with morph targets, a skinned mesh, a mesh with per-primitive vertex colors, an emissive
+material, and a scene with mixed UV availability). Any error fails the
 job and warnings are listed. Real game data is never sent to CI, so the real default-head GLBs are
 not validated there; they come from the same writer code paths as the synthetic head.
 

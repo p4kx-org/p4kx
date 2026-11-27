@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Mining compositions, mining parameters, provider presets, multi configs and where the presets
-//! are used, in the Basetool catalog.
+//! are used, in the P4KX catalog.
 
 use crate::harvest_fixture::{
     COMPOSITION, CONTACT_TYPE, ELEMENT, ENTITY, ENTITY_BARE, ENTITY_SILENT, HARVESTABLE,
@@ -13,19 +13,32 @@ use crate::harvest_fixture::{
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, Kind, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "harvest_provider_sdk.rs"]
+mod provider_sdk;
+
 fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    build_archive(&archive, filter)
+}
+
+fn build_archive(
+    archive: &Archive,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -43,48 +56,66 @@ fn guid(value: u128) -> String {
 }
 
 fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, Box<dyn Error>> {
-    catalog[kind]
-        .as_array()
+    let requested = guid(record);
+    let rows = match kind {
+        "miningGlobalParams" => catalog.pointer("/configurations/miningGlobal/rows"),
+        "mineableEntities" => catalog.pointer("/definitions/mineableEntities/rows"),
+        _ => catalog.get(kind),
+    };
+    rows.and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == guid(record).as_str())
-        .ok_or_else(|| format!("{kind} has no {}", guid(record)).into())
+        .find(|entry| {
+            let identity = &entry["guid"];
+            identity == requested.as_str() || identity["value"] == requested.as_str()
+        })
+        .ok_or_else(|| format!("{kind} has no {requested}").into())
 }
 
 #[test]
-fn a_composition_lists_its_parts_and_leaves_a_dangling_element_null() -> TestResult {
+fn a_composition_preserves_authored_order_widths_and_dangling_reference() -> TestResult {
     let (built, catalog) = build(None)?;
+    let source = entry(&catalog, "mineableCompositions", COMPOSITION)?;
+    verify_composition_header(&catalog, source)?;
     assert_eq!(
-        *entry(&catalog, "mineableCompositions", COMPOSITION)?,
-        json!({
-            "guid": guid(COMPOSITION),
-            "className": "Asteroid_CType_Iron",
-            "recordPath": "libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron",
-            "depositName": {
-                "key": "@hud_mining_asteroid_name_5",
-                "en": "Iron Deposit",
-                "de": null
-            },
-            "minimumDistinctElements": 2,
-            "parts": [
-                {
-                    "mineableElementGuid": guid(ELEMENT),
-                    "minPercentage": 30.0,
-                    "maxPercentage": 70.0,
-                    "probability": 0.8,
-                    "curveExponent": null,
-                    "qualityScale": null
-                },
-                {
-                    "mineableElementGuid": null,
-                    "minPercentage": 20.0,
-                    "maxPercentage": 70.0,
-                    "probability": 0.8,
-                    "curveExponent": null,
-                    "qualityScale": null
-                }
-            ]
-        })
+        source["minimumDistinctElements"]["value"],
+        json!({"type": "int32", "value": 2})
+    );
+    let parts = source["parts"]["value"].as_array().ok_or("parts")?;
+    assert_eq!(parts.len(), 2, "authored length");
+    let first = &parts[0]["value"];
+    let second = &parts[1]["value"];
+    let link = &first["mineableElement"]["value"];
+    assert_eq!(link["status"], "present");
+    assert_eq!(link["guid"]["value"], guid(ELEMENT));
+    let dangling = &second["mineableElement"]["value"];
+    assert_eq!(dangling["status"], "dangling");
+    assert_eq!(dangling["guid"]["value"], guid(RESOURCE + 0xff));
+    assert_eq!(dangling["targetRecordIndex"]["state"], "absent");
+    assert_eq!(first["minPercentage"]["value"]["finite"], 30.0);
+    assert_eq!(second["minPercentage"]["value"]["finite"], 20.0);
+    assert_eq!(
+        first["qualityScale"]["value"],
+        json!({"type": "f64", "rawBits": "3fe0000000000001", "finite": 0.500_000_000_000_000_1})
+    );
+    assert_eq!(first["curveExponent"]["state"], "absent");
+    for value in [
+        &source["parts"],
+        &parts[0],
+        &parts[1],
+        &first["maxPercentage"],
+    ] {
+        assert_eq!(value["containsEncryptedSource"], true);
+        assert!(
+            value["sourceUsesRefs"]
+                .as_array()
+                .is_some_and(|ids| !ids.is_empty()),
+            "each original array and field occurrence has direct evidence"
+        );
+    }
+    assert_ne!(
+        first["maxPercentage"]["sourceUsesRefs"], second["maxPercentage"]["sourceUsesRefs"],
+        "equal values at different positions keep distinct uses"
     );
     let kind = built.summary().kind(Kind::MineableCompositions);
     assert_eq!(
@@ -95,83 +126,69 @@ fn a_composition_lists_its_parts_and_leaves_a_dangling_element_null() -> TestRes
     Ok(())
 }
 
+fn verify_composition_header(catalog: &Value, source: &Value) -> TestResult {
+    crate::catalog_mining::verify_name(
+        catalog,
+        source,
+        "depositName",
+        "@hud_mining_asteroid_name_5",
+        Some("Iron Deposit"),
+    )?;
+    assert_eq!(
+        source.pointer("/className/value").and_then(Value::as_str),
+        Some("Asteroid_CType_Iron"),
+        "original composition class name",
+    );
+    assert_eq!(
+        source.pointer("/recordPath/value").and_then(Value::as_str),
+        Some("libs/foundry/records/mining/rockcompositionpresets/asteroid_ctype_iron"),
+        "original composition Record path",
+    );
+    Ok(())
+}
+
 #[test]
 fn the_mining_parameters_carry_their_numbers_and_nested_blocks() -> TestResult {
     let (built, catalog) = build(None)?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
-    assert_eq!(params["className"], "MiningGlobalParamsShip");
-    assert_eq!(params["cScuPerVolume"], 0.7);
-    assert_eq!(params["defaultMass"], 100.0);
-    assert_eq!(params["compositionMassMultiplier"], 1.5);
-    assert_eq!(params["gadgetDestroyThreshold"], Value::Null);
-    assert_eq!(params["hitConsistency"]["timeExponent"], 2.0);
-    assert_eq!(params["hitConsistency"]["minDeviation"], Value::Null);
-    assert_eq!(params["wasteResourceTypeGuid"], guid(RESOURCE).as_str());
+    assert_eq!(params["className"]["value"], "MiningGlobalParamsShip");
+    assert_eq!(params["cSCUPerVolume"]["value"]["finite"], 0.7);
+    assert_eq!(params["defaultMass"]["value"]["finite"], 100.0);
+    assert_eq!(params["compositionMassMultiplier"]["value"]["finite"], 1.5);
+    assert_eq!(params["gadgetDestroyThreshold"]["state"], "absent");
+    assert_eq!(
+        params["hitConsistencyParams"]["value"]["timeExponent"]["value"]["finite"],
+        2.0
+    );
+    assert_eq!(
+        params["hitConsistencyParams"]["value"]["minDeviation"]["state"],
+        "absent"
+    );
+    assert_eq!(
+        params["wasteResourceType"]["value"]["guid"]["value"],
+        guid(RESOURCE).as_str()
+    );
     let kind = built.summary().kind(Kind::MiningGlobalParams);
     assert_eq!(kind.map(|kind| (kind.count, kind.skipped)), Some((1, 1)));
     Ok(())
 }
 
 #[test]
-fn a_record_without_the_mass_multiplier_leaves_it_null() -> TestResult {
+fn a_record_without_the_mass_multiplier_retains_its_absence() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         write_archive_without_mass_multiplier(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(
-        &archive,
-        &CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000)),
-    )?;
+    let options = CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+    };
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
-    assert_eq!(params["compositionMassMultiplier"], Value::Null);
-    assert_eq!(params["defaultMass"], 100.0);
-    Ok(())
-}
-
-#[test]
-fn a_provider_preset_follows_each_harvestable_to_its_composition() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let preset = entry(&catalog, "harvestableProviderPresets", PRESET_PLACED)?;
-    assert_eq!(preset["className"], "HPP_Placed");
-    let group = &preset["groups"][0];
-    assert_eq!(group["groupName"], "SpaceShip_Mineables");
-    let via_preset = json!({
-        "presetGuid": guid(HARVESTABLE),
-        "presetClassName": "Mining_Iron",
-        "entityGuid": guid(ENTITY),
-        "mineableCompositionGuid": guid(COMPOSITION),
-        "miningGlobalParamsGuid": guid(PARAMS),
-    });
-    assert_eq!(group["harvestables"][0]["harvestable"], via_preset);
-    assert_eq!(group["harvestables"][0]["relativeProbability"], 22.0);
-    assert_eq!(
-        group["harvestables"][0]["geometryTagGuids"],
-        json!([guid(RESOURCE)])
-    );
-    assert_eq!(
-        group["harvestables"][1]["harvestable"],
-        json!({
-            "presetGuid": null,
-            "presetClassName": null,
-            "entityGuid": guid(ENTITY),
-            "mineableCompositionGuid": guid(COMPOSITION),
-            "miningGlobalParamsGuid": guid(PARAMS),
-        }),
-        "an element that names the entity only"
-    );
-    assert_eq!(
-        preset["areas"],
-        json!([{
-            "name": "Acidic",
-            "globalModifier": 1.0,
-            "objectPresetPaths": [
-                "Libs/ObjectPresets/PU/system/stanton/hurston/acidic_pools_01.opr"
-            ],
-            "modifiers": []
-        }])
-    );
+    assert_eq!(params["compositionMassMultiplier"]["state"], "absent");
+    assert_eq!(params["defaultMass"]["value"]["finite"], 100.0);
     Ok(())
 }
 
@@ -259,19 +276,44 @@ fn a_container_that_names_a_preset_is_a_location_of_the_object_it_hangs_below() 
 fn a_mineable_entity_takes_its_scan_signature_from_the_slot_the_radar_parameters_name() -> TestResult
 {
     let (built, catalog) = build(None)?;
+    let rock = entry(&catalog, "mineableEntities", ENTITY)?;
+    assert_eq!(rock["guid"]["value"], guid(ENTITY).as_str());
+    assert_eq!(rock["className"]["value"], "MineableRock_Iron");
     assert_eq!(
-        *entry(&catalog, "mineableEntities", ENTITY)?,
-        json!({
-            "guid": guid(ENTITY),
-            "className": "MineableRock_Iron",
-            "recordPath": "libs/foundry/records/entities/mineable/mineablerock_iron",
-            "mineableCompositionGuid": guid(COMPOSITION),
-            "miningGlobalParamsGuid": guid(PARAMS),
-            "scanSignature": 4270.0,
-            "signatures": [0.0, 0.0, 4270.0, 0.0],
-            "radarContactTypeGuid": guid(CONTACT_TYPE),
-        }),
-        "the named slot is the third, not the fifth"
+        rock["recordPath"]["value"],
+        "libs/foundry/records/entities/mineable/mineablerock_iron"
+    );
+    assert!(rock["recordIndex"]["value"].is_u64());
+    let mining = &rock["mining"][0];
+    assert_eq!(mining["sourcePosition"]["value"], 0);
+    assert_eq!(
+        mining["composition"]["value"]["guid"]["value"],
+        guid(COMPOSITION).as_str()
+    );
+    assert_eq!(
+        mining["globalParams"]["value"]["guid"]["value"],
+        guid(PARAMS).as_str()
+    );
+    let radar = &rock["radar"][0];
+    assert_eq!(radar["sourcePosition"]["value"], 1);
+    let properties = &radar["properties"]["value"];
+    assert_eq!(
+        properties["contactType"]["value"]["guid"]["value"],
+        guid(CONTACT_TYPE).as_str()
+    );
+    let base = &properties["baseSignatureParams"]["value"];
+    assert_eq!(
+        base["scanSignature"]["value"], 4270.0,
+        "the named signature is the third slot"
+    );
+    assert_eq!(
+        base["signatures"]["value"].as_array().map(Vec::len),
+        Some(4)
+    );
+    assert_eq!(base["signatures"]["value"][2]["value"]["finite"], 4270.0);
+    assert_eq!(
+        base["signatures"]["value"][2]["value"]["rawBits"],
+        format!("{:08x}", 4270.0_f32.to_bits())
     );
     let kind = built.summary().kind(Kind::MineableEntities);
     assert_eq!(kind.map(|kind| kind.count), Some(3));
@@ -282,21 +324,26 @@ fn a_mineable_entity_takes_its_scan_signature_from_the_slot_the_radar_parameters
 fn an_entity_with_only_zero_signatures_has_no_scan_signature_but_keeps_the_array() -> TestResult {
     let (_, catalog) = build(None)?;
     let silent = entry(&catalog, "mineableEntities", ENTITY_SILENT)?;
-    assert_eq!(silent["scanSignature"], Value::Null);
-    assert_eq!(silent["signatures"], json!([0.0, 0.0, 0.0, 0.0]));
-    assert_eq!(silent["radarContactTypeGuid"], guid(CONTACT_TYPE).as_str());
+    let properties = &silent["radar"][0]["properties"]["value"];
+    let base = &properties["baseSignatureParams"]["value"];
+    assert_eq!(base["scanSignature"]["value"], Value::Null);
+    let signatures = base["signatures"]["value"].as_array().ok_or("signatures")?;
+    assert_eq!(signatures.len(), 4);
+    assert!(signatures.iter().all(|slot| slot["value"]["finite"] == 0.0));
+    assert_eq!(
+        properties["contactType"]["value"]["guid"]["value"],
+        guid(CONTACT_TYPE).as_str()
+    );
     Ok(())
 }
 
 #[test]
-fn an_entity_without_signature_or_mining_components_leaves_every_link_null() -> TestResult {
+fn an_entity_without_signature_or_mining_components_keeps_its_identity() -> TestResult {
     let (_, catalog) = build(None)?;
     let bare = entry(&catalog, "mineableEntities", ENTITY_BARE)?;
-    assert_eq!(bare["scanSignature"], Value::Null);
-    assert_eq!(bare["signatures"], json!([]));
-    assert_eq!(bare["radarContactTypeGuid"], Value::Null);
-    assert_eq!(bare["mineableCompositionGuid"], Value::Null);
-    assert_eq!(bare["miningGlobalParamsGuid"], Value::Null);
+    assert_eq!(bare["guid"]["value"], guid(ENTITY_BARE).as_str());
+    assert_eq!(bare["radar"], json!([]));
+    assert_eq!(bare["mining"], json!([]));
     Ok(())
 }
 
@@ -314,7 +361,14 @@ fn a_filter_keeps_only_the_locations_of_the_presets_it_selects() -> TestResult {
     assert_eq!(locations.len(), 1);
     assert_eq!(locations[0]["presetGuid"], guid(PRESET_UNREACHED).as_str());
     assert_eq!(catalog["mineableCompositions"], json!([]), "filtered");
-    assert_eq!(catalog["mineableEntities"], json!([]), "filtered");
+    assert_eq!(
+        catalog["definitions"]["mineableEntities"]["rows"],
+        json!([])
+    );
+    assert!(
+        catalog.get("mineableEntities").is_none(),
+        "one canonical table"
+    );
     assert_eq!(
         catalog["completeness"]["harvestableLocations"]["status"],
         "partial"

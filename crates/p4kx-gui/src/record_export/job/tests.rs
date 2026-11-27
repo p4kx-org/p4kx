@@ -35,6 +35,8 @@ fn run(tags: bool) -> Result<(bool, usize, usize), Box<dyn Error>> {
         request: &request,
         cancel: &cancel,
         shared: &shared,
+        #[cfg(feature = "test-hooks")]
+        pause: crate::hold::Pause::default(),
     };
     let summary = job.run()?;
     Ok((

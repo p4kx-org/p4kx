@@ -7,6 +7,8 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::ChfJsonName;
+
 /// A JSON document that keeps the order of the keys, which `serde_json::Value` loses unless the
 /// whole workspace turns on `preserve_order`.
 #[derive(Debug, Clone, PartialEq)]
@@ -17,6 +19,8 @@ pub(crate) enum Node {
     Signed(i64),
     Float(f64),
     Text(String),
+    ChfHash(ChfJsonName),
+    ChfLabel(String, ChfJsonName),
     List(Vec<Self>),
     Object(Vec<(String, Self)>),
 }
@@ -105,7 +109,8 @@ impl Serialize for Node {
             Self::Unsigned(value) => serializer.serialize_u64(*value),
             Self::Signed(value) => serializer.serialize_i64(*value),
             Self::Float(value) => serializer.serialize_f64(*value),
-            Self::Text(value) => serializer.serialize_str(value),
+            Self::Text(value) | Self::ChfLabel(value, _) => serializer.serialize_str(value),
+            Self::ChfHash(name) => serializer.serialize_u64(u64::from(name.hash())),
             Self::List(items) => {
                 let mut seq = serializer.serialize_seq(Some(items.len()))?;
                 for item in items {

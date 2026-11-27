@@ -14,7 +14,7 @@ use crate::theme::desktop::{
     PICKER_PADDING_X,
 };
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, FS_BODY, GLOW_PRIMARY, Weight};
+use crate::theme::tokens::{CORNER_CONTROL, FS_BODY, GLOW_PRIMARY, Weight};
 use crate::widgets::rows::chevron;
 use crate::widgets::text::{line, paint_left, plain};
 use crate::{ComparisonText, Model, Text, Texts};
@@ -99,14 +99,15 @@ fn side(texts: &Texts, channel: &Channel) -> String {
 /// and glow while focused or open, the value in 16 point Regular, the hint in italics.
 fn paint_field(ui: &Ui, rect: Rect, display: &Display, focused: bool) {
     let border = if focused {
-        ui.painter().add(GLOW_PRIMARY.as_shape(rect, CORNER_SM));
+        ui.painter()
+            .add(GLOW_PRIMARY.as_shape(rect, CORNER_CONTROL));
         palette::PRIMARY
     } else {
         palette::CONTROL_BORDER
     };
     ui.painter().rect(
         rect,
-        CORNER_SM,
+        CORNER_CONTROL,
         palette::CONTROL_BG,
         Stroke::new(1.0, border),
         StrokeKind::Inside,

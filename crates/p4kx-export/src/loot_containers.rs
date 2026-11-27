@@ -2,30 +2,59 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::slice::from_ref;
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue, SourcedValue};
 use rayon::prelude::*;
 
-use crate::container_read::{MAX_SOC_LEN, read_limited, soc_entries};
+use crate::catalog_read::original::EntryCapture;
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::contract_loot::{LootContainer, TagCount};
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::harvest_locations::Objects;
-use crate::loot_soc::EntityTags;
+use crate::harvest_locations::{NoObject, Objects};
+use crate::loot_soc_source::Counted as Tags;
 use crate::loot_unreadable::{Unreadable, UnreadableContainer};
-use crate::loot_walk::{Explored, Placed, Summary, below, explore, path_of};
+use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
+use crate::{CatalogError, ExportAccountingError, Kind};
 
-/// The tag counts of a placed container, or why they cannot be counted.
-type Tags = Result<EntityTags, Unreadable>;
+#[path = "loot_parent_origin.rs"]
+mod parent_origin;
+use parent_origin::ParentOrigins;
+
+#[path = "loot_record_admission.rs"]
+pub(crate) mod admission;
+
+#[path = "loot_ancestor_resolution.rs"]
+mod ancestor_resolution;
+
+#[path = "loot_container_query_read.rs"]
+mod scoped;
+pub(crate) use scoped::read_physical_container;
+
+#[path = "loot_system_origin.rs"]
+mod system_origin;
+
+use system_origin::SystemOrigins;
+
+#[cfg(test)]
+#[path = "loot_system_walk_tests.rs"]
+mod system_walk_tests;
+
+#[path = "loot_container_selection.rs"]
+mod selection;
+
+use selection::SelectedPlacement;
 
 /// The loot containers found and what could not be read or used while looking for them.
 pub(crate) struct Located {
+    pub(crate) ledger: ExportLedger,
     pub(crate) containers: Vec<LootContainer>,
+    pub(crate) original_documents: StagedCatalogTable,
     /// The containers and entity files that cannot be read, ordered by path.
     pub(crate) unreadable: Vec<UnreadableContainer>,
-    /// How many containers the limit on the walk left unread.
-    pub(crate) beyond_limit: usize,
     /// The entity files that name several different containers or configs, as `container: file`,
     /// ordered.
     pub(crate) several: Vec<String>,
@@ -39,65 +68,79 @@ pub(crate) struct Located {
 pub(crate) fn locate(
     archive: &Archive,
     opened: &[Opened],
-    objects: &Objects,
+    objects: &Objects<'_>,
     cancel: Option<&CancelToken>,
-) -> Located {
+    capture: &EntryCapture<'_>,
+) -> Result<Located, CatalogError> {
     let index = Index::new(archive);
     let Explored {
         summaries,
-        beyond_limit,
-    } = explore(archive, &index, opened, cancel);
-    let tags = read_tags(archive, &summaries, cancel);
-    let containers = rows(opened, objects, &summaries, &tags);
-    Located {
+        mut ledger,
+        original_documents,
+    } = explore(archive, &index, opened, cancel, capture)?;
+    let counted_targets = summaries
+        .values()
+        .flat_map(|summary| summary.placed.iter())
+        .filter_map(|placed| placed.target.entry());
+    let (tags, observed) = read_tags(archive, counted_targets, cancel, capture)?;
+    ledger.merge(observed);
+    let mut systems = SystemOrigins::try_new(archive, capture, &index)?;
+    let mut parents = ParentOrigins::new(objects, capture.source_uses());
+    let containers = rows(
+        selection::first_placements(opened, objects, &summaries),
+        &tags,
+        capture.source_uses(),
+        |root, location| {
+            let system = systems.project(root)?;
+            let object = parents.project(root, location, &system)?;
+            Ok(PlacementValues { system, object })
+        },
+    )?;
+    if !cancel.is_some_and(CancelToken::is_cancelled) {
+        ledger.inventory(Kind::LootContainers);
+    }
+    Ok(Located {
+        ledger,
         containers,
+        original_documents,
         unreadable: unreadable(archive, &summaries, &tags),
-        beyond_limit,
         several: several(archive, &summaries),
-    }
+    })
 }
 
-fn rows(
-    opened: &[Opened],
-    objects: &Objects,
-    summaries: &HashMap<usize, Summary>,
+struct PlacementValues {
+    system: SourcedValue<String>,
+    object: SourcedValue<CatalogGuid>,
+}
+
+fn rows<'source>(
+    selected: impl Iterator<Item = SelectedPlacement<'source>>,
     tags: &HashMap<usize, Tags>,
-) -> Vec<LootContainer> {
-    let mut reached: HashMap<usize, Vec<&Placed>> = HashMap::new();
-    let mut containers = Vec::new();
-    for root in opened {
-        let location = objects.location(root.under).ok();
-        let placed = reached
-            .entry(root.entry)
-            .or_insert_with(|| below(root.entry, summaries));
-        for placed in placed.iter() {
-            containers.push(row(
-                placed,
-                &root.system,
-                location,
-                placed.entry.and_then(|entry| tags.get(&entry)),
-            ));
-        }
-    }
-    containers.sort_by_cached_key(|row| {
-        (
-            row.multi_config_guid.text(),
-            row.container.clone(),
-            row.system.clone(),
-            row.starmap_object_guid.map(CatalogGuid::text),
+    sources: &SourceUses,
+    mut placement: impl FnMut(
+        &Opened,
+        Result<CatalogGuid, NoObject>,
+    ) -> Result<PlacementValues, CatalogError>,
+) -> Result<Vec<LootContainer>, CatalogError> {
+    selected
+        .map(
+            |SelectedPlacement {
+                 root,
+                 placed,
+                 location,
+             }| {
+                row(
+                    placed,
+                    placement(root, location)?,
+                    placed.target.entry().and_then(|entry| tags.get(&entry)),
+                    sources,
+                )
+            },
         )
-    });
-    containers.dedup_by(|later, earlier| {
-        later.multi_config_guid == earlier.multi_config_guid
-            && later.container == earlier.container
-            && later.system == earlier.system
-            && later.starmap_object_guid == earlier.starmap_object_guid
-    });
-    containers
+        .collect()
 }
 
-/// Returns the containers that cannot be read, a placed container the Archive lacks, and the
-/// tags that cannot be counted, ordered by path and reason.
+/// Returns the unreadable sources and unresolved targets, ordered by path and reason.
 fn unreadable(
     archive: &Archive,
     summaries: &HashMap<usize, Summary>,
@@ -110,7 +153,7 @@ fn unreadable(
         })
     });
     let counted = tags.iter().filter_map(|(&entry, read)| {
-        read.as_ref().err().map(|&reason| UnreadableContainer {
+        read.tags.as_ref().err().map(|&reason| UnreadableContainer {
             path: path_of(archive, entry).to_owned(),
             reason,
         })
@@ -118,10 +161,16 @@ fn unreadable(
     let missing = summaries
         .values()
         .flat_map(|summary| summary.placed.iter())
-        .filter(|placed| placed.entry.is_none())
-        .map(|placed| UnreadableContainer {
-            path: placed.path.clone(),
-            reason: Unreadable::MissingFromArchive,
+        .filter_map(|placed| {
+            let reason = match placed.target {
+                PlacedTarget::Resolved(_) | PlacedTarget::VerifiedMissing => return None,
+                PlacedTarget::Missing => Unreadable::MissingFromArchive,
+                PlacedTarget::Ambiguous => Unreadable::AmbiguousContainer,
+            };
+            Some(UnreadableContainer {
+                path: placed.path.clone(),
+                reason,
+            })
         });
     let mut found: Vec<UnreadableContainer> = read.chain(counted).chain(missing).collect();
     found.sort_by_cached_key(ToString::to_string);
@@ -145,106 +194,102 @@ fn several(archive: &Archive, summaries: &HashMap<usize, Summary>) -> Vec<String
 
 fn row(
     placed: &Placed,
-    system: &str,
-    location: Option<CatalogGuid>,
+    placement: PlacementValues,
     tags: Option<&Tags>,
-) -> LootContainer {
-    let counts = tags.and_then(|read| read.as_ref().ok());
-    let mut tag_counts: Vec<TagCount> = counts
-        .map(|counts| {
-            counts
-                .by_tag
-                .iter()
-                .map(|(&tag, &entities)| TagCount {
-                    tag_guid: CatalogGuid(tag),
-                    entities,
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    tag_counts.sort_by_cached_key(|count| count.tag_guid.text());
-    LootContainer {
-        multi_config_guid: CatalogGuid(placed.config),
-        container: placed.path.clone(),
-        system: system.to_owned(),
-        starmap_object_guid: location,
-        entity_count: counts.map(|counts| counts.entities),
+    sources: &SourceUses,
+) -> Result<LootContainer, CatalogError> {
+    let entity_count = count_value(placed, tags, sources)?;
+    let tag_counts = project_tag_counts(&entity_count, tags, sources)?;
+    Ok(LootContainer {
+        multi_config_guid: sources.value_with_origins(
+            SourceValue::Present(CatalogGuid(placed.config)),
+            &[&placed.config_origin],
+        )?,
+        container: sources.value_with_origins(
+            SourceValue::Present(placed.path.clone()),
+            &[&placed.path_origin],
+        )?,
+        system: placement.system,
+        starmap_object_guid: placement.object,
+        entity_count,
         tag_counts,
-    }
+    })
 }
 
-/// Counts the entities and tags of all `.soc` files of every container a config is placed with,
-/// in parallel.
+fn project_tag_counts(
+    survey: &SourcedValue<u32>,
+    tags: Option<&Tags>,
+    sources: &SourceUses,
+) -> Result<SourcedValue<Vec<TagCount>>, CatalogError> {
+    let mut rows = Vec::new();
+    if let Some(read) = tags
+        && let Ok(counts) = &read.tags
+    {
+        rows.try_reserve(counts.by_tag.len())
+            .map_err(CatalogError::SourceUseAllocation)?;
+        for (&guid, &count) in &counts.by_tag {
+            let use_ref = read
+                .first_tag_uses
+                .get(&guid)
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            rows.push(TagCount {
+                tag_guid: sources.value(
+                    SourceValue::Present(CatalogGuid(guid)),
+                    from_ref(use_ref),
+                    true,
+                ),
+                entities: survey.map_ref(|_| count),
+            });
+        }
+        rows.sort_by_cached_key(|row| row.tag_guid.value().copied().map(CatalogGuid::text));
+    }
+    Ok(survey.map_ref(|_| rows))
+}
+
+fn count_value(
+    placed: &Placed,
+    tags: Option<&Tags>,
+    sources: &SourceUses,
+) -> Result<SourcedValue<u32>, CatalogError> {
+    if let Some(read) = tags {
+        let value = read.tags.as_ref().map_or(SourceValue::Unreadable, |tags| {
+            SourceValue::Present(tags.entities)
+        });
+        return Ok(sources.value_with_origins(value, &[&placed.path_origin, &read.origin])?);
+    }
+    if matches!(placed.target, PlacedTarget::VerifiedMissing) {
+        return Ok(sources.value_with_origins(SourceValue::Absent, &[&placed.path_origin])?);
+    }
+    let incomplete = sources.origin(&[], false);
+    Ok(sources.value_with_origins(SourceValue::Unreadable, &[&placed.path_origin, &incomplete])?)
+}
+
+/// Counts entities and tags after deduplicating the requested physical containers.
 fn read_tags(
     archive: &Archive,
-    summaries: &HashMap<usize, Summary>,
+    entries: impl Iterator<Item = usize>,
     cancel: Option<&CancelToken>,
-) -> HashMap<usize, Tags> {
-    let mut entries: Vec<usize> = summaries
-        .values()
-        .flat_map(|summary| summary.placed.iter().filter_map(|placed| placed.entry))
-        .collect();
+    capture: &EntryCapture<'_>,
+) -> Result<(HashMap<usize, Tags>, ExportLedger), CatalogError> {
+    let mut entries: Vec<usize> = entries.collect();
     entries.sort_unstable();
     entries.dedup();
-    entries
+    let reads: Vec<_> = entries
         .par_iter()
         .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, soc_tags(archive, entry)))
-        .collect()
-}
-
-/// Sums the entities and tags of every `.soc` of the container `entry`; a container without a
-/// `.soc` has none.
-fn soc_tags(archive: &Archive, entry: usize) -> Tags {
-    let socpak = archive
-        .entries()
-        .get(entry)
-        .ok_or(Unreadable::NoSuchEntry)?;
-    let container = archive
-        .open_container(socpak)
-        .map_err(|_| Unreadable::NotAContainer)?;
-    let mut counts = EntityTags::default();
-    for soc in soc_entries(&container) {
-        let bytes = read_limited(&container, soc, MAX_SOC_LEN).ok_or(Unreadable::SocFile)?;
-        counts.add_soc(&bytes)?;
+        .map(|&entry| {
+            crate::loot_soc_source::read(archive, entry, cancel, capture).map(|read| (entry, read))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut ledger = ExportLedger::default();
+    let mut tags = HashMap::with_capacity(reads.len());
+    for (entry, (counted, observed)) in reads {
+        tags.insert(entry, counted);
+        ledger.merge(observed);
     }
-    Ok(counts)
+    Ok((tags, ledger))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    use p4kx_extraction::Guid;
-
-    const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
-
-    fn placed(path: &str) -> Placed {
-        Placed {
-            config: CONFIG.parse::<Guid>().expect("a GUID"),
-            path: path.to_owned(),
-            entry: Some(1),
-        }
-    }
-
-    #[test]
-    fn a_container_that_could_not_be_counted_has_no_entity_count() {
-        let failed: Tags = Err(Unreadable::SocFile);
-        let row = row(&placed("a.socpak"), "stanton", None, Some(&failed));
-        assert_eq!(row.entity_count, None);
-        assert!(row.tag_counts.is_empty());
-    }
-
-    #[test]
-    fn a_container_without_a_soc_has_zero_entities() {
-        let none: Tags = Ok(EntityTags::default());
-        let row = row(&placed("a.socpak"), "stanton", None, Some(&none));
-        assert_eq!(row.entity_count, Some(0));
-    }
-
-    #[test]
-    fn a_container_the_archive_lacks_has_no_entity_count() {
-        let row = row(&placed("a.socpak"), "stanton", None, None);
-        assert_eq!(row.entity_count, None);
-    }
-}
+#[path = "loot_container_row_tests.rs"]
+mod tests;

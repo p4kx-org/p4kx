@@ -16,8 +16,9 @@ fn base(specular: [f32; 3]) -> [u8; 3] {
         specular,
         decal: None,
     };
-    let image = base_colour(&pixel(DARK_DIFFUSE), Some(&pixel(LIGHT_MAP)), tints, false)
-        .expect("a base colour image");
+    let diffuse = LoadedTexture::new(pixel(DARK_DIFFUSE), false);
+    let specular = LoadedTexture::new(pixel(LIGHT_MAP), false);
+    let image = base_colour(&diffuse, Some(&specular), tints, false).expect("a base colour image");
     let [red, green, blue, _] = texel(&image, 0, 0);
     [red, green, blue]
 }
@@ -61,6 +62,16 @@ fn the_alpha_of_a_decal_is_its_strongest_mask_and_the_later_mask_covers_the_earl
 }
 
 #[test]
+fn red_precedes_blue_where_the_green_mask_is_clear() {
+    assert_eq!(painted([OPAQUE, 0, OPAQUE]), [OPAQUE, 0, 0, OPAQUE]);
+    let [red, green, blue, alpha] = painted([128, 0, OPAQUE]);
+    assert_eq!(green, 0);
+    assert_eq!(alpha, OPAQUE);
+    assert!(red.abs_diff(188) <= 1 && blue.abs_diff(187) <= 1);
+    assert_eq!(painted([OPAQUE, 1, OPAQUE]), [0, 0, OPAQUE, OPAQUE]);
+}
+
+#[test]
 fn a_dark_specular_colour_darkens_a_light_specular_map() {
     let [red, ..] = base([0.061; 3]);
     assert!(red < 80, "the map is multiplied by the dark colour: {red}");
@@ -74,10 +85,37 @@ fn a_bright_specular_colour_keeps_the_light_map_as_the_colour() {
 
 #[test]
 fn a_dark_specular_colour_makes_the_metalness_of_the_map_small() {
-    let image = metallic_roughness(None, Some(&pixel(LIGHT_MAP)), [0.061; 3])
+    let specular = LoadedTexture::new(pixel(LIGHT_MAP), false);
+    let image = metallic_roughness(None, Some(&specular), [0.061; 3], None)
         .expect("a metallic-roughness image")
         .expect("a specular map gives an image")
         .image;
     let [_, _, metallic, _] = texel(&image, 0, 0);
     assert_eq!(metallic, 0);
+}
+
+#[test]
+fn selected_red_gloss_and_ddna_alpha_remain_independent() {
+    let finish = Some(SurfaceFinish::new(0.5, Some(0.8)));
+    for alpha in [0, 64, 128, 255] {
+        let image = pixel([37, 89, 201, alpha]);
+        for (channel, scalar) in [
+            (Smoothness::ExplicitRed(&image), 37),
+            (Smoothness::NormalAlpha(&image), alpha),
+        ] {
+            let packed = metallic_roughness(Some(channel), None, [1.0; 3], finish)
+                .expect("valid packed image")
+                .expect("a scalar source");
+            let expected = (f32::from(scalar) / 255.0 * 0.5).mul_add(-0.8, 1.0);
+            let green = texel(&packed.image, 0, 0)[1];
+            assert!((unit(green) - expected).abs() <= 0.5 / 255.0);
+        }
+        let legacy =
+            metallic_roughness(Some(Smoothness::ExplicitRgb(&image)), None, [1.0; 3], None)
+                .expect("valid legacy image")
+                .expect("a colour source");
+        let luminance = 0.0722_f32.mul_add(201.0, 0.7152_f32.mul_add(89.0, 0.2126 * 37.0));
+        let expected = 1.0 - luminance / 255.0;
+        assert!((unit(texel(&legacy.image, 0, 0)[1]) - expected).abs() <= 0.5 / 255.0);
+    }
 }

@@ -1,0 +1,336 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::collections::HashMap;
+use std::fmt;
+use std::marker::PhantomData;
+
+use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer};
+
+#[path = "real_archive_catalog_replay_references.rs"]
+mod references;
+#[path = "real_archive_catalog_replay_use_index.rs"]
+mod use_index;
+
+pub(super) use references::{Observed, References};
+use use_index::UseIndex;
+
+const FIRST_INDEX_PROGRESS: usize = 1 << 22;
+
+pub(super) struct Inventory {
+    sources: u64,
+    uses: UseIndex,
+    variant_sets: HashMap<u32, VariantSet>,
+}
+
+struct VariantSet {
+    references: Vec<Box<str>>,
+    observed: Observed,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VariantSetRow {
+    id: u32,
+    source_uses_refs: Vec<Box<str>>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct UseFacts {
+    role: Role,
+    encryption: Encryption,
+    opaque: bool,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum Role {
+    Payload,
+    Selector,
+    Conversion,
+    Attempted,
+    Reference,
+}
+
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(super) enum Encryption {
+    Encrypted,
+    Unencrypted,
+    Unknown,
+}
+
+#[derive(Deserialize)]
+struct SourceRow {
+    id: Box<str>,
+    ancestors: Vec<Box<str>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UseRow {
+    id: Box<str>,
+    source: Box<str>,
+    role: Role,
+    location: Location,
+    effective_encryption: Encryption,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum Location {
+    Opaque,
+    LocalizationLookup {
+        selector: Box<str>,
+    },
+    #[serde(other)]
+    Other,
+}
+
+impl Inventory {
+    pub(super) fn variant_contributors(
+        &self,
+        shared: Option<u32>,
+        local: &[Box<str>],
+    ) -> Result<Observed, &'static str> {
+        let observed = references::contributors(&self.uses, local)?;
+        let Some(id) = shared else {
+            return Ok(observed);
+        };
+        let shared = self
+            .variant_sets
+            .get(&id)
+            .ok_or("missing variant source-use set")?;
+        for reference in local {
+            if shared.references.binary_search(reference).is_ok() {
+                return Err("variant local and pooled source-use references overlap");
+            }
+        }
+        Ok(observed.merge(shared.observed))
+    }
+
+    pub(super) fn check_variant_attempts(
+        &self,
+        references: &[Box<str>],
+    ) -> Result<(), &'static str> {
+        references::check_attempts(&self.uses, references)
+    }
+
+    pub(super) fn variant_set_count(&self) -> usize {
+        self.variant_sets.len()
+    }
+
+    pub(super) const fn counts(&self) -> (u64, u64) {
+        (self.sources, self.uses.len() as u64)
+    }
+}
+
+impl UseFacts {
+    pub(super) const fn contributes(self) -> bool {
+        matches!(self.role, Role::Payload | Role::Selector | Role::Conversion)
+    }
+
+    pub(super) const fn encryption(self) -> Encryption {
+        self.encryption
+    }
+
+    pub(super) const fn opaque(self) -> bool {
+        self.opaque
+    }
+}
+
+impl Encryption {
+    pub(super) const fn from_marker(marker: Option<bool>) -> Self {
+        match marker {
+            Some(true) => Self::Encrypted,
+            Some(false) => Self::Unencrypted,
+            None => Self::Unknown,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Inventory {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_map(InventoryVisitor)
+    }
+}
+
+struct InventoryVisitor;
+
+impl<'de> Visitor<'de> for InventoryVisitor {
+    type Value = Inventory;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("the catalog provenance inventory")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Inventory, A::Error> {
+        let mut sources = None;
+        let mut uses = None;
+        let mut variant_sets = None;
+        while let Some(field) = map.next_key::<String>()? {
+            match field.as_str() {
+                "sources" if sources.is_none() => {
+                    let mut index = Sources::default();
+                    map.next_value_seed(FoldRows::new(|row: SourceRow| index.insert(row)))?;
+                    index.validate().map_err(de::Error::custom)?;
+                    sources = Some(index);
+                }
+                "uses" if uses.is_none() => {
+                    let index = sources
+                        .as_ref()
+                        .ok_or_else(|| de::Error::custom("source inventory must precede uses"))?;
+                    let mut builder = Uses::default();
+                    map.next_value_seed(FoldRows::new(|row: UseRow| builder.insert(index, row)))?;
+                    uses = Some(builder.finish().map_err(de::Error::custom)?);
+                }
+                "variantSourceUseSets" if variant_sets.is_none() => {
+                    let uses = uses.as_ref().ok_or_else(|| {
+                        de::Error::custom("source uses must precede variant sets")
+                    })?;
+                    let mut sets = HashMap::new();
+                    map.next_value_seed(FoldRows::new(|row: VariantSetRow| {
+                        let observed = references::contributors(uses, &row.source_uses_refs)?;
+                        let set = VariantSet {
+                            references: row.source_uses_refs,
+                            observed,
+                        };
+                        if sets.insert(row.id, set).is_some() {
+                            return Err("duplicate variant source-use set ID");
+                        }
+                        Ok(())
+                    }))?;
+                    variant_sets = Some(sets);
+                }
+                "sources" | "uses" | "variantSourceUseSets" => {
+                    return Err(de::Error::custom("duplicate provenance inventory"));
+                }
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        Ok(Inventory {
+            sources: sources
+                .ok_or_else(|| de::Error::missing_field("sources"))?
+                .0
+                .len() as u64,
+            uses: uses.ok_or_else(|| de::Error::missing_field("uses"))?,
+            variant_sets: variant_sets.unwrap_or_default(),
+        })
+    }
+}
+
+#[derive(Default)]
+struct Sources(HashMap<Box<str>, Vec<Box<str>>>);
+
+impl Sources {
+    fn insert(&mut self, row: SourceRow) -> Result<(), &'static str> {
+        if row.id.is_empty() || self.0.insert(row.id, row.ancestors).is_some() {
+            return Err("invalid or duplicate physical-source ID");
+        }
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<(), &'static str> {
+        for ancestors in self.0.values() {
+            for (position, ancestor) in ancestors.iter().enumerate() {
+                let parent = self
+                    .0
+                    .get(ancestor)
+                    .ok_or("missing physical source ancestor")?;
+                if ancestors.get(..position) != Some(parent.as_slice()) {
+                    return Err("invalid physical source ancestry order");
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Uses {
+    rows: UseIndex,
+    selectors: Vec<Box<str>>,
+}
+
+impl Uses {
+    fn insert(&mut self, sources: &Sources, row: UseRow) -> Result<(), &'static str> {
+        if !sources.0.contains_key(&row.source) {
+            return Err("source use refers to a missing physical source");
+        }
+        let facts = UseFacts {
+            role: row.role,
+            encryption: row.effective_encryption,
+            opaque: matches!(row.location, Location::Opaque),
+        };
+        self.rows.insert(&row.id, facts)?;
+        let indexed = self.rows.len();
+        if indexed >= FIRST_INDEX_PROGRESS && indexed.is_power_of_two() {
+            super::support::print_line(&format!("catalog replay indexing sourceUses={indexed}"));
+        }
+        if let Location::LocalizationLookup { selector } = row.location {
+            self.selectors.push(selector);
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<UseIndex, &'static str> {
+        for selector in self.selectors {
+            let source = self
+                .rows
+                .get(&selector)
+                .ok_or("missing localization selector")?;
+            if source.role != Role::Selector {
+                return Err("localization lookup target does not have the selector role");
+            }
+        }
+        Ok(self.rows)
+    }
+}
+
+struct FoldRows<Row, F> {
+    row: PhantomData<fn(Row)>,
+    fold: F,
+}
+
+impl<Row, F> FoldRows<Row, F> {
+    const fn new(fold: F) -> Self {
+        Self {
+            row: PhantomData,
+            fold,
+        }
+    }
+}
+
+impl<'de, Row, F> DeserializeSeed<'de> for FoldRows<Row, F>
+where
+    Row: Deserialize<'de>,
+    F: FnMut(Row) -> Result<(), &'static str>,
+{
+    type Value = ();
+
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<(), D::Error> {
+        deserializer.deserialize_seq(self)
+    }
+}
+
+impl<'de, Row, F> Visitor<'de> for FoldRows<Row, F>
+where
+    Row: Deserialize<'de>,
+    F: FnMut(Row) -> Result<(), &'static str>,
+{
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("one provenance inventory row array")
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(mut self, mut sequence: A) -> Result<(), A::Error> {
+        while let Some(row) = sequence.next_element::<Row>()? {
+            (self.fold)(row).map_err(de::Error::custom)?;
+        }
+        Ok(())
+    }
+}

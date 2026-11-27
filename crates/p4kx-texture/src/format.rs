@@ -70,14 +70,14 @@ impl TextureFormat {
         bit_count: u32,
         masks: [u32; 4],
     ) -> Self {
-        if flags & PF_FOURCC != 0 {
+        if legacy_uses_four_cc(flags) {
             return from_four_cc(four_cc);
         }
         let [red, green, blue, alpha_mask] = masks;
-        let alpha = if flags & (PF_ALPHA_PIXELS | PF_ALPHA) == 0 {
-            0
-        } else {
+        let alpha = if legacy_uses_alpha_mask(flags) {
             alpha_mask
+        } else {
+            0
         };
         let dxgi = match (bit_count, [red, green, blue, alpha]) {
             (32, [0xFF_0000, 0xFF00, 0xFF, 0xFF00_0000]) => 87,
@@ -97,6 +97,14 @@ impl TextureFormat {
         };
         Self::Dxgi(DxgiFormat(dxgi))
     }
+}
+
+pub(crate) const fn legacy_uses_four_cc(flags: u32) -> bool {
+    flags & PF_FOURCC != 0
+}
+
+pub(crate) const fn legacy_uses_alpha_mask(flags: u32) -> bool {
+    flags & (PF_ALPHA_PIXELS | PF_ALPHA) != 0
 }
 
 const fn from_four_cc(four_cc: [u8; 4]) -> TextureFormat {

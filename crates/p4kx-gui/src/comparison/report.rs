@@ -7,6 +7,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 
 use p4kx_comparison::{Filter, OwnedComparison};
+use p4kx_extraction::CancelToken;
 
 use crate::model::describe;
 
@@ -25,7 +26,14 @@ pub enum ReportStatus {
 #[derive(Debug)]
 pub(crate) struct ReportJob {
     status: ReportStatus,
+    cancel: CancelToken,
     result: Option<Receiver<Result<(), String>>>,
+}
+
+impl Drop for ReportJob {
+    fn drop(&mut self) {
+        self.cancel.cancel();
+    }
 }
 
 impl ReportJob {
@@ -71,14 +79,16 @@ pub(crate) fn start(
     wake: impl Fn() + Send + 'static,
 ) -> ReportJob {
     let (sender, result) = mpsc::channel();
+    let cancel = CancelToken::new();
+    let thread_cancel = cancel.clone();
     let thread_comparison = Arc::clone(comparison);
     let thread_path = path.clone();
     let spawned = thread::Builder::new()
         .name("comparison-report".to_owned())
         .spawn(move || {
             let saved = thread_comparison
-                .recompare(filter.as_ref(), None, |comparison| {
-                    comparison.save_report(&thread_path)
+                .recompare(filter.as_ref(), Some(&thread_cancel), |comparison| {
+                    comparison.save_report_with_cancel(&thread_path, Some(&thread_cancel))
                 })
                 .map_err(|error| describe(&error))
                 .and_then(|written| written.map_err(|error| describe(&error)));
@@ -89,10 +99,12 @@ pub(crate) fn start(
     match spawned {
         Ok(_handle) => ReportJob {
             status: ReportStatus::Saving(path),
+            cancel,
             result: Some(result),
         },
         Err(error) => ReportJob {
             status: ReportStatus::Failed(path, describe(&error)),
+            cancel,
             result: None,
         },
     }

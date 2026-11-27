@@ -14,17 +14,19 @@ use crate::theme::desktop::{
 };
 use crate::theme::palette;
 use crate::theme::tokens::{
-    CORNER_SM, GLOW_DANGER_LG, GLOW_PRIMARY_LG, RADIUS_SM, SPACE_3, SPACE_4, Weight,
+    CORNER_BOX, CORNER_TILE, GLOW_DANGER_LG, GLOW_PRIMARY_LG, RADIUS_BOX_POINTS, SPACE_3, SPACE_4,
+    Weight,
 };
+use crate::theme::window_metrics::PANEL_INSET;
 
 /// The padding above and below the content of a modal.
 pub(crate) const MODAL_PADDING_Y: f32 = SPACE_3;
 /// The height of the foot of a modal: its gap, the hairline's gap and the action.
 pub(crate) const FOOT_HEIGHT: f32 = SPACE_4 + SPACE_3 + BUTTON_HEIGHT;
 /// The width of the body of a modal.
-pub(crate) const MODAL_BODY_WIDTH: f32 = MODAL_WIDTH - 2.0 * SPACE_4;
+pub(crate) const MODAL_BODY_WIDTH: f32 = 2.0f32.mul_add(-SPACE_4, MODAL_WIDTH);
 /// The width of the body of a wide modal.
-pub(crate) const MODAL_WIDE_BODY_WIDTH: f32 = MODAL_WIDE_WIDTH - 2.0 * SPACE_4;
+pub(crate) const MODAL_WIDE_BODY_WIDTH: f32 = 2.0f32.mul_add(-SPACE_4, MODAL_WIDE_WIDTH);
 
 /// The tone of a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,13 +96,13 @@ pub(crate) fn inset() -> Frame {
     Frame::NONE.inner_margin(Margin::same(px(SPACE_3)))
 }
 
-/// The frame of a `.list-panel` or the preview: the panel surface with a hairline and the
-/// `radius-sm` corner.
+/// The work-panel frame and its protected inner edge.
 pub(crate) fn panel() -> Frame {
     Frame::NONE
         .fill(palette::SURFACE_PANEL)
         .stroke(Stroke::new(1.0, palette::GRAY_3))
-        .corner_radius(CORNER_SM)
+        .corner_radius(CORNER_BOX)
+        .inner_margin(Margin::same(px(PANEL_INSET)))
 }
 
 /// Paints `colour` over the part of the rounded `shape` that lies in `edge`, so an accent edge
@@ -123,7 +125,7 @@ pub(crate) fn preview_body() -> Frame {
 
 /// Returns the width a text inside an `.alert` that is `outer` wide may take.
 pub(crate) const fn alert_text_width(outer: f32) -> f32 {
-    outer - 2.0 * SPACE_4 - ACCENT_BAR - 2.0
+    2.0f32.mul_add(-SPACE_4, outer) - ACCENT_BAR - 2.0
 }
 
 /// Shows an `.alert.alert-warning` with `body` inside.
@@ -140,7 +142,7 @@ fn alert<R>(ui: &mut Ui, (fill, accent): (Color32, Color32), body: impl FnOnce(&
     let response = Frame::NONE
         .fill(fill)
         .stroke(Stroke::new(1.0, accent))
-        .corner_radius(CORNER_SM)
+        .corner_radius(CORNER_TILE)
         .inner_margin(Margin {
             left: px(SPACE_4 + ACCENT_BAR),
             right: px(SPACE_4),
@@ -153,7 +155,7 @@ fn alert<R>(ui: &mut Ui, (fill, accent): (Color32, Color32), body: impl FnOnce(&
         });
     let rect = response.response.rect;
     let bar = Rect::from_min_size(rect.min, vec2(ACCENT_BAR, rect.height()));
-    accent_edge(ui.painter(), (rect, CORNER_SM), bar, accent);
+    accent_edge(ui.painter(), (rect, CORNER_TILE), bar, accent);
     response.inner
 }
 
@@ -166,19 +168,22 @@ pub(super) fn modal_frame(tone: Tone) -> Frame {
     Frame::NONE
         .fill(palette::BG_DARK_GRAY)
         .stroke(Stroke::new(1.0, palette::GRAY_3))
-        .corner_radius(CORNER_SM)
+        .corner_radius(CORNER_BOX)
         .shadow(glow)
         .inner_margin(margin(SPACE_4, MODAL_PADDING_Y))
 }
 
 /// Returns the title of a modal head in `tone`.
 pub(crate) fn modal_title(title: &str, tone: Tone) -> egui::RichText {
-    let colour = if tone == Tone::Danger {
+    caps(title, TITLE_SIZE, Weight::Bold, TITLE_TRACKING).color(title_colour(tone))
+}
+
+fn title_colour(tone: Tone) -> Color32 {
+    if tone == Tone::Danger {
         palette::DANGER_TEXT
     } else {
-        palette::WHITE
-    };
-    caps(title, TITLE_SIZE, Weight::Bold, TITLE_TRACKING).color(colour)
+        palette::TITLE
+    }
 }
 
 /// Shows the head of a modal: the upper-case `title` over a hairline, with the close cross named
@@ -198,7 +203,7 @@ pub(crate) fn head(
     if labelled {
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, title));
     }
-    super::text::paint_left(ui, rect, galley, palette::WHITE);
+    super::text::paint_left(ui, rect, galley, title_colour(tone));
     let closed = close.is_some_and(|label| {
         let cross = Rect::from_min_size(
             pos2(rect.right() - BUTTON_XS_HEIGHT, rect.top()),
@@ -300,24 +305,50 @@ pub(crate) fn modal_decoration(ctx: &Context, layer: LayerId, rect: Rect, tone: 
     let painter = ctx.layer_painter(layer);
     let accent = tone.accent();
     let edge = Rect::from_min_size(rect.min, vec2(rect.width(), MODAL_TOP_EDGE));
-    accent_edge(&painter, (rect, CORNER_SM), edge, accent);
-    brackets(&painter, rect.expand(BRACKET_STROKE / 2.0), accent);
+    accent_edge(&painter, (rect, CORNER_BOX), edge, accent);
+    brackets(&painter, rect, accent);
 }
 
 fn brackets(painter: &Painter, rect: Rect, colour: Color32) {
     let stroke = Stroke::new(BRACKET_STROKE, colour);
-    let (min, max) = (rect.min, rect.max);
-    painter.line_segment([min, pos2(min.x + BRACKET, min.y)], stroke);
-    painter.line_segment([min, pos2(min.x, min.y + BRACKET)], stroke);
-    painter.line_segment([max, pos2(max.x - BRACKET, max.y)], stroke);
-    painter.line_segment([max, pos2(max.x, max.y - BRACKET)], stroke);
+    let outer = rect.expand(BRACKET_STROKE / 2.0);
+    let (min, max) = (outer.min, outer.max);
+    let radius = f32::from(RADIUS_BOX_POINTS) + BRACKET_STROKE / 2.0;
+    let corners = [
+        (
+            pos2(min.x, min.y + BRACKET),
+            min + vec2(radius, radius),
+            2.0,
+            pos2(min.x + BRACKET, min.y),
+        ),
+        (
+            pos2(max.x, max.y - BRACKET),
+            max - vec2(radius, radius),
+            0.0,
+            pos2(max.x - BRACKET, max.y),
+        ),
+    ];
+    for (start, centre, quarter, end) in corners {
+        let points = std::iter::once(start)
+            .chain(corner_arc(centre, radius, quarter))
+            .chain(std::iter::once(end))
+            .collect();
+        painter.add(Shape::line(points, stroke));
+    }
 }
 
 const ARC_STEPS: u8 = 4;
 
-/// Returns the closed outline of `rect` with `radius-sm` corners, clockwise from the top-left.
+fn corner_arc(centre: Pos2, radius: f32, start: f32) -> impl Iterator<Item = Pos2> {
+    (0..=ARC_STEPS).map(move |step| {
+        let angle = (start + f32::from(step) / f32::from(ARC_STEPS)) * std::f32::consts::FRAC_PI_2;
+        centre + vec2(angle.cos(), angle.sin()) * radius
+    })
+}
+
+/// Returns the clockwise outline of a box, from the top-left corner.
 fn rounded_outline(rect: Rect) -> Vec<Pos2> {
-    let radius = RADIUS_SM;
+    let radius = f32::from(RADIUS_BOX_POINTS);
     let corners = [
         (pos2(rect.left() + radius, rect.top() + radius), 2.0),
         (pos2(rect.right() - radius, rect.top() + radius), 3.0),

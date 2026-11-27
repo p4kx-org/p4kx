@@ -3,17 +3,23 @@
 
 use std::collections::HashSet;
 
+use p4kx_archive::EntryOrigin;
+
 use rayon::prelude::*;
 
 use crate::animation_load::{Described, Kind, Loaded, kind};
 use crate::animation_set::{ADDITIVE_REASON, Source, names, normalised, stem};
-use crate::{AnimationChoice, ChunkSource, ConversionError, UnreadAnimation};
+use crate::{
+    AnimationChoice, ChunkSource, ConversionError, PositionedUnreadAnimation, UnreadAnimation,
+};
 
 /// What a read of animation sources found, before it takes the shape of a front-end's type.
 pub(crate) struct Gathered<T> {
     pub(crate) animations: Vec<T>,
     pub(crate) origins: Vec<String>,
-    pub(crate) unread: Vec<UnreadAnimation>,
+    pub(crate) archive_sources: Vec<Option<EntryOrigin>>,
+    pub(crate) matched_specs: Vec<Vec<String>>,
+    pub(crate) unread: Vec<PositionedUnreadAnimation>,
     pub(crate) files: usize,
 }
 
@@ -22,7 +28,10 @@ impl<T> Default for Gathered<T> {
         Self {
             animations: Vec::new(),
             origins: Vec::new(),
+            archive_sources: Vec::new(),
+            matched_specs: Vec::new(),
             unread: Vec::new(),
+
             files: 0,
         }
     }
@@ -32,18 +41,36 @@ impl<T> Default for Gathered<T> {
 pub(crate) struct Wanted<'a> {
     specs: Vec<&'a str>,
     by_name: bool,
+    evidence: ReadEvidence,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ReadEvidence {
+    Off,
+    MatchedSpecs,
+    UnreadClips,
+    SelectedAndUnread,
 }
 
 impl<'a> Wanted<'a> {
-    fn of(choice: &'a AnimationChoice) -> Self {
+    const fn captures_unread(&self) -> bool {
+        matches!(
+            self.evidence,
+            ReadEvidence::UnreadClips | ReadEvidence::SelectedAndUnread
+        )
+    }
+
+    fn of(choice: &'a AnimationChoice, evidence: ReadEvidence) -> Self {
         match choice {
             AnimationChoice::Named(specs) => Self {
                 specs: specs.iter().map(String::as_str).collect(),
                 by_name: true,
+                evidence,
             },
             AnimationChoice::All => Self {
                 specs: Vec::new(),
                 by_name: false,
+                evidence,
             },
         }
     }
@@ -64,15 +91,94 @@ impl<'a> Wanted<'a> {
             || kind == Kind::Dba
             || !self.hits(stem(&source.label), &source.label).is_empty()
     }
+
+    fn missing(&self, sources: &[Source], matched: &HashSet<&str>) -> Vec<String> {
+        self.specs
+            .iter()
+            .filter(|spec| {
+                !matched.contains(**spec)
+                    && !sources
+                        .iter()
+                        .any(|source| source.whole && names(spec, "", &source.label))
+            })
+            .map(|spec| (*spec).to_owned())
+            .collect()
+    }
 }
 
 /// Sorts and merges `sources`, reads those the choice wants and collects the animations.
 pub(crate) fn read<T: Described + Send>(
-    mut sources: Vec<Source>,
+    sources: Vec<Source>,
     choice: &AnimationChoice,
     open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
     load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
 ) -> Result<Gathered<T>, ConversionError> {
+    read_observing(sources, choice, open, load, ReadEvidence::Off, |_, _| {})
+}
+
+pub(crate) fn read_observing<T: Described + Send>(
+    mut sources: Vec<Source>,
+    choice: &AnimationChoice,
+    open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
+    load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
+    evidence: ReadEvidence,
+    mut observe: impl FnMut(Option<&EntryOrigin>, &Loaded<T>),
+) -> Result<Gathered<T>, ConversionError> {
+    merge_sources(&mut sources);
+    let wanted = Wanted::of(choice, evidence);
+    let results: Vec<_> = sources
+        .par_iter()
+        .filter_map(|source| {
+            let kind = kind(&source.label)?;
+            wanted.reads(source, kind).then(|| {
+                let mut origin = None;
+                let loaded = open(&source.label).and_then(|file| {
+                    origin = file.archive_origin().cloned();
+                    load(&file, &source.label, kind, source.explicit)
+                });
+                (source, origin, loaded)
+            })
+        })
+        .collect();
+    let mut set = Gathered::default();
+    let mut matched: HashSet<&str> = HashSet::new();
+    for (source, origin, result) in results {
+        let loaded = match result {
+            Ok(loaded) => loaded,
+            Err(error) if is_fatal(source, &error) => return Err(error),
+            Err(error) => {
+                let row = unread_source(&source.label, &error);
+                set.unread.push(row.with_origin(origin.as_ref()));
+                continue;
+            }
+        };
+        observe(origin.as_ref(), &loaded);
+        set.files += 1;
+
+        set.unread.extend(
+            loaded
+                .unread
+                .into_iter()
+                .map(|row| row.with_origin(origin.as_ref())),
+        );
+        keep(
+            &mut set,
+            &mut matched,
+            &wanted,
+            source,
+            origin.as_ref(),
+            loaded.animations,
+        );
+    }
+    let missing = wanted.missing(&sources, &matched);
+    if missing.is_empty() {
+        Ok(set)
+    } else {
+        Err(ConversionError::UnknownAnimations { names: missing })
+    }
+}
+
+fn merge_sources(sources: &mut Vec<Source>) {
     sources.sort_by_cached_key(|source| (normalised(&source.label), !source.whole));
     sources.dedup_by(|later, earlier| {
         let same = normalised(&later.label) == normalised(&earlier.label);
@@ -80,53 +186,6 @@ pub(crate) fn read<T: Described + Send>(
         earlier.whole |= same && later.whole;
         same
     });
-    let wanted = Wanted::of(choice);
-    let results: Vec<_> = sources
-        .par_iter()
-        .filter_map(|source| {
-            let kind = kind(&source.label)?;
-            wanted.reads(source, kind).then(|| {
-                let loaded = open(&source.label)
-                    .and_then(|file| load(&file, &source.label, kind, source.explicit));
-                (source, loaded)
-            })
-        })
-        .collect();
-    let mut set = Gathered::default();
-    let mut matched: HashSet<&str> = HashSet::new();
-    for (source, result) in results {
-        let loaded = match result {
-            Ok(loaded) => loaded,
-            Err(error) if is_fatal(source, &error) => return Err(error),
-            Err(error) => {
-                set.unread.push(UnreadAnimation {
-                    source: source.label.clone(),
-                    name: None,
-                    reason: describe(&error),
-                });
-                continue;
-            }
-        };
-        set.files += 1;
-        set.unread.extend(loaded.unread);
-        keep(&mut set, &mut matched, &wanted, source, loaded.animations);
-    }
-    let missing: Vec<String> = wanted
-        .specs
-        .iter()
-        .filter(|spec| {
-            !matched.contains(**spec)
-                && !sources
-                    .iter()
-                    .any(|source| source.whole && names(spec, "", &source.label))
-        })
-        .map(|spec| (*spec).to_owned())
-        .collect();
-    if missing.is_empty() {
-        Ok(set)
-    } else {
-        Err(ConversionError::UnknownAnimations { names: missing })
-    }
 }
 
 /// Adds the animations of `source` that the choice wants to `set`, and lists the additive ones
@@ -136,6 +195,7 @@ fn keep<'a, T: Described>(
     matched: &mut HashSet<&'a str>,
     wanted: &Wanted<'a>,
     source: &Source,
+    origin: Option<&EntryOrigin>,
     animations: Vec<T>,
 ) {
     let caf_by_caller = source.explicit && kind(&source.label) == Some(Kind::Caf);
@@ -145,14 +205,28 @@ fn keep<'a, T: Described>(
             if wanted.by_name && !source.whole {
                 continue;
             }
-            set.unread.push(UnreadAnimation {
-                source: source.label.clone(),
-                name: Some(animation.name().to_owned()),
-                reason: ADDITIVE_REASON.to_owned(),
-            });
+            let coordinates = if wanted.captures_unread() {
+                animation.additive_coordinates()
+            } else {
+                None
+            };
+            let row = PositionedUnreadAnimation::new(
+                UnreadAnimation {
+                    source: source.label.clone(),
+                    name: Some(animation.name().to_owned()),
+                    reason: ADDITIVE_REASON.to_owned(),
+                },
+                coordinates,
+            );
+            set.unread.push(row.with_origin(origin));
         } else if source.whole || !wanted.by_name || !hits.is_empty() {
+            if matches!(wanted.evidence, ReadEvidence::MatchedSpecs) {
+                set.matched_specs
+                    .push(hits.iter().map(|spec| (*spec).to_owned()).collect());
+            }
             matched.extend(hits);
             set.origins.push(source.label.clone());
+            set.archive_sources.push(origin.cloned());
             set.animations.push(animation);
         }
     }
@@ -170,7 +244,7 @@ const fn is_fatal(source: &Source, error: &ConversionError) -> bool {
         )
 }
 
-fn describe(error: &ConversionError) -> String {
+fn unread_source(label: &str, error: &ConversionError) -> PositionedUnreadAnimation {
     let mut text = error.to_string();
     let mut cause = std::error::Error::source(error);
     while let Some(next) = cause {
@@ -178,5 +252,12 @@ fn describe(error: &ConversionError) -> String {
         text.push_str(&next.to_string());
         cause = next.source();
     }
-    text
+    PositionedUnreadAnimation::new(
+        UnreadAnimation {
+            source: label.to_owned(),
+            name: None,
+            reason: text,
+        },
+        None,
+    )
 }

@@ -7,15 +7,12 @@ use crate::forge::{AEGS_TEXT, AVENGER_TEXT, dataforge, install, many_items};
 use crate::support::{Server, TestResult, key_order, member};
 
 fn texts(items: &Value, key: &str) -> Vec<String> {
-    items
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item[key].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    items.as_array().map_or_default(|items| {
+        items
+            .iter()
+            .filter_map(|item| item[key].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 /// Calls `tool` page by page and returns every item under `key`.
@@ -85,15 +82,12 @@ fn a_record_path_gives_every_record_at_it_in_definition_order() -> TestResult {
         &json!({ "path": r"Libs\Foundry\Records\Items\Boxes.XML" }),
     )?;
     assert_eq!(result["total"], 2, "two Records share it");
-    let names: Vec<&str> = result["records"]
-        .as_array()
-        .map(|records| {
-            records
-                .iter()
-                .filter_map(|record| record["$path"].as_str())
-                .collect()
-        })
-        .unwrap_or_default();
+    let names: Vec<&str> = result["records"].as_array().map_or_default(|records| {
+        records
+            .iter()
+            .filter_map(|record| record["$path"].as_str())
+            .collect()
+    });
     assert_eq!(
         names, ["libs/foundry/records/items/boxes"; 2],
         "case, separator and .xml do not matter"

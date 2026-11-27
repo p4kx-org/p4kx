@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::model::{MaterialStatus, Model};
-use p4kx_extraction::{AnimationSet, GlbSummary, Guid, TextureRole, WriteRefused};
+use p4kx_extraction::{
+    AnimationSet, GlbGeometryPublication, GlbSummary, Guid, TextureRole, WriteProtectionError,
+};
 
 use crate::model_info::{MAX_LISTED_ANIMATIONS, printable};
 use crate::{ChunkNote, ModelInfo, NoEntries};
@@ -13,6 +15,7 @@ use crate::{ChunkNote, ModelInfo, NoEntries};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelExportSummary {
     file: PathBuf,
+    origin_receipt: PathBuf,
     name: String,
     lod: u32,
     written: GlbSummary,
@@ -57,11 +60,46 @@ pub enum AnimationNoteKind {
 
 /// Why the material library of a model was not used.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialProblem {
-    /// The library as the model names it, below `Data` without `.mtl`.
-    pub library: String,
-    /// Why it cannot be read, or `None` when it does not exist.
-    pub reason: Option<String>,
+#[non_exhaustive]
+pub enum MaterialProblem {
+    /// The library does not exist at its resolved destination.
+    Missing {
+        /// The original material-library reference.
+        library: String,
+        /// The destination established by the owning resolver, when available.
+        target: Option<String>,
+    },
+    /// The library exists but cannot be read or its reference is invalid.
+    Unreadable {
+        /// The original material-library reference.
+        library: String,
+        /// The destination established by the owning resolver, when available.
+        target: Option<String>,
+        /// The underlying read, parse or admission error.
+        reason: String,
+    },
+}
+
+impl MaterialProblem {
+    /// Retains the material status and resolver destination as independent presentation data.
+    pub(crate) fn of(status: &MaterialStatus) -> Option<Self> {
+        match status {
+            MaterialStatus::Missing { path, target } => Some(Self::Missing {
+                library: printable(path),
+                target: target.as_deref().map(printable),
+            }),
+            MaterialStatus::Unreadable {
+                path,
+                target,
+                reason,
+            } => Some(Self::Unreadable {
+                library: printable(path),
+                target: target.as_deref().map(printable),
+                reason: printable(reason),
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// A texture of a material that the file lacks, so the material keeps its plain colour.
@@ -82,13 +120,19 @@ impl ModelExportSummary {
         file: PathBuf,
         lod: u32,
         model: &Model,
-        (written, animations): (GlbSummary, &AnimationSet),
+        (publication, animations): (GlbGeometryPublication, &AnimationSet),
         animations_asked: bool,
     ) -> Self {
+        let GlbGeometryPublication {
+            summary: written,
+            receipt: origin_receipt,
+            ..
+        } = publication;
         let info = ModelInfo::of(model);
         let unmatched = unmatched(&written, animations);
         Self {
             file,
+            origin_receipt,
             name: info.name,
             lod,
             unread_total: info.chunks.skipped + info.chunks.unknown,
@@ -104,17 +148,7 @@ impl ModelExportSummary {
                 .collect(),
             written,
             unread: info.unread,
-            material_problem: match &model.materials {
-                MaterialStatus::Missing { path } => Some(MaterialProblem {
-                    library: printable(path),
-                    reason: None,
-                }),
-                MaterialStatus::Unreadable { path, reason } => Some(MaterialProblem {
-                    library: printable(path),
-                    reason: Some(printable(reason)),
-                }),
-                _ => None,
-            },
+            material_problem: MaterialProblem::of(&model.materials),
             unnamed_sub_materials: model
                 .materials
                 .library()
@@ -175,6 +209,12 @@ impl ModelExportSummary {
     #[must_use]
     pub fn file(&self) -> &Path {
         &self.file
+    }
+
+    /// Returns the digest-bound origin receipt beside the GLB.
+    #[must_use]
+    pub fn origin_receipt(&self) -> &Path {
+        &self.origin_receipt
     }
 
     /// Returns the file name of the model.
@@ -257,7 +297,7 @@ fn unmatched(written: &GlbSummary, animations: &AnimationSet) -> Vec<AnimationNo
 }
 
 /// Why an Export as GLB wrote no file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum ModelExportFailure {
     /// The model is encrypted and the Archive has no key.
     KeyRequired,
@@ -265,8 +305,8 @@ pub enum ModelExportFailure {
     KeyRejected,
     /// The Archive changed on disk, so the model was not exported.
     ArchiveChanged,
-    /// The file lies inside a Star Citizen installation.
-    Refused(WriteRefused),
+    /// The output violates a protection or identity boundary.
+    Refused(WriteProtectionError),
     /// The DataForge has no Record with this GUID.
     NoRecord(Guid),
     /// The model could not be read or the file not written, for the reason given.

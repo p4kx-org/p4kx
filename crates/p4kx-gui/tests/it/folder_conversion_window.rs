@@ -5,7 +5,7 @@
 //! `egui_kittest` and drawn by wgpu in both languages.
 //!
 //! The render test needs a graphics adapter, a software one is enough, and returns early without
-//! one unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set. `P4KX_RENDER_DIR` names a folder the
+//! one unless `P4KX_REQUIRE_RENDER_ADAPTER` is set. `P4KX_RENDER_DIR` names a folder the
 //! rendered windows are written to as PNG files.
 
 use std::error::Error;
@@ -114,6 +114,11 @@ fn a_finished_conversion_shows_its_counts_and_the_folders() -> TestResult {
         "Written 1 (1 converted), kept 0, failed 0, cancelled 0, left out without a conversion 1",
     );
     harness.get_by_label(&format!("Input folder: {}", input.display()));
+    harness.get_by_label("File origin receipts (1)");
+    assert!(
+        output.join("Data/gladius.xml.p4kx-origin.jsonl").is_file(),
+        "the GUI names the committed CryXml companion"
+    );
     assert!(
         output.join("Data").join("gladius.xml").is_file(),
         "converted"
@@ -173,8 +178,8 @@ fn adapter() -> Option<RenderState> {
             .ok();
     if state.is_none() {
         assert!(
-            std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-            "a software adapter is required"
+            !p4kx_testkit::render_adapter_required(),
+            "a graphics adapter is required"
         );
         eprintln!("no graphics adapter: the test checks nothing");
     }

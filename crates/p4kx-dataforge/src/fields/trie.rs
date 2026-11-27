@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use crate::fields::metric_coverage::Gaps;
 use crate::fields::number::{Distinct, Extremes};
 use crate::fields::{FieldKind, FieldStatisticsError, MAX_FIELD_PATHS};
 
@@ -21,6 +22,7 @@ pub(crate) struct Node<'f> {
     pub(crate) kinds: Vec<(FieldKind, u64)>,
     pub(crate) extremes: Option<Box<Extremes>>,
     pub(crate) distinct: Option<Box<Distinct>>,
+    pub(super) gaps: Gaps,
 }
 
 impl<'f> Node<'f> {
@@ -35,6 +37,7 @@ impl<'f> Node<'f> {
             kinds: Vec::new(),
             extremes: None,
             distinct: None,
+            gaps: Gaps::new(),
         }
     }
 
@@ -53,6 +56,7 @@ impl<'f> Node<'f> {
     }
 
     fn absorb(&mut self, other: Self) {
+        self.gaps.merge(other.gaps);
         self.occurrences += other.occurrences;
         self.empty += other.empty;
         self.records += other.records;
@@ -125,6 +129,11 @@ impl<'f> Trie<'f> {
         } else {
             (self, other)
         };
+        if let Some(root) = base.nodes.first_mut()
+            && let Some(other_root) = small.nodes.first()
+        {
+            root.gaps.merge(other_root.gaps);
+        }
         let mut ids = vec![ROOT; small.nodes.len()];
         for (index, node) in small.nodes.into_iter().enumerate().skip(1) {
             let parent = ids.get(node.parent as usize).copied().unwrap_or(ROOT);

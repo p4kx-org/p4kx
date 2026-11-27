@@ -5,11 +5,42 @@
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, UNIX_EPOCH};
 
+use p4kx_export::{BuiltShipBase, Filter, ShipBase, ShipBaseOptions};
+use p4kx_extraction::Archive;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestCapacity, TestEntity, TestEntry, TestLoadout,
     TestLoadoutEntry, closed_container_record, entity_schema, open_container_record,
 };
+
+/// Builds the standard fixture with the public Ship Base API.
+pub(crate) fn build(filter: Option<&Filter>) -> Result<BuiltShipBase, Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let archive =
+        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    let mut options = ShipBaseOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.filter = filter;
+    Ok(p4kx_export::build_ship_base(&archive, &options)?)
+}
+
+/// Finds the fixture's Ship row by its original Record GUID.
+pub(crate) fn ship_by_guid(built: &BuiltShipBase, guid: u128) -> Result<&ShipBase, Box<dyn Error>> {
+    let text = format!("{guid:032x}");
+    let wanted = format!(
+        "{}-{}-{}-{}-{}",
+        &text[0..8],
+        &text[8..12],
+        &text[12..16],
+        &text[16..20],
+        &text[20..32]
+    );
+    built
+        .ships()
+        .iter()
+        .find(|ship| ship.guid.to_string() == wanted)
+        .ok_or_else(|| format!("no ship {wanted}").into())
+}
 
 pub(crate) const ALPHA: u128 = 0x10;
 pub(crate) const BETA: u128 = 0x11;
@@ -24,9 +55,9 @@ pub(crate) const UNKNOWN: u128 = 0x16;
 pub(crate) const ROLLING: u128 = 0x17;
 pub(crate) const CAR: u128 = 0x18;
 pub(crate) const HUGE: u128 = 0x19;
-const GRID_HUGE: u128 = 0x25;
+const GRID_NONFINITE: u128 = 0x25;
 const GRID_NEGATIVE: u128 = 0x26;
-const CONTAINER_HUGE: u128 = 0x32;
+const CONTAINER_NONFINITE: u128 = 0x32;
 const CONTAINER_NEGATIVE: u128 = 0x33;
 const GRID_OPEN: u128 = 0x20;
 const GRID_CLOSED: u128 = 0x21;
@@ -131,19 +162,19 @@ fn entities() -> Vec<TestEntity> {
         ship(DISPLAY, "ACME_Beta_Display").vehicle(definition("ACME_Alpha"), "Heavy"),
         item(GUN_DISPLAY, "ACME_Gun_Display").attach_type("WeaponGun"),
         ship(MIXED, "ACME_Mixed").loadout(TestLoadout::Manual(vec![
-            TestLoadoutEntry::class("grid_huge", "ACME_Grid_Huge"),
+            TestLoadoutEntry::class("grid_nonfinite", "ACME_Grid_Nonfinite"),
             TestLoadoutEntry::class("grid_negative", "ACME_Grid_Negative"),
             TestLoadoutEntry::class("grid_ok", "ACME_Grid_Open"),
         ])),
         ship(UNKNOWN, "ACME_Unknown")
             .vehicle(definition("ACME_Flat"), "")
             .loadout(TestLoadout::Manual(vec![
-                TestLoadoutEntry::class("grid_huge", "ACME_Grid_Huge"),
+                TestLoadoutEntry::class("grid_nonfinite", "ACME_Grid_Nonfinite"),
                 TestLoadoutEntry::class("grid_negative", "ACME_Grid_Negative"),
             ])),
-        item(GRID_HUGE, "ACME_Grid_Huge")
+        item(GRID_NONFINITE, "ACME_Grid_Nonfinite")
             .attach_type("CargoGrid")
-            .container(CONTAINER_HUGE),
+            .container(CONTAINER_NONFINITE),
         item(GRID_NEGATIVE, "ACME_Grid_Negative")
             .attach_type("CargoGrid")
             .container(CONTAINER_NEGATIVE),
@@ -177,12 +208,12 @@ fn database() -> DataForgeBuilder {
             .record(closed_container_record(
                 CONTAINER_CLOSED,
                 "grid_closed",
-                TestCapacity::Centi(250.0),
+                TestCapacity::Centi(250),
             ))
             .record(open_container_record(
-                CONTAINER_HUGE,
-                "grid_huge",
-                [1e30, 1e30, 1e30],
+                CONTAINER_NONFINITE,
+                "grid_nonfinite",
+                [f32::INFINITY, 2.5, 2.5],
             ))
             .record(open_container_record(
                 CONTAINER_NEGATIVE,
@@ -222,6 +253,39 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
             format!("{XML_DIR}ACME_Broken.xml"),
             b"CryXmlB\0not really".to_vec(),
         ))
+        .write_to(&path)?;
+    Ok(path)
+}
+
+/// Writes an Archive whose DataForge is plain and whose vehicle file of `ACME_Alpha` is
+/// encrypted, so that the ship base needs the Archive key for it.
+pub(crate) fn write_encrypted_vehicle_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let path = dir.join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()))
+        .entry(
+            TestEntry::zstd(
+                format!("{XML_DIR}ACME_Alpha.xml"),
+                ALPHA_XML.as_bytes().to_vec(),
+            )
+            .encrypted(),
+        )
+        .write_to(&path)?;
+    Ok(path)
+}
+
+/// Writes a clear containing Entry around mixed vehicle and DataForge inputs.
+pub(crate) fn write_nested_vehicle_provenance_archive(
+    dir: &Path,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let inner = ArchiveBuilder::v2()
+        .entry(TestEntry::stored("Data\\Game2.dcb", database().build()))
+        .entry(
+            TestEntry::stored(format!("{XML_DIR}ACME_Alpha.xml"), ALPHA_XML.as_bytes()).encrypted(),
+        );
+    let path = dir.join("Data.p4k");
+    ArchiveBuilder::v2()
+        .entry(TestEntry::stored("nested.pak", inner.build()))
         .write_to(&path)?;
     Ok(path)
 }

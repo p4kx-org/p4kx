@@ -3,23 +3,29 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_texture::{RgbaImage, TextureError, cube_cross, write_png};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngEncoding, RgbaImage, TextureError, cube_cross,
+    write_png_with_transfer,
+};
 use rayon::prelude::*;
 
-use crate::output_file::write_replacing;
-use crate::texture_names::{image_suffixes, suffixed_path};
-use crate::{ConversionError, Texture};
+#[path = "texture_png_receipt.rs"]
+mod receipt;
+
+pub use self::receipt::PngOrigins;
+use crate::output_file::{write_error, write_replacing_protected};
+use crate::{ConversionError, Texture, TextureImageFormat, TextureImagePlan};
 
 const CUBE_FACES: usize = 6;
 
-/// The names of a cubemap's faces in DDS order +X, −X, +Y, −Y, +Z, −Z, as the face files of
+/// The names of a cubemap's faces in DDS order +X, âˆ’X, +Y, âˆ’Y, +Z, âˆ’Z, as the face files of
 /// [`CubemapLayout::Faces`] carry them.
 pub const CUBE_FACE_NAMES: [&str; 6] = ["posx", "negx", "posy", "negy", "posz", "negz"];
 
 /// How a PNG export writes a cubemap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CubemapLayout {
-    /// One file per face, `<stem>_posx.<extension>` … `<stem>_negz.<extension>` next to the
+    /// One file per face, `<stem>_posx.<extension>` â€¦ `<stem>_negz.<extension>` next to the
     /// requested file.
     #[default]
     Faces,
@@ -40,6 +46,18 @@ pub struct PngReport {
     pub files: Vec<PathBuf>,
     /// Whether an alpha tail was merged into the alpha channel.
     pub alpha_tail: bool,
+    /// The transfer and channel processing of the encoded PNG samples.
+    pub encoding: DdsPngEncoding,
+    /// Original declaration from the DDS colour header.
+    pub alpha_association: DdsAlphaAssociation,
+    /// RGB unassociation applied to produce straight colour.
+    pub alpha_transform: DdsAlphaTransform,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Publication {
+    Ordinary,
+    Receipts,
 }
 
 impl Texture<'_> {
@@ -77,15 +95,47 @@ impl Texture<'_> {
         level: u32,
         layout: CubemapLayout,
     ) -> Result<PngReport, ConversionError> {
+        let (report, _) = self.write_png_images(out, level, layout, Publication::Ordinary)?;
+        Ok(report)
+    }
+
+    /// Writes PNG files and their byte-bound receipts with exact transfer evidence.
+    ///
+    /// # Errors
+    /// Returns an input, output or evidence error.
+    pub fn png_to_file_with_origins(
+        &self,
+        out: &Path,
+        level: u32,
+        layout: CubemapLayout,
+    ) -> Result<(PngReport, PngOrigins), ConversionError> {
+        let (report, origins) = self.write_png_images(out, level, layout, Publication::Receipts)?;
+        let origins = origins
+            .ok_or_else(|| write_error(out, std::io::Error::other("PNG origin is missing")))?;
+        Ok((report, origins))
+    }
+
+    fn write_png_images(
+        &self,
+        out: &Path,
+        level: u32,
+        layout: CubemapLayout,
+        publication: Publication,
+    ) -> Result<(PngReport, Option<PngOrigins>), ConversionError> {
         let cross = layout == CubemapLayout::Cross;
-        let files: Vec<PathBuf> = image_suffixes(self.header(), level, cross)
-            .iter()
-            .map(|suffix| suffixed_path(out, suffix))
-            .collect();
+        let files: Vec<PathBuf> =
+            TextureImagePlan::new(self.header(), level, layout, TextureImageFormat::Png)
+                .map_err(|error| ConversionError::of_texture(self.name(), error))?
+                .map(|image| image.path(out))
+                .collect();
         for file in &files {
             self.refuse_input(file)?;
         }
-        let images = self.decode_images(level, cross)?;
+        let (surfaces, inputs, alpha_transform) = self.decode_png_surfaces(level)?;
+        let encoding = inputs
+            .png_encoding()
+            .map_err(|error| ConversionError::of_texture(self.name(), error))?;
+        let images = self.layout_cube_crosses(surfaces, cross)?;
         if images.len() != files.len() {
             return Err(ConversionError::of_texture(
                 self.name(),
@@ -94,39 +144,61 @@ impl Texture<'_> {
                 },
             ));
         }
-        files
-            .par_iter()
-            .zip(&images)
-            .try_for_each(|(file, image)| self.write_png_file(file, image))?;
+        let origins = if publication == Publication::Receipts {
+            let plan = receipt::PreparedPng::new(
+                self,
+                &inputs,
+                layout,
+                (encoding, alpha_transform),
+                &files,
+                out,
+            )?;
+            plan.write_images(&inputs, level, (encoding, alpha_transform), &files, &images)?;
+            Some(plan.finish())
+        } else {
+            files
+                .par_iter()
+                .zip(&images)
+                .try_for_each(|(file, image)| self.write_png_file(file, image, encoding))?;
+            None
+        };
         let (width, height) = images
             .first()
             .map_or((0, 0), |image| (image.width(), image.height()));
-        Ok(PngReport {
-            level,
-            width,
-            height,
-            files,
-            alpha_tail: self.has_alpha_tail(),
-        })
+        Ok((
+            PngReport {
+                level,
+                width,
+                height,
+                files,
+                alpha_tail: self.has_alpha_tail(),
+                encoding,
+                alpha_association: inputs.source_alpha().0,
+                alpha_transform,
+            },
+            origins,
+        ))
     }
 
-    fn write_png_file(&self, out: &Path, image: &RgbaImage) -> Result<(), ConversionError> {
-        write_replacing(out, |writer| {
-            write_png(image, writer)
+    fn write_png_file(
+        &self,
+        out: &Path,
+        image: &RgbaImage,
+        encoding: DdsPngEncoding,
+    ) -> Result<(), ConversionError> {
+        write_replacing_protected(out, self.write_protection()?, None, |writer| {
+            write_png_with_transfer(image, encoding.transfer, writer)
                 .map_err(|error| ConversionError::of_texture(self.name(), error))
         })
     }
 }
 
 impl Texture<'_> {
-    /// Decodes every image of mip `level` with the alpha tail merged in, in the order of its
-    /// file names: with `cross`, a cubemap's six faces are laid out as one cross.
-    pub(crate) fn decode_images(
+    pub(crate) fn layout_cube_crosses(
         &self,
-        level: u32,
+        images: Vec<RgbaImage>,
         cross: bool,
     ) -> Result<Vec<RgbaImage>, ConversionError> {
-        let images = self.decode_surfaces(level)?;
         if !(cross && self.header().faces() as usize == CUBE_FACES) {
             return Ok(images);
         }

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fmt::Write as _;
-
+use crate::diff_source::{ChfDiffLookup, ChfObservedChange, Trail};
 use crate::{Chf, Dna, DnaBlend, NameTable, face_part_name};
 
 /// One difference between two CHF files.
@@ -20,58 +19,13 @@ pub struct ChfChange {
     pub new: Option<String>,
 }
 
-/// The place of a field: its readable path and its path of raw hashes.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct Trail {
-    text: String,
-    raw: String,
-}
-
-impl Trail {
-    pub(crate) fn key(&self, key: &str) -> Self {
-        self.join(key, key)
-    }
-
-    pub(crate) fn segment(&self, text: &str, raw: &str, ordinal: usize) -> Self {
-        if ordinal == 0 {
-            return self.join(text, raw);
-        }
-        let mut text = text.to_owned();
-        let mut raw = raw.to_owned();
-        let _infallible = write!(text, "#{ordinal}");
-        let _infallible = write!(raw, "#{ordinal}");
-        self.join(&text, &raw)
-    }
-
-    fn join(&self, text: &str, raw: &str) -> Self {
-        let dot = |base: &str, part: &str| {
-            if base.is_empty() {
-                part.to_owned()
-            } else {
-                format!("{base}.{part}")
-            }
-        };
-        Self {
-            text: dot(&self.text, text),
-            raw: dot(&self.raw, raw),
-        }
-    }
-}
-
 /// Collects the changes between two files.
 pub(crate) struct Changes<'n> {
     pub(crate) names: &'n NameTable,
-    list: Vec<ChfChange>,
+    emit: &'n mut dyn FnMut(ChfChange, &Trail, Vec<ChfDiffLookup>),
 }
 
-impl<'n> Changes<'n> {
-    const fn new(names: &'n NameTable) -> Self {
-        Self {
-            names,
-            list: Vec::new(),
-        }
-    }
-
+impl Changes<'_> {
     pub(crate) fn field<T: PartialEq>(
         &mut self,
         trail: &Trail,
@@ -93,17 +47,37 @@ impl<'n> Changes<'n> {
         self.push(trail, None, Some(value));
     }
 
-    pub(crate) fn replaced(&mut self, trail: &Trail, old: String, new: String) {
-        self.push(trail, Some(old), Some(new));
+    pub(crate) fn order(
+        &mut self,
+        trail: &Trail,
+        old: String,
+        new: String,
+        lookups: Vec<ChfDiffLookup>,
+    ) {
+        self.emit(trail, Some(old), Some(new), lookups);
     }
 
     fn push(&mut self, trail: &Trail, old: Option<String>, new: Option<String>) {
-        self.list.push(ChfChange {
-            path: trail.text.clone(),
-            raw_path: trail.raw.clone(),
-            old,
-            new,
-        });
+        self.emit(trail, old, new, Vec::new());
+    }
+
+    fn emit(
+        &mut self,
+        trail: &Trail,
+        old: Option<String>,
+        new: Option<String>,
+        order: Vec<ChfDiffLookup>,
+    ) {
+        (self.emit)(
+            ChfChange {
+                path: trail.text.clone(),
+                raw_path: trail.raw.clone(),
+                old,
+                new,
+            },
+            trail,
+            order,
+        );
     }
 }
 
@@ -130,8 +104,32 @@ pub(crate) fn hex(value: &u32) -> String {
 /// must come from [`Chf::read`], which keeps the item port depth within [`crate::MAX_PORT_DEPTH`].
 #[must_use]
 pub fn diff_chf(old: &Chf, new: &Chf, names: &NameTable) -> Vec<ChfChange> {
-    let mut changes = Changes::new(names);
-    let root = Trail::default();
+    let mut values = Vec::new();
+    compare(old, new, names, false, &mut |change, _, _| {
+        values.push(change);
+    });
+    values
+}
+
+/// Returns each comparison row with the actual field and hash-selector coordinates.
+#[must_use]
+pub fn diff_chf_observed(old: &Chf, new: &Chf, names: &NameTable) -> Vec<ChfObservedChange> {
+    let mut values = Vec::new();
+    compare(old, new, names, true, &mut |change, trail, order| {
+        values.push(trail.observe(change, order));
+    });
+    values
+}
+
+fn compare(
+    old: &Chf,
+    new: &Chf,
+    names: &NameTable,
+    capture: bool,
+    emit: &mut dyn FnMut(ChfChange, &Trail, Vec<ChfDiffLookup>),
+) {
+    let mut changes = Changes { names, emit };
+    let root = Trail::root(capture);
     let container = root.key("container");
     changes.field(
         &container,
@@ -141,6 +139,7 @@ pub fn diff_chf(old: &Chf, new: &Chf, names: &NameTable) -> Vec<ChfChange> {
         |flags| format!("{flags:#06x}"),
     );
     let (old, new) = (&old.character, &new.character);
+    let root = root.source_key("character");
     let versions = root.key("versions");
     changes.field(
         &versions,
@@ -184,7 +183,6 @@ pub fn diff_chf(old: &Chf, new: &Chf, names: &NameTable) -> Vec<ChfChange> {
         &old.materials,
         &new.materials,
     );
-    changes.list
 }
 
 fn diff_dna(changes: &mut Changes<'_>, trail: &Trail, old: &Dna, new: &Dna) {
@@ -230,7 +228,11 @@ fn diff_dna(changes: &mut Changes<'_>, trail: &Trail, old: &Dna, new: &Dna) {
     );
     let parts = trail.key("face_parts");
     for index in 0..old.face_parts.len().max(new.face_parts.len()) {
-        let part = parts.key(&face_part_name(index));
+        let part = parts.display_key(&face_part_name(index)).source_indices(
+            index,
+            index < old.face_parts.len(),
+            index < new.face_parts.len(),
+        );
         match (old.face_parts.get(index), new.face_parts.get(index)) {
             (Some(old), Some(new)) => diff_blends(changes, &part, old, new),
             (Some(_), None) => changes.removed(&part, "present".to_owned()),
@@ -242,7 +244,10 @@ fn diff_dna(changes: &mut Changes<'_>, trail: &Trail, old: &Dna, new: &Dna) {
 
 fn diff_blends(changes: &mut Changes<'_>, part: &Trail, old: &[DnaBlend], new: &[DnaBlend]) {
     for blend in 0..old.len().max(new.len()) {
-        let at = part.key(&format!("blends[{blend}]"));
+        let at = part
+            .display_key(&format!("blends[{blend}]"))
+            .source_key("blends")
+            .source_indices(blend, blend < old.len(), blend < new.len());
         match (old.get(blend), new.get(blend)) {
             (Some(old), Some(new)) => {
                 changes.field(&at, "value", &old.value, &new.value, text);

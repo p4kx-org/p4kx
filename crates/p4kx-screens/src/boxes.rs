@@ -31,7 +31,11 @@ fn paint_square(cx: &mut Context<'_>, widget: &Widget, look: &Look<'_>, area: Ar
         .background
         .and_then(|spec| cx.colour(spec, alpha, widget))
     {
+        #[cfg(test)]
+        let before = cx.painter.len();
         cx.painter.rect(area, colour);
+        #[cfg(test)]
+        observe_background(cx, before, colour);
     }
     paint_strips(cx, widget, look, area, alpha);
 }
@@ -81,7 +85,11 @@ fn paint_rounded(
         .background
         .and_then(|spec| cx.colour(spec, alpha, widget))
     {
+        #[cfg(test)]
+        let before = cx.painter.len();
         cx.painter.fill_outline(outline(area, corners), colour);
+        #[cfg(test)]
+        observe_background(cx, before, colour);
     }
     let widths = look.borders.map(|(width, _)| width);
     if widths.iter().all(|width| *width <= 0.0) {
@@ -109,5 +117,14 @@ fn paint_rounded(
     ));
     if let Some(colour) = first.1.and_then(|spec| cx.colour(spec, alpha, widget)) {
         cx.painter.fill_outline(ring, colour);
+    }
+}
+
+#[cfg(test)]
+const fn observe_background(cx: &mut Context<'_>, before: usize, colour: p4kx_gfx::Rgba) {
+    if cx.painter.len() > before
+        && let Some(trace) = &mut cx.power_trace
+    {
+        trace.background = Some(colour);
     }
 }

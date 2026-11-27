@@ -16,6 +16,7 @@ dirs.workspace = true
 p4kx-archive.workspace = true
 p4kx-settings.workspace = true
 serde_json.workspace = true
+same-file.workspace = true
 
 [dev-dependencies]
 p4kx-testkit.workspace = true

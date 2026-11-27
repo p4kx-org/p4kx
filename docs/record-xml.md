@@ -158,9 +158,9 @@ A value that cannot be read becomes an error at its place and the rest of the Re
 written. Errors are a string offset outside the text table, an enum or struct that does not
 exist, a bool byte other than 0 and 1, a pointer to a struct or instance that does not exist, an
 array outside the values stored for its type, a Reference to a Record that does not exist, a weak
-pointer outside the Record, an array with more elements than a Record may hold, an instance owned
-twice in one Record (which also cuts a cycle of strong pointers) and structs nested deeper than 64
-levels. The reason is English text for people, not a stable code.
+pointer outside the Record, an instance owned twice in one Record (which also cuts a cycle of
+strong pointers) and a cyclic scalar inline Class declaration. The reason is English text for
+people, not a stable code.
 
 A Reference to a Record that does not exist (a dangling Reference) also carries the GUID of the
 missing Record, in lower case, in the attribute `guid` after `reason`, in a field and in an array
@@ -170,8 +170,9 @@ alike (ADR-0269); no other error has it:
 <p4kx:error field="entityClass" reason="the Reference refers to the Record 3cf6753c-d69c-4980-a45e-724151407096, which does not exist" guid="3cf6753c-d69c-4980-a45e-724151407096"/>
 ```
 
-A Record whose struct layouts cannot be read, or whose tree would hold more than 1,048,576 values,
-is not written at all. The largest Record of the game data holds fewer than 80,000.
+A Record whose struct layouts cannot be read is not written. Canonical construction and writers
+use heap continuations without an owned-depth or mixed value/work cutoff; see
+[canonical owned values](canonical-owned-values.md) for ownership, costs and consumer boundaries.
 
 ## Names
 
@@ -204,10 +205,18 @@ Record paths and names that could leave the target folder are rejected.
 Entry the same way, one file per Record, below the folder of that Entry instead of the `.dcb`:
 the Records of `Data\Game2.dcb` go below `Data/`. Only the Entry the DataForge is read from is
 converted, `Game2.dcb` before `Game.dcb`; another `.dcb` is written unchanged. A DataForge that
-cannot be read or opened, or is larger than 2 GiB, fails the Entry; no raw `.dcb` is written in
+cannot be read or opened, or exceeds platform capacity, fails the Entry; no raw `.dcb` is written in
 its place.
 
 ## Combined document
+
+The combined CLI export publishes the companion for unannotated output and for
+output localized with `--lang`. It writes
+`Game2.xml.p4kx-origin.jsonl` beside `Game2.xml`. Its byte ranges address the
+finished document, including the prefix before each Record. The digest binds
+the whole file, including its generated wrapper and namespace. See
+[Standalone field origins](source-origin.md#companion-records) for the
+companion format.
 
 `p4kx dcb export --combined` writes every selected Record into one file in the target folder,
 named after the DataForge Entry with `.xml`, e.g. `Game2.xml`:

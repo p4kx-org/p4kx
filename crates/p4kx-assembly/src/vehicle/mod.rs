@@ -1,32 +1,49 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The vehicle implementation of a ship: the XML file its `VehicleComponentParams` name, with the
-//! Modification the Entity selects applied.
+//! Vehicle implementations with the Entity's selected Modification applied.
 
+mod aggregate_evidence;
 mod elem;
+mod file_read;
 mod gear;
 mod item_port;
+mod light_ports;
 mod locate;
 mod origin;
 mod patch;
+mod paths;
+mod port_selection;
 mod read;
+mod request;
 mod structure;
+mod structure_evidence;
 mod totals;
+mod xml_evidence;
 
 use std::collections::HashMap;
 
+use crate::gear_placement_source::GearDeclaration;
+use crate::markup::AttributeOrigins;
 use crate::merge::port_key;
 use crate::{LoadoutError, LoadoutFiles};
 
+pub use aggregate_evidence::{VehicleAggregateEvidence, VehicleAggregateIssue};
 pub use elem::ElemOverride;
 pub(crate) use gear::gears;
-pub(crate) use item_port::flags_contain;
+pub(crate) use item_port::{
+    ITEM_SUBTYPES_ATTRIBUTE, ITEM_TYPE_ATTRIBUTE, PORT_OBSERVED_ATTRIBUTES, flags_contain,
+};
 pub use item_port::{VehicleItemPort, VehicleItemType};
-pub(crate) use locate::load;
+pub use light_ports::{VehicleLightAttachment, VehicleLightPort};
+pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
+pub use port_selection::VehiclePortSelection;
+pub use structure_evidence::VehicleStructureEvidence;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
+pub use totals::{VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric};
+pub use xml_evidence::{VehicleAttributeEvidence, VehicleXmlSite};
 
 /// Whether a port shows its item: the vehicle implementation's part of that name decides, else
 /// the flags of the port definition.
@@ -72,6 +89,7 @@ pub enum PartKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehiclePart {
     pub(crate) name: String,
+    pub(crate) name_proof: Option<crate::LoadoutPath>,
     pub(crate) class: String,
     pub(crate) kind: PartKind,
     pub(crate) mass: Option<f64>,
@@ -79,7 +97,7 @@ pub struct VehiclePart {
     pub(crate) detach_ratio: Option<f64>,
     pub(crate) destroy_ratio: Option<f64>,
     pub(crate) attributes: Vec<(String, String)>,
-    pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) origins: AttributeOrigins,
     pub(crate) item_port: Option<VehicleItemPort>,
     pub(crate) tread_wheels: Vec<String>,
     pub(crate) children: Vec<Self>,
@@ -134,10 +152,13 @@ impl VehiclePart {
     /// [`ValueOrigin::Base`] unless the Modification's patch file or an `Elem` set it.
     #[must_use]
     pub fn origin_of(&self, name: &str) -> ValueOrigin {
-        self.origins
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map_or(ValueOrigin::Base, |(_, origin)| *origin)
+        self.origins.origin_of(name)
+    }
+
+    /// Returns the original name selection retained for this effective part.
+    #[must_use]
+    pub const fn name_proof(&self) -> Option<&crate::LoadoutPath> {
+        self.name_proof.as_ref()
     }
 
     /// Returns the raw value of the part's attribute `name`, ignoring ASCII case, or `None`
@@ -170,11 +191,18 @@ impl VehiclePart {
 }
 
 /// One landing gear of the `VehicleLandingGearSystem` Record an Entity's vehicle component names.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct LandingGear {
     pub(crate) bone: String,
     pub(crate) geometry: String,
     pub(crate) mass: Option<f64>,
+    pub(crate) source: GearDeclaration,
+}
+
+impl PartialEq for LandingGear {
+    fn eq(&self, other: &Self) -> bool {
+        self.bone == other.bone && self.geometry == other.geometry && self.mass == other.mass
+    }
 }
 
 impl LandingGear {
@@ -201,13 +229,15 @@ impl LandingGear {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehicleImplementation {
     pub(crate) path: String,
+    declarations: origin::DeclarationOrigins,
     pub(crate) patch_path: Option<String>,
     pub(crate) modification: Option<String>,
     pub(crate) report: Option<ModificationReport>,
     pub(crate) elems: Vec<ElemOverride>,
     pub(crate) name: String,
     pub(crate) parts: Vec<VehiclePart>,
-    pub(crate) port_paths: HashMap<String, Box<[usize]>>,
+    rolling_parts: bool,
+    port_paths: HashMap<String, read::IndexedPort>,
     pub(crate) issues: Vec<LoadoutError>,
     pub(crate) structure: [u8; 16],
 }
@@ -225,8 +255,8 @@ impl VehicleImplementation {
     ///
     /// # Errors
     ///
-    /// Returns [`LoadoutError::VehicleImplementation`] when no file holds the implementation or
-    /// it is no readable `Vehicle` document.
+    /// Returns [`LoadoutError::MissingVehicleImplementation`] when no candidate file exists and
+    /// [`LoadoutError::VehicleImplementation`] for unreadable or invalid `Vehicle` documents.
     pub fn read(
         files: &dyn LoadoutFiles,
         class_name: &str,
@@ -282,18 +312,6 @@ impl VehicleImplementation {
             .iter()
             .rev()
             .find(|elem| elem.id_ref == id && elem.name.eq_ignore_ascii_case(attribute))
-    }
-
-    /// Returns the path of the file a value with `origin` was read from: the implementation file
-    /// for [`ValueOrigin::Base`] and [`ValueOrigin::Elem`], whose `Elem` it holds, and the patch
-    /// file for [`ValueOrigin::Patch`]. `None` when the origin is `Patch` and no patch file was
-    /// applied.
-    #[must_use]
-    pub fn source_path(&self, origin: ValueOrigin) -> Option<&str> {
-        match origin {
-            ValueOrigin::Patch => self.patch_path(),
-            ValueOrigin::Base | ValueOrigin::Elem => Some(self.path()),
-        }
     }
 
     /// Returns the `name` of the `Vehicle` element.
@@ -354,13 +372,17 @@ impl VehicleImplementation {
     pub fn port_visibility(&self, name: &str) -> PortVisibility {
         self.port_part(name)
             .and_then(|part| part.item_port.as_ref())
-            .map(VehicleItemPort::visibility)
-            .unwrap_or_default()
+            .map_or_default(VehicleItemPort::visibility)
     }
 
     /// Returns the first part named `name` that holds an item port, ignoring ASCII case.
-    pub(crate) fn port_part(&self, name: &str) -> Option<&VehiclePart> {
-        let (first, rest) = self.port_paths.get(&port_key(name))?.split_first()?;
+    #[must_use]
+    pub fn port_part(&self, name: &str) -> Option<&VehiclePart> {
+        self.part_at(&self.port_paths.get(&port_key(name))?.path)
+    }
+
+    fn part_at(&self, path: &[usize]) -> Option<&VehiclePart> {
+        let (first, rest) = path.split_first()?;
         let mut part = self.parts.get(*first)?;
         for index in rest {
             part = part.children.get(*index)?;

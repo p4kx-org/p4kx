@@ -83,10 +83,11 @@ pub(crate) fn convert_into_window(
     offset: u64,
     keep: usize,
     limit: u64,
+    observe: impl FnMut(cryxml::XmlWriteField) -> io::Result<()>,
 ) -> Result<Window, EntryReadError> {
     let document = cryxml::parse(data).map_err(EntryReadError::Convert)?;
     let mut window = Window::new(offset, keep, limit);
-    match document.write_xml(&mut window) {
+    match document.write_xml_observed(&mut window, observe) {
         Ok(()) => Ok(window),
         Err(_) if window.exceeded() => Err(EntryReadError::TooLarge { limit }),
         Err(source) => Err(EntryReadError::Read(source)),
@@ -128,12 +129,12 @@ mod tests {
             .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
         assert!(
             matches!(
-                convert_into_window(&cryxml, 0, 8, 16),
+                convert_into_window(&cryxml, 0, 8, 16, |_| Ok(())),
                 Err(EntryReadError::TooLarge { limit: 16 })
             ),
             "the XML is longer than 16 bytes"
         );
-        let window = convert_into_window(&cryxml, 0, 8, 1 << 20);
+        let window = convert_into_window(&cryxml, 0, 8, 1 << 20, |_| Ok(()));
         assert!(
             window.is_ok_and(|window| window.written() > 16),
             "a larger limit converts it"

@@ -28,6 +28,7 @@ expression: "serde_json::to_string_pretty(&value)?"
     ],
     "name": "Play_Line"
   },
+  "truncated_by_limits": false,
   "variants": [
     {
       "event": "Play_Line",

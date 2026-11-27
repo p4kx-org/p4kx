@@ -1,12 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-/// A text of the Basetool catalog entry of the Export menu and its windows, looked up in the
+/// A text of the P4KX catalog entry of the Export menu and its windows, looked up in the
 /// Fluent file of the current language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CatalogText {
     /// The entry of the Export menu that asks for the catalog file.
     Action,
+    /// The export action for a catalog with full provenance.
+    FullAction,
+    /// Explicitly requests a catalog intended for diagnosis rather than normal publication.
+    DiagnosticAction,
+    /// The progress title of an explicitly requested diagnostic catalog.
+    DiagnosticRunningTitle,
+    /// The summary title of an explicitly requested diagnostic catalog.
+    DiagnosticSummaryTitle,
+    /// Explains the consumer rule of a diagnostic catalog.
+    DiagnosticNotice,
+    /// Explains that incomplete normal publication wrote no file.
+    Incomplete,
+    /// The selected sources were read and projected successfully.
+    HealthComplete,
+    /// Some selected sources could not be read or projected successfully.
+    HealthIncomplete,
+    /// The affected kind, reason and count of a failed original Entry operation.
+    HealthEntryDiagnostic,
     /// The file type of the save dialog.
     FileFilter,
     /// The file type of the save dialog for the zstd-compressed catalog.
@@ -68,7 +86,7 @@ pub enum CatalogText {
     NearLimitPlain,
     /// The plain JSON catalog is over the upload limit; takes `limit`.
     OverLimitPlain,
-    /// The decompressed catalog is close to the Basetool limit for decompressed content; takes `limit`.
+    /// Decoded size is close to its reference threshold; takes `limit`.
     DecompressedNearLimit,
     /// The decompressed catalog is over that limit; takes `limit`.
     DecompressedOverLimit,
@@ -92,8 +110,17 @@ pub enum CatalogText {
 
 impl CatalogText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 48] = [
         Self::Action,
+        Self::FullAction,
+        Self::DiagnosticAction,
+        Self::DiagnosticRunningTitle,
+        Self::DiagnosticSummaryTitle,
+        Self::DiagnosticNotice,
+        Self::Incomplete,
+        Self::HealthComplete,
+        Self::HealthIncomplete,
+        Self::HealthEntryDiagnostic,
         Self::FileFilter,
         Self::FileFilterCompressed,
         Self::RunningTitle,
@@ -139,6 +166,15 @@ impl CatalogText {
     pub const fn id(self) -> &'static str {
         match self {
             Self::Action => "catalog-action",
+            Self::FullAction => "catalog-full-action",
+            Self::DiagnosticAction => "catalog-diagnostic-action",
+            Self::DiagnosticRunningTitle => "catalog-diagnostic-running-title",
+            Self::DiagnosticSummaryTitle => "catalog-diagnostic-summary-title",
+            Self::DiagnosticNotice => "catalog-diagnostic-notice",
+            Self::Incomplete => "catalog-incomplete",
+            Self::HealthComplete => "catalog-health-complete",
+            Self::HealthIncomplete => "catalog-health-incomplete",
+            Self::HealthEntryDiagnostic => "catalog-health-entry-diagnostic",
             Self::FileFilter => "catalog-file-filter",
             Self::FileFilterCompressed => "catalog-file-filter-compressed",
             Self::RunningTitle => "catalog-running-title",

@@ -11,8 +11,8 @@ use std::time::SystemTime;
 
 use p4kx_channels::channel_name;
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, ConflictPolicy, Entry, ExtractOptions, Progress,
-    create_default_target, extract,
+    Archive, ArchiveWatch, ArchiveWriteProtection, Build, CancelToken, ConflictPolicy, Entry,
+    ExtractOptions, Progress, create_default_target_protected, extract,
 };
 
 use p4kx_settings::{ExtractionAudio, ExtractionTextures};
@@ -286,7 +286,27 @@ fn write(
     cancel: &CancelToken,
     progress: &Mutex<Progress>,
 ) -> RunResult {
-    let target = prepare_target(archive, request).map_err(|error| describe(&error))?;
+    let cancelled = || {
+        ExtractionSummary::cancelled_selection(
+            request.folder.clone(),
+            entries,
+            request.convert,
+            watch.check().is_err(),
+        )
+    };
+    if watch.check().is_err() {
+        return Ok(cancelled());
+    }
+    let protection = match ArchiveWriteProtection::new(archive.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ok(cancelled()),
+        Err(error) => return Err(describe(&error)),
+    };
+    let target = match prepare_target(archive, request, &protection, cancel) {
+        Ok(target) => target,
+        Err(error) if crate::installation::guard_cancelled(&error) => return Ok(cancelled()),
+        Err(error) => return Err(describe(&error)),
+    };
     let on_progress = |now: Progress| {
         *progress.lock().unwrap_or_else(PoisonError::into_inner) = now;
     };
@@ -300,6 +320,7 @@ fn write(
         cancel: Some(cancel),
         progress: Some(&on_progress),
         watch: Some(watch),
+        protection: Some(&protection),
     };
     let report = extract(archive, entries, &target, &options);
     let excluded_parts = if request.convert {
@@ -310,20 +331,32 @@ fn write(
     Ok(ExtractionSummary::new(target, &report).with_excluded_parts(excluded_parts))
 }
 
-fn prepare_target(archive: &Archive, request: &Request) -> io::Result<PathBuf> {
-    crate::installation::refuse(&request.folder)?;
+fn prepare_target(
+    archive: &Archive,
+    request: &Request,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
+) -> io::Result<PathBuf> {
+    protection
+        .ensure_writable(&request.folder, cancel.flag())
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
     match request.kind {
         TargetKind::ExistingFolder => {
             fs::create_dir_all(&request.folder)?;
+            protection
+                .ensure_writable(&request.folder, cancel.flag())
+                .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
             Ok(request.folder.clone())
         }
         TargetKind::NewFolder => {
             let (channel, build) = target_naming(archive.path(), archive.build());
-            create_default_target(
+            create_default_target_protected(
                 &request.folder,
                 channel.as_deref(),
                 build,
                 SystemTime::now(),
+                protection,
+                cancel,
             )
         }
     }

@@ -6,14 +6,20 @@
 use std::path::Path;
 
 use p4kx_assembly::{Assembly, Part};
-use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode, TextureLoader};
+use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MaterialMode, TextureLoader};
 
 use crate::build::assembly_issue;
+use crate::entity_classification::EntityClassifications;
 use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
-use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
-use crate::{PackageInfo, PackageResult, PackageSummary};
+use crate::rig_package::{RigScene, WrittenRig, rig_manifest, write_rig_package};
+use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
+
+#[path = "creature_triangle_evidence.rs"]
+mod triangle_evidence;
+
+use triangle_evidence::TriangleEvidence;
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
 /// [`Assembly::write_glb_with`] writes it, its skeleton as bone nodes with the skins bound to it,
@@ -27,7 +33,7 @@ pub(crate) fn write_creature_package(
     options: &GlbOptions,
     info: &PackageInfo,
     out: &Path,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<PackageSummary> {
     let options = options.with_materials(MaterialMode::Textures);
     let name = assembly.root().map_or("", Part::class_name);
@@ -39,13 +45,39 @@ pub(crate) fn write_creature_package(
     } else {
         assembly
     };
+    let classifications = EntityClassifications::capture(assembly.root(), assembly.forge_origin())?;
     write_rig_package(
         out,
         name,
         &options,
-        cancelled,
-        |options, writer| assembly.write_glb_with(options, textures, writer),
-        |written| manifest(assembly, interior_left_out, info, &options, written),
+        context,
+        |options, writer, map| {
+            let mut map = map;
+            let mut triangles = TriangleEvidence::new();
+            let summary = assembly.write_glb_with_vertex_origins(
+                options,
+                textures,
+                writer,
+                &mut |row, model, sources| {
+                    triangles.observe(&row, model, sources, context)?;
+                    if let Some(map) = map.as_deref_mut() {
+                        map.observe(&row, model, sources, context)?;
+                    }
+                    Ok(())
+                },
+            )?;
+            let scene_fields = triangles
+                .finish(summary.triangles)
+                .map_err(GltfError::Write)?;
+            let mut written = WrittenRig::geometry(summary);
+            written.scene_fields = Some(scene_fields);
+            Ok(written)
+        },
+        |written| {
+            let mut manifest = manifest(assembly, interior_left_out, info, &options, written);
+            classifications.apply(&mut manifest);
+            manifest
+        },
     )
 }
 
@@ -93,12 +125,20 @@ fn manifest(
         rig: rig(assembly, written),
         issues,
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = assembly
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(assembly: &Assembly, written: &GlbSummary) -> Rig {
     Rig {
         body: None,
+        worn_mount_provenance: None,
+        body_zones: None,
         skeleton: assembly
             .root()
             .and_then(Part::geometry)

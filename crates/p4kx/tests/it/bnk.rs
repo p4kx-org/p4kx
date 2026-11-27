@@ -90,7 +90,13 @@ fn extract_writes_every_wem_named_by_its_id() -> TestResult {
         120,
         "the prefetched start as the bank holds it"
     );
-    assert_eq!(fs::read_dir(&out)?.count(), 4, "nothing else");
+    for id in [100, 200, 300, 400] {
+        assert!(
+            out.join(format!("{id}.wem.p4kx-origin.jsonl")).is_file(),
+            "missing raw companion for {id}",
+        );
+    }
+    assert_eq!(fs::read_dir(&out)?.count(), 8, "media and their companions");
     Ok(())
 }
 

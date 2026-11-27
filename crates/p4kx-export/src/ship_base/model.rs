@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::Guid;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::digest::Digest;
 use crate::paint_port::VehiclePorts;
@@ -14,18 +14,6 @@ pub(crate) struct ShipRead {
     pub(crate) base: ShipBase,
     pub(crate) implementation: Option<Digest>,
     pub(crate) paint_ports: VehiclePorts,
-}
-
-fn guid<S: Serializer>(value: &Guid, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.collect_str(value)
-}
-
-#[expect(clippy::ref_option, reason = "serde passes the field by reference")]
-fn optional_guid<S: Serializer>(value: &Option<Guid>, serializer: S) -> Result<S::Ok, S::Error> {
-    match value {
-        Some(value) => serializer.collect_str(value),
-        None => serializer.serialize_none(),
-    }
 }
 
 /// What kind of file a value was read from.
@@ -177,16 +165,16 @@ pub struct CargoGrid {
     /// The class name of the grid's Entity.
     pub class_name: String,
     /// The GUID of the grid's Entity.
-    #[serde(serialize_with = "guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_guid")]
     pub guid: Guid,
     /// The GUID of the `InventoryContainer` Record, `null` when the Entity names none.
-    #[serde(serialize_with = "optional_guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_optional_guid")]
     pub container: Option<Guid>,
     /// `open` for a grid of cells, `closed` for a capacity in cargo units, `null` when unknown.
     pub shape: Option<&'static str>,
     /// The capacity in standard cargo units; `null` when it cannot be read.
     pub scu: Option<f64>,
-    /// The cells of 1.25 m an open grid holds; `null` for any other grid.
+    /// The cells of 1.25 m an open grid holds when the count fits in `u64`.
     pub cells: Option<u64>,
     /// The interior size of an open grid in metres, `[x, y, z]`.
     pub dimensions: Option<[f64; 3]>,
@@ -203,7 +191,7 @@ pub struct Cargo {
     /// The sum of the readable grids' capacity in standard cargo units, rounded to four
     /// decimals: 0 for a ship with no cargo grid, `null` when it has grids and none is readable.
     pub scu: Option<f64>,
-    /// The sum of the open grids' cells, `null` like `scu`.
+    /// The sum of readable open grids' cells when each count and the sum fit in `u64`.
     pub cells: Option<u64>,
     /// How many grids have an `issue`; when it is not 0 the sums are a lower bound.
     pub grids_with_issue: usize,
@@ -221,7 +209,7 @@ pub struct LoadoutPort {
     pub class_name: Option<String>,
     /// The GUID of the attached Entity's Record, or of the Record the Loadout names when the
     /// attachment cannot be resolved; `null` for a class name only.
-    #[serde(serialize_with = "optional_guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_optional_guid")]
     pub guid: Option<Guid>,
     /// The Record or XML Loadout file that supplied the attachment, `null` for a port nothing
     /// names. For `port_default` it is the Entity Record that defines the port.
@@ -247,7 +235,7 @@ pub struct Implementation {
     pub patch_file: Option<String>,
 }
 
-/// Whether a vehicle is a spaceship or a ground vehicle.
+/// The kind of a vehicle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -256,6 +244,8 @@ pub enum VehicleKind {
     Spaceship,
     /// A vehicle of the folder `entities/groundvehicles`.
     GroundVehicle,
+    /// A powered exosuit.
+    Exosuit,
 }
 
 impl VehicleKind {
@@ -265,6 +255,7 @@ impl VehicleKind {
         match self {
             Self::Spaceship => "spaceship",
             Self::GroundVehicle => "groundVehicle",
+            Self::Exosuit => "exosuit",
         }
     }
 }
@@ -274,7 +265,7 @@ impl VehicleKind {
 #[serde(rename_all = "camelCase")]
 pub struct ShipBase {
     /// The GUID of the ship's Record.
-    #[serde(serialize_with = "guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_guid")]
     pub guid: Guid,
     /// The class name, the Record name after `EntityClassDefinition.`.
     pub class_name: String,
@@ -282,8 +273,7 @@ pub struct ShipBase {
     pub record_path: String,
     /// The vehicle implementation file, `null` when the ship names none or it cannot be read.
     pub implementation: Option<Implementation>,
-    /// Spaceship or ground vehicle, `null` when the record path and the vehicle implementation
-    /// disagree or the path names neither folder.
+    /// The resolved vehicle kind, `null` when the original sources do not establish it.
     pub vehicle_kind: Option<VehicleKind>,
     /// The item size from `AttachDef.Size`.
     pub size: Option<Sourced<i64>>,

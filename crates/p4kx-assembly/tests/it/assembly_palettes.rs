@@ -31,13 +31,18 @@ fn assemble_ship(
 ) -> Result<Assembly, Box<dyn std::error::Error>> {
     let entry = DataForgeEntry::read(archive)?;
     let forge = entry.open()?;
-    let mut resolver = LoadoutResolver::new(&forge);
+    let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&entry);
     let record = resolver.entities().find(class)?;
     let tree = resolver.resolve(&record)?;
     let models = ArchiveModels::new(archive);
     let options = AssemblyOptions::default();
     Ok(if palettes {
-        Assembly::build_with_palettes(&tree, &models, &ForgePalettes::new(&forge), &options)?
+        Assembly::build_with_palettes(
+            &tree,
+            &models,
+            &ForgePalettes::new(&forge).with_entry(&entry),
+            &options,
+        )?
     } else {
         Assembly::build(&tree, &models, &options)?
     })
@@ -317,3 +322,6 @@ fn the_texture_mip_picks_the_size_of_the_embedded_image() -> TestResult {
     assert_eq!(past_the_end.texture_pixels, 1, "the smallest mip");
     Ok(())
 }
+
+#[path = "assembly_palette_sources.rs"]
+mod sources;

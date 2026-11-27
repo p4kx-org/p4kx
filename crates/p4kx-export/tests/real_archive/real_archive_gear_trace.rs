@@ -4,89 +4,107 @@
 //! Every gameplay property a blueprint modifies finds its stat field on the item the blueprint
 //! produces, on a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
 
-use std::collections::{BTreeMap, HashMap};
-use std::error::Error;
-use std::time::SystemTime;
-
-use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::Archive;
-use p4kx_testkit::real_archive_path;
+use p4kx_export::Kind;
 use serde_json::Value;
+use std::collections::{BTreeMap, HashMap};
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
+
+use crate::real_archive_equipment_catalog::{
+    TestResult, WEAPONS, action_nodes, catalog, definition, owner_rows, primary_ammo,
+};
 
 const FIELDS: [(&str, &[&str]); 29] = [
     (
         "gpp_armor_damagemitigation",
-        &["armor.damageResistance.physical.multiplier"],
+        &["armorMacro.damageResistance.value.physical.value.multiplier.value"],
     ),
     (
         "gpp_armor_temperaturemin",
-        &["clothing.temperatureResistanceMin"],
+        &["clothing.temperatureResistance.value.minResistance.value"],
     ),
     (
         "gpp_armor_temperaturemax",
-        &["clothing.temperatureResistanceMax"],
+        &["clothing.temperatureResistance.value.maxResistance.value"],
     ),
     (
         "gpp_armor_radiationcapacity",
-        &["clothing.radiationCapacity"],
+        &["clothing.radiationResistance.value.maximumRadiationCapacity.value"],
     ),
     (
         "gpp_armor_radiationdissipation",
-        &["clothing.radiationDissipationRate"],
+        &["clothing.radiationResistance.value.radiationDissipationRate.value"],
     ),
-    ("gpp_health_maxhealth", &["health"]),
+    ("gpp_health_maxhealth", &["health.health.value"]),
     (
         "gpp_weapon_damage",
-        &["weapon.ammo.damage", "weapon.fireActions[].damagePerSecond"],
+        &[
+            "ammo.projectileParams.value.kind.value.damage.value",
+            "weapon.actionNodes[].kind.value.damagePerSecond.value.value",
+        ],
     ),
-    ("gpp_weapon_firerate", &["weapon.fireActions[].fireRate"]),
-    ("gpp_weapon_spread", &["weapon.fireActions[].spread"]),
+    (
+        "gpp_weapon_firerate",
+        &["weapon.actionNodes[].kind.value.fireRate.value"],
+    ),
+    (
+        "gpp_weapon_spread",
+        &["weapon.actionNodes[].kind.value.launchParams.value.spreadParams.value"],
+    ),
     ("gpp_weapon_recoil_kick", &[]),
     ("gpp_weapon_recoil_handling", &[]),
     ("gpp_weapon_recoil_smoothness", &[]),
     ("gpp_weapon_reloadspeed", &[]),
     (
         "gpp_itemresource_powergeneration",
-        &["powerPlant.powerOutput"],
+        &["resourceGeneration.Power"],
     ),
     (
         "gpp_itemresource_coolantgeneration",
-        &["cooler.coolingRate"],
+        &["resourceGeneration.Coolant"],
     ),
-    ("gpp_shield_maxhealth", &["shield.maxHealth"]),
+    ("gpp_shield_maxhealth", &["shield.maxHealth.value"]),
     (
         "gpp_radar_minaimassistdistance",
-        &["radar.aimAssistDistanceMin"],
+        &["radar.aimAssist.value.distanceMinAssignment.value"],
     ),
     (
         "gpp_radar_maxaimassistdistance",
-        &["radar.aimAssistDistanceMax"],
+        &["radar.aimAssist.value.distanceMaxAssignment.value"],
     ),
-    ("gpp_quantum_speed", &["quantumDrive.driveSpeed"]),
+    (
+        "gpp_quantum_speed",
+        &["quantumDrive.standard.value.driveSpeed.value"],
+    ),
     (
         "gpp_quantum_fuelrequirement",
-        &["quantumDrive.fuelRequirement"],
+        &["quantumDrive.fuelRequirement.value"],
     ),
-    ("gpp_weapon_tractor_force", &["tractorBeam.maxForce"]),
-    ("gpp_weapon_tractor_maxdist", &["tractorBeam.maxDistance"]),
+    ("gpp_weapon_tractor_force", &["tractor.maxForce.value"]),
+    ("gpp_weapon_tractor_maxdist", &["tractor.maxDistance.value"]),
     (
         "gpp_weapon_tractor_fullstrengthdist",
-        &["tractorBeam.fullStrengthDistance"],
+        &["tractor.fullStrengthDistance.value"],
     ),
-    ("gpp_weapon_tractor_maxvolume", &["tractorBeam.maxVolume"]),
+    ("gpp_weapon_tractor_maxvolume", &["tractor.maxVolume.value"]),
     (
         "gpp_weapon_hullscraping_radius",
-        &["weaponModifier.salvage.radiusMultiplier"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.radiusMultiplier.value",
+        ],
     ),
     (
         "gpp_weapon_hullscraping_speed",
-        &["weaponModifier.salvage.salvageSpeedMultiplier"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.salvageSpeedMultiplier.value",
+        ],
     ),
     (
         "gpp_weapon_hullscraping_efficiency",
-        &["weaponModifier.salvage.extractionEfficiency"],
+        &[
+            "attachment.modifiers.value[].value.value.weaponModifier.value.weaponStats.value.salvageModifier.value.extractionEfficiency.value",
+        ],
     ),
     ("gpp_crafter_craftspeed", &[]),
     ("gpp_crafter_dismantleefficiency", &[]),
@@ -120,23 +138,72 @@ fn filled(value: &Value, name: &str) -> bool {
     value.get(name).is_some_and(|inner| !inner.is_null())
 }
 
-fn property_guids(value: &Value, found: &mut Vec<String>) {
-    match value {
-        Value::Object(map) => {
-            if let Some(guid) = map.get("propertyGuid").and_then(Value::as_str) {
-                found.push(guid.to_owned());
-            }
-            for inner in map.values() {
-                property_guids(inner, found);
-            }
+fn source_blocks<'catalog>(
+    catalog: &'catalog Value,
+    item: &Value,
+    block: &str,
+) -> Vec<&'catalog Value> {
+    let table = match block {
+        "health" => "/configurations/durability/rows",
+        "shield" => "/configurations/shieldGenerators/rows",
+        "quantumDrive" => "/configurations/quantumDrives/rows",
+        "resourceGeneration" => "/configurations/resourceComponents/rows",
+        "clothing" => "/configurations/clothing/rows",
+        "radar" => "/configurations/itemRadars/rows",
+        "weapon" => WEAPONS,
+        "attachment" => "/configurations/attachableModifiers/rows",
+        "tractor" => {
+            return owner_rows(catalog, WEAPONS, item)
+                .flat_map(action_nodes)
+                .filter(|action| {
+                    action.pointer("/kind/type").and_then(Value::as_str) == Some("tractorBeam")
+                })
+                .filter_map(|action| action.pointer("/kind/value"))
+                .collect();
         }
-        Value::Array(items) => {
-            for inner in items {
-                property_guids(inner, found);
-            }
+        "armorMacro" => {
+            return owner_rows(catalog, "/configurations/suitArmor/rows", item)
+                .filter_map(|row| row.pointer("/damageResistance/value/targetRecordIndex/value"))
+                .filter_map(|target| {
+                    definition(
+                        catalog,
+                        "/definitions/damageResistanceMacros/rows",
+                        target,
+                        "/source/recordIndex/value",
+                    )
+                })
+                .collect();
         }
-        _ => {}
+        "ammo" => {
+            return primary_ammo(catalog, item)
+                .and_then(|ammo| ammo.definition)
+                .into_iter()
+                .collect();
+        }
+        _ => return Vec::new(),
+    };
+    owner_rows(catalog, table, item).collect()
+}
+
+fn uses_only_beams(catalog: &Value, item: &Value) -> bool {
+    let mut firing = owner_rows(catalog, WEAPONS, item)
+        .flat_map(action_nodes)
+        .filter_map(|node| node.pointer("/kind/type").and_then(Value::as_str))
+        .filter(|kind| matches!(*kind, "beam" | "single" | "rapid" | "burst" | "tractorBeam"));
+    firing.next() == Some("beam") && firing.all(|kind| kind == "beam")
+}
+
+fn item_reaches(catalog: &Value, item: &Value, path: &str) -> bool {
+    let (block, fields) = path.split_once('.').unwrap_or((path, ""));
+    if block == "resourceGeneration" {
+        return crate::real_archive_resource_components::known_generation_amount(
+            catalog, item, fields,
+        )
+        .is_some();
     }
+    source_blocks(catalog, item, block)
+        .into_iter()
+        .any(|source| fields.is_empty() || reaches(source, fields))
 }
 
 #[test]
@@ -146,41 +213,42 @@ fn property_guids(value: &Value, found: &mut Vec<String>) {
     reason = "one pass over the blueprints that prints its evidence as it goes"
 )]
 fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> TestResult {
-    let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    let classes: HashMap<&str, String> = catalog["gameplayProperties"]
-        .as_array()
-        .ok_or("the properties")?
-        .iter()
-        .filter_map(|property| {
-            Some((
-                property["guid"].as_str()?,
-                property["className"].as_str()?.to_ascii_lowercase(),
-            ))
-        })
-        .collect();
+    let catalog = catalog()?;
+    let mut classes = HashMap::new();
+    for property in catalog_v3_consumer::rows(&catalog, Kind::GameplayProperties)? {
+        let guid = catalog_v3_consumer::identity(property, Kind::GameplayProperties)?;
+        let class = catalog_v3_consumer::field(property, Kind::GameplayProperties, "className")?
+            .as_str()
+            .ok_or("a present property className")?;
+        classes.insert(guid, class.to_ascii_lowercase());
+    }
     let items: HashMap<&str, &Value> = catalog["items"]
         .as_array()
         .ok_or("the items")?
         .iter()
-        .filter_map(|item| Some((item["guid"].as_str()?, item)))
-        .collect();
+        .map(|item| Ok((catalog_v3_consumer::identity(item, Kind::Items)?, item)))
+        .collect::<Result<_, Box<dyn std::error::Error>>>()?;
     let mut uses: BTreeMap<String, usize> = BTreeMap::new();
     let mut misses: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut no_source: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut unmapped = 0_usize;
-    let blueprints = catalog["blueprints"].as_array().ok_or("the blueprints")?;
-    for blueprint in blueprints {
-        let mut guids = Vec::new();
-        property_guids(blueprint, &mut guids);
-        guids.sort();
-        guids.dedup();
-        let produced = blueprint["producedItemGuid"]
+    let blueprints = Blueprints::read(&catalog)?;
+    for blueprint in blueprints.rows() {
+        let guids: std::collections::BTreeSet<_> = blueprint
+            .costs()
+            .flat_map(|cost| {
+                cost["context"]["modifiers"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+            })
+            .filter_map(|modifier| modifier["propertyGuid"]["value"].as_str())
+            .collect();
+        let produced = blueprint.presentation["producedItem"]["value"]
             .as_str()
             .and_then(|guid| items.get(guid));
         for guid in guids {
-            let class = classes.get(guid.as_str()).ok_or("an unknown property")?;
+            let class = classes.get(guid).ok_or("an unknown property")?;
             let (_, paths) = FIELDS
                 .iter()
                 .find(|(name, _)| name == class)
@@ -193,31 +261,34 @@ fn every_modified_property_is_filled_on_the_item_the_blueprint_produces() -> Tes
                 unmapped += 1;
                 continue;
             };
-            if !paths.iter().any(|path| reaches(&item["stats"], path)) {
-                let beams_only = item["stats"]["weapon"]["fireActions"]
-                    .as_array()
-                    .is_some_and(|actions| {
-                        actions
-                            .iter()
-                            .all(|action| action["kind"] == "SWeaponActionFireBeamParams")
-                    });
+            if !paths.iter().any(|path| item_reaches(&catalog, item, path)) {
+                let beams_only = uses_only_beams(&catalog, item);
                 let without_source = (class == "gpp_weapon_firerate" && beams_only)
                     || paths.iter().all(|path| {
                         let block = path.split('.').next().unwrap_or(path);
-                        item["stats"].get(block).is_none_or(Value::is_null)
+                        if block == "armorMacro" {
+                            owner_rows(&catalog, "/configurations/suitArmor/rows", item)
+                                .next()
+                                .is_none()
+                        } else {
+                            source_blocks(&catalog, item, block).is_empty()
+                        }
                     });
                 let list = if without_source {
                     &mut no_source
                 } else {
                     &mut misses
                 };
-                list.entry(class.clone())
-                    .or_default()
-                    .push(item["className"].as_str().unwrap_or("?").to_owned());
+                list.entry(class.clone()).or_default().push(
+                    item.pointer("/className/value")
+                        .and_then(Value::as_str)
+                        .unwrap_or("?")
+                        .to_owned(),
+                );
             }
         }
     }
-    report(&format!("blueprints: {}", blueprints.len()));
+    report(&format!("blueprints: {}", blueprints.rows().len()));
     for (class, count) in &uses {
         report(&format!("{class}: {count} blueprints"));
     }

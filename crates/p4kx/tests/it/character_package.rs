@@ -13,6 +13,10 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "character_package_origins.rs"]
+mod clip_origins;
+mod default_chf_tests;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 struct Run {
@@ -25,7 +29,7 @@ fn archive(dir: &Path, entries: Vec<TestEntry>) -> Result<PathBuf, Box<dyn Error
     crate::chf_glb::archive(dir, entries)
 }
 
-fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+fn chf_fixture() -> TestChf {
     let blend = |part: usize| {
         if part == 3 {
             vec![(65535, 2), (0, 0)]
@@ -33,13 +37,16 @@ fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
             vec![(0, 0), (0, 0)]
         }
     };
-    let test = TestChf {
+    TestChf {
         dna_hashes: Some((MALE_RIG_HASH, 0)),
         face_parts: (0..HEAD_REGIONS).map(blend).collect(),
         ..TestChf::v8()
-    };
+    }
+}
+
+fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("hero.chf");
-    fs::write(&path, test.to_bytes())?;
+    fs::write(&path, chf_fixture().to_bytes())?;
     Ok(path)
 }
 
@@ -127,13 +134,16 @@ fn a_character_with_animations_is_a_package_of_one_skinned_glb() -> TestResult {
     )?;
 
     assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
-    assert_eq!(names(&out)?, ["meshes", "scene.json", "textures"]);
+    assert_eq!(
+        names(&out)?,
+        ["meshes", "receipt.json", "scene.json", "textures"]
+    );
     assert_eq!(names(&out.join("meshes"))?, ["m0001.glb"]);
     assert!(run.stdout.contains("on the male body"), "{}", run.stdout);
     assert!(run.stdout.contains("2 animations"), "{}", run.stdout);
 
     let manifest = manifest(&out)?;
-    assert_eq!(manifest["version"], p4kx_blender::FORMAT_VERSION);
+    clip_origins::verify(&manifest)?;
     assert_eq!(manifest["nodes"][0]["kind"], "character");
     assert_eq!(manifest["nodes"][0]["name"], "hero");
     assert_eq!(manifest["nodes"][0]["mesh"], "m0001");
@@ -311,5 +321,33 @@ fn an_earlier_character_package_is_replaced() -> TestResult {
     assert_eq!(first.code, Some(0), "{}", first.stderr);
     assert_eq!(second.code, Some(0), "{}", second.stderr);
     assert_eq!(names(dir.path())?, ["Data.p4k", "body"]);
+    Ok(())
+}
+
+#[test]
+fn the_character_package_vertex_map_flag_writes_the_rigged_sidecar() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path(), armour_entries())?;
+    let out = dir.path().join("body");
+    let run = package(
+        &archive,
+        &out,
+        &["--materials", "colours", "--vertex-maps"],
+        false,
+    )?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let document = manifest(&out)?;
+    let map = document
+        .pointer("/meshes/0/vertex_map")
+        .and_then(Value::as_str)
+        .ok_or("rigged vertex map path")?;
+    assert_eq!(
+        map, "meshes/m0001.vertex-map.jsonl",
+        "character sidecar reference"
+    );
+    assert!(
+        out.join(map).is_file(),
+        "character CLI writes the referenced sidecar"
+    );
     Ok(())
 }

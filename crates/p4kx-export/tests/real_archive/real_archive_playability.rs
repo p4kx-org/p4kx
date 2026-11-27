@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The playability of ships and items in the Basetool catalog of a real Archive; runs with
+//! The playability of ships and items in the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, Playability, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, Playability, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
@@ -15,11 +15,21 @@ use serde_json::Value;
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn playability<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
-    catalog[kind]
-        .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
-        .map(|entry| &entry["playability"])
-        .ok_or_else(|| format!("{kind} {class} missing"))
+    let family = Kind::ALL
+        .into_iter()
+        .find(|family| family.name() == kind)
+        .ok_or("known entity family")?;
+    let rows =
+        crate::catalog_v3_consumer::rows(catalog, family).map_err(|error| error.to_string())?;
+    for entry in rows {
+        let name = crate::catalog_v3_consumer::field(entry, family, "className")
+            .map_err(|error| error.to_string())?;
+        if name == class {
+            return crate::catalog_v3_consumer::field(entry, family, "playability")
+                .map_err(|error| error.to_string());
+        }
+    }
+    Err(format!("{kind} {class} missing"))
 }
 
 #[expect(clippy::print_stdout, reason = "the counts are the result of the run")]
@@ -32,7 +42,10 @@ fn print_line(line: &str) {
 fn known_ships_and_items_of_a_real_archive_have_the_expected_playability() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let summary = built.summary().playability();
     for (kind, counts) in [("items", summary.items), ("ships", summary.ships)] {
@@ -73,7 +86,10 @@ const AI_RECORD_TAG: &str = "SystemsDesign";
 fn no_player_ship_carries_the_ai_record_tag() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;

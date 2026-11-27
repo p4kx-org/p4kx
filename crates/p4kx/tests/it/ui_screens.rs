@@ -19,6 +19,9 @@ use serde_json::Value;
 
 use crate::ui_panel::reference::assert_matches_reference;
 
+#[path = "ui_screens_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MFD: &str = "libs/foundry/records/ui/buildingblocks/test/test_mfd";

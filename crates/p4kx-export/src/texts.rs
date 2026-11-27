@@ -5,39 +5,71 @@ use std::borrow::Cow;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_extraction::{
-    Archive, Language, LocalizationLoadError, LocalizationNote, LocalizationSet, Lookup, TextSet,
-    display_text, is_placeholder_key,
+    Archive, Language, LocalizationEntry, LocalizationLoadError, LocalizationNote, LocalizationSet,
+    TextSet, display_text, is_placeholder_key,
 };
 
-use crate::contract::LocalisedText;
 use crate::{CatalogError, TextSummary};
 
 /// The languages the catalog carries texts in, in the order its summary lists them.
-pub(crate) const CATALOG_LANGUAGES: [Language; 2] = [Language::English, Language::German];
+pub(crate) const CATALOG_LANGUAGES: [Language; 11] = Language::ALL;
 
 /// The `global.ini` Entry of every language in [`CATALOG_LANGUAGES`] the Archive holds.
 pub(crate) struct TextSources {
     set: LocalizationSet,
+    consulted: Vec<Language>,
 }
 
 impl TextSources {
     /// Reads the `global.ini` of every catalog language from `archive`.
     pub(crate) fn read(archive: &Archive) -> Result<Self, CatalogError> {
-        let set =
-            LocalizationSet::read(archive, &CATALOG_LANGUAGES).map_err(CatalogError::LoadTexts)?;
-        Ok(Self { set })
+        Self::read_item_languages(archive, &CATALOG_LANGUAGES)
+    }
+
+    pub(crate) fn read_item_languages(
+        archive: &Archive,
+        requested: &[Language],
+    ) -> Result<Self, CatalogError> {
+        let languages: Vec<_> = CATALOG_LANGUAGES
+            .into_iter()
+            .filter(|language| *language == Language::English || requested.contains(language))
+            .collect();
+        Self::read_languages(archive, &languages)
+    }
+
+    pub(crate) fn read_languages(
+        archive: &Archive,
+        languages: &[Language],
+    ) -> Result<Self, CatalogError> {
+        let set = LocalizationSet::read(archive, languages).map_err(CatalogError::LoadTexts)?;
+        Ok(Self {
+            set,
+            consulted: languages.to_vec(),
+        })
+    }
+
+    pub(crate) fn consulted(&self, language: Language) -> bool {
+        self.consulted.contains(&language)
+    }
+
+    pub(crate) fn entry(&self, language: Language) -> Option<&LocalizationEntry> {
+        self.set.entry(language)
     }
 }
 
 /// Resolves localisation keys in every catalog language and counts what resolves.
-///
-/// Every kind turns its keys into [`LocalisedText`]s through [`Texts::localised`]; it may be
-/// called from any worker thread.
 pub(crate) struct Texts<'e> {
+    sources: &'e TextSources,
     set: TextSet<'e>,
     notes: Vec<LocalizationNote>,
     languages: [LanguageCount; CATALOG_LANGUAGES.len()],
     placeholders: AtomicUsize,
+}
+
+/// One winning decoded text and its display form from the same lookup.
+pub(crate) struct TextProjection<'source> {
+    pub(crate) source: &'source str,
+    pub(crate) display: Cow<'source, str>,
 }
 
 struct LanguageCount {
@@ -54,6 +86,15 @@ impl LanguageCount {
             unresolved: AtomicUsize::new(0),
         }
     }
+
+    fn note(&self, resolved: bool) {
+        let counter = if resolved {
+            &self.resolved
+        } else {
+            &self.unresolved
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 impl<'e> Texts<'e> {
@@ -65,6 +106,7 @@ impl<'e> Texts<'e> {
         })?;
         let notes = sources.set.notes(&set);
         Ok(Self {
+            sources,
             set,
             notes,
             languages: CATALOG_LANGUAGES.map(LanguageCount::new),
@@ -72,34 +114,33 @@ impl<'e> Texts<'e> {
         })
     }
 
-    /// Returns the text with localisation `key` and its English and German texts, each
-    /// decoded (`\n` to a line feed) and trimmed; without a key every part is `None` and nothing is counted, and a
-    /// [placeholder key](crate::PLACEHOLDER_KEYS) keeps the key, has no texts and is counted as a
-    /// placeholder.
-    pub(crate) fn localised<'a>(&self, key: Option<&'a str>) -> LocalisedText<'a>
-    where
-        'e: 'a,
-    {
-        let Some(key) = key else {
-            return LocalisedText::default();
-        };
-        if is_placeholder_key(key) {
-            self.placeholders.fetch_add(1, Ordering::Relaxed);
-            return LocalisedText {
-                key: Some(key),
-                ..LocalisedText::default()
-            };
-        }
-        LocalisedText {
-            key: Some(key),
-            en: self.resolve(Language::English, key),
-            de: self.resolve(Language::German, key),
-        }
+    pub(crate) fn consulted(&self, language: Language) -> bool {
+        self.sources.consulted(language)
     }
 
-    /// Returns a note for every `global.ini` that was read lossily or had lines skipped.
+    pub(crate) fn source_entry(&self, language: Language) -> Option<&'e LocalizationEntry> {
+        self.sources.entry(language)
+    }
+
+    pub(crate) fn skipped_lines(&self, language: Language) -> Option<usize> {
+        self.set
+            .ini(language)
+            .map(p4kx_extraction::GlobalIni::skipped)
+    }
+
     pub(crate) fn notes(&self) -> &[LocalizationNote] {
         &self.notes
+    }
+
+    /// Drops the lookup indexes and returns the language counts and localization notes.
+    pub(crate) fn into_summary(self) -> (Vec<TextSummary>, Vec<LocalizationNote>) {
+        let summary = self.summary();
+        (summary, self.into_notes())
+    }
+
+    /// Returns localization notes without preparing the field-count summary.
+    pub(crate) fn into_notes(self) -> Vec<LocalizationNote> {
+        self.notes
     }
 
     /// Returns what resolved per language, in the order of [`CATALOG_LANGUAGES`].
@@ -107,6 +148,10 @@ impl<'e> Texts<'e> {
         let placeholder = self.placeholders.load(Ordering::Relaxed);
         self.languages
             .iter()
+            .filter(|count| {
+                matches!(count.language, Language::English | Language::German)
+                    || self.set.ini(count.language).is_some()
+            })
             .map(|count| TextSummary {
                 language: count.language,
                 available: self.set.ini(count.language).is_some(),
@@ -117,19 +162,37 @@ impl<'e> Texts<'e> {
             .collect()
     }
 
-    fn resolve(&self, language: Language, key: &str) -> Option<Cow<'e, str>> {
+    /// Projects both forms of one winning text and counts its display result once.
+    pub(crate) fn project(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
         let count = self
             .languages
             .iter()
             .find(|count| count.language == language)?;
-        if let Lookup::Found { text, .. } = self.set.lookup(key, language, None) {
-            let shown = display_text(text);
-            if !shown.is_empty() {
-                count.resolved.fetch_add(1, Ordering::Relaxed);
-                return Some(shown);
-            }
+        let text = self.lookup_forms(language, key);
+        count.note(text.as_ref().is_some_and(|text| !text.display.is_empty()));
+        text
+    }
+
+    /// Counts one lookup occurrence per supported language from prepared outcomes.
+    pub(crate) fn note_languages(&self, resolved: [bool; CATALOG_LANGUAGES.len()]) {
+        for (count, resolved) in self.languages.iter().zip(resolved) {
+            count.note(resolved);
         }
-        count.unresolved.fetch_add(1, Ordering::Relaxed);
-        None
+    }
+
+    /// Returns the winning forms without recording another lookup.
+    pub(crate) fn lookup_forms(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
+        if is_placeholder_key(key) {
+            return None;
+        }
+        let source = self.set.text(key, language)?;
+        Some(TextProjection {
+            source,
+            display: display_text(source),
+        })
+    }
+
+    pub(crate) fn note_placeholder(&self) {
+        self.placeholders.fetch_add(1, Ordering::Relaxed);
     }
 }

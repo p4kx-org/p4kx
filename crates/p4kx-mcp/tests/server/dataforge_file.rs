@@ -4,7 +4,7 @@
 //! The DataForge tools over a DataForge file on disk in place of an Archive.
 
 use p4kx_testkit::TestEntry;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::forge::{AVENGER_TEXT, dataforge};
 use crate::support::{Install, TestResult};
@@ -40,8 +40,34 @@ fn every_dataforge_tool_reads_a_file_like_the_archive() -> TestResult {
         read["archive"] = json!("");
         expected["archive"] = json!("");
 
+        if matches!(
+            tool,
+            "get_record" | "search_records" | "list_structs" | "list_enums" | "run_query"
+        ) {
+            take_forge_origin(&mut read, "file", &Value::Null)?;
+            take_forge_origin(&mut expected, "archiveEntry", &json!(false))?;
+        }
         assert_eq!(read, expected, "{tool}");
     }
+    Ok(())
+}
+
+fn take_forge_origin(result: &mut Value, kind: &str, encryption: &Value) -> TestResult {
+    let result = result.as_object_mut().ok_or("search result object")?;
+    let fields = result
+        .remove("fieldOrigins")
+        .ok_or("search field origins")?;
+    assert_eq!(
+        fields.pointer("/~1structuredContent~1total/containsEncryptedSource"),
+        Some(encryption),
+        "the total reflects its actual input",
+    );
+    let provenance = result.remove("provenance").ok_or("search provenance")?;
+    assert_eq!(
+        provenance.pointer("/sources/0/kind"),
+        Some(&json!(kind)),
+        "each input retains its own physical source",
+    );
     Ok(())
 }
 

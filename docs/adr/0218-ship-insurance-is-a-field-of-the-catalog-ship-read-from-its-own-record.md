@@ -36,3 +36,16 @@ Decided for issue #323. Builds on ADR-0002, ADR-0054 and ADR-0065.
 - On LIVE all 1,066 catalog ships carry `insurance` with a fee.
 - The Record is optional: an Archive without it gives `itemRecovery` `null`, and the choice
   follows ADR-0065, which exports what a Record states and nothing it does not.
+
+## Catalog schema 3 recovery
+
+The selected physical `ItemRecoveryConfigurationParams` Record supplies three configuration
+tables under ADR-0356. The economy row retains the canonical Record header. Override and
+policy rows use that Record's GUID and physical index. This keeps the original selection
+rule while preserving each authored array, repeated condition and independent field.
+
+The economy separates fields declared directly in older sources from the nested cooldown,
+delivery, repair and escalation groups. Shared names keep their source-specific meanings.
+The catalog stores numeric words and authored references under ADR-0357. Notification locale
+fields use the protected game-text catalog with the same per-value provenance. Ship insurance
+continues to originate in each ship's own Record.

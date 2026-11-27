@@ -1,0 +1,4 @@
+# Additional GitHub-hosted runner labels for workflow validation.
+self-hosted-runner:
+  labels:
+    - xcode-27

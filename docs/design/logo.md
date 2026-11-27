@@ -14,7 +14,7 @@ A 130 x 130 unit square. `p4kx_gui::theme::logo` rasterises exactly this.
 
 | Part | Drawing | Colour |
 | --- | --- | --- |
-| Tile | rounded square, `rx` 24 | `CANVAS` `#0F0F0F` |
+| Tile | rounded square, `rx` 24 | `BRAND_TILE` `#0F0F0F` |
 | Left bracket | `M42,30 H28 V100 H42`, stroke 9, mitred joins, no fill | `WHITE` `#FFFFFF` |
 | Right bracket | `M88,30 H102 V100 H88`, stroke 9, mitred joins, no fill | `WHITE` `#FFFFFF` |
 | X, back stroke | line (50,42) to (80,88), stroke 11, round caps | `ACCENT_DARK` `#C45C00` |

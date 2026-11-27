@@ -12,9 +12,9 @@ use crate::entity_selection::{Selected, select};
 use crate::guid_text::CatalogGuid;
 use crate::item_variant::{self, ItemKey};
 use crate::playability_rules::{self, Evidence};
-use crate::record_fields::{class_name, component};
+use crate::record_fields::{class_name, component, text};
 use crate::ship_pool::ShipPool;
-use crate::variants::{Candidate, ShipKey, group};
+use crate::variants::{self, Candidate, ShipKey, VariantMember};
 use crate::{Kind, VariantSummary, item, item_stats, ship};
 
 /// The variant groups of the ships and items of a DataForge (ADR-0066): which entity is the base
@@ -54,11 +54,13 @@ impl VariantGroups {
         self.bases.is_empty()
     }
 
-    fn add(&mut self, bases: Vec<Option<CatalogGuid>>, members: &[CatalogGuid]) {
-        for (member, base) in members.iter().zip(bases) {
+    fn add<K>(&mut self, bases: Vec<Option<VariantMember>>, candidates: &[Candidate<'_, K>]) {
+        for (candidate, base) in candidates.iter().zip(bases) {
             if let Some(base) = base {
-                self.bases.insert(member.0, base.0);
-                self.variants.entry(base.0).or_default().push(member.0);
+                let member = candidate.member.guid.0;
+                let base = base.guid.0;
+                self.bases.insert(member, base);
+                self.variants.entry(base).or_default().push(member);
             }
         }
     }
@@ -113,12 +115,10 @@ pub fn read_variant_groups(
         }
     }
     let mut groups = VariantGroups::default();
-    let (bases, ships) = group(&ship_candidates);
-    let members: Vec<CatalogGuid> = ship_candidates.iter().map(|c| c.guid).collect();
-    groups.add(bases, &members);
-    let (bases, items) = group(&item_candidates);
-    let members: Vec<CatalogGuid> = item_candidates.iter().map(|c| c.guid).collect();
-    groups.add(bases, &members);
+    let (bases, ships) = variants::group(&ship_candidates);
+    groups.add(bases, &ship_candidates);
+    let (bases, items) = variants::group(&item_candidates);
+    groups.add(bases, &item_candidates);
     groups.summary = VariantSummary { ships, items };
     Some(groups)
 }
@@ -134,24 +134,30 @@ fn pick<'f>(
     };
     let tree = trees.build(record)?;
     if kind == Kind::Ships {
+        let vehicle = component(&tree, ship::VEHICLE_COMPONENT);
         return Ok(ships.read(record, &tree).ok().map(|read| {
             Pick::Ship(Candidate {
-                guid: CatalogGuid(tree.guid()),
+                member: VariantMember {
+                    guid: CatalogGuid(tree.guid()),
+                    record_index: tree.record_index(),
+                },
                 class_name: class_name(&tree),
-                playability: playability_rules::ship(
-                    &tree,
-                    component(&tree, "VehicleComponentParams"),
-                    evidence,
-                ),
-                key: ship::variant_key(&tree, &read),
+                playability: playability_rules::ship(&tree, vehicle, evidence),
+                key: ShipKey::from_read(text(vehicle, "vehicleDefinition"), read.implementation),
             })
         }));
     }
-    let stats = item_stats::read(&tree, forge, trees);
+    let key = item_variant::component_key(&tree).and_then(|components| {
+        let stats = item_stats::read(&tree, forge, trees);
+        components.with_stats(stats.as_ref())
+    });
     Ok(Some(Pick::Item(Candidate {
-        guid: CatalogGuid(tree.guid()),
+        member: VariantMember {
+            guid: CatalogGuid(tree.guid()),
+            record_index: tree.record_index(),
+        },
         class_name: class_name(&tree),
         playability: item::playability(&tree),
-        key: item_variant::key(&tree, stats.as_ref()),
+        key,
     })))
 }

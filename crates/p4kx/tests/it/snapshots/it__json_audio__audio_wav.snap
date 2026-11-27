@@ -5,6 +5,7 @@ expression: json
 {
   "channels": 2,
   "loop": null,
+  "originReceipt": "100.wav.p4kx-origin.jsonl",
   "output": "[DIR]/100.wav",
   "sample_count": 1200,
   "sample_rate": 48000,

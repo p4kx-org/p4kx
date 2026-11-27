@@ -5,7 +5,9 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_extraction::{Archive, ArchiveWatch, Entry, VerificationReport, VerifyOptions, verify};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, Entry, VerificationReport, VerifyOptions, verify, verify_observed,
+};
 use serde::Serialize;
 
 use crate::cli::VerifyArgs;
@@ -13,6 +15,11 @@ use crate::extract;
 use crate::failure_report::{FailureJson, MismatchJson, reason, unreadable, write_mismatch};
 use crate::progress::ProgressLine;
 use crate::{exit, filter_pair, json};
+
+#[path = "verify_origins.rs"]
+mod origins;
+
+use origins::VerificationOrigins;
 
 #[derive(Serialize)]
 struct ReportJson<'a> {
@@ -22,6 +29,8 @@ struct ReportJson<'a> {
     failed: Vec<FailureJson<'a>>,
     cancelled: &'a [String],
     archive_changed: bool,
+    #[serde(flatten)]
+    origins: VerificationOrigins,
 }
 
 /// Checks the Entries of the Archive, or those the Filter matches, against their checksums and
@@ -45,24 +54,31 @@ pub(crate) fn execute(archive: &Archive, entries: &[&Entry], as_json: bool) -> R
         progress: Some(&on_progress),
         watch: Some(&watch),
     };
-    let report = verify(archive, entries, &options);
-    line.finish();
-    let printed = if as_json {
-        json::print(&report_json(archive, &report))
+    let (status, printed) = if as_json {
+        let observed = verify_observed(archive, entries, &options);
+        line.finish();
+        let report = observed.report();
+        let origins = VerificationOrigins::capture(archive, &observed)?;
+        (
+            exit_code(report),
+            json::print(&report_json(archive, report, origins)),
+        )
     } else {
-        print_report(archive, &report)
+        let report = verify(archive, entries, &options);
+        line.finish();
+        (exit_code(&report), print_report(archive, &report))
     };
     if let Err(error) = printed
         && error.kind() != io::ErrorKind::BrokenPipe
     {
         return Err(error.into());
     }
-    if report.archive_changed()
+    if status == exit::ARCHIVE_CHANGED
         && let Err(changed) = watch.check()
     {
         let _ignored = writeln!(io::stderr().lock(), "error: {changed}");
     }
-    Ok(ExitCode::from(exit_code(&report)))
+    Ok(ExitCode::from(status))
 }
 
 const fn exit_code(report: &VerificationReport) -> u8 {
@@ -75,7 +91,11 @@ const fn exit_code(report: &VerificationReport) -> u8 {
     }
 }
 
-fn report_json<'a>(archive: &Archive, report: &'a VerificationReport) -> ReportJson<'a> {
+fn report_json<'a>(
+    archive: &Archive,
+    report: &'a VerificationReport,
+    origins: VerificationOrigins,
+) -> ReportJson<'a> {
     ReportJson {
         archive: json::path(archive.location()),
         verified: report.verified(),
@@ -87,6 +107,7 @@ fn report_json<'a>(archive: &Archive, report: &'a VerificationReport) -> ReportJ
         failed: unreadable(report.failures()).map(FailureJson::of).collect(),
         cancelled: report.cancelled(),
         archive_changed: report.archive_changed(),
+        origins,
     }
 }
 

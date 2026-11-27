@@ -12,6 +12,8 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[expect(clippy::print_stdout, reason = "the lists are the result of the run")]
@@ -29,7 +31,10 @@ fn has_token(text: &str, tokens: &[&str]) -> bool {
 fn the_ship_tokens_leave_out_leftover_ships_only() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -63,9 +68,17 @@ fn the_ship_tokens_leave_out_leftover_ships_only() -> TestResult {
     for path in &newly {
         print_line(path);
     }
+    check_catalog(&catalog)
+}
+
+fn check_catalog(catalog: &Value) -> TestResult {
     for entity in catalog["ships"].as_array().ok_or("no ships")? {
-        let path = entity["recordPath"].as_str().unwrap_or_default();
-        let class = entity["className"].as_str().unwrap_or_default();
+        let path = catalog_v3_consumer::present(&entity["recordPath"])?
+            .as_str()
+            .ok_or("Ship record path")?;
+        let class = catalog_v3_consumer::present(&entity["className"])?
+            .as_str()
+            .ok_or("Ship class name")?;
         assert!(
             !has_token(path, &SHIP_EXCLUDED_TOKENS) && !has_token(class, &SHIP_EXCLUDED_TOKENS),
             "ship {class} is in the catalog"
@@ -75,7 +88,9 @@ fn the_ship_tokens_leave_out_leftover_ships_only() -> TestResult {
     assert!(
         items.iter().any(|item| {
             has_token(
-                item["className"].as_str().unwrap_or_default(),
+                item.pointer("/className/value")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
                 &SHIP_EXCLUDED_TOKENS,
             )
         }),

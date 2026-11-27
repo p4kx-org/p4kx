@@ -4,17 +4,24 @@
 //! A synthetic Archive with contracts, sub contracts, templates, mission types, a mission
 //! organisation with tagged string variants and reputation rewards.
 
+mod consumer_rank_markers;
+mod fixed_reward_origins;
 mod gaps;
 mod lookups;
+mod mission_item_titles;
 mod prerequisites;
 mod records;
 mod referenced;
+mod reputation_gain_origins;
 mod structures;
+mod title_limits;
+mod title_missing;
+mod title_origins;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, TestRecord};
 
 pub(crate) const GENERATOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
 pub(crate) const CONTRACT_A: u128 = 0x2000_0000_0000_4000_8000_0000_0000_0001;
@@ -66,19 +73,28 @@ pub(crate) const STRAY_FACTION: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0005
 pub(crate) const RIVAL: u128 = 0x6000_0000_0000_4000_8000_0000_0000_0004;
 
 fn database() -> DataForgeBuilder {
+    database_with_scope(DataForgeBuilder::new(), lookups::faction_scope())
+}
+
+fn database_with_scope(builder: DataForgeBuilder, scope: TestRecord) -> DataForgeBuilder {
     records::generator(lookups::places(lookups::reputation(
         referenced::referenced(structures::structures(
-            DataForgeBuilder::new()
-                .version(8)
-                .enumeration("ECurrency", ["UEC"]),
+            builder.version(8).enumeration("ECurrency", ["UEC"]),
         )),
+        scope,
     )))
 }
 
 fn english() -> TestEntry {
-    TestEntry::zstd(
-        "Data\\Localization\\english\\global.ini",
-        GlobalIniBuilder::new()
+    english_entry(&english_strings())
+}
+
+fn english_entry(strings: &GlobalIniBuilder) -> TestEntry {
+    TestEntry::zstd("Data\\Localization\\english\\global.ini", strings.build())
+}
+
+fn english_strings() -> GlobalIniBuilder {
+    GlobalIniBuilder::new()
             .text(
                 "title_a",
                 "Deliver ~mission(Cargo) to ~mission(Location) for ~mission(Contractor|Title) ~mission(Missing)  ",
@@ -94,6 +110,8 @@ fn english() -> TestEntry {
             .text("org_solo", "Solo Corp")
             .text("wrap_text", "Wrapped ~mission(Location)")
             .text("contractor_acme", "Acme Agency")
+            .text("contractor_local", "Local Agency")
+            .text("contractor_bypassed", "Unselected Agency")
             .text("title_broker", "Broker Haul")
             .text(
                 "desc_handler",
@@ -113,8 +131,6 @@ fn english() -> TestEntry {
             .text("type_delivery", "Delivery")
             .text("type_bounty", "Bounty")
             .text("type_escort", "Escort")
-            .build(),
-    )
 }
 
 fn german() -> TestEntry {

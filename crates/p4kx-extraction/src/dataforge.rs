@@ -1,38 +1,58 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::TryReserveError;
 use std::io::{self, Read};
 
 use p4kx_archive::{Archive, ArchiveError, Entry};
 use p4kx_dataforge::{DataForge, DataForgeError};
 use thiserror::Error;
 
-use crate::ArchiveChanged;
+use crate::decoded_buffer::{AppendError, DecodedBuffer};
+use crate::source::{SourceEntry, SourceReader};
+use crate::{ArchiveChanged, DataForgeOrigin, DataForgeReadOptions};
 
 /// The Entries that may hold DataForge, the preferred one first.
 pub const DATAFORGE_ENTRIES: [&str; 2] = ["Data\\Game2.dcb", "Data\\Game.dcb"];
 
-/// The largest uncompressed DataForge Entry that is read, 2 GiB; larger sizes are rejected.
-pub const MAX_DATAFORGE_SIZE: u64 = 2 << 30;
-
-const READ_CHUNK: u64 = 1 << 20;
+const READ_CHUNK: usize = 1 << 20;
 
 /// The bytes of an Archive's DataForge Entry, read into memory.
 #[derive(Debug)]
 pub struct DataForgeEntry {
     path: String,
     bytes: Vec<u8>,
+    origin: DataForgeOrigin,
 }
 
 impl DataForgeEntry {
+    /// Binds the bytes of one completed decoded read to its physical input.
+    pub(crate) fn from_decoded_source(
+        entry: &SourceEntry<'_>,
+        reader: &SourceReader<'_>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        let origin = entry.observed_entry().map_or_else(
+            || {
+                reader
+                    .file_origin()
+                    .map_or(DataForgeOrigin::Unknown, DataForgeOrigin::File)
+            },
+            |entry| DataForgeOrigin::Archive(entry.snapshot()),
+        );
+        Self {
+            path: entry.path().to_owned(),
+            bytes,
+            origin,
+        }
+    }
+
     /// Reads the DataForge Entry of `archive`: `Data\Game2.dcb`, or `Data\Game.dcb` when the
     /// Archive has no `Game2.dcb`.
     ///
     /// # Errors
     ///
-    /// Returns [`DataForgeLoadError::Missing`] when the Archive holds neither Entry,
-    /// [`DataForgeLoadError::TooLarge`] when its size exceeds [`MAX_DATAFORGE_SIZE`], and another
-    /// [`DataForgeLoadError`] when the Entry cannot be read.
+    /// Returns the same errors as [`Self::read_until_with_options`].
     pub fn read(archive: &Archive) -> Result<Self, DataForgeLoadError> {
         Self::read_until(archive, &|| false)
     }
@@ -48,47 +68,97 @@ impl DataForgeEntry {
         archive: &Archive,
         stop: &dyn Fn() -> bool,
     ) -> Result<Self, DataForgeLoadError> {
-        let entry = Self::locate(archive).ok_or(DataForgeLoadError::Missing)?;
-        let path = entry.path().to_owned();
-        let size = entry.uncompressed_size();
-        check_size(&path, size)?;
-        let reader = archive
-            .open_entry(entry)
-            .map_err(DataForgeLoadError::Archive)?;
-        Self::read_stream(path, size, reader, stop)
+        Self::read_until_with_options(archive, DataForgeReadOptions::default(), stop)
     }
 
-    /// Reads `size` bytes of `reader` in mebibytes, polling `stop` before each one.
+    /// Reads the Archive's DataForge Entry with caller-selected decoded input admission.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing Entry, admission, allocation, read or cancellation error.
+    pub fn read_until_with_options(
+        archive: &Archive,
+        options: DataForgeReadOptions,
+        stop: &dyn Fn() -> bool,
+    ) -> Result<Self, DataForgeLoadError> {
+        let entry = Self::locate(archive).ok_or(DataForgeLoadError::Missing)?;
+        let path = entry.path().to_owned();
+        let input = options.admit(&path, entry.uncompressed_size())?;
+        if stop() {
+            return Err(DataForgeLoadError::Cancelled);
+        }
+        let reader = archive
+            .open_entry(entry)
+            .map_err(DataForgeLoadError::Archive)?
+            .reject_overlong();
+        let origin = archive
+            .entry_origin(entry)
+            .map_or(DataForgeOrigin::Unknown, DataForgeOrigin::Archive);
+        let mut loaded = Self::read_stream(path, input, reader, stop)?;
+        loaded.set_origin(origin);
+        Ok(loaded)
+    }
+
     pub(crate) fn read_stream(
         path: String,
-        size: u64,
-        reader: impl Read,
+        input: DecodedBuffer,
+        mut reader: impl Read,
         stop: &dyn Fn() -> bool,
     ) -> Result<Self, DataForgeLoadError> {
         let mut bytes = Vec::new();
-        let reserve = usize::try_from(size).unwrap_or(usize::MAX);
-        if bytes.try_reserve_exact(reserve).is_err() {
-            return Err(too_large(path, size));
+        if stop() {
+            return Err(DataForgeLoadError::Cancelled);
         }
-        let mut reader = reader.take(size);
+        let mut scratch = Vec::new();
+        let chunk_size = input.size().clamp(1, READ_CHUNK);
+        scratch
+            .try_reserve_exact(chunk_size)
+            .map_err(|source| DataForgeLoadError::allocation(&path, chunk_size, source))?;
+        scratch.resize(chunk_size, 0_u8);
         loop {
             if stop() {
                 return Err(DataForgeLoadError::Cancelled);
             }
-            let before = bytes.len();
-            (&mut reader)
-                .take(READ_CHUNK)
-                .read_to_end(&mut bytes)
-                .map_err(|source| DataForgeLoadError::Read {
-                    path: path.clone(),
-                    source,
+            let remaining = input.size().saturating_sub(bytes.len());
+            let admitted = remaining.saturating_add(1).min(scratch.len());
+            let window = scratch.get_mut(..admitted).ok_or_else(|| {
+                DataForgeLoadError::read(
+                    &path,
+                    io::Error::new(io::ErrorKind::InvalidData, "the reader window is invalid"),
+                )
+            })?;
+            let count = match reader.read(window) {
+                Ok(0) => break,
+                Ok(count) => count,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(source) => return Err(DataForgeLoadError::read(&path, source)),
+            };
+            let chunk = window.get(..count).ok_or_else(|| {
+                DataForgeLoadError::read(
+                    &path,
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "the reader returned an invalid count",
+                    ),
+                )
+            })?;
+            input
+                .append(&mut bytes, chunk)
+                .map_err(|error| match error {
+                    AppendError::Overlong(source) => DataForgeLoadError::read(&path, source),
+                    AppendError::Allocation { requested, source } => {
+                        DataForgeLoadError::allocation(&path, requested, source)
+                    }
                 })?;
-            if bytes.len() == before {
-                break;
-            }
         }
-        bytes.shrink_to_fit();
-        Ok(Self { path, bytes })
+        input
+            .finish(&bytes)
+            .map_err(|source| DataForgeLoadError::read(&path, source))?;
+        Ok(Self {
+            path,
+            bytes,
+            origin: DataForgeOrigin::Unknown,
+        })
     }
 
     /// Returns the Entry [`DataForgeEntry::read`] reads, or `None` when the Archive holds no
@@ -109,6 +179,23 @@ impl DataForgeEntry {
         &self.path
     }
 
+    /// Returns the measured number of original payload bytes supplied to DataForge.
+    #[must_use]
+    pub const fn byte_len(&self) -> u64 {
+        self.bytes.len() as u64
+    }
+
+    pub(crate) fn set_origin(&mut self, origin: DataForgeOrigin) {
+        self.origin = origin;
+    }
+
+    /// Returns the physical input retained when these bytes were read.
+    /// Standalone files retain their own input; generic streams remain Unknown.
+    #[must_use]
+    pub const fn origin(&self) -> &DataForgeOrigin {
+        &self.origin
+    }
+
     /// Opens the DataForge over the Entry's bytes.
     ///
     /// # Errors
@@ -116,6 +203,12 @@ impl DataForgeEntry {
     /// Returns a [`DataForgeError`] for an unsupported version or a corrupt database.
     pub fn open(&self) -> Result<DataForge<'_>, DataForgeError> {
         DataForge::open(&self.bytes)
+    }
+
+    /// Returns the physical origin when the DataForge uses this exact opened input.
+    #[must_use]
+    pub fn origin_of(&self, forge: &DataForge<'_>) -> Option<&DataForgeOrigin> {
+        forge.is_opened_over(&self.bytes).then_some(&self.origin)
     }
 }
 
@@ -126,15 +219,40 @@ pub enum DataForgeLoadError {
     /// The Archive holds neither `Data\Game2.dcb` nor `Data\Game.dcb`.
     #[error("the Archive holds no DataForge: neither Data\\Game2.dcb nor Data\\Game.dcb")]
     Missing,
-    /// The Entry is larger than [`MAX_DATAFORGE_SIZE`] or than the memory that can be reserved.
-    #[error("the DataForge Entry {path} claims {size} bytes, more than the limit of {limit} bytes")]
+    /// The decoded size does not fit a byte vector on this platform.
+    #[error(
+        "the DataForge input {path} claims {size} bytes, beyond the addressable size of {limit} bytes"
+    )]
     TooLarge {
-        /// The Entry path.
+        /// The Entry or file path.
         path: String,
-        /// The uncompressed size the Archive gives.
+        /// The declared decoded size.
         size: u64,
-        /// The largest size that is read.
+        /// The platform byte-vector limit.
         limit: u64,
+    },
+    /// The caller declined the declared decoded size.
+    #[error(
+        "the DataForge input {path} claims {size} bytes, beyond the caller's budget of {limit} bytes"
+    )]
+    BudgetExceeded {
+        /// The Entry or file path.
+        path: String,
+        /// The declared decoded size.
+        size: u64,
+        /// The caller's decoded-byte budget.
+        limit: u64,
+    },
+    /// The allocator refused storage for observed data or decoder scratch.
+    #[error("cannot reserve {requested} bytes for the DataForge input {path}")]
+    Allocation {
+        /// The Entry or file path.
+        path: String,
+        /// The requested capacity.
+        requested: usize,
+        /// The allocator error.
+        #[source]
+        source: TryReserveError,
     },
     /// The Entry cannot be opened in the Archive.
     #[error(transparent)]
@@ -163,9 +281,8 @@ pub enum DataForgeLoadError {
 }
 
 impl DataForgeLoadError {
-    /// Returns whether reading again could succeed: the failure came from the disk, a changed
-    /// file, a missing thread or a stop asked for by the caller ([`Cancelled`](Self::Cancelled)),
-    /// not from the content of the Entry.
+    /// Returns whether a fresh read could succeed without repairing the input format.
+    /// A different caller budget, changed resources or cancellation can affect a retry.
     #[must_use]
     pub fn is_transient(&self) -> bool {
         match self {
@@ -174,37 +291,28 @@ impl DataForgeLoadError {
                 source.kind(),
                 io::ErrorKind::InvalidData | io::ErrorKind::UnexpectedEof
             ),
-            Self::Archive(_) | Self::ArchiveChanged(_) | Self::Thread(_) | Self::Cancelled => true,
+            Self::BudgetExceeded { .. }
+            | Self::Allocation { .. }
+            | Self::Archive(_)
+            | Self::ArchiveChanged(_)
+            | Self::Thread(_)
+            | Self::Cancelled => true,
         }
     }
-}
 
-/// Returns [`DataForgeLoadError::TooLarge`] when `size` exceeds [`MAX_DATAFORGE_SIZE`].
-pub(crate) fn check_size(path: &str, size: u64) -> Result<(), DataForgeLoadError> {
-    check_size_within(path, size, MAX_DATAFORGE_SIZE)
-}
-
-/// Returns [`DataForgeLoadError::TooLarge`] when `size` exceeds `limit`.
-pub(crate) fn check_size_within(
-    path: &str,
-    size: u64,
-    limit: u64,
-) -> Result<(), DataForgeLoadError> {
-    if size > limit {
-        return Err(DataForgeLoadError::TooLarge {
+    fn read(path: &str, source: io::Error) -> Self {
+        Self::Read {
             path: path.to_owned(),
-            size,
-            limit,
-        });
+            source,
+        }
     }
-    Ok(())
-}
 
-const fn too_large(path: String, size: u64) -> DataForgeLoadError {
-    DataForgeLoadError::TooLarge {
-        path,
-        size,
-        limit: MAX_DATAFORGE_SIZE,
+    fn allocation(path: &str, requested: usize, source: TryReserveError) -> Self {
+        Self::Allocation {
+            path: path.to_owned(),
+            requested,
+            source,
+        }
     }
 }
 
@@ -221,18 +329,50 @@ fn same_path(left: &str, right: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::error::Error;
+
+    use super::{DataForgeEntry, DataForgeLoadError, DataForgeOrigin, DataForgeReadOptions};
 
     #[test]
-    fn the_limit_of_a_read_is_two_gibibytes_and_is_reported() {
-        assert_eq!(MAX_DATAFORGE_SIZE, 2 << 30);
-        assert!(check_size("a", MAX_DATAFORGE_SIZE).is_ok());
-        assert!(matches!(
-            check_size("a", MAX_DATAFORGE_SIZE + 1),
-            Err(DataForgeLoadError::TooLarge {
-                limit: MAX_DATAFORGE_SIZE,
-                ..
-            })
-        ));
+    fn a_generic_stream_has_no_trusted_archive_origin() -> Result<(), Box<dyn Error>> {
+        let bytes = b"synthetic stream";
+        let input =
+            DataForgeReadOptions::default().admit("Game2.dcb", u64::try_from(bytes.len())?)?;
+        let entry =
+            DataForgeEntry::read_stream("Game2.dcb".to_owned(), input, bytes.as_slice(), &|| {
+                false
+            })?;
+        assert!(
+            matches!(entry.origin(), DataForgeOrigin::Unknown),
+            "a path-like label does not establish an Archive origin"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_allocation_error_does_not_poison_cached_source_content() -> Result<(), &'static str> {
+        let mut bytes = Vec::<u8>::new();
+        let source = bytes
+            .try_reserve_exact(usize::MAX)
+            .err()
+            .ok_or("checked allocation refusal")?;
+        let allocation = DataForgeLoadError::allocation("Game2.dcb", 16, source);
+        assert!(
+            allocation.is_transient(),
+            "allocator refusal can change between reads"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn cancellation_stops_before_the_stream_is_touched() -> Result<(), Box<dyn Error>> {
+        let input = DataForgeReadOptions::default().admit("Game2.dcb", 3)?;
+        let source = std::io::repeat(1);
+        let result = DataForgeEntry::read_stream("Game2.dcb".to_owned(), input, source, &|| true);
+        assert!(
+            matches!(result, Err(DataForgeLoadError::Cancelled)),
+            "initial stop takes priority"
+        );
+        Ok(())
     }
 }

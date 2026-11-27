@@ -13,7 +13,7 @@ use crate::theme::desktop::{
     SECTION_TRACKING, TITLE_SIZE, TREE_ROW_HOVER, ZEBRA,
 };
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, SPACE_4, TOUCH_TARGET, Weight};
+use crate::theme::tokens::{CORNER_CONTROL, SPACE_4, TOUCH_TARGET, Weight};
 
 /// How a data row is shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub(crate) enum RowState {
 
 impl RowState {
     /// Returns the state of a `.master-row` from its flags: like [`RowState::of`], but hovered in
-    /// the 3 % white of a list instead of the table's `control-bg`.
+    /// the 3 % white of a list.
     pub(crate) const fn of_list(active: bool, hovered: bool) -> Self {
         if active {
             Self::Active
@@ -68,11 +68,11 @@ impl RowState {
     pub(crate) const fn colours(self) -> (Color32, Color32) {
         match self {
             Self::Rest => (Color32::TRANSPARENT, palette::GRAY_1),
-            Self::Hovered => (palette::CONTROL_BG, palette::GRAY_1),
+            Self::Hovered => (palette::TABLE_ROW_HOVER, palette::GRAY_1),
             Self::ListHovered => (LIST_ROW_HOVER, palette::GRAY_1),
             Self::TreeHovered => (TREE_ROW_HOVER, palette::GRAY_1),
             Self::Checked => (palette::CONTROL_SELECTED_BG, palette::GRAY_1),
-            Self::Active => (palette::SURFACE_BAR, palette::WHITE),
+            Self::Active => (palette::CONTROL_SELECTED_BG, palette::WHITE),
         }
     }
 }
@@ -178,13 +178,13 @@ pub(crate) fn section_header(ui: &mut Ui, id: Id, title: &str, default_open: boo
     let painter = ui.painter();
     painter.rect(
         rect,
-        CORNER_SM,
+        CORNER_CONTROL,
         fill,
         Stroke::new(1.0, palette::GRAY_3),
         egui::StrokeKind::Inside,
     );
     let bar = Rect::from_min_size(rect.min, vec2(ACCENT_BAR, rect.height()));
-    accent_edge(painter, (rect, CORNER_SM), bar, palette::PRIMARY);
+    accent_edge(painter, (rect, CORNER_CONTROL), bar, palette::PRIMARY);
     let text = caps(
         title,
         TITLE_SIZE,
@@ -227,7 +227,11 @@ mod tests {
 
     #[test]
     fn rows_use_the_surface_ladder_and_never_a_solid_orange_block() {
-        assert_eq!(RowState::Hovered.colours().0, palette::CONTROL_BG, "hover");
+        assert_eq!(
+            RowState::Hovered.colours().0,
+            palette::TABLE_ROW_HOVER,
+            "hover"
+        );
         assert_eq!(
             RowState::of_list(false, true).colours().0,
             LIST_ROW_HOVER,
@@ -246,7 +250,7 @@ mod tests {
         );
         assert_eq!(
             RowState::Active.colours(),
-            (palette::SURFACE_BAR, palette::WHITE),
+            (palette::CONTROL_SELECTED_BG, palette::WHITE),
             "active"
         );
     }

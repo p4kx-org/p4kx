@@ -8,11 +8,26 @@ expression: "serde_json::to_string_pretty(&value)?"
   "converted": 1,
   "extracted": 2,
   "failed": [],
+  "raw_artifacts": [
+    {
+      "digest": {
+        "byteLength": "5",
+        "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+      },
+      "origin_receipt": "Data/readme.txt.p4kx-origin.jsonl",
+      "path": "Data/readme.txt"
+    }
+  ],
   "records": {
     "cancelled": 0,
     "error_values": 1,
     "exported": 3,
     "failed": [],
+    "origin_receipts": [
+      "Data/libs/foundry/records/anchors/anchor.xml.p4kx-origin.jsonl",
+      "Data/libs/foundry/records/items/boxes/Item.Box.xml.p4kx-origin.jsonl",
+      "Data/libs/foundry/records/items/boxes/Item.Crate.xml.p4kx-origin.jsonl"
+    ],
     "records_with_errors": 1,
     "skipped": []
   },

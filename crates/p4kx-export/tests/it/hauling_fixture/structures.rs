@@ -121,10 +121,17 @@ fn manifest_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("CargoManifest")
             .field("lockCargoGridsOnSpawn", TestType::Bool)
+            .array("tags", TestType::String)
+            .array("descriptionTags", TestType::Locale)
             .field("cargoFillCapacity", pointer("CargoFillCapacityValue"))
             .array("cargoSpawnRules", pointer("CargoSpawnRule")),
         TestStruct::new("CargoFillCapacityValue"),
         TestStruct::new("CargoFillCapacityValue_Even")
+            .parent("CargoFillCapacityValue")
+            .field("minCapacityRange", TestType::Single)
+            .field("maxCapacityRange", TestType::Single)
+            .array("resources", class("CargoResource")),
+        TestStruct::new("CargoFillCapacityValue_Random")
             .parent("CargoFillCapacityValue")
             .field("minCapacityRange", TestType::Single)
             .field("maxCapacityRange", TestType::Single)
@@ -148,6 +155,9 @@ fn manifest_structs() -> Vec<TestStruct> {
         TestStruct::new("CargoSpawnResourceDef")
             .parent("CargoSpawnRule")
             .array("resources", TestType::Reference),
+        TestStruct::new("CargoSpawnFutureDef")
+            .parent("CargoSpawnRule")
+            .field("futureQuota", TestType::UInt64),
         TestStruct::new("CargoManifestQuantityDef"),
         TestStruct::new("CargoManifestFixedQuantityDef")
             .parent("CargoManifestQuantityDef")

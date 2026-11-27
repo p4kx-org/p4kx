@@ -5,11 +5,13 @@
 
 mod chf;
 mod diff;
+mod diff_origins;
 mod face_pose;
 mod json;
 mod limits;
 mod logic_deltas;
 mod named_json;
+mod named_json_origins;
 mod rig;
 mod rig_blend;
 mod rig_limits;

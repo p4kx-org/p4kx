@@ -4,9 +4,11 @@
 use p4kx_archive::Archive;
 use p4kx_dataforge::DataForge;
 
+use crate::DataForgeEntry;
 use crate::coverage::{CoverageReport, ReferenceList};
 use crate::coverage_entries;
 use crate::coverage_forge;
+use crate::coverage_origins::{CoverageOriginError, CoverageSites, ObservedCoverage};
 
 impl CoverageReport {
     /// Checks what `forge` and `archive` hold of `list`: for every Record type whether it is
@@ -17,13 +19,46 @@ impl CoverageReport {
     /// `archive`.
     #[must_use]
     pub fn of(archive: &Archive, forge: &DataForge<'_>, list: &ReferenceList<'_>) -> Self {
-        let found = coverage_forge::check(forge, list.items());
-        Self {
-            types: found.types,
-            components: found.components,
-            objects: found.objects,
-            entries: coverage_entries::check(archive, list.items()),
-            unreadable_entities: found.unreadable_entities,
-        }
+        scan(archive, forge, list, None)
+    }
+
+    /// Checks coverage and retains original sources for the sample and failure paths.
+    ///
+    /// # Errors
+    /// Returns an error if a field path or its original source cannot be registered.
+    pub fn observed(
+        archive: &Archive,
+        forge: &DataForge<'_>,
+        input: &DataForgeEntry,
+        list: &ReferenceList<'_>,
+    ) -> Result<ObservedCoverage, CoverageOriginError> {
+        let mut sites = CoverageSites::default();
+        let report = scan(archive, forge, list, Some(&mut sites));
+        ObservedCoverage::new(report, archive, forge, input, sites)
+    }
+}
+
+fn scan<'archive, 'forge>(
+    archive: &'archive Archive,
+    forge: &'forge DataForge<'_>,
+    list: &ReferenceList<'_>,
+    mut sites: Option<&mut CoverageSites<'archive, 'forge>>,
+) -> CoverageReport {
+    let found = coverage_forge::check(
+        forge,
+        list.items(),
+        sites.as_mut().map(|sites| &mut sites.samples),
+    );
+    let entries = coverage_entries::check(
+        archive,
+        list.items(),
+        sites.map(|sites| &mut sites.failures),
+    );
+    CoverageReport {
+        types: found.types,
+        components: found.components,
+        objects: found.objects,
+        entries,
+        unreadable_entities: found.unreadable_entities,
     }
 }

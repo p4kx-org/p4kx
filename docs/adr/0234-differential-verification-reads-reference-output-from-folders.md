@@ -8,6 +8,8 @@ Amended for issue #807: embedded Records are compared by content.
 
 ## Decision
 
+- Configured reference roots require [ADR-0342](0342-independent-references-require-preconversion-manifests.md): source-bound pre-conversion manifests, complete logical source accounting and reviewed producer-error contracts. Empty/partial roots cannot pass; unset optional variables still skip explicitly.
+
 - P4KX is compared with unp4k, unforge and StarBreaker by `#[ignore]`d tests in
   `crates/p4kx-extraction/tests/reference/`. A test reads a folder of output the owner produced
   beforehand, named by `P4KX_REF_UNP4K`, `P4KX_REF_UNFORGE` or `P4KX_REF_STARBREAKER`, and returns
@@ -16,6 +18,7 @@ Amended for issue #807: embedded Records are compared by content.
   (tag, attributes in order, trimmed text, children) for `CryXml`, and values per Record (field
   name, kind, value) for DataForge. A number is compared at the precision of the field P4KX read:
   a single is compared as `f32`, `-0.0` equals `0.0`, an integer exactly.
+- The unp4k zero-suffix allowance follows [ADR-0341](0341-reference-zero-trimming-requires-effective-decoder-and-producer-evidence.md): validated producer/source evidence, an encrypted direct decoder and the exact retained-prefix boundary are required. Actual compressed logical-byte loss and unknown contexts fail.
 - A difference fails the test unless it is on a documented allow-list, each entry with its reason
   and counted per allowed value in the summary. The allow-list is the known behaviour of the
   reference tools: trailing zero bytes unp4k trims from encrypted Entries, `BUGGED` against a

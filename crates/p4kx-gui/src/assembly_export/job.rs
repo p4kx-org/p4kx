@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod failure;
+mod glb_publication;
 mod package;
 mod run;
 pub(super) mod stop;
@@ -11,11 +13,11 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 
+pub(crate) use failure::failure_of;
 use p4kx_assembly::LoadoutChanges;
 use p4kx_extraction::{CancelToken, GlbOptions, Guid, MaterialMode};
 use p4kx_settings::ModelMaterials;
 pub(crate) use package::{info_of, package_failure};
-pub(crate) use run::failure_of;
 #[cfg(test)]
 use stop::Observed;
 
@@ -162,7 +164,7 @@ pub enum AssemblyExportStatus<'a> {
     Finished(&'a AssemblyExportSummary),
     /// The export was cancelled; no file was written.
     Cancelled,
-    /// No file was written, for the reason given.
+    /// The export failed, for the reason given.
     Failed(&'a ModelExportFailure),
 }
 

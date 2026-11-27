@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 use thiserror::Error;
 
-use crate::source::{EntrySource, SourceEntry, SourceReader};
-use crate::{CancelToken, EntryFailure, Exclusion, ExtractionError, Filter};
+use crate::observed_file_origin::ObservedFileStream;
+use crate::source::{EntrySource, OpenOptions, SourceEntry, SourceReader};
+use crate::{CancelToken, EntryFailure, Exclusion, ExtractionError, FileStamp, Filter};
 
 /// The most files, folders and rejected names [`FolderSource::scan`] visits; it bounds the memory
 /// of the listing, of the rejected names and of the folders waiting to be read.
@@ -119,7 +120,7 @@ pub enum FolderError {
     },
     /// The output folder lies inside a Star Citizen installation.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The run was cancelled while the folder was read.
     #[error("cancelled")]
     Cancelled,
@@ -140,7 +141,7 @@ type Pending = (PathBuf, String, usize);
 
 /// The files below an input folder, listed once, with the paths below it using `\`.
 ///
-/// Links are never followed and so never listed; each is reported as a rejected file.
+/// Links are rejected and recognized P4KX origin companions are excluded.
 #[derive(Debug)]
 pub struct FolderSource {
     root: PathBuf,
@@ -325,13 +326,18 @@ impl FolderSource {
         Ok(())
     }
 
-    /// Lists the file `item` as `path`, or rejects it when its size cannot be read.
     fn add(&mut self, item: &fs::DirEntry, path: String) {
+        let disk = item.path();
+        match crate::file_receipt::is_owned_native_companion(&disk) {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(error) => return self.reject(&path, FolderFileError::Unreadable(error.kind())),
+        }
         match item.metadata() {
             Ok(metadata) => self.files.push(FolderFile {
                 path,
                 size: metadata.len(),
-                disk: item.path(),
+                disk,
             }),
             Err(error) => self.reject(&path, FolderFileError::Unreadable(error.kind())),
         }
@@ -345,7 +351,7 @@ impl FolderSource {
 }
 
 impl EntrySource for FolderSource {
-    fn open(&self, index: usize, _verify: bool) -> Result<SourceReader<'_>, ExtractionError> {
+    fn open(&self, index: usize, _: OpenOptions) -> Result<SourceReader<'_>, ExtractionError> {
         let file = self.files.get(index).ok_or_else(|| {
             ExtractionError::Read(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -369,7 +375,9 @@ impl EntrySource for FolderSource {
         if !resolved.starts_with(&self.root) {
             return Err(FolderFileError::Outside.into());
         }
-        Ok(Box::new(opened.take(file.size)))
+        let stamp = FileStamp::from_metadata(&metadata);
+        let stream = ObservedFileStream::with_stamp(file.disk.as_path(), opened, Some(stamp));
+        Ok(SourceReader::File(stream.take(file.size)))
     }
 
     fn checksum(&self, _index: usize) -> Option<p4kx_archive::Checksum> {

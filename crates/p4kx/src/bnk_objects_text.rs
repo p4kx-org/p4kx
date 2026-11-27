@@ -43,7 +43,21 @@ pub(crate) fn write_object(out: &mut impl Write, object: &ObjectView<'_>) -> io:
     if let Some(error) = &object.error {
         writeln!(out, "{INDENT}{}", one_line(error))?;
     }
-    match &object.detail {
+    write_detail(out, object.detail.as_ref())
+}
+
+fn write_detail(out: &mut impl Write, detail: Option<&Detail<'_>>) -> io::Result<()> {
+    match detail {
+        Some(Detail::State(state)) => {
+            for property in &state.properties {
+                writeln!(
+                    out,
+                    "{INDENT}property {}  {:#010x}",
+                    property.id, property.value_bits
+                )?;
+            }
+            Ok(())
+        }
         Some(Detail::Sound(sound)) => sound_lines(out, sound),
         Some(Detail::Action(action)) => {
             write!(
@@ -62,13 +76,16 @@ pub(crate) fn write_object(out: &mut impl Write, object: &ObjectView<'_>) -> io:
         Some(Detail::Segment(segment)) => segment_lines(out, segment),
         Some(Detail::Track(track)) => track_lines(out, track),
         Some(Detail::Switch(switch)) => {
-            writeln!(
+            write!(
                 out,
-                "{INDENT}{} transition rules, groups [{}], targets [{}]",
+                "{INDENT}{} transition rules, groups [{}], ",
                 switch.rule_count,
-                Ids(switch.group_ids),
-                Ids(switch.targets)
-            )
+                Ids(switch.group_ids)
+            )?;
+            let Some(targets) = switch.targets else {
+                return writeln!(out, "targets in the compact decision graph (--json)");
+            };
+            writeln!(out, "targets [{}]", Ids(targets))
         }
         Some(Detail::Playlist(playlist)) => {
             writeln!(out, "{INDENT}{} transition rules", playlist.rule_count)?;
@@ -77,7 +94,7 @@ pub(crate) fn write_object(out: &mut impl Write, object: &ObjectView<'_>) -> io:
                 .iter()
                 .try_for_each(|item| item_line(out, item))
         }
-        None => Ok(()),
+        Some(Detail::ActorMixer(_)) | None => Ok(()),
     }
 }
 

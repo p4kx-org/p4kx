@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_model::{
-    DIFFUSE_SLOT, Material, TextureSlot, is_diffuse_map, texture_suffix_lowercase as suffix,
+    DIFFUSE_SLOT, Material, TextureRole as MaterialTextureRole, TextureSlot, is_diffuse_map,
+    texture_suffix_lowercase as suffix,
 };
 
 use crate::material_alpha::is_hair_cards;
@@ -156,6 +157,48 @@ fn collect(textures: &[TextureSlot], opacity_suffix: Option<&str>) -> Sources {
     found
 }
 
+/// Finds the explicit gloss candidates of an unlayered `HardSurface` material in authored order.
+pub(crate) fn explicit_gloss_sources(
+    material: &Material,
+    refused: &mut Vec<(TextureRole, String)>,
+) -> Vec<Source> {
+    if !material.layers.is_empty() || !material.shader.eq_ignore_ascii_case("HardSurface") {
+        return Vec::new();
+    }
+    layer_gloss_sources(material, &material.textures, refused)
+}
+
+pub(crate) fn layer_gloss_sources(
+    material: &Material,
+    textures: &[TextureSlot],
+    refused: &mut Vec<(TextureRole, String)>,
+) -> Vec<Source> {
+    if !material.shader.eq_ignore_ascii_case("HardSurface") {
+        return Vec::new();
+    }
+    textures
+        .iter()
+        .filter_map(|slot| {
+            if slot.file.trim_start().starts_with('$')
+                || material.texture_role(&slot.map, &slot.file) != MaterialTextureRole::Gloss
+            {
+                return None;
+            }
+            let file = slot.file.clone();
+            let Some(path) = canonical(&file) else {
+                refused.push((TextureRole::Gloss, file));
+                return None;
+            };
+            Some(Source {
+                path,
+                file,
+                gloss: false,
+                opacity: false,
+            })
+        })
+        .collect()
+}
+
 /// Returns the path of the diffuse map of `material` as a [`TextureLoader`](crate::TextureLoader)
 /// takes it, the texture the GLB writer draws the base colour from, or `None` when the material
 /// has none a loader can use.
@@ -168,7 +211,7 @@ pub fn diffuse_texture_path(material: &Material) -> Option<String> {
 /// as `$RenderToTexture` and for a path that is empty, absolute, drive-qualified, has control
 /// characters or an empty, `.` or `..` component.
 ///
-/// The extension of a source image (`.tif`, `.tga`, …) becomes `.dds`, the form the Archive holds.
+/// The extension of a source image (`.tif`, `.tga`, Ã¢â‚¬Â¦) becomes `.dds`, the form the Archive holds.
 pub(crate) fn canonical(file: &str) -> Option<String> {
     let unified = file.trim().replace('\\', "/");
     let relative = match unified.get(..DATA_PREFIX.len()) {

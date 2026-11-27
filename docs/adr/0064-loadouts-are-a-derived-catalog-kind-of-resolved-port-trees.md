@@ -45,15 +45,15 @@ size is handled by `.json.zst`.
   tags, GUIDs, class names and the localisation key of a port's display name (`null` for a
   placeholder key). No description, no geometry, no media (the owner's legal review of 2026-10-20).
 - **Closed sets are strings** (ADR-0054): `entityKind`, `source` and `visibility` document their
-  values in the schema and keep the type string.
+  values in the schema and keep the type string. `entityKind` carries it as the value of a sourced cell.
 
 ## Consequences
 
 - The ship entries repeat the trees of the items they carry. The repetition compresses well
   (`.json.zst`) and keeps every entry self-contained for the import.
 - The catalog build resolves every ship and every port-carrying item with one `LoadoutResolver`
-  taken from a pool, so a resolver keeps its caches across the splits of the parallel run; the
-  measurements are in `docs/basetool-catalog.md`. A ship whose own Record cannot be resolved stays
-  in `ships` without a loadout and is listed in the failures.
+  in stable GUID order. The resolver records the first actual file read and reuses its cache
+  for later roots. Each resolved row is staged before the next root. A ship whose own Record cannot
+  be resolved stays in `ships` without a loadout and is listed in the failures.
 - A port is not identified across entries: a consumer that wants the ports of a turret under a
   specific ship reads the tree of that ship.

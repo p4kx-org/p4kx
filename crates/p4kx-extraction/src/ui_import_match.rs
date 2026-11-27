@@ -71,7 +71,7 @@ fn language_folders(language: Language) -> Vec<String> {
     folders
 }
 
-/// Returns the indexes of up to `limit` Entries that a movie in `folder` may mean by the import
+/// Returns the indexes of the Entries that a movie in `folder` may mean by the import
 /// URL `url`, the best first: the exact path, the same tail below the UI folder or the
 /// localisation folder of `language` and then of English, the same file name there, then
 /// anywhere below the UI folder, then anywhere. A `.swf` and a
@@ -82,8 +82,7 @@ pub(crate) fn candidates(
     url: &str,
     folder: &str,
     language: Language,
-    limit: usize,
-) -> Vec<usize> {
+) -> impl Iterator<Item = usize> {
     let language_folders = language_folders(language);
     let fallback = language != Language::English;
     let relative = normalised(&format!("{folder}\\{url}"));
@@ -135,5 +134,5 @@ pub(crate) fn candidates(
     found.sort_unstable_by(|left, right| {
         (left.0, &left.1, left.2).cmp(&(right.0, &right.1, right.2))
     });
-    found.into_iter().take(limit).map(|(_, _, at)| at).collect()
+    found.into_iter().map(|(_, _, at)| at)
 }

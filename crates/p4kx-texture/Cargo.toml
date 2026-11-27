@@ -16,6 +16,8 @@ p4kx-foundation.workspace = true
 flate2.workspace = true
 png.workspace = true
 rayon.workspace = true
+schemars.workspace = true
+serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

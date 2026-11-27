@@ -9,8 +9,8 @@ use p4kx_dataforge::Guid;
 use crate::bindings::ParamValues;
 use crate::canvas::{Canvas, find_canvas};
 use crate::elements;
-use crate::report::VariableInForce;
-use crate::rest::{AtRest, Given, RestParams, same_parameter};
+use crate::report::{ContentOmissionCode, OmissionInput, VariableInForce};
+use crate::rest::{AtRest, BindingOmission, Given, RestParams, same_parameter};
 use crate::style::{Modifiers, Subject};
 use crate::variables::Variable;
 use crate::walk::Walk;
@@ -42,10 +42,11 @@ fn left_out_reason(field: &str) -> String {
 }
 
 /// What a widget hands to the canvas it holds: the localised and the typed parameter values.
-pub(crate) struct Handover {
+pub(crate) struct Handover<'a> {
     pub(crate) text: ParamValues,
     pub(crate) typed: RestParams,
     pub(crate) stylesheet: Option<Guid>,
+    pub(crate) widget: &'a Widget,
 }
 
 impl Walk<'_, '_, '_, '_> {
@@ -140,22 +141,51 @@ impl Walk<'_, '_, '_, '_> {
     }
 
     fn note_rest(&mut self, canvas: &Canvas, state: &AtRest) {
-        let name = |at: usize| {
-            canvas
-                .widgets
-                .get(at)
-                .map_or("", |widget| widget.name.as_str())
-        };
-        if self.left_out_noted.insert(canvas.guid) {
-            for (widget, field) in state.left_out() {
-                let reason = left_out_reason(field);
-                self.cx.report.note("Binding", &reason, name(*widget));
+        let first = self.left_out_noted.insert(canvas.guid);
+        for omission in state.omissions() {
+            if first || omission.code != ContentOmissionCode::UnsupportedField {
+                self.note_binding(canvas, omission);
             }
         }
-        for (widget, field, why) in state.unknown() {
-            let reason = format!("the input of the bound field {field} is not evaluated: {why}");
-            self.cx.report.note("Binding", &reason, name(*widget));
+    }
+
+    fn note_binding(&mut self, canvas: &Canvas, omission: &BindingOmission) {
+        let BindingOmission {
+            operation,
+            variable,
+            widget,
+            field,
+            source,
+            code,
+            detail,
+        } = omission;
+        let reason = match (code, source, detail) {
+            (ContentOmissionCode::UnsupportedField, _, _) => left_out_reason(field),
+            (ContentOmissionCode::VariableMissing, Some(name), _) => {
+                format!("no caller value for {name}, the variable of the bound field {field}")
+            }
+            (ContentOmissionCode::SourceMissing, _, _) => {
+                format!("the bound field {field} names no text variable")
+            }
+            (_, _, Some(why)) => {
+                format!("the input of the bound field {field} is not evaluated: {why}")
+            }
+            (_, _, None) => format!("the input of the bound field {field} is not evaluated"),
+        };
+        let widget = canvas.widgets.get(*widget);
+        if let Some(widget) = widget {
+            let input = OmissionInput::Binding {
+                operation: *operation,
+                variable: *variable,
+            };
+            self.cx
+                .content_omission(widget, field, source.as_deref(), *code, input);
         }
+        self.cx.report.note(
+            "Binding",
+            &reason,
+            widget.map_or("", |widget| widget.name.as_str()),
+        );
     }
 
     /// Returns what tells the state at rest of the canvas being laid out from its other states.
@@ -220,7 +250,7 @@ impl Walk<'_, '_, '_, '_> {
         style
             .canvas
             .or_else(|| self.rests.last().and_then(|state| state.canvas(index)))
-            .or(widget.canvas)
+            .or_else(|| widget.canvas.guid())
     }
 
     /// Returns the own alpha of widget `index`, in the same order of precedence.
@@ -233,7 +263,7 @@ impl Walk<'_, '_, '_, '_> {
 
     /// Returns the values widget `index` hands to its nested canvas: the bound parameters over
     /// the ones the widget names, the localised ones included.
-    pub(crate) fn handover(&self, index: usize, widget: &Widget) -> Handover {
+    pub(crate) fn handover<'a>(&self, index: usize, widget: &'a Widget) -> Handover<'a> {
         let bound = self
             .rests
             .last()
@@ -272,6 +302,7 @@ impl Walk<'_, '_, '_, '_> {
             text,
             typed,
             stylesheet: widget.stylesheet,
+            widget,
         }
     }
 

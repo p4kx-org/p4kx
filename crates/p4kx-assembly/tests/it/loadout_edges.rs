@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadout edge cases: cycles, depth and size limits, overrides, port defaults and References
+//! Loadout edge cases: cycles, depth, wide trees, overrides, port defaults and References
 //! to Records that are no Entities.
 
 use std::error::Error;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, LoadoutResolver, MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS,
+    Attachment, EntityNode, LoadoutError, LoadoutOrigin, LoadoutResolver, MAX_LOADOUT_DEPTH,
     PortSource,
 };
 use p4kx_dataforge::DataForge;
@@ -112,10 +112,10 @@ fn a_chain_deeper_than_the_limit_ends_in_too_deep() -> TestResult {
 }
 
 #[test]
-fn a_loadout_larger_than_the_limit_ends_in_too_many_ports() -> TestResult {
-    let fan = 300;
+fn a_wide_loadout_retains_every_attached_branch_in_order() -> TestResult {
+    const FAN: usize = 256;
     let ports = |class_name: Option<&str>| {
-        (0..fan)
+        (0..FAN)
             .map(|index| {
                 let port = format!("p{index}");
                 class_name.map_or_else(
@@ -130,34 +130,24 @@ fn a_loadout_larger_than_the_limit_ends_in_too_many_ports() -> TestResult {
         entity(B, "Leaf").loadout(manual(ports(None))),
     ]);
     let root = resolve(&builder, "Hub")?;
-    assert_eq!(root.walk().len(), MAX_LOADOUT_PORTS, "exactly the limit");
-    let capped = capped_nodes(&root);
-    assert_eq!(capped, 2, "the Leaf that reached it and the Hub after it");
+    let mut observed = 0;
+    root.visit_ports(|_, _| observed += 1);
+    assert_eq!(observed, FAN * (FAN + 1), "every parent and child port");
+    assert_eq!(root.ports().len(), FAN, "all authored attachments");
+    assert!(root.issues().is_empty(), "the complete root has no issue");
+    let tail = root.ports().last().ok_or("the last parent port")?;
+    assert_eq!(tail.name(), "p255", "authored parent order");
+    let Attachment::Entity(leaf) = tail.attachment() else {
+        return Err("the last port retains its attached Entity".into());
+    };
+    assert!(leaf.issues().is_empty(), "the last leaf is complete");
+    let last = leaf.ports().last().ok_or("the last leaf port")?;
+    assert_eq!(last.name(), "p255", "authored child order");
+    assert!(
+        matches!(last.origin(), Some(LoadoutOrigin::Record(path)) if path.as_ref() == leaf.record_path()),
+        "the last port keeps the original child Record",
+    );
     Ok(())
-}
-
-#[test]
-fn empty_ports_alone_also_stop_at_the_limit() -> TestResult {
-    let entries = (0..MAX_LOADOUT_PORTS + 10)
-        .map(|index| TestLoadoutEntry::empty(format!("p{index}")))
-        .collect();
-    let builder = database(&[entity(A, "Rack").loadout(manual(entries))]);
-    let root = resolve(&builder, "Rack")?;
-    assert_eq!(root.ports().len(), MAX_LOADOUT_PORTS, "the ports so far");
-    assert_eq!(root.issues(), [LoadoutError::TooManyPorts], "one issue");
-    Ok(())
-}
-
-fn capped_nodes(node: &EntityNode) -> usize {
-    let own = usize::from(node.issues().contains(&LoadoutError::TooManyPorts));
-    own + node
-        .ports()
-        .iter()
-        .map(|port| match port.attachment() {
-            Attachment::Entity(child) => capped_nodes(child),
-            _ => 0,
-        })
-        .sum::<usize>()
 }
 
 #[test]

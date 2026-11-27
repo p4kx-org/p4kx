@@ -12,6 +12,9 @@ expression: "serde_json::to_string_pretty(&value)?"
   "failed": [],
   "file": "Game2.xml",
   "format": "xml",
+  "origin_receipts": [
+    "[DIR]/out/Game2.xml.p4kx-origin.jsonl"
+  ],
   "records_with_errors": 1,
   "skipped": [],
   "target": "[DIR]/out"

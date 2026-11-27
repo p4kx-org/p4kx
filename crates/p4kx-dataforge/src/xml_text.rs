@@ -4,32 +4,19 @@
 use std::fmt;
 use std::io::{self, Write};
 
+use p4kx_foundation::xml_name;
+
 const REPLACEMENT: &[u8] = "\u{fffd}".as_bytes();
 
 /// Returns whether `name` can stand as an element or attribute name without a namespace: an XML
 /// 1.0 `NCName` that does not start with `xml` in any case.
 pub(crate) fn is_plain_name(name: &str) -> bool {
     let mut chars = name.chars();
-    chars.next().is_some_and(is_name_start)
-        && chars.all(is_name_char)
+    chars.next().is_some_and(xml_name::is_start)
+        && chars.all(xml_name::is_continue)
         && !name
             .get(..3)
             .is_some_and(|prefix| prefix.eq_ignore_ascii_case("xml"))
-}
-
-const fn is_name_start(c: char) -> bool {
-    matches!(c,
-        'A'..='Z' | '_' | 'a'..='z'
-        | '\u{C0}'..='\u{D6}' | '\u{D8}'..='\u{F6}' | '\u{F8}'..='\u{2FF}'
-        | '\u{370}'..='\u{37D}' | '\u{37F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}'
-        | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
-        | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
-}
-
-const fn is_name_char(c: char) -> bool {
-    is_name_start(c)
-        || matches!(c,
-            '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}')
 }
 
 /// Writes `text` as the content of a double-quoted attribute value.

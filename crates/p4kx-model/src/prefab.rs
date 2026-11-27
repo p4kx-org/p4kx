@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
+use std::borrow::Cow;
 
 use p4kx_cryxml::{CryXmlError, Xml};
 use thiserror::Error;
 
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
-use crate::soc_entities::entity_transform;
+use crate::prefab_diagnostic::PrefabParseFailure;
+use crate::prefab_entity_links::PrefabEntityLinkGroup;
+use crate::prefab_guid_remapping::PrefabGuidRemapping;
+use crate::prefab_objects;
+use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
 
 /// The most prefabs one library lists.
 pub const MAX_LIBRARY_PREFABS: usize = 1 << 16;
@@ -57,6 +61,8 @@ pub struct PrefabRef {
     /// The `PrefabName`: the library name and the prefab name joined by `.`, e.g.
     /// `pu/derelict/components.visual.flare`; empty when it names none.
     pub name: String,
+    /// Authored `GUIDRemapping` blocks and their pairs in file order.
+    pub guid_remapping_blocks: Vec<Vec<PrefabGuidRemapping>>,
 }
 
 /// An object of a prefab, placed in the prefab's space.
@@ -79,6 +85,8 @@ pub struct PrefabObject {
     pub transform: Transform,
     /// The prefab the object instances, for an object of type `Prefab`.
     pub nested: Option<PrefabRef>,
+    /// Direct authored `EntityLinks` groups in their original order.
+    pub entity_links: Box<[PrefabEntityLinkGroup]>,
     /// Whether the object is attached to another object (`Parent` other than its group, or an
     /// `AttachmentTarget`), in which case its transform is relative to that attachment and not
     /// to the prefab.
@@ -121,15 +129,39 @@ impl PrefabLibrary {
     /// Returns [`PrefabError`] when the file is neither, its root is no `PrefabsLibrary` or it
     /// lists more prefabs or objects than are read.
     pub fn parse(bytes: &[u8]) -> Result<Self, PrefabError> {
-        match p4kx_cryxml::read(bytes)? {
-            Xml::CryXml(document) => library(document.root()),
-            Xml::Text(text) => {
-                let text = String::from_utf8_lossy(text);
-                p4kx_cryxml::check_text_depth(&text)?;
-                let document = roxmltree::Document::parse(&text)?;
-                library(document.root_element())
-            }
-        }
+        parse_library(bytes, PrefabParseMode::ValuesOnly)
+            .map(|parsed| parsed.library)
+            .map_err(PrefabParseFailure::into_error)
+    }
+
+    /// Reads the library and the positions of its original fields.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::parse`].
+    pub fn parse_positioned(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
+        parse_library(bytes, PrefabParseMode::Positions).map_err(PrefabParseFailure::into_error)
+    }
+
+    /// Reads the library with original field and flattened object coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::parse`].
+    pub fn parse_positioned_objects(bytes: &[u8]) -> Result<PositionedPrefabLibrary, PrefabError> {
+        parse_library(bytes, PrefabParseMode::Objects).map_err(PrefabParseFailure::into_error)
+    }
+
+    /// Reads a library and retains original values used by a failed-read diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original Prefab parse error and any retained diagnostic source.
+    pub fn parse_observed(
+        bytes: &[u8],
+        mode: PrefabParseMode,
+    ) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
+        parse_library(bytes, mode)
     }
 
     /// Returns the first prefab named `name`, ignoring case.
@@ -141,205 +173,102 @@ impl PrefabLibrary {
     }
 }
 
-fn library<'a>(root: impl XmlElement<'a>) -> Result<PrefabLibrary, PrefabError> {
+/// Selects the original position data kept for a successful Prefab parse.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum PrefabParseMode {
+    /// Keep the parsed values.
+    ValuesOnly,
+    /// Keep library and Prefab row positions.
+    Positions,
+    /// Keep those positions and the surviving objects' original fields.
+    Objects,
+}
+
+impl PrefabParseMode {
+    const fn omit_if_repaired(self, repaired: bool) -> Self {
+        if repaired { Self::ValuesOnly } else { self }
+    }
+}
+
+fn parse_library(
+    bytes: &[u8],
+    capture: PrefabParseMode,
+) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
+    match p4kx_cryxml::read(bytes).map_err(PrefabError::from)? {
+        Xml::CryXml(document) => library(document.root(), capture, document.is_lossy()),
+        Xml::Text(text) => {
+            let text = String::from_utf8_lossy(text);
+            p4kx_cryxml::check_text_depth(&text).map_err(PrefabError::from)?;
+            let document = roxmltree::Document::parse(&text).map_err(PrefabError::from)?;
+            library(
+                document.root_element(),
+                capture,
+                matches!(text, Cow::Owned(_)),
+            )
+        }
+    }
+}
+
+fn library<'a>(
+    root: impl XmlElement<'a>,
+    capture: PrefabParseMode,
+    repaired: bool,
+) -> Result<PositionedPrefabLibrary, PrefabParseFailure> {
     let is_library = root.name().eq_ignore_ascii_case("PrefabsLibrary")
         || root
             .children()
             .any(|element| element.name().eq_ignore_ascii_case("Prefab"));
     if !is_library {
-        return Err(PrefabError::NotLibrary {
-            found: root.name().to_owned(),
-        });
+        return Err(PrefabParseFailure::root_name(
+            root.name(),
+            (!repaired).then(|| root.position()),
+        ));
     }
-    let mut result = PrefabLibrary {
-        name: Some(attribute(root, "Name"))
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| root.name().to_owned()),
+    let capture = capture.omit_if_repaired(repaired);
+    let authored_name = root
+        .attribute("Name")
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let mut library = PrefabLibrary {
+        name: authored_name.unwrap_or_else(|| root.name()).to_owned(),
         prefabs: Vec::new(),
     };
-    let mut objects = 0_usize;
+    let mut source = match capture {
+        PrefabParseMode::Positions | PrefabParseMode::Objects => {
+            PrefabLibrarySource::new(root, authored_name)
+        }
+        PrefabParseMode::ValuesOnly => None,
+    };
+    let mut total_objects = 0_usize;
     for element in root.children() {
         if !element.name().eq_ignore_ascii_case("Prefab") {
             continue;
         }
-        if result.prefabs.len() >= MAX_LIBRARY_PREFABS {
+        if library.prefabs.len() >= MAX_LIBRARY_PREFABS {
             return Err(PrefabError::TooMany {
                 what: "prefabs",
                 limit: MAX_LIBRARY_PREFABS,
-            });
+            }
+            .into());
         }
-        result.prefabs.push(read_prefab(element, &mut objects)?);
-    }
-    Ok(result)
-}
-
-fn attribute<'a>(element: impl XmlElement<'a>, name: &str) -> String {
-    element
-        .attribute(name)
-        .unwrap_or_default()
-        .trim()
-        .to_owned()
-}
-
-fn child<'a, E: XmlElement<'a>>(parent: E, name: &str) -> Option<E> {
-    parent
-        .children()
-        .find(|element| element.name().eq_ignore_ascii_case(name))
-}
-
-fn is_object<'a>(element: impl XmlElement<'a>) -> bool {
-    element.name().eq_ignore_ascii_case("Object")
-}
-
-struct Pending<E> {
-    element: E,
-    group: Transform,
-    group_id: Arc<str>,
-    depth: usize,
-}
-
-fn push_members<'a, E: XmlElement<'a>>(
-    stack: &mut Vec<Pending<E>>,
-    parent: E,
-    group: Transform,
-    group_id: &Arc<str>,
-    depth: usize,
-) {
-    let at = stack.len();
-    stack.extend(
-        parent
-            .children()
-            .filter(|member| is_object(*member))
-            .map(|element| Pending {
-                element,
-                group,
-                group_id: Arc::clone(group_id),
-                depth,
-            }),
-    );
-    if let Some(added) = stack.get_mut(at..) {
-        added.reverse();
-    }
-}
-
-fn read_prefab<'a, E: XmlElement<'a>>(
-    element: E,
-    total: &mut usize,
-) -> Result<Prefab, PrefabError> {
-    let mut prefab = Prefab {
-        name: attribute(element, "Name"),
-        id: attribute(element, "Id"),
-        library: attribute(element, "Library"),
-        objects: Vec::new(),
-        invalid: 0,
-    };
-    let Some(objects) = child(element, "Objects") else {
-        return Ok(prefab);
-    };
-    let mut stack = Vec::new();
-    push_members(&mut stack, objects, Transform::IDENTITY, &Arc::from(""), 0);
-    while let Some(pending) = stack.pop() {
-        *total += 1;
-        if *total > MAX_LIBRARY_OBJECTS {
-            return Err(PrefabError::TooMany {
-                what: "objects",
-                limit: MAX_LIBRARY_OBJECTS,
-            });
-        }
-        let Some(local) = entity_transform(pending.element) else {
-            prefab.invalid += 1 + count_below(pending.element);
-            continue;
+        let objects = prefab_objects::child(element, "Objects");
+        let mut row = source.as_ref().map(|_| PrefabSource::new(element, objects));
+        let object_sources = match capture {
+            PrefabParseMode::Objects => row
+                .as_mut()
+                .map(|row| row.object_sources.insert(Vec::new())),
+            PrefabParseMode::ValuesOnly | PrefabParseMode::Positions => None,
         };
-        let world = pending.group.then(&local);
-        let kind = attribute(pending.element, "Type");
-        let id: Arc<str> = Arc::from(attribute(pending.element, "Id"));
-        if let Some(members) = child(pending.element, "Objects") {
-            if pending.depth + 1 >= MAX_GROUP_DEPTH {
-                prefab.invalid += count_below(pending.element);
-            } else {
-                push_members(&mut stack, members, world, &id, pending.depth + 1);
-            }
-        }
-        if !kind.eq_ignore_ascii_case("Group") {
-            prefab.objects.push(read_object(
-                pending.element,
-                kind,
-                &id,
-                world,
-                &pending.group_id,
-            ));
+        library.prefabs.push(prefab_objects::read(
+            element,
+            objects,
+            &mut total_objects,
+            object_sources,
+        )?);
+        if let (Some(source), Some(row)) = (&mut source, row) {
+            source.prefabs.push(row);
         }
     }
-    Ok(prefab)
-}
-
-fn count_below<'a>(element: impl XmlElement<'a>) -> usize {
-    let mut count = 0;
-    let mut stack = vec![element];
-    while let Some(parent) = stack.pop() {
-        for members in parent
-            .children()
-            .filter(|node| node.name().eq_ignore_ascii_case("Objects"))
-        {
-            for member in members.children().filter(|node| is_object(*node)) {
-                count += 1;
-                stack.push(member);
-            }
-        }
-    }
-    count
-}
-
-fn read_object<'a>(
-    element: impl XmlElement<'a>,
-    kind: String,
-    id: &str,
-    transform: Transform,
-    group_id: &str,
-) -> PrefabObject {
-    let nested = kind.eq_ignore_ascii_case("Prefab").then(|| PrefabRef {
-        guid: attribute(element, "PrefabGUID"),
-        name: attribute(element, "PrefabName"),
-    });
-    let parent = attribute(element, "Parent");
-    let attached = (!parent.is_empty() && !parent.eq_ignore_ascii_case(group_id))
-        || !attribute(element, "AttachmentTarget").is_empty();
-    PrefabObject {
-        name: attribute(element, "Name"),
-        model: model(element, &kind),
-        kind,
-        id: id.to_owned(),
-        class: attribute(element, "EntityClass"),
-        transform,
-        nested,
-        attached,
-    }
-}
-
-fn model<'a>(element: impl XmlElement<'a>, kind: &str) -> Option<String> {
-    let named = |name: &str| {
-        element
-            .attribute(name)
-            .map(str::trim)
-            .filter(|path| !path.is_empty())
-            .map(str::to_owned)
-    };
-    if kind.eq_ignore_ascii_case("Brush") {
-        return named("Prefab");
-    }
-    named("Geometry").or_else(|| resource_geometry(element))
-}
-
-fn resource_geometry<'a, E: XmlElement<'a>>(element: E) -> Option<String> {
-    let mut node = child(
-        child(element, "PropertiesDataCore")?,
-        "EntityGeometryResource",
-    )?;
-    for _ in 0..3 {
-        node = child(node, "Geometry")?;
-    }
-    node.attribute("path")
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .map(str::to_owned)
+    Ok(PositionedPrefabLibrary { library, source })
 }

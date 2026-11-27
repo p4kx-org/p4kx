@@ -4,9 +4,10 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::{self, Write};
+use std::ops::Range;
 
 use crate::Value;
-use crate::flat_cells::{CSV_BYTE_ORDER_MARK, write_csv_cell};
+use crate::flat_cells::{self, CSV_BYTE_ORDER_MARK, CsvCellMode};
 use crate::value_json::{write_json_string, write_json_value};
 
 /// The heading of the first column of every Query result, the record path.
@@ -24,6 +25,19 @@ pub enum ResultFormat {
     CsvRaw,
     /// One line of JSON: an array with one object per row, keyed by column.
     Json,
+    /// CSV with RFC 4180 ASCII fields, CRLF rows and no byte order mark.
+    CsvStrict,
+}
+
+impl ResultFormat {
+    const fn csv_mode(self) -> Option<CsvCellMode> {
+        match self {
+            Self::Csv => Some(CsvCellMode::Spreadsheet),
+            Self::CsvRaw => Some(CsvCellMode::Raw),
+            Self::CsvStrict => Some(CsvCellMode::Strict),
+            Self::Json => None,
+        }
+    }
 }
 
 /// Writes a Query result row by row in a [`ResultFormat`], holding no more than one row.
@@ -43,7 +57,7 @@ impl<W: Write> ResultWriter<W> {
     ///
     /// # Errors
     ///
-    /// Returns the [`io::Error`] of writing to `out`.
+    /// Returns an I/O error or [`io::ErrorKind::InvalidData`] for unsupported strict CSV headings.
     pub fn new(out: W, format: ResultFormat, columns: &[String]) -> io::Result<Self> {
         let mut writer = Self {
             out,
@@ -53,33 +67,30 @@ impl<W: Write> ResultWriter<W> {
             rows: 0,
             text: String::new(),
         };
-        match format {
-            ResultFormat::Csv | ResultFormat::CsvRaw => {
-                if format == ResultFormat::Csv {
-                    writer.out.write_all(CSV_BYTE_ORDER_MARK)?;
-                }
-                writer.csv_field(RECORD_PATH_COLUMN, true)?;
-                for column in columns {
-                    writer.out.write_all(b",")?;
-                    writer.csv_field(column, true)?;
-                }
-                writer.out.write_all(b"\r\n")?;
+        if let Some(mode) = format.csv_mode() {
+            if mode == CsvCellMode::Spreadsheet {
+                writer.out.write_all(CSV_BYTE_ORDER_MARK)?;
             }
-            ResultFormat::Json => {
-                let mut seen = HashSet::from([RECORD_PATH_COLUMN]);
-                for column in columns {
-                    let key = if seen.insert(column.as_str()) {
-                        let mut key = Vec::new();
-                        write_json_string(&mut key, column)?;
-                        key.push(b':');
-                        Some(key)
-                    } else {
-                        None
-                    };
-                    writer.keys.push(key);
-                }
-                writer.out.write_all(b"[")?;
+            flat_cells::write_csv_cell_with_mode(&mut writer.out, RECORD_PATH_COLUMN, mode)?;
+            for column in columns {
+                writer.out.write_all(b",")?;
+                flat_cells::write_csv_cell_with_mode(&mut writer.out, column, mode)?;
             }
+            writer.out.write_all(b"\r\n")?;
+        } else {
+            let mut seen = HashSet::from([RECORD_PATH_COLUMN]);
+            for column in columns {
+                let key = if seen.insert(column.as_str()) {
+                    let mut key = Vec::new();
+                    write_json_string(&mut key, column)?;
+                    key.push(b':');
+                    Some(key)
+                } else {
+                    None
+                };
+                writer.keys.push(key);
+            }
+            writer.out.write_all(b"[")?;
         }
         Ok(writer)
     }
@@ -90,14 +101,52 @@ impl<W: Write> ResultWriter<W> {
     ///
     /// # Errors
     ///
-    /// Returns the [`io::Error`] of writing to `out`.
+    /// Returns an I/O error or [`io::ErrorKind::InvalidData`] for unsupported strict CSV data.
     pub fn write_row(&mut self, record_path: &str, cells: &[Option<Value<'_>>]) -> io::Result<()> {
-        match self.format {
-            ResultFormat::Csv | ResultFormat::CsvRaw => self.csv_row(record_path, cells)?,
-            ResultFormat::Json => self.json_row(record_path, cells)?,
+        if let Some(mode) = self.format.csv_mode() {
+            self.csv_row(record_path, cells, mode, |_, _| {})?;
+        } else {
+            self.json_row(record_path, cells)?;
         }
         self.rows = self.rows.saturating_add(1);
         Ok(())
+    }
+
+    /// Writes a CSV row and reports the exact byte interval for each field in column order.
+    ///
+    /// # Errors
+    /// Returns a write error or invalid data when the selected format is not CSV.
+    pub fn write_csv_row_observed(
+        &mut self,
+        record_path: &str,
+        cells: &[Option<Value<'_>>],
+        position: impl Fn(&W) -> u64,
+        mut field: impl FnMut(Range<u64>),
+    ) -> io::Result<()> {
+        let mode = self.format.csv_mode().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "observed CSV row requires CSV format",
+            )
+        })?;
+        let mut start = position(&self.out);
+        self.csv_row(record_path, cells, mode, |start_of_field, writer| {
+            if start_of_field {
+                start = position(writer);
+            } else {
+                field(start..position(writer));
+            }
+        })?;
+        self.rows = self.rows.saturating_add(1);
+        Ok(())
+    }
+
+    /// Returns the column positions the JSON row writer retains.
+    pub fn json_columns(&self) -> impl Iterator<Item = usize> + '_ {
+        self.keys
+            .iter()
+            .enumerate()
+            .filter_map(|(index, key)| key.as_ref().map(|_| index))
     }
 
     /// Returns the number of rows written.
@@ -125,10 +174,19 @@ impl<W: Write> ResultWriter<W> {
         Ok(self.out)
     }
 
-    fn csv_row(&mut self, record_path: &str, cells: &[Option<Value<'_>>]) -> io::Result<()> {
-        self.csv_field(record_path, true)?;
+    fn csv_row(
+        &mut self,
+        record_path: &str,
+        cells: &[Option<Value<'_>>],
+        mode: CsvCellMode,
+        mut boundary: impl FnMut(bool, &W),
+    ) -> io::Result<()> {
+        boundary(true, &self.out);
+        flat_cells::write_csv_cell_with_mode(&mut self.out, record_path, mode)?;
+        boundary(false, &self.out);
         for index in 0..self.columns {
             self.out.write_all(b",")?;
+            boundary(true, &self.out);
             if let Some(Some(value)) = cells.get(index) {
                 let mut text = std::mem::take(&mut self.text);
                 text.clear();
@@ -145,21 +203,21 @@ impl<W: Write> ResultWriter<W> {
                     write!(text, "{value}")
                         .map_err(|_| io::Error::other("a value cannot be formatted"))
                 };
-                let is_text = matches!(value, Value::String(_) | Value::Locale(_) | Value::Enum(_));
-                let written = formatted.and_then(|()| self.csv_field(&text, is_text));
+                let cell_mode = match value {
+                    Value::String(_) | Value::Locale(_) | Value::Enum(_) => mode,
+                    _ => mode.verbatim(),
+                };
+                let written = formatted.and_then(|()| {
+                    flat_cells::write_csv_cell_with_mode(&mut self.out, &text, cell_mode)
+                });
                 self.text = text;
                 written?;
+            } else {
+                flat_cells::write_csv_cell_with_mode(&mut self.out, "", mode)?;
             }
+            boundary(false, &self.out);
         }
         self.out.write_all(b"\r\n")
-    }
-
-    fn csv_field(&mut self, text: &str, is_text: bool) -> io::Result<()> {
-        write_csv_cell(
-            &mut self.out,
-            text,
-            is_text && self.format == ResultFormat::Csv,
-        )
     }
 
     fn json_row(&mut self, record_path: &str, cells: &[Option<Value<'_>>]) -> io::Result<()> {

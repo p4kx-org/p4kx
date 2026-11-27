@@ -99,12 +99,11 @@ pub(crate) fn geometry_component(
         .collect();
     let node =
         geometry_node("", path, material, palette).value("SubGeometry", TestValue::Array(subs));
-    let mut component =
-        TestInstance::new("SGeometryResourceParams").value("Geometry", TestValue::Struct(node));
-    if !choices.is_empty() {
-        component = component.value("Material", material_tree(choices));
-    }
-    TestValue::Struct(component)
+    TestValue::Struct(
+        TestInstance::new("SGeometryResourceParams")
+            .value("Geometry", TestValue::Struct(node))
+            .value("Material", material_tree(choices)),
+    )
 }
 
 pub(crate) fn vehicle_structs() -> Vec<TestStruct> {

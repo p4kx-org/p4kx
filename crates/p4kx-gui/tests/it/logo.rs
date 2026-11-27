@@ -101,14 +101,14 @@ fn the_svg_files_carry_the_geometry_and_only_theme_colours() -> TestResult {
     let mark = std::fs::read_to_string(design("p4kx-mark.svg"))?;
 
     let mut with_tile = drawing.clone();
-    with_tile.insert(hex(palette::CANVAS));
+    with_tile.insert(hex(palette::BRAND_TILE));
     assert_eq!(colours_of(&tile), with_tile, "tile colours");
     assert_eq!(colours_of(&mark), drawing, "mark colours");
     let side = logo::VIEW_BOX;
     let rect = format!(
         r#"<rect width="{side}" height="{side}" rx="{}" fill="{}"/>"#,
         logo::TILE_RADIUS,
-        hex(palette::CANVAS)
+        hex(palette::BRAND_TILE)
     );
     assert!(tile.contains(&rect), "tile");
     for svg in [&tile, &mark] {
@@ -300,7 +300,7 @@ fn the_header_shows_the_mark_before_the_wordmark() -> TestResult {
 fn draw_social_preview(ui: &Ui, texture: &TextureHandle) {
     let area = ui.ctx().content_rect();
     let painter = ui.painter();
-    painter.rect_filled(area, CornerRadius::ZERO, palette::CANVAS);
+    painter.rect_filled(area, CornerRadius::ZERO, palette::BRAND_TILE);
     let side = f32::from(SOCIAL_MARK);
     let galley = painter.layout_no_wrap(
         "P4KX".to_owned(),
@@ -353,9 +353,9 @@ fn the_social_preview_is_the_mark_and_the_wordmark_on_canvas() -> TestResult {
     assert_eq!(
         image.get_pixel(2, 2).0,
         [
-            palette::CANVAS.r(),
-            palette::CANVAS.g(),
-            palette::CANVAS.b(),
+            palette::BRAND_TILE.r(),
+            palette::BRAND_TILE.g(),
+            palette::BRAND_TILE.b(),
             255
         ],
         "canvas ground"

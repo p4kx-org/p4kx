@@ -1,19 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 
 /// A mining laser, raw facts of `SEntityComponentMiningLaserParams` (ADR-0262).
 ///
 /// The beams are fire modes of `weapon.fireActions`: their `hitType`, `fullDamageRange`,
 /// `zeroDamageRange` and `damagePerSecond`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct MiningLaserStats {
     /// `miningLaserModifiers.isOptimalRateGood`.
     pub(crate) is_optimal_rate_good: Option<bool>,
@@ -34,9 +31,8 @@ pub(crate) struct MiningLaserStats {
 /// The modifiers of a `MiningLaserModifiers` struct, each the `value` of a
 /// `FloatModifierMultiplicative` as stored, in percent; `null` for a modifier the struct leaves
 /// unset.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct MiningModifierValues {
     /// `laserInstability`.
     pub(crate) instability: Option<f32>,
@@ -56,9 +52,8 @@ pub(crate) struct MiningModifierValues {
 
 /// A mining module or gadget, raw facts of the `EntityComponentAttachableModifierParams` that
 /// holds a mining modifier (ADR-0262).
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct MiningModifierStats<'a> {
     /// `activationMethod`, e.g. `ActivateOnAttach` for a passive module and `ActivateOnDemand`
     /// for an active module or a gadget. A closed set the game may extend; the schema keeps a
@@ -82,9 +77,8 @@ pub(crate) struct MiningModifierStats<'a> {
 
 /// The mining modifiers one `ItemMiningModifierParams` or `ItemMineableRockModifierParams`
 /// applies.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct MiningEffect {
     /// `modifierLifetime.lifetime`, in seconds; `null` for a modifier that lasts.
     pub(crate) lifetime: Option<f32>,
@@ -95,9 +89,8 @@ pub(crate) struct MiningEffect {
 }
 
 /// The filter change of a `MiningFilterItemModifierParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct FilterEffect {
     /// `modifierLifetime.lifetime`, in seconds; `null` for a modifier that lasts.
     pub(crate) lifetime: Option<f32>,
@@ -106,9 +99,8 @@ pub(crate) struct FilterEffect {
 }
 
 /// The damage multiplier an `ItemWeaponModifiersParams` applies to one fire action of the laser.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct FireActionModifier {
     /// `fireActionIndex`, the index into the laser's `fireActions` as stored.
     pub(crate) fire_action_index: Option<i64>,

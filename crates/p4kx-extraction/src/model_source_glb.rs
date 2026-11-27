@@ -6,12 +6,17 @@ use std::path::Path;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, TextureLoader};
 
 use crate::model_observed::{Observed, is_cancelled};
-use crate::model_source::ModelSource;
+use crate::model_source::{ArchiveDefaultMaterial, ModelSource};
 use crate::model_textures::ArchiveTextures;
-use crate::output_file::{write_error, write_replacing};
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::texture_parts::is_same_file;
 use crate::{AnimationSet, CancelToken, ConversionError};
+
+#[path = "model_source_glb_receipt.rs"]
+mod receipt;
+
+pub use receipt::GlbGeometryPublication;
 
 impl ModelSource {
     /// Writes the model as a GLB file to `out`, replacing it; the file is written under a
@@ -114,39 +119,48 @@ impl ModelSource {
         cancel: &CancelToken,
         progress: &dyn Fn(u64, u64),
     ) -> Result<GlbSummary, ConversionError> {
+        self.refuse_glb_input(out, animations)?;
+        if cancel.is_cancelled() {
+            return Err(ConversionError::Cancelled);
+        }
+        write_replacing_protected(out, self.protection.context()?, Some(cancel), |writer| {
+            let mut observed = Observed::new(writer, cancel, progress);
+            let fallback = self
+                .default_material()
+                .and_then(ArchiveDefaultMaterial::material);
+            let written = p4kx_gltf::write_glb_animated_with_fallback(
+                self.model(),
+                &animations.animations,
+                options,
+                textures,
+                fallback,
+                &mut observed,
+            );
+            written.map_err(|error| self.glb_write_error(out, error))
+        })
+    }
+
+    pub(super) fn refuse_glb_input(
+        &self,
+        out: &Path,
+        animations: &AnimationSet,
+    ) -> Result<(), ConversionError> {
         if is_same_file(out, self.inputs().iter().chain(&animations.inputs).cloned()) {
             return Err(ConversionError::OutputIsInput {
                 path: out.to_path_buf(),
             });
         }
-        if cancel.is_cancelled() {
-            return Err(ConversionError::Cancelled);
+        Ok(())
+    }
+
+    pub(super) fn glb_write_error(&self, out: &Path, error: GltfError) -> ConversionError {
+        match error {
+            GltfError::Write(source) if is_cancelled(&source) => ConversionError::Cancelled,
+            GltfError::Write(source) => write_error(out, source),
+            source => ConversionError::Glb {
+                file: self.name().to_owned(),
+                source,
+            },
         }
-        write_replacing(out, |writer| {
-            let mut observed = Observed::new(writer, cancel, progress);
-            let written = match textures {
-                Some(textures) => p4kx_gltf::write_glb_animated_with(
-                    self.model(),
-                    &animations.animations,
-                    options,
-                    textures,
-                    &mut observed,
-                ),
-                None => p4kx_gltf::write_glb_animated(
-                    self.model(),
-                    &animations.animations,
-                    options,
-                    &mut observed,
-                ),
-            };
-            written.map_err(|error| match error {
-                GltfError::Write(source) if is_cancelled(&source) => ConversionError::Cancelled,
-                GltfError::Write(source) => write_error(out, source),
-                source => ConversionError::Glb {
-                    file: self.name().to_owned(),
-                    source,
-                },
-            })
-        })
     }
 }

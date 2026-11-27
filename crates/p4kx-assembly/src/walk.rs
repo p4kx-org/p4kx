@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::LoadoutTargetGuid;
 use p4kx_dataforge::Guid;
 
 use crate::plan::Plan;
-use crate::{LoadoutError, MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS};
+use crate::{LoadoutError, MAX_LOADOUT_DEPTH};
 
-/// The state of one resolution: the Entities on the current branch, the ports so far and the
-/// changes being applied.
+/// The Entities on the current branch, nested Loadout levels and changes being applied.
 pub(crate) struct Walk {
     pub(crate) ancestors: Vec<Guid>,
     pub(crate) nesting: usize,
-    ports: usize,
     pub(crate) plan: Option<Plan>,
     pub(crate) cancellable: bool,
 }
@@ -21,7 +20,6 @@ impl Walk {
         Self {
             ancestors: vec![root],
             nesting: 0,
-            ports: 0,
             plan,
             cancellable: false,
         }
@@ -58,20 +56,12 @@ impl Walk {
         self.ancestors.len().saturating_add(self.nesting)
     }
 
-    /// Counts one more port, or returns `false` when the tree already holds
-    /// [`MAX_LOADOUT_PORTS`].
-    pub(crate) const fn reserve(&mut self) -> bool {
-        if self.ports >= MAX_LOADOUT_PORTS {
-            return false;
-        }
-        self.ports = self.ports.saturating_add(1);
-        true
-    }
-
     /// Returns why the Entity `guid` may not be attached below the current branch, if it may not.
     pub(crate) fn limit(&self, guid: Guid) -> Option<LoadoutError> {
         if self.ancestors.contains(&guid) {
-            Some(LoadoutError::Cycle { guid })
+            Some(LoadoutError::Cycle {
+                guid: LoadoutTargetGuid::unbound(guid),
+            })
         } else if self.depth() > MAX_LOADOUT_DEPTH {
             Some(LoadoutError::TooDeep)
         } else {

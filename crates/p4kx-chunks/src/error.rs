@@ -9,6 +9,9 @@ use crate::Container;
 /// A failure to read a chunk file.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ChunkError {
+    /// The validated table cannot be allocated.
+    #[error("cannot allocate the chunk table")]
+    Allocation,
     /// The file starts with neither `#ivo` nor `CrCh`.
     #[error("not a chunk file: the signature is \"{}\", not \"#ivo\" or \"CrCh\"", signature.escape_ascii())]
     UnknownSignature {

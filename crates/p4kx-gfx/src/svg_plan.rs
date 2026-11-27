@@ -43,6 +43,7 @@ pub(crate) struct Group {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Drawn {
     pub(crate) group: usize,
+    pub(crate) ordinal: usize,
     pub(crate) transform: Affine,
     pub(crate) mask: Option<usize>,
 }
@@ -91,8 +92,8 @@ impl Plan {
             layers: Vec::new(),
             exhausted: false,
         };
-        for item in &inputs.scene.items {
-            builder.item(item);
+        for (ordinal, item) in inputs.scene.items.iter().enumerate() {
+            builder.item(ordinal, item);
             if builder.exhausted {
                 break;
             }
@@ -125,7 +126,7 @@ impl Builder<'_> {
         }
     }
 
-    fn item(&mut self, item: &SceneItem) {
+    fn item(&mut self, ordinal: usize, item: &SceneItem) {
         let mask = match item.mask {
             Some(index) => match self.charge_mask(index) {
                 Ok(()) => Some(index),
@@ -171,10 +172,10 @@ impl Builder<'_> {
                 Err(reason) => self.skip(item, reason),
             }
         }
-        self.place(item, mask);
+        self.place(ordinal, item, mask);
     }
 
-    fn place(&mut self, item: &SceneItem, mask: Option<usize>) {
+    fn place(&mut self, ordinal: usize, item: &SceneItem, mask: Option<usize>) {
         if self.layers.is_empty() {
             return;
         }
@@ -199,6 +200,7 @@ impl Builder<'_> {
         });
         self.plan.drawn.push(Drawn {
             group,
+            ordinal,
             transform: item.transform,
             mask,
         });

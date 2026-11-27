@@ -49,7 +49,9 @@ ihren Teilen; ein Teil in einem anderen Ordner als sein Kopf gehört zur Ansicht
 ADR-0023). Keine
 neuen Maße (`tableRow.textureGroup` im JSON der Spec nennt die benutzten).
 
-**D.27 Scrollflächen der Vorschau und des Vergleichs rollen mit der Tastatur.** egui rollt eine
+**D.27 Scrollflächen der Vorschau und des Vergleichs rollen mit der Tastatur.** In der
+DataForge-Zusammenfassung zeigt der vorhandene Tooltip die Verschlüsselungsherkunft je Header-Wert
+und Tabellenzelle. egui rollt eine
 `ScrollArea` nur mit Maus und Rad; ohne Tastenbehandlung käme ein Tastaturnutzer über die erste
 Bildschirmseite nicht hinaus. Deshalb ist jede lange Fläche eine fokussierbare Rollfläche
 (`widgets::scroll_region`), wie die Zeilenansicht des XML (D.19): die Tabulatortaste erreicht sie,
@@ -205,7 +207,8 @@ in D.18 in `color-danger-text`, mit dem Namen der WEM („WEM 123 aus Data\Sound
 Hinweises auf Text und Hex, die hier die Bank zeigen. Eine unlesbare Bank steht als Satz in
 `color-danger-text`, eine ohne WEMs als schlichter Satz; das übrige Fenster bleibt bedienbar. Die
 Liste ist eine Tabelle und kein Baum, weil die Bank keine Ebenen kennt; Ereignisse und Auslöser
-gehören zur Auflösung der Sounds (M11).
+gehören zur Auflösung der Sounds (M11). Die vorhandenen Tooltips zeigen die Verschlüsselungsherkunft
+von Pfad, Größe und Anzahl der WEMs, je Tabellenzeile und in der Faktenleiste der gewählten WEM.
 
 **D.34 Reiter „Referenziert von" listet die verweisenden Records.** Ist ein Record gewählt, steht
 nach „Record" ein weiterer Reiter der Vorschau-Leiste (D.1 Tab-Leiste, 44 px, gleiche Beschriftung
@@ -526,7 +529,11 @@ Dessen Gruppe „Ausgabe" steht mit der Segmentgruppe „Detailstufe" in einer Z
 „Blender-Paket". Bei „Blender-Paket" steht darunter der Hinweis in `color-gray-2-text` (Größe `FS_XS`), entfallen
 die Materialien (ein Paket enthält immer die Texturen), bleiben Texturgröße, Vertex-Farben und Interior,
 und die Gruppe „Datei" wird zur Gruppe „Paketordner" mit demselben Pfadfeld und „Ordner wählen …"
-(Ordnerdialog des Systems). Der gewählte Ordner ist das Paket selbst. Er darf neu, leer oder ein früheres
+(Ordnerdialog des Systems). Außerhalb Flatpaks ist der gewählte Ordner das Paket selbst.
+Unter Flatpak führt diese Aktion zur gemeinsamen Zielauswahl aus D.20: Der Systemdialog wählt
+den übergeordneten Ordner; ein einzelner Paketname bestimmt darin den Paketordner. Dadurch liegen
+Paket und die Geschwister für Aufbau und Austausch im gewählten Elternordner. Die Anzeige des
+vollständigen Paketpfads verhindert eine Verwechslung von Eltern- und Paketordner. Er darf neu, leer oder ein früheres
 Paket von P4KX sein; ein früheres Paket meldet der Dialog in `color-warning` („wird ersetzt, sobald das neue
 vollständig ist"), und es bleibt bis dahin und bei Abbruch oder Fehler unberührt. Ein Ordner mit anderem
 Inhalt und ein Pfad ohne Ordnernamen sind eine Gefahrenmeldung (`danger-alert`, `color-gray-1`) und sperren
@@ -556,8 +563,11 @@ geändertes Archiv bricht sie ab. Darunter steht ein verstellbares Feld mit den 
 „Ausgelassen", jedes mit seiner Zahl. „Inhalt" zeigt eine Faktenleiste, deren Paare aus Name und Wert nicht
 umbrechen, und die Zeilen der Teile (Art in `color-gray-2-text`, Zeilenhöhe `rowHeight`); „Ausgelassen"
 zeigt die Zahlen und die Zeilen dessen, was der Renderer übersprang, ohne Wirkung zeichnete, ausließ oder
-nicht lesen konnte, in den Worten von `p4kx ui render`, bis `reportMaxLines`. „Exportieren …" öffnet den
-Speichern-Dialog des Systems mit dem vorgeschlagenen Namen; das Ergebnis steht unter der Leiste in
+nicht lesen konnte, in den Worten von `p4kx ui render`, bis `reportMaxLines`. Bei Bildschirmen folgt
+„Ausgelassene Inhalte" mit einer scrollbaren Liste der betroffenen Widgets. Jede Zeile nennt die
+Ursprungsposition im Datensatz, das Feld, die Quelle und den Grund. Abgeschnittene Texte stehen
+vollständig im Tooltip. „Exportieren …" öffnet den Speichern-Dialog des Systems mit dem
+vorgeschlagenen Namen; das Ergebnis steht unter der Leiste in
 `color-success-text`, bei ausgelassenen Elementen in `color-warning`, bei Fehlern in `color-danger-text`, mit
 „Schließen" (`btn-ghost btn-xs`). Das geöffnete Archiv wird nie überschrieben, eine Datei in einer
 Star-Citizen-Installation lehnt der Tab wie die anderen Exporte ab, und hat sich das Archiv während des
@@ -619,6 +629,13 @@ Fensters. Neue Maße gibt es nicht.
 
 **D.57 Fortschritt ohne Messwert läuft unbestimmt, und die Ersetzen-Liste hat benannte Maße.** Das Fortschrittsfenster des Entity-Exports (D.47, D.50) zeigt für jeden Schritt, was er misst, und erfindet keine Anteile: Nur das Lesen des Interiors zählt Container und Modelldateien und füllt die Leiste (`attendance-meter`) von 0 bis 100 %; „Loadout wird aufgelöst", „Modelle werden gelesen" und „Datei wird geschrieben" haben keine bekannte Größe, die Leiste zeigt dort die leere Bahn, über die ein Block in `color-primary` (beim Abbrechen `color-gray-2`) von Anfang bis Ende läuft und neu beginnt (`progressBar.sweepShare` 0,25 der Bahn, `progressBar.sweepPeriodMs` 900, wie eine Drehung des Spinners). Der Dialog „Entity ersetzen" (`entityReplace`) benennt seine zwei bisher eingebauten Maße: `listHeight` 236 (die Höhe der Vorschau, `previewPanel.defaultHeight`; die Liste rollt darin und im Platz des Dialogs) und `headGap` 10 (`modal.bodyGroupGap` / 2, zwischen der Zeile, was der Port aufnimmt, und dem Suchfeld). Neue Farben und Bauteile gibt es nicht.
 
-**D.58 Tabellen des Tabs „Sounds": benannte Spaltenmaße, Trennlinien und Sprachwahl.** Die Spalten der Trigger- und der Sound-Tabelle haben eigene Maße (`soundTables` in `p4kx-desktop-spec.json`, `theme::sound_metrics`) statt geliehener: `SOUND_NAME_COLUMN` (294, gemessen 293,0 für den Beispielnamen von vierzig Zeichen, längere Namen werden abgeschnitten), `SOUND_STATE_COLUMN` (132, gemessen 131,4, der längste Status oder Kopf in Deutsch und Britischem Englisch) und `SOUND_LANGUAGE_COLUMN` (155, gemessen 155,0, `English(US)` mit der Ersatz-Marke; die Namen der Sprachordner sind Daten des Archivs, andere Namen können abgeschnitten werden, die Spalte ist verstellbar); der Test `sound_columns_tests` misst sie wie `audio_tests` die Spalten der Soundbank-Liste. Die Spaltentrenner der Trigger-Tabelle enden über der Fußzeile der Liste wie im Tab „Tags", weil die Tabelle in einem eigenen Bereich steht. Hat das Archiv mehr als einen Sprachordner, steht zwischen den Aktionen und dem Suchfeld der Werkzeugleiste eine umbrechende Zeile mit der Beschriftung „Sprache" und je Sprachordner einem `btn-xs`-Knopf; die gewählte Sprache trägt die gewählten Farben der Steuerelemente (`control-selected-bg`, `-border`, `-fg`) und ist für Hilfstechnik als gewählt ausgewiesen, die übrigen sind `btn-ghost`; `btn-outline` bleibt der Hauptaktion „Sounds anzeigen" vorbehalten. Die Wahl gilt wie `--lang` für die Auflösung und den Export; die Standardsprache bleibt `English(US)` oder der erste Ordner. Neue Farben und Bauteile gibt es nicht; die Maße folgen aus den Zeilenmaßen und der Zellenpolsterung.
+**D.58 Tabellen des Tabs „Sounds": benannte Spaltenmaße, Trennlinien und Sprachwahl.** Die Spalten der Trigger- und der Sound-Tabelle haben eigene Maße (`soundTables` in `p4kx-desktop-spec.json`, `theme::sound_metrics`) statt geliehener: `SOUND_NAME_COLUMN` (294, gemessen 293,0 für den Beispielnamen von vierzig Zeichen, längere Namen werden abgeschnitten), `SOUND_STATE_COLUMN` (132, gemessen 131,4, der längste Status oder Kopf in Deutsch und Britischem Englisch) und `SOUND_LANGUAGE_COLUMN` (155, gemessen 155,0, `English(US)` mit der Ersatz-Marke; die Namen der Sprachordner sind Daten des Archivs, andere Namen können abgeschnitten werden, die Spalte ist verstellbar); der Test `sound_columns_tests` misst sie wie `audio_tests` die Spalten der Soundbank-Liste. Die Spaltentrenner der Trigger-Tabelle enden über der Fußzeile der Liste wie im Tab „Tags", weil die Tabelle in einem eigenen Bereich steht. Hat das Archiv mehr als einen Sprachordner, steht zwischen den Aktionen und dem Suchfeld der Werkzeugleiste eine umbrechende Zeile mit der Beschriftung „Sprache" und je Sprachordner einem `btn-xs`-Knopf; die gewählte Sprache trägt die gewählten Farben der Steuerelemente (`control-selected-bg`, `-border`, `-fg`) und ist für Hilfstechnik als gewählt ausgewiesen, die übrigen sind `btn-ghost`; `btn-outline` bleibt der Hauptaktion „Sounds anzeigen" vorbehalten. Die Wahl gilt wie `--lang` für die Auflösung und den Export; die Standardsprache bleibt `English(US)` oder der erste Ordner. Neue Farben und Bauteile gibt es nicht; die Maße folgen aus den Zeilenmaßen und der Zellenpolsterung. Der vorhandene Tooltip zeigt in der Überschrift, im gewählten Sound und je unterbrochener Verknüpfung die Verschlüsselungsherkunft der einzelnen Werte.
 
 **D.59 Die Arbeitsfläche passt in das kleinste Fenster.** `workSurface.minWidth` sinkt von 720 auf 572: das kleinste Fenster (640) abzüglich der Leiste der eingeklappten Seitenleiste (40), der Bildlaufleiste, die ein niedriges Fenster zeigt (`SCROLLBAR`, 12), und des Rands `space-2` (8) links und rechts im Fenster; das Maß ist aus diesen Konstanten abgeleitet. Bei 640 × 400 rollt die Arbeitsfläche nicht mehr seitwärts, die Knöpfe „Suchen", „Text kopieren", „GUID kopieren" und „Tag-Pfad kopieren" stehen ohne Rollen im Bild (ADR-0235, Ticket #358). `sidebar.collapseWidth` folgt mit 872 (Seitenleiste 300 plus 572). Die Höhe bleibt, wie sie war: `workSurface.minHeight` 480 (aus `browseListMinHeight` 244 plus der Vorschau 236 abgeleitet) und `browseListMinHeight` 244. Die Höhe der zweiten Zeile (`workSurface.wrappedActionsHeight` 56, `toolbar.padding` plus Knopfhöhe) wird nur dann zusätzlich vorgehalten, wenn eine Werkzeugleiste ihre Aktionen tatsächlich umbricht (deutsche Beschriftungen in schmalem Platz): dann behalten der Raum der Arbeitsfläche und die Liste des Tabs „Durchsuchen" je 56 mehr, ein breites Fenster rollt nicht öfter als vorher. Werkzeugleisten, die in 572 nicht in einer Zeile stehen, stellen ihre Aktionen in eine eigene rechtsbündige Zeile, die bei Bedarf umbricht: die drei Extraktions-Knöpfe der Tabs „Durchsuchen" (D.52) und Record-Suche, und der Export des Tabs „Charaktere" unter Detailgrad und Materialien. Die Entry-Tabelle verkleinert die Anfangsbreiten der Spalten Kompression, Verschlüsselung und Größe gleichmäßig, bis sie samt Auswahlspalte und dem Mindestmaß des Namens (160) in den Platz passen. Im Tab „UI" nimmt die Dateiliste höchstens ein Drittel statt der Hälfte der Breite. Neue Farben, Abstände und Bauteile gibt es nicht.
+
+**D.60 Radien nach Rolle und geschützte Ecken.** Die P4KX-Flächenstaffel und die
+rollenbezogenen Radien stehen im [Desktop-Vertrag](desktop-spec.md#flächen-radien-und-kontrast).
+Die innen rechteckig gezeichneten Tabellen und Leisten lassen je 4 px Abstand zu
+den gerundeten Panelkanten. Die daraus berechneten Mindesthöhen betragen 252 px
+für die Browse-Liste und 488 px für die Arbeitsfläche. Die Fensteruntergrenze und
+die Dichte der Datenzeilen richten sich weiterhin nach D.59 und D.1.

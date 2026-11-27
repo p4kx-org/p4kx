@@ -33,11 +33,19 @@ pub enum ImageText {
     Failed,
     /// Shown when every mip is larger than the preview can show; takes `path`.
     Unshowable,
+    /// The rendered pixels of the selected mip.
+    Pixels,
+    /// Source encryption includes a proved encrypted input.
+    OriginEncrypted,
+    /// All contributing inputs are proved unencrypted.
+    OriginPlain,
+    /// Available evidence does not establish the encryption origin.
+    OriginUnknown,
 }
 
 impl ImageText {
     /// Every text of the image preview.
-    pub(crate) const ALL: [Self; 14] = [
+    pub(crate) const ALL: [Self; 18] = [
         Self::Tab,
         Self::Mip,
         Self::Format,
@@ -52,6 +60,10 @@ impl ImageText {
         Self::Unsupported,
         Self::Failed,
         Self::Unshowable,
+        Self::Pixels,
+        Self::OriginEncrypted,
+        Self::OriginPlain,
+        Self::OriginUnknown,
     ];
 
     /// Returns the Fluent message id.
@@ -72,6 +84,10 @@ impl ImageText {
             Self::Unsupported => "image-unsupported",
             Self::Failed => "image-failed",
             Self::Unshowable => "image-unshowable",
+            Self::Pixels => "image-pixels",
+            Self::OriginEncrypted => "image-origin-encrypted",
+            Self::OriginPlain => "image-origin-plain",
+            Self::OriginUnknown => "image-origin-unknown",
         }
     }
 }

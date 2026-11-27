@@ -7,12 +7,14 @@
 
 #[cfg(test)]
 mod fixtures;
+mod model_info_provenance;
 mod paint;
 mod playback;
 mod preview;
 mod preview_animations;
 mod support;
 
+pub use model_info_provenance::ModelInfoProvenance;
 pub(crate) use p4kx_render::{AssemblyDraw, Look, Subject, hidden_mask};
 pub use p4kx_render::{
     AssemblyScene, Bounds, BuildError, BuildOptions, Camera, DrawList, GpuReport, GroupDraw, Hooks,
@@ -26,5 +28,5 @@ pub use paint::install;
 pub(crate) use paint::{paint_callback, release_callback};
 pub use playback::{Control, Playback};
 pub use preview::{MODEL_FILE_LIMIT, ModelPreview, ModelStatus, is_model_path};
-pub use preview_animations::PREVIEW_ANIMATION_BOUNDS;
+pub use preview_animations::{AnimationCountProvenance, PREVIEW_ANIMATION_BOUNDS};
 pub use support::{Problem, ViewerSupport};

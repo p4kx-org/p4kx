@@ -2,14 +2,18 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::ops::Range;
 
 use p4kx_extraction::Value;
-use p4kx_extraction::query::{QueryRun, RECORD_PATH_COLUMN, write_short_text};
+use p4kx_extraction::query::{QueryRun, RECORD_PATH_COLUMN, Row, write_short_text};
 
-use crate::query_rows::{Counts, for_each_row};
+use crate::query_rows::{Counts, RowMode, for_each_row};
+use crate::query_text_position::Positioned;
 
 /// The gap between two columns of the table.
 const GAP: &str = "  ";
+
+type RowObserver<'a> = dyn FnMut(&Row<'_>, &[Range<u64>]) -> io::Result<()> + 'a;
 
 /// Writes the result as a table whose columns fit every row: a first pass over the pages
 /// measures the columns, a second one writes the rows; with `count_line`, the table ends with
@@ -17,17 +21,25 @@ const GAP: &str = "  ";
 pub(crate) fn write(
     columns: &[String],
     run: &QueryRun<'_, '_>,
-    mut out: impl Write,
+    out: impl Write,
     count_line: bool,
     counts: &mut Counts,
+    mut observe: Option<&mut RowObserver<'_>>,
 ) -> io::Result<()> {
+    let mut out = Positioned::new(out);
     let mut header = vec![one_line(RECORD_PATH_COLUMN)];
     header.extend(columns.iter().map(|column| one_line(column)));
     let widths = measure(run, &header);
-    line(&mut out, &widths, &header)?;
+    line(&mut out, &widths, &header, None)?;
     let rule: Vec<String> = widths.iter().map(|width| "-".repeat(*width)).collect();
-    line(&mut out, &widths, &rule)?;
-    for_each_row(run, counts, |row, cells| {
+    line(&mut out, &widths, &rule, None)?;
+    let mode = if observe.is_some() {
+        RowMode::Observed
+    } else {
+        RowMode::Raw
+    };
+    let mut spans = Vec::new();
+    for_each_row(run, counts, mode, |row, cells| {
         let mut texts = Vec::with_capacity(cells.len().saturating_add(1));
         texts.push(one_line(row.record_path()));
         texts.extend(
@@ -35,7 +47,17 @@ pub(crate) fn write(
                 .iter()
                 .map(|cell| cell.as_ref().map_or_else(String::new, cell_text)),
         );
-        line(&mut out, &widths, &texts)
+        spans.clear();
+        line(
+            &mut out,
+            &widths,
+            &texts,
+            observe.as_ref().map(|_| &mut spans),
+        )?;
+        if let Some(observer) = observe.as_mut() {
+            observer(row, &spans)?;
+        }
+        Ok(())
     })?;
     if count_line {
         writeln!(out, "{}", counts.line(""))?;
@@ -88,15 +110,39 @@ fn line_width(text: &str) -> usize {
     })
 }
 
-fn line(out: &mut impl Write, widths: &[usize], cells: &[String]) -> io::Result<()> {
+fn line(
+    out: &mut Positioned<impl Write>,
+    widths: &[usize],
+    cells: &[String],
+    mut spans: Option<&mut Vec<Range<u64>>>,
+) -> io::Result<()> {
+    let origin = out.position();
     let mut line = String::new();
     for (index, (width, text)) in widths.iter().zip(cells).enumerate() {
         if index > 0 {
             line.push_str(GAP);
         }
+        let start = line.len();
         line.push_str(text);
+        if let Some(spans) = spans.as_mut() {
+            spans.push(start as u64..line.len() as u64);
+        }
         let padding = width.saturating_sub(text.chars().count());
         line.extend(std::iter::repeat_n(' ', padding));
     }
-    writeln!(out, "{}", line.trim_end())
+    let text = line.trim_end();
+    let end = text.len() as u64;
+    if let Some(spans) = spans {
+        for span in spans {
+            span.start = table_position(origin, span.start.min(end))?;
+            span.end = table_position(origin, span.end.min(end))?;
+        }
+    }
+    writeln!(out, "{text}")
+}
+
+fn table_position(origin: u64, offset: u64) -> io::Result<u64> {
+    origin
+        .checked_add(offset)
+        .ok_or_else(|| io::Error::other("query table position exceeds u64"))
 }

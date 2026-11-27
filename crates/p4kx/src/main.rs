@@ -12,17 +12,26 @@ mod bnk;
 mod bnk_objects;
 mod bnk_objects_text;
 mod catalog;
+mod catalog_basetool;
+mod catalog_failure_json;
 mod catalog_input;
+
 mod catalog_json;
 mod catalog_json_shops;
 mod catalog_json_slugs;
 mod catalog_size;
+mod catalog_summary;
 mod channels;
 mod character_package;
 mod chf;
 mod chf_diff;
+mod chf_diff_origins;
+mod chf_diff_text;
+mod chf_diff_text_output;
 mod chf_glb;
 mod chf_names;
+mod chf_origin_fields;
+mod chf_origin_io;
 mod chunks;
 mod cli;
 mod cli_actionmap;
@@ -48,8 +57,10 @@ mod cli_hologram;
 mod cli_interior;
 mod cli_key;
 mod cli_loc;
+mod cli_media;
 mod cli_model;
 mod cli_output;
+mod cli_package_mesh;
 mod cli_prefab;
 mod cli_ships;
 mod cli_socpak;
@@ -58,15 +69,19 @@ mod cli_verify;
 mod cli_wwise;
 mod compare;
 mod compare_schema;
+mod container_selection;
 mod convert;
 mod coverage;
 mod coverage_json;
 mod cryxml;
+mod cryxml_origins;
 mod dataforges;
 mod dcb;
 mod dcb_export;
 mod dcb_fields;
+mod dcb_fields_json;
 mod dcb_fields_out;
+mod dcb_fields_source_proof;
 mod dcb_query;
 mod dcb_refs;
 mod dcb_refs_json;
@@ -89,10 +104,12 @@ mod entity_outfit;
 mod entity_package;
 mod entity_root;
 mod entity_vehicle;
+mod entry_listing_json;
 mod exit;
 mod extract;
 mod extract_report;
 mod failure_report;
+mod file_receipt;
 mod filter_pair;
 mod forge_input;
 mod grep;
@@ -103,12 +120,16 @@ mod info;
 mod interior_forge;
 mod interior_glb;
 mod interior_package;
+mod interior_source;
 mod issues;
 mod json;
 mod key;
+mod key_note;
+mod launcher_discovery;
 mod layers_json;
 mod list;
 mod loc;
+mod media;
 mod model;
 mod model_animations;
 mod model_bones;
@@ -122,19 +143,25 @@ mod progress;
 mod query_file;
 mod query_rows;
 mod query_table;
+mod query_text_position;
 mod renamed_report;
+mod scene_report_origins;
 mod ships;
 mod socpak;
 mod test_build;
 mod texture;
 mod texture_image;
+mod texture_info_origin;
 mod ui;
+mod ui_asset_origins;
 mod ui_extract;
 mod ui_hologram;
 mod ui_json;
 mod ui_render;
+mod ui_render_origins;
 mod ui_screen_render;
 mod ui_screens;
+mod update_status;
 mod verify;
 mod wwise;
 mod wwise_events;
@@ -147,38 +174,72 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::cli::{Cli, Command};
+use crate::cli::{CatalogArgs, CatalogCommand, Cli, Command};
+use crate::cli_media::{MediaAction, MediaArgs};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if let Err(code) = prepare_command(&cli) {
+        return code;
+    }
     let json = cli.json;
-    guard::protect_installations();
-    if !matches!(cli.command, Command::Key(_)) {
-        guard::start_game_check();
-    }
-    if let Err(error) = key::init(&cli) {
-        report(&error);
-        return exit::for_error(&error);
-    }
     let given = key::Given {
         key: cli.archive_key.clone(),
         file: cli.key_file.clone(),
     };
     let result = dispatch(cli.command, json, &given);
-    match result {
+    let code = match result {
         Ok(code) => code,
         Err(error) if is_broken_pipe(&error) => ExitCode::from(exit::SUCCESS),
         Err(error) => {
             report(&error);
             exit::for_error(&error)
         }
+    };
+    key_note::print();
+    code
+}
+
+fn prepare_command(cli: &Cli) -> Result<(), ExitCode> {
+    if matches!(cli.command, Command::CheckUpdate) {
+        return Ok(());
     }
+    if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
+        report(&anyhow::Error::new(error));
+        return Err(ExitCode::from(exit::PARTIAL_FAILURE));
+    }
+    if matches!(
+        cli.command,
+        Command::Catalog(CatalogArgs {
+            command: Some(CatalogCommand::Schema(_)),
+            ..
+        }) | Command::Media(MediaArgs {
+            action: MediaAction::Schema { .. },
+        })
+    ) {
+        return Ok(());
+    }
+    guard::protect_installations();
+    if !matches!(cli.command, Command::Key(_)) {
+        guard::start_game_check();
+    }
+    key::init(cli).map_err(|error| {
+        report(&error);
+        exit::for_error(&error)
+    })
 }
 
 fn report(error: &anyhow::Error) {
     let mut stderr = io::stderr().lock();
     let _ignored = writeln!(stderr, "error: {error:#}");
-    if let Some(hint) = key::hint(error).or_else(|| no_match::no_match_hint(error)) {
+    let key_hint = key::hint(error);
+    if key_hint.is_some() {
+        key_note::suppress();
+    }
+    if let Some(hint) = key_hint
+        .or_else(|| no_match::no_match_hint(error))
+        .or_else(|| catalog::hint(error))
+    {
         let _ignored = writeln!(stderr, "hint: {hint}");
     }
 }
@@ -193,6 +254,7 @@ fn is_broken_pipe(error: &anyhow::Error) -> bool {
 fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<ExitCode> {
     let success = |()| ExitCode::from(exit::SUCCESS);
     match command {
+        Command::CheckUpdate => update_status::write(json).map(success),
         Command::List(args) => list::run(&args, json).map(success),
         Command::Search(args) => list::search(&args, json).map(success),
         Command::Extract(args) => extract::run(&args, json),
@@ -203,6 +265,7 @@ fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<
         Command::Dcb(args) => dcb::run(&args, json),
         Command::Grep(args) => grep::run(&args, json),
         Command::Catalog(args) => catalog::run(&args, json),
+        Command::Media(args) => media::run(&args, json),
         Command::Coverage(args) => coverage::run(&args, json),
         Command::Ships(args) => ships::run(&args, json),
         Command::Entity(args) => entity::run(&args, json),
@@ -211,7 +274,7 @@ fn dispatch(command: Command, json: bool, given: &key::Given) -> anyhow::Result<
         Command::Armour(args) => armour::run(&args, json).map(success),
         Command::Character(args) => character_package::run(&args, json).map(success),
         Command::Loc(args) => loc::run(&args, json),
-        Command::ActionMap(args) => actionmap::run(&args, json).map(success),
+        Command::ActionMap(args) => actionmap::run(&args, json),
         Command::Compare(args) => Ok(compare::run(&args, json).unwrap_or_else(|error| {
             report(&error);
             exit::for_compare_error(&error)

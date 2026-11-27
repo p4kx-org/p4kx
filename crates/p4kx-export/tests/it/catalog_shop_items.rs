@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Item lists of shops in the Basetool catalog, through the public API.
+//! Item lists of shops in the P4KX catalog, through the public API.
 
 use crate::shop_items_fixture::{self, ITEM_A, ITEM_B};
 use crate::shops_fixture::{CLOTHING, EXCHANGE, FOOD, LOOSE, MIXED};
@@ -10,7 +10,9 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -21,8 +23,9 @@ fn build_with(
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(write(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let built = build_catalog(&archive, &options)?;
+    let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -32,15 +35,14 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
 }
 
 fn shops_of<'a>(catalog: &'a Value, entity: &str) -> Vec<&'a Value> {
-    catalog["shops"]
-        .as_array()
-        .map(|shops| {
-            shops
-                .iter()
-                .filter(|shop| shop["entityGuid"] == entity)
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog["shops"].as_array().map_or_default(|shops| {
+        shops
+            .iter()
+            .filter(|shop| {
+                shop.pointer("/entityGuid/value").and_then(Value::as_str) == Some(entity)
+            })
+            .collect()
+    })
 }
 
 #[test]
@@ -48,8 +50,8 @@ fn a_named_inventory_gives_ordered_item_guids_without_prices() -> TestResult {
     let (_, catalog) = build()?;
     let shops = shops_of(&catalog, EXCHANGE);
     assert_eq!(shops.len(), 1);
-    assert_eq!(shops[0]["inventory"], "inv_commex");
-    assert_eq!(shops[0]["itemGuids"], serde_json::json!([ITEM_B, ITEM_A]));
+    assert_eq!(shops[0]["inventory"]["value"], "inv_commex");
+    assert_eq!(item_values(shops[0])?, [ITEM_B, ITEM_A]);
     let text = serde_json::to_string(&catalog["shops"])?;
     for forbidden in ["BuyPrice", "SellPrice", "CurrentInventory", "Rental"] {
         assert!(!text.contains(forbidden), "{forbidden}");
@@ -62,8 +64,8 @@ fn an_xml_name_resolves_to_the_json_file_and_the_flat_shape_is_read() -> TestRes
     let (_, catalog) = build()?;
     let shops = shops_of(&catalog, LOOSE);
     assert_eq!(shops.len(), 1);
-    assert_eq!(shops[0]["inventory"], "inv_loose");
-    assert_eq!(shops[0]["itemGuids"], serde_json::json!([ITEM_A]));
+    assert_eq!(shops[0]["inventory"]["value"], "inv_loose");
+    assert_eq!(item_values(shops[0])?, [ITEM_A]);
     Ok(())
 }
 
@@ -72,8 +74,8 @@ fn a_shop_without_a_usable_inventory_has_no_list() -> TestResult {
     let (_, catalog) = build()?;
     for entity in [CLOTHING, FOOD, MIXED] {
         for shop in shops_of(&catalog, entity) {
-            assert!(shop["inventory"].is_null(), "{entity}");
-            assert!(shop["itemGuids"].is_null(), "{entity}");
+            assert!(shop["inventory"]["value"].is_null(), "{entity}");
+            assert!(shop["itemGuids"]["value"].is_null(), "{entity}");
         }
     }
     Ok(())
@@ -132,8 +134,20 @@ fn a_soc_without_a_shop_component_is_unscanned_and_warns() -> TestResult {
     assert!(
         shops_of(&catalog, EXCHANGE)
             .iter()
-            .all(|shop| shop["itemGuids"].is_null() && shop["kind"] == "commex"),
+            .all(|shop| shop["itemGuids"]["value"].is_null() && shop["kind"]["value"] == "commex"),
         "the kind does not depend on the .soc"
     );
     Ok(())
+}
+
+pub(crate) fn item_values(shop: &Value) -> Result<Vec<&str>, Box<dyn Error>> {
+    let items = crate::health_origin_assertions::rows(shop, "/itemGuids/value")?;
+    items
+        .iter()
+        .map(|item| {
+            crate::health_origin_assertions::at(item, "/value")?
+                .as_str()
+                .ok_or_else(|| "expected a sourced inventory GUID".into())
+        })
+        .collect()
 }

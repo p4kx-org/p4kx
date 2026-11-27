@@ -13,7 +13,7 @@ const GAP: &str = "  ";
 pub(crate) fn listings(
     out: &mut impl Write,
     mode: Mode,
-    listings: &[Listing<'_>],
+    listings: &[Listing<'_, '_>],
 ) -> io::Result<()> {
     let incoming = mode == Mode::Incoming;
     for (position, listing) in listings.iter().enumerate() {
@@ -67,7 +67,7 @@ pub(crate) fn listings(
 }
 
 /// Writes every unresolved Reference with the Record that holds it.
-pub(crate) fn unresolved(out: &mut impl Write, links: &[Link<'_>]) -> io::Result<()> {
+pub(crate) fn unresolved(out: &mut impl Write, links: &[Link<'_, '_>]) -> io::Result<()> {
     let rows: Vec<Vec<String>> = links
         .iter()
         .map(|link| {
@@ -107,11 +107,11 @@ fn heading(info: &Info<'_>) -> String {
     ))
 }
 
-fn guid(link: &Link<'_>) -> String {
+fn guid(link: &Link<'_, '_>) -> String {
     link.guid.clone().unwrap_or_default()
 }
 
-fn distinct(links: &[Link<'_>]) -> usize {
+fn distinct(links: &[Link<'_, '_>]) -> usize {
     links
         .iter()
         .filter_map(|link| link.record.as_ref())
@@ -126,9 +126,21 @@ pub(crate) fn count(number: usize, noun: &str) -> String {
 }
 
 pub(crate) fn table(out: &mut impl Write, header: &[&str], rows: &[Vec<String>]) -> io::Result<()> {
+    table_rows(out, header, || rows.iter().map(Vec::as_slice))
+}
+
+pub(crate) fn table_rows<Row, Rows>(
+    out: &mut impl Write,
+    header: &[&str],
+    rows: impl Fn() -> Rows,
+) -> io::Result<()>
+where
+    Row: AsRef<[String]>,
+    Rows: Iterator<Item = Row>,
+{
     let mut widths: Vec<usize> = header.iter().map(|text| text.chars().count()).collect();
-    for row in rows {
-        for (width, text) in widths.iter_mut().zip(row) {
+    for row in rows() {
+        for (width, text) in widths.iter_mut().zip(row.as_ref()) {
             *width = (*width).max(text.chars().count());
         }
     }
@@ -136,8 +148,8 @@ pub(crate) fn table(out: &mut impl Write, header: &[&str], rows: &[Vec<String>])
     let rule: Vec<String> = widths.iter().map(|width| "-".repeat(*width)).collect();
     line(out, &widths, &head)?;
     line(out, &widths, &rule)?;
-    for row in rows {
-        line(out, &widths, row)?;
+    for row in rows() {
+        line(out, &widths, row.as_ref())?;
     }
     Ok(())
 }

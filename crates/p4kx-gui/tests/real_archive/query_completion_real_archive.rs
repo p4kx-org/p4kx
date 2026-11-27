@@ -38,7 +38,7 @@ fn shown(model: &Model) -> (Vec<String>, usize) {
     model
         .query()
         .completion_shown()
-        .map(|(completion, _)| {
+        .map_or_default(|(completion, _)| {
             let names = completion
                 .candidates()
                 .iter()
@@ -46,7 +46,6 @@ fn shown(model: &Model) -> (Vec<String>, usize) {
                 .collect();
             (names, completion.more())
         })
-        .unwrap_or_default()
 }
 
 fn names(model: &Model) -> Vec<String> {

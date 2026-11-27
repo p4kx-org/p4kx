@@ -35,6 +35,7 @@ pub(crate) struct Placed {
     pub(crate) item: usize,
     pub(crate) x: f32,
     pub(crate) baseline: f32,
+    pub(crate) inspected: usize,
 }
 
 const ALIGN_RIGHT: u8 = 1;
@@ -46,8 +47,11 @@ pub(crate) fn layout(items: &[Item], area: &Area, out: &mut Vec<Placed>) {
     let mut top = area.top;
     let mut start = 0;
     let mut first = true;
+    let mut inspected = 0;
     loop {
-        let end = line_end(items, start, area, first);
+        let boundary = line_end(items, start, area, first);
+        let end = boundary.end;
+        inspected = inspected.max(boundary.inspected);
         let line = items.get(start..end).unwrap_or_default();
         let next = if items
             .get(end)
@@ -79,6 +83,7 @@ pub(crate) fn layout(items: &[Item], area: &Area, out: &mut Vec<Placed>) {
                     item: start + offset,
                     x,
                     baseline,
+                    inspected,
                 });
             }
             x += item.advance;
@@ -92,24 +97,38 @@ pub(crate) fn layout(items: &[Item], area: &Area, out: &mut Vec<Placed>) {
     }
 }
 
-fn line_end(items: &[Item], start: usize, area: &Area, first: bool) -> usize {
+struct LineEnd {
+    end: usize,
+    inspected: usize,
+}
+
+fn line_end(items: &[Item], start: usize, area: &Area, first: bool) -> LineEnd {
     let limit = area.width - if first { area.indent } else { 0.0 };
     let mut width = 0.0;
     let mut break_after = None;
     for (offset, item) in items.get(start..).unwrap_or_default().iter().enumerate() {
         let at = start + offset;
         if item.kind == Kind::Newline {
-            return at;
+            return LineEnd {
+                end: at,
+                inspected: at + 1,
+            };
         }
         if area.wrap && at > start && item.kind == Kind::Glyph && width + item.advance > limit {
-            return break_after.unwrap_or(at);
+            return LineEnd {
+                end: break_after.unwrap_or(at),
+                inspected: at + 1,
+            };
         }
         width += item.advance;
         if item.kind == Kind::Space {
             break_after = Some(at + 1);
         }
     }
-    items.len()
+    LineEnd {
+        end: items.len(),
+        inspected: items.len(),
+    }
 }
 
 fn trimmed_width(line: &[Item]) -> f32 {
@@ -206,6 +225,32 @@ mod tests {
         assert_eq!(rows, [(0, 8.0), (2, 18.0), (3, 18.0)]);
         let long = [item(Kind::Glyph, 6.0), item(Kind::Glyph, 6.0)];
         assert_eq!(run(&long, &area(8.0, true)).len(), 2, "a long word breaks");
+    }
+
+    #[test]
+    fn consulted_prefix_stops_at_the_newline_or_the_wrap_lookahead() {
+        let glyph = item(Kind::Glyph, 4.0);
+        let separate = [glyph, item(Kind::Newline, 0.0), glyph, glyph];
+        let prefixes: Vec<_> = run(&separate, &area(50.0, false))
+            .iter()
+            .map(|placed| placed.inspected)
+            .collect();
+        assert_eq!(
+            prefixes,
+            [2, 4, 4],
+            "later lines cannot change earlier positions"
+        );
+
+        let wrapped = [glyph, item(Kind::Space, 2.0), glyph, glyph];
+        let prefixes: Vec<_> = run(&wrapped, &area(8.0, true))
+            .iter()
+            .map(|placed| placed.inspected)
+            .collect();
+        assert_eq!(
+            prefixes,
+            [3, 4, 4],
+            "the first excluded glyph participates in wrapping"
+        );
     }
 
     #[test]

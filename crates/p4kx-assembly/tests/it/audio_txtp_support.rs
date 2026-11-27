@@ -65,6 +65,8 @@ pub(crate) struct Case {
     /// WEMs embedded in the soundbank.
     pub(crate) wems: Vec<(u32, Vec<u8>)>,
     pub(crate) objects: Vec<TestHircObject>,
+    /// Additional physical bank Entries, in Archive order.
+    pub(crate) additional_banks: Vec<(String, Vec<u8>)>,
 }
 
 impl Case {
@@ -90,7 +92,7 @@ impl Case {
             self.events
         };
         let names: Vec<&str> = events.iter().map(String::as_str).collect();
-        let mut builder = ArchiveBuilder::new()
+        let builder = ArchiveBuilder::new()
             .entry(TestEntry::zstd(
                 "Data\\Libs\\GameAudio\\SC.xml",
                 TestAtl::new("SC").trigger(trigger, &names).to_cryxml(),
@@ -99,13 +101,7 @@ impl Case {
                 "Data\\Sounds\\wwise\\Bank.bnk",
                 bank.bytes(),
             ));
-        for (id, bytes) in &self.loose {
-            builder = builder.entry(TestEntry::stored(
-                format!("Data\\Sounds\\wwise\\Media\\{id}.wem"),
-                bytes.clone(),
-            ));
-        }
-        builder.write_to(&path)?;
+        additional_entries(builder, self.additional_banks, self.loose).write_to(&path)?;
         let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
         let audio = ArchiveAudio::new(&archive);
         let sounds = audio.resolve_trigger(trigger).ok_or("resolves")?;
@@ -132,6 +128,26 @@ impl Case {
         let report = write(ConflictPolicy::Overwrite);
         check(&folder, &report, &write)
     }
+}
+
+fn additional_entries(
+    mut builder: ArchiveBuilder,
+    banks: Vec<(String, Vec<u8>)>,
+    loose: Vec<(u32, Vec<u8>)>,
+) -> ArchiveBuilder {
+    for (name, bytes) in banks {
+        builder = builder.entry(TestEntry::stored(
+            format!("Data/Sounds/wwise/{name}"),
+            bytes,
+        ));
+    }
+    for (id, bytes) in loose {
+        builder = builder.entry(TestEntry::stored(
+            format!("Data\\Sounds\\wwise\\Media\\{id}.wem"),
+            bytes,
+        ));
+    }
+    builder
 }
 
 /// A case with the WEMs embedded in the soundbank.

@@ -9,7 +9,8 @@ mod summary;
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
-    AudioConversion, ConflictPolicy, Exclusion, FilterError, TextureConversion, WriteRefused,
+    AudioConversion, ConflictPolicy, Exclusion, FilterError, TextureConversion,
+    WriteProtectionError,
 };
 use p4kx_settings::{ExtractionAudio, ExtractionTextures};
 
@@ -55,12 +56,12 @@ pub struct Confirmation {
 }
 
 /// The choices of an Extraction before it starts: scope, target, Conflict policy and Conversion.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ExtractionSetup {
     scope: ExtractionScope,
     kind: TargetKind,
     folder: Option<PathBuf>,
-    refusal: Option<WriteRefused>,
+    refusal: Option<WriteProtectionError>,
     policy: ConflictPolicy,
     convert: bool,
     textures: ExtractionTextures,
@@ -164,7 +165,7 @@ impl ExtractionSetup {
     /// Returns why the chosen folder cannot be written to, when it lies inside a Star Citizen
     /// installation.
     #[must_use]
-    pub const fn refusal(&self) -> Option<&WriteRefused> {
+    pub const fn refusal(&self) -> Option<&WriteProtectionError> {
         self.refusal.as_ref()
     }
 

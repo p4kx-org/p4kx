@@ -19,6 +19,10 @@ use crate::{
 #[must_use]
 pub fn compare_schema(old: &DataForge<'_>, new: &DataForge<'_>) -> SchemaDiff {
     let (old, new) = rayon::join(|| SideSchema::read(old), || SideSchema::read(new));
+    compare_sides(&old, &new)
+}
+
+pub(crate) fn compare_sides(old: &SideSchema<'_>, new: &SideSchema<'_>) -> SchemaDiff {
     let mut diff = SchemaDiff {
         unreadable: SideCounts {
             old: old.unreadable,
@@ -78,11 +82,22 @@ fn struct_change(
         old: old.map_or(0, |def| def.records),
         new: new.map_or(0, |def| def.records),
     };
-    let (change, parent, properties) = match (old, new) {
-        (Some(_), None) => (SchemaChangeKind::Removed, None, Vec::new()),
-        (None, Some(_)) => (SchemaChangeKind::Added, None, Vec::new()),
+    let mapped_instances = SideCounts {
+        old: old.map_or(0, |def| def.mapped_instances),
+        new: new.map_or(0, |def| def.mapped_instances),
+    };
+    let empty = BTreeMap::new();
+    let properties = join(
+        old.map_or(&empty, |def| &def.properties),
+        new.map_or(&empty, |def| &def.properties),
+        |name, old, new| {
+            property_change(name, old.map(|def| &def.shape), new.map(|def| &def.shape))
+        },
+    );
+    let (change, parent) = match (old, new) {
+        (Some(_), None) => (SchemaChangeKind::Removed, None),
+        (None, Some(_)) => (SchemaChangeKind::Added, None),
         (Some(old), Some(new)) => {
-            let properties = join(&old.properties, &new.properties, property_change);
             let parent = (old.parent != new.parent).then(|| ParentChange {
                 old: old.parent.map(str::to_owned),
                 new: new.parent.map(str::to_owned),
@@ -90,7 +105,7 @@ fn struct_change(
             if parent.is_none() && properties.is_empty() {
                 return None;
             }
-            (SchemaChangeKind::Changed, parent, properties)
+            (SchemaChangeKind::Changed, parent)
         }
         (None, None) => return None,
     };
@@ -98,6 +113,7 @@ fn struct_change(
         name: name.to_owned(),
         change,
         records,
+        mapped_instances: Some(mapped_instances),
         parent,
         properties,
     })
@@ -149,25 +165,20 @@ fn enum_change(
         (Some(_), None) => (SchemaChangeKind::Removed, Vec::new()),
         (None, Some(_)) => (SchemaChangeKind::Added, Vec::new()),
         (Some(old), Some(new)) => {
-            let removed = old
-                .options
-                .difference(&new.options)
-                .map(|name| OptionChange {
-                    name: (*name).to_owned(),
-                    change: OptionChangeKind::Removed,
-                });
-            let added = new
-                .options
-                .difference(&old.options)
-                .map(|name| OptionChange {
-                    name: (*name).to_owned(),
-                    change: OptionChangeKind::Added,
-                });
-            let mut options: Vec<OptionChange> = removed.chain(added).collect();
+            let options = join(&old.options, &new.options, |name, old, new| {
+                let change = match (old, new) {
+                    (Some(_), None) => OptionChangeKind::Removed,
+                    (None, Some(_)) => OptionChangeKind::Added,
+                    _ => return None,
+                };
+                Some(OptionChange {
+                    name: name.to_owned(),
+                    change,
+                })
+            });
             if options.is_empty() {
                 return None;
             }
-            options.sort_by(|a, b| a.name.cmp(&b.name));
             (SchemaChangeKind::Changed, options)
         }
         (None, None) => return None,

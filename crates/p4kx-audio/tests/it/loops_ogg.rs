@@ -44,8 +44,7 @@ fn opus_tags(ogg: &[u8]) -> Result<(String, Vec<String>), Box<dyn std::error::Er
     let packets = pages::packets(&pages);
     let tags = packets
         .get(1)
-        .map(|(packet, _)| packet.as_slice())
-        .unwrap_or_default();
+        .map_or_default(|(packet, _)| packet.as_slice());
     assert!(
         tags.starts_with(b"OpusTags"),
         "the second packet is OpusTags"

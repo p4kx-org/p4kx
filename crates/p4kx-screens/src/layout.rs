@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
 use std::rc::Rc;
 
-use crate::flex::{Flex, Item, Slot, arrange, limit};
+use crate::flex::{self, Flex, Item, LayoutApproximation, Slot};
 use crate::geometry::{Dim, Geometry};
 use crate::paint::Area;
+use crate::report::Report;
+use crate::screen_asset_inputs::WidgetInput;
 use crate::style::Modifiers;
 use crate::walk_measure::MeasureKey;
 use crate::widget::Widget;
@@ -66,8 +69,8 @@ pub(crate) fn size_of(
     let fell_back = |dim: Dim, own: Option<f32>| dim == Dim::Auto && own.is_none() && has_children;
     Sized {
         size: [
-            limit(resolved_width, min[0], max[0]),
-            limit(resolved_height, min[1], max[1]),
+            flex::limit(resolved_width, min[0], max[0]),
+            flex::limit(resolved_height, min[1], max[1]),
         ],
         auto: fell_back(width, content[0]) || fell_back(height, content[1]),
         min,
@@ -103,7 +106,13 @@ pub(crate) struct Placed {
     pub(crate) auto: bool,
 }
 
-fn flow_items(siblings: &[Sibling<'_>], sized: &[Sized], in_flow: &[usize]) -> Vec<Item> {
+fn flow_items(
+    siblings: &[Sibling<'_>],
+    sized: &[Sized],
+    in_flow: &[usize],
+    main: usize,
+) -> Vec<Item> {
+    let cross = 1 - main;
     in_flow
         .iter()
         .filter_map(|&at| Some((siblings.get(at)?, sized.get(at)?)))
@@ -113,6 +122,9 @@ fn flow_items(siblings: &[Sibling<'_>], sized: &[Sized], in_flow: &[usize]) -> V
             let down = margin.top + margin.bottom;
             Item {
                 size: [sized.size[0] + across, sized.size[1] + down],
+                fixed_main_size: matches!(sibling.geometry.size.get(main), Some(Dim::Fixed(_))),
+                measured_auto_cross_size: sibling.geometry.size.get(cross) == Some(&Dim::Auto)
+                    && sibling.content.get(cross).is_some_and(Option::is_some),
                 grow: sibling.geometry.grow,
                 shrink: sibling.geometry.shrink,
                 min: [sized.min[0] + across, sized.min[1] + down],
@@ -125,10 +137,16 @@ fn flow_items(siblings: &[Sibling<'_>], sized: &[Sized], in_flow: &[usize]) -> V
 pub(crate) struct Frame<'f> {
     pub(crate) content: Area,
     pub(crate) flex: Option<&'f Flex>,
+    pub(crate) owner: Option<&'f Widget>,
     pub(crate) centred: bool,
 }
 
-pub(crate) fn place(frame: &Frame<'_>, siblings: &[Sibling<'_>]) -> Vec<Placed> {
+pub(crate) fn place(
+    frame: &Frame<'_>,
+    siblings: &[Sibling<'_>],
+    report: &mut Report,
+    layout_sites: &mut HashSet<(WidgetInput, LayoutApproximation)>,
+) -> Vec<Placed> {
     let content = frame.content;
     let parent = [content.width, content.height];
     let sized: Vec<Sized> = siblings
@@ -149,11 +167,19 @@ pub(crate) fn place(frame: &Frame<'_>, siblings: &[Sibling<'_>]) -> Vec<Placed> 
             *slot = Some(position);
         }
     }
-    let items = flow_items(siblings, &sized, &in_flow);
-    let slots = frame
+    let main = usize::from(frame.flex.is_some_and(|flex| flex.column));
+    let items = flow_items(siblings, &sized, &in_flow, main);
+    let arrangement = frame
         .flex
-        .map(|flex| arrange(flex, parent, &items))
-        .unwrap_or_default();
+        .map_or_default(|policy| flex::arrange(policy, parent, &items));
+    if let Some(owner) = frame.owner {
+        for approximation in arrangement.approximations() {
+            let site = layout_sites
+                .insert((owner.input, approximation))
+                .then_some(owner.input);
+            report.note_layout(owner, approximation.reason(), site);
+        }
+    }
     siblings
         .iter()
         .zip(&sized)
@@ -163,7 +189,7 @@ pub(crate) fn place(frame: &Frame<'_>, siblings: &[Sibling<'_>]) -> Vec<Placed> 
                 .get(at)
                 .copied()
                 .flatten()
-                .and_then(|position| slots.get(position));
+                .and_then(|position| arrangement.slots.get(position));
             Placed {
                 at,
                 area: area_of(frame, &sibling.geometry, sized.size, slot),

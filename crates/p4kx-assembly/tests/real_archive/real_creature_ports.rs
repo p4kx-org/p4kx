@@ -26,13 +26,12 @@ fn skeleton_bones(assembly: &Assembly) -> HashSet<String> {
         .root()
         .and_then(|root| root.model())
         .and_then(|model| Some(model.bones_of(model.lods.first()?)))
-        .map(|bones| {
+        .map_or_default(|bones| {
             bones
                 .iter()
                 .map(|bone| bone.name.to_ascii_lowercase())
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 /// The Kopion variants of LIVE that wear a collar.

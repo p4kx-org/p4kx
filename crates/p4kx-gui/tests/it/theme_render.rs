@@ -33,8 +33,8 @@ use tempfile::TempDir;
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SIZE: [f32; 2] = [1280.0, 800.0];
-const STRIPE_ON_PANEL: [u8; 3] = [0x30, 0x35, 0x3A];
-const TILE_FILL: [u8; 3] = [0x1A, 0x1D, 0x21];
+const STRIPE_ON_PANEL: [u8; 3] = [0x1E, 0x23, 0x29];
+const TILE_FILL: [u8; 3] = [0x20, 0x25, 0x2C];
 const LANGUAGES: [(Language, &str); 2] = [
     (Language::BritishEnglish, "en-GB"),
     (Language::German, "de-DE"),
@@ -198,7 +198,7 @@ fn the_sounds_tab_stripes_its_rows_in_the_table_stripe() -> TestResult {
 }
 
 #[test]
-fn the_comparison_tiles_take_the_bar_fill_inside_the_panel() -> TestResult {
+fn the_comparison_tiles_use_their_own_surface_above_the_panel() -> TestResult {
     for (language, suffix, start, added) in [
         (Language::BritishEnglish, "en-GB", "Compare", "Added 1"),
         (Language::German, "de-DE", "Vergleichen", "Hinzugefügt 1"),
@@ -228,7 +228,7 @@ fn the_comparison_tiles_take_the_bar_fill_inside_the_panel() -> TestResult {
             );
         let tab = harness.state_mut().comparison_mut();
         tab.set_archive(ComparisonSide::Old, pair.old.clone());
-        tab.set_archive(ComparisonSide::New, pair.new.clone());
+        tab.set_archive(ComparisonSide::New, pair.new);
         harness.run_quiet();
         harness.get_by_label(start).click();
         tagging::wait_until(

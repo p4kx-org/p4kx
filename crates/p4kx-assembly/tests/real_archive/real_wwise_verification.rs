@@ -11,30 +11,20 @@
 
 #![expect(clippy::print_stdout, reason = "the counts and timings are the report")]
 
+mod canary;
+
 use std::error::Error;
 use std::fs;
 use std::time::Instant;
 
-use p4kx_assembly::Entities;
 use p4kx_assembly::audio::{
     ArchiveAudio, AtlTrigger, AudioIndex, DEFAULT_LANGUAGE, ExportOptions, ExportReport,
     LanguageChoice, SoundFormat, SoundVariant, SourceKind, TriggerSounds,
 };
-use p4kx_extraction::{Archive, ConflictPolicy, DataForgeEntry};
+use p4kx_extraction::{Archive, ConflictPolicy};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-const DOCUMENTED: [&str; 8] = [
-    "ORIG_890Jump",
-    "AEGS_Gladius",
-    "AEGS_Avenger_Titan",
-    "ANVL_Hornet_F7C",
-    "RSI_Constellation_Andromeda",
-    "TMBL_Cyclone",
-    "MISC_Freelancer",
-    "DRAK_Cutlass_Black",
-];
 
 fn open() -> Result<Archive, Box<dyn Error>> {
     Ok(Archive::open_with_key(
@@ -74,60 +64,9 @@ fn the_audio_index_builds_and_reports_its_time() -> TestResult {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_triggers_of_documented_entities_resolve_to_sounds() -> TestResult {
-    let archive = open()?;
-    let entry = DataForgeEntry::read(&archive)?;
-    let forge = entry.open()?;
-    let entities = Entities::new(&forge);
-    let audio = ArchiveAudio::new(&archive);
-    let started = Instant::now();
-    let index = audio.index();
-    println!("audio index built in {:.2?}", started.elapsed());
-    let language = index.language(DEFAULT_LANGUAGE);
-    let choice = LanguageChoice::new(language, None);
-    let started = Instant::now();
-    let (mut triggers, mut matched, mut with_sounds) = (0_usize, 0_usize, 0_usize);
-    let (mut variants, mut with_media, mut breaks) = (0_usize, 0_usize, 0_usize);
-    for name in DOCUMENTED {
-        let entity_audio = index.entity_audio(&entities.find(name)?)?;
-        triggers += entity_audio.triggers().len();
-        for trigger in entity_audio
-            .triggers()
-            .iter()
-            .filter(|trigger| trigger.unmatched().is_none())
-        {
-            matched += 1;
-            let sounds = audio
-                .resolve_trigger_in(trigger.name(), &choice)
-                .ok_or("a matched trigger has a definition")?;
-            with_sounds += usize::from(!sounds.variants().is_empty());
-            variants += sounds.variants().len();
-            with_media += sounds.variants().iter().filter(|v| located(v)).count();
-            breaks += sounds.breaks().len();
-        }
-    }
-    println!(
-        "documented Entities: {triggers} triggers, {matched} matched, {with_sounds} with sounds, \
-         {variants} sounds, {with_media} with media, {breaks} broken links, resolved in {:.2?}",
-        started.elapsed()
-    );
-    assert!(triggers > 100, "{triggers} triggers");
-    assert!(
-        matched * 100 >= triggers * 95,
-        "{matched} of {triggers} triggers reach a soundbank"
-    );
-    assert!(
-        with_sounds * 100 >= matched * 60,
-        "{with_sounds} of {matched} matched triggers resolve to sounds"
-    );
-    assert!(variants > 1_000, "{variants} sounds");
-    assert!(
-        with_media * 100 >= variants * 80,
-        "{with_media} of {variants} sounds have media"
-    );
-    Ok(())
+fn the_triggers_of_documented_entities_resolve_to_sounds() {
+    crate::media_fixtures::run(canary::verify);
 }
-
 fn first_with<'a>(
     audio: &'a ArchiveAudio<'_>,
     choice: &LanguageChoice,

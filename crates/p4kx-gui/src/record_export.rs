@@ -10,10 +10,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_export::RecordForm;
-use p4kx_extraction::{ConflictPolicy, Filter, FilterError, WriteRefused};
+use p4kx_extraction::{ConflictPolicy, Filter, FilterError, WriteProtectionError};
 
 pub use job::{RecordExport, RecordExportStatus};
 pub(crate) use job::{Request, Selection, start};
+pub use p4kx_extraction::RecordExportProvenance;
 pub use progress::{RecordExportProgress, RecordExportStage};
 pub(crate) use selection::records_below;
 pub use summary::{FailedRecord, RecordExportSummary, RenamedRecord};
@@ -22,11 +23,12 @@ use crate::TargetKind;
 use crate::installation::refusal_of;
 
 /// The forms the Record export dialog offers.
-pub const RECORD_FORMS: [RecordForm; 5] = [
+pub const RECORD_FORMS: [RecordForm; 6] = [
     RecordForm::Json,
     RecordForm::Ndjson,
     RecordForm::FlatCsv,
     RecordForm::FlatCsvRaw,
+    RecordForm::FlatCsvStrict,
     RecordForm::FlatNdjson,
 ];
 
@@ -71,7 +73,7 @@ impl TreeSelection {
 }
 
 /// The choices of a Record export before it starts: the Records, the form and the target.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct RecordExportSetup {
     scope: RecordScope,
     tree: Option<TreeSelection>,
@@ -80,7 +82,7 @@ pub struct RecordExportSetup {
     tags: bool,
     kind: TargetKind,
     folder: Option<PathBuf>,
-    refusal: Option<WriteRefused>,
+    refusal: Option<WriteProtectionError>,
     policy: ConflictPolicy,
 }
 
@@ -196,7 +198,7 @@ impl RecordExportSetup {
     /// Returns why the chosen folder cannot be written to, when it lies inside a Star Citizen
     /// installation.
     #[must_use]
-    pub const fn refusal(&self) -> Option<&WriteRefused> {
+    pub const fn refusal(&self) -> Option<&WriteProtectionError> {
         self.refusal.as_ref()
     }
 

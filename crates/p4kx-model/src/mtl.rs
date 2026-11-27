@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::mtl_parse::parse_library;
 use crate::mtl_raw::Attributes;
+use std::sync::Arc;
+
+use crate::mtl_public_value::{self, PublicValue};
+use crate::mtl_source::MaterialSource;
 use crate::{
-    CompanionResolver, LayerCache, MaterialError, MaterialLayer, MaterialReading, PaletteSlot,
-    RawElement,
+    CompanionResolver, LayerCache, MaterialLayer, MaterialReading, PaletteSlot, RawElement,
 };
 
 /// The most sub-materials a material library may hold; the engine allows 128.
 pub const MAX_SUB_MATERIALS: usize = 1024;
-
-/// The most texture slots one material may hold.
-pub const MAX_TEXTURE_SLOTS: usize = 64;
 
 /// The `MtlFlags` of a material, as the engine's `EMaterialFlags` define them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -103,18 +102,12 @@ pub struct Material {
     /// The child elements that are neither `Textures`, `PublicParams`, `MatLayers` nor
     /// `SubMaterials`, as the file has them.
     pub elements: Vec<RawElement>,
-    /// What the reader's limits cut off, e.g. `layers beyond 64`; empty when nothing was.
+    /// Raw element fragments omitted by their element or depth limits.
     pub truncated: Vec<String>,
     /// Whether the diffuse map of a [relief decal](Self::is_relief_decal) candidate holds no colour
     /// of its own, as the resolver that loaded the library found out; `None` when it was not asked
     /// or could not tell.
     pub diffuse_map_is_grey: Option<bool>,
-}
-
-/// A parsed `PublicParams` value.
-enum PublicValue {
-    Number(f32),
-    Colour([f32; 3]),
 }
 
 impl Material {
@@ -123,44 +116,16 @@ impl Material {
     /// none or its value is neither.
     #[must_use]
     pub fn public_param(&self, name: &str) -> Option<[f32; 3]> {
-        match self.public_value(name)? {
-            PublicValue::Number(first) => Some([first, 0.0, 0.0]),
-            PublicValue::Colour(colour) => Some(colour),
-        }
+        mtl_public_value::read(self, name).components()
     }
 
     /// Returns the shader parameter `name` of the material's `PublicParams`, ignoring case, when
     /// it is a colour of exactly three finite components; `None` for a number or anything else.
     #[must_use]
     pub fn public_colour(&self, name: &str) -> Option<[f32; 3]> {
-        match self.public_value(name)? {
+        match mtl_public_value::read(self, name).value? {
             PublicValue::Colour(colour) => Some(colour),
             PublicValue::Number(_) => None,
-        }
-    }
-
-    /// Parses the parameter `name` as one finite number or three finite components.
-    fn public_value(&self, name: &str) -> Option<PublicValue> {
-        let (_, text) = self
-            .public_params
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))?;
-        let number = |part: &str| {
-            part.trim()
-                .parse::<f32>()
-                .ok()
-                .filter(|value| value.is_finite())
-        };
-        let mut parts = text.split(',');
-        let first = number(parts.next()?)?;
-        match (parts.next(), parts.next(), parts.next()) {
-            (None, ..) => Some(PublicValue::Number(first)),
-            (Some(second), Some(third), None) => Some(PublicValue::Colour([
-                first,
-                number(second)?,
-                number(third)?,
-            ])),
-            _ => None,
         }
     }
 
@@ -251,8 +216,12 @@ impl Material {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MaterialLibrary {
-    /// The path the model gave, below `Data` without `.mtl`.
+    /// Ordered authored root syntax, original submaterial dispositions and actual loss boundaries.
+    pub authored: Arc<MaterialSource>,
+    /// The original library reference supplied to the reader.
     pub path: String,
+    /// The mapped companion destination, absent for a direct parse or an unreported target.
+    pub target: Option<String>,
     /// The tint palette the library names as its default, a Record path.
     pub default_palette: Option<String>,
     /// Whether the file is one material that serves every material ID, rather than a list of
@@ -262,42 +231,11 @@ pub struct MaterialLibrary {
     /// [`Material::engine_default`] so that the IDs after them keep their position.
     pub unknown_entries: usize,
     /// The paths of the layer files of the materials that are missing or unreadable, as the
-    /// layers name them; their layers keep no [`LayerSurface`]. Set by
+    /// layers name them; their layers keep no [`LayerSurface`](crate::LayerSurface). Set by
     /// [`MaterialStatus::load`], empty after [`Self::parse`] and a plain read.
     pub unresolved_layers: Vec<String>,
     /// The sub-materials in material ID order; one material when [`Self::single`].
     pub materials: Vec<Material>,
-}
-
-impl MaterialLibrary {
-    /// Reads the `.mtl` file `bytes`, text XML or `CryXml`, of the library `path`.
-    ///
-    /// A file with a `SubMaterials` element is a list: the material ID is the position of the
-    /// sub-material, and an entry that is no `Material` element counts as a position and reads
-    /// as the engine's default material. A file without is one material that serves every ID. Numbers that are
-    /// missing, malformed or not finite read as white diffuse, a dim dielectric specular, no
-    /// emission, full opacity and a shininess of 10.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MaterialError::Xml`] when the file is no XML or `CryXml`,
-    /// [`MaterialError::NotMaterial`] when its root is no `Material`, and
-    /// [`MaterialError::TooMany`] when it holds more sub-materials or texture slots than the
-    /// limits allow.
-    pub fn parse(path: &str, bytes: &[u8]) -> Result<Self, MaterialError> {
-        parse_library(path, bytes)
-    }
-
-    /// Returns the material of `id`, or `None` when the library has no sub-material at that
-    /// position and the engine falls back to its default material.
-    #[must_use]
-    pub fn material(&self, id: u16) -> Option<&Material> {
-        if self.single {
-            self.materials.first()
-        } else {
-            self.materials.get(usize::from(id))
-        }
-    }
 }
 
 /// What reading a model's material library came to.
@@ -310,6 +248,8 @@ pub enum MaterialStatus {
     Missing {
         /// The path the model gave.
         path: String,
+        /// The destination established by the owning resolver.
+        target: Option<String>,
     },
     /// The library exists but cannot be read, or its name is no safe path.
     Unreadable {
@@ -317,6 +257,8 @@ pub enum MaterialStatus {
         path: String,
         /// What is wrong.
         reason: String,
+        /// The destination established by the owning resolver.
+        target: Option<String>,
     },
     /// The library was read.
     Loaded(MaterialLibrary),
@@ -356,6 +298,16 @@ impl MaterialStatus {
         }
     }
 
+    /// Returns the destination established by the owning resolver.
+    #[must_use]
+    pub fn target(&self) -> Option<&str> {
+        match self {
+            Self::Missing { target, .. } | Self::Unreadable { target, .. } => target.as_deref(),
+            Self::Loaded(library) => library.target.as_deref(),
+            Self::Unnamed | Self::Skipped => None,
+        }
+    }
+
     /// Returns what went wrong with the layer files of a read library, or `None` when all were
     /// read: the materials of the missing layers keep the colours of their own file.
     #[must_use]
@@ -374,9 +326,21 @@ impl MaterialStatus {
     #[must_use]
     pub fn problem(&self) -> Option<String> {
         match self {
-            Self::Missing { path } => Some(format!("the material library {path} does not exist")),
-            Self::Unreadable { path, reason } => Some(format!(
-                "the material library {path} cannot be read: {reason}"
+            Self::Missing { path, target } => Some(target.as_ref().map_or_else(
+                || format!("the material library {path} does not exist"),
+                |target| format!("the material library {path} mapped to {target} does not exist"),
+            )),
+            Self::Unreadable {
+                path,
+                reason,
+                target,
+            } => Some(target.as_ref().map_or_else(
+                || format!("the material library {path} cannot be read: {reason}"),
+                |target| {
+                    format!(
+                        "the material library {path} mapped to {target} cannot be read: {reason}"
+                    )
+                },
             )),
             Self::Unnamed | Self::Loaded(_) | Self::Skipped => None,
         }

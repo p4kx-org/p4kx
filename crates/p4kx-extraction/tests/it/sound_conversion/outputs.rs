@@ -20,7 +20,14 @@ fn ogg_rebuilds_vorbis_decodes_other_codecs_to_wav_and_unpacks_the_soundbank() -
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.ogg", "600.wav", "700.wem"],
+        [
+            "500.ogg",
+            "500.ogg.p4kx-origin.jsonl",
+            "600.wav",
+            "600.wav.p4kx-origin.jsonl",
+            "700.wem",
+            "700.wem.p4kx-origin.jsonl",
+        ],
         "loose sounds"
     );
     assert!(
@@ -37,6 +44,17 @@ fn ogg_rebuilds_vorbis_decodes_other_codecs_to_wav_and_unpacks_the_soundbank() -
         xma(),
         "written unchanged"
     );
+    check_ogg_bank_outputs(&fixture)?;
+    assert_eq!(report.extracted(), 4, "every Entry");
+    assert_eq!(
+        report.converted(),
+        Some(3),
+        "both decodable sounds and the soundbank"
+    );
+    Ok(())
+}
+
+fn check_ogg_bank_outputs(fixture: &Fixture) -> TestResult {
     assert_eq!(
         fixture.read(BANK)?,
         bank(),
@@ -44,7 +62,16 @@ fn ogg_rebuilds_vorbis_decodes_other_codecs_to_wav_and_unpacks_the_soundbank() -
     );
     assert_eq!(
         fixture.names(BANK_FOLDER)?,
-        ["10.ogg", "20.wav", "30.wem", "40.wem"],
+        [
+            "10.ogg",
+            "10.ogg.p4kx-origin.jsonl",
+            "20.wav",
+            "20.wav.p4kx-origin.jsonl",
+            "30.wem",
+            "30.wem.p4kx-origin.jsonl",
+            "40.wem",
+            "40.wem.p4kx-origin.jsonl",
+        ],
         "one file per embedded WEM, named by ID"
     );
     assert!(
@@ -55,12 +82,6 @@ fn ogg_rebuilds_vorbis_decodes_other_codecs_to_wav_and_unpacks_the_soundbank() -
         fixture.read("Data\\Sounds\\wwise\\Ship\\40.wem")?,
         prefetch(),
         "the prefetched start"
-    );
-    assert_eq!(report.extracted(), 4, "every Entry");
-    assert_eq!(
-        report.converted(),
-        Some(3),
-        "both decodable sounds and the soundbank"
     );
     Ok(())
 }
@@ -98,12 +119,28 @@ fn wav_decodes_every_sound() -> TestResult {
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.wav", "600.wav", "700.wem"],
+        [
+            "500.wav",
+            "500.wav.p4kx-origin.jsonl",
+            "600.wav",
+            "600.wav.p4kx-origin.jsonl",
+            "700.wem",
+            "700.wem.p4kx-origin.jsonl",
+        ],
         "loose sounds"
     );
     assert_eq!(
         fixture.names(BANK_FOLDER)?,
-        ["10.wav", "20.wav", "30.wem", "40.wem"],
+        [
+            "10.wav",
+            "10.wav.p4kx-origin.jsonl",
+            "20.wav",
+            "20.wav.p4kx-origin.jsonl",
+            "30.wem",
+            "30.wem.p4kx-origin.jsonl",
+            "40.wem",
+            "40.wem.p4kx-origin.jsonl",
+        ],
         "embedded WEMs"
     );
     assert_eq!(
@@ -123,13 +160,29 @@ fn raw_keeps_the_sounds_and_unpacks_the_soundbank_unchanged() -> TestResult {
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.wem", "600.wem", "700.wem"],
+        [
+            "500.wem",
+            "500.wem.p4kx-origin.jsonl",
+            "600.wem",
+            "600.wem.p4kx-origin.jsonl",
+            "700.wem",
+            "700.wem.p4kx-origin.jsonl",
+        ],
         "unchanged"
     );
     assert_eq!(fixture.read(VORBIS)?, vorbis(), "the Entry");
     assert_eq!(
         fixture.names(BANK_FOLDER)?,
-        ["10.wem", "20.wem", "30.wem", "40.wem"],
+        [
+            "10.wem",
+            "10.wem.p4kx-origin.jsonl",
+            "20.wem",
+            "20.wem.p4kx-origin.jsonl",
+            "30.wem",
+            "30.wem.p4kx-origin.jsonl",
+            "40.wem",
+            "40.wem.p4kx-origin.jsonl",
+        ],
         "embedded WEMs as they are"
     );
     assert_eq!(
@@ -156,7 +209,11 @@ fn a_soundbank_whose_wems_all_fall_back_to_raw_is_not_counted_converted() -> Tes
 
     let report = fixture.run(AudioConversion::Ogg, ConflictPolicy::Skip);
 
-    assert_eq!(fixture.names(BANK_FOLDER)?, ["30.wem"], "written unchanged");
+    assert_eq!(
+        fixture.names(BANK_FOLDER)?,
+        ["30.wem", "30.wem.p4kx-origin.jsonl"],
+        "the unchanged WEM and its companion"
+    );
     assert_eq!(report.converted(), Some(0), "not converted");
     assert_eq!(report.unconverted().len(), 1, "listed as not converted");
     Ok(())
@@ -170,7 +227,14 @@ fn without_conversion_sounds_and_soundbanks_are_written_unchanged() -> TestResul
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.wem", "600.wem", "700.wem"],
+        [
+            "500.wem",
+            "500.wem.p4kx-origin.jsonl",
+            "600.wem",
+            "600.wem.p4kx-origin.jsonl",
+            "700.wem",
+            "700.wem.p4kx-origin.jsonl",
+        ],
         "unchanged"
     );
     assert!(!fixture.exists(BANK_FOLDER), "no soundbank folder");
@@ -211,6 +275,39 @@ fn a_file_inside_the_soundbank_folder_is_written_after_the_soundbank() -> TestRe
     assert!(
         ogg_samples(fixture.read(INSIDE)?)? > 0,
         "the unpacked Ogg stays"
+    );
+
+    let replaced = fixture.run(AudioConversion::Ogg, ConflictPolicy::Overwrite);
+    assert!(replaced.failures().is_empty(), "{replaced:?}");
+    assert_eq!(
+        fixture.read(INSIDE)?,
+        b"loose",
+        "the explicit Entry overwrites the converted bank member"
+    );
+    let [bank, raw, _, _] = replaced.raw_artifacts() else {
+        return Err("the bank, the native replacement and two unchanged bank members".into());
+    };
+    assert_eq!(bank.path, "Data/Sounds/wwise/Ship.bnk", "the parent bank");
+    let receipt_path = raw.origin_receipt.as_deref().ok_or("raw Entry companion")?;
+    assert_eq!(
+        raw.path, "Data/Sounds/wwise/Ship/10.ogg",
+        "the explicit Entry owns the output"
+    );
+    assert_eq!(
+        raw.digest.byte_length(),
+        5,
+        "measurement of the raw replacement"
+    );
+    assert!(
+        fixture.exists(receipt_path),
+        "the replacement owns a companion"
+    );
+    let [remaining] = replaced.sound_artifacts() else {
+        return Err("one final bank receipt".into());
+    };
+    assert_eq!(
+        remaining.path, "Data/Sounds/wwise/Ship/20.wav",
+        "unrelated member receipt remains"
     );
     Ok(())
 }

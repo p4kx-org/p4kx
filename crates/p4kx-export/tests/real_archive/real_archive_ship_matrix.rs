@@ -32,7 +32,10 @@ fn playability_of_the_ships_is_compared_with_the_ship_matrix() -> Result<(), Box
     let matrix = parse_matrix(&std::fs::read_to_string(matrix_path)?)?;
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
 
     let ship_entries = catalog["ships"].as_array().ok_or("ships")?;
@@ -43,8 +46,8 @@ fn playability_of_the_ships_is_compared_with_the_ship_matrix() -> Result<(), Box
         .iter()
         .filter_map(|ship| {
             Some(CatalogShip {
-                class_name: ship["className"].as_str()?,
-                playability: ship["playability"].as_str(),
+                class_name: ship["className"]["value"].as_str()?,
+                playability: ship.pointer("/playability/value").and_then(Value::as_str),
             })
         })
         .collect();

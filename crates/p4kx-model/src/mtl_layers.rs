@@ -4,8 +4,11 @@
 use std::collections::HashSet;
 
 use crate::mtl_layer_cache::MAX_LAYER_FILES;
-use crate::mtl_parse::{scalar, vector};
-use crate::{CompanionResolver, LayerCache, Material, MaterialLayer, MaterialLibrary, TextureSlot};
+use crate::mtl_number;
+use crate::{
+    CompanionResolver, LayerCache, Material, MaterialCompanionUse, MaterialLayer, MaterialLibrary,
+    TextureSlot,
+};
 
 const WHITE: [f32; 3] = [1.0; 3];
 
@@ -13,13 +16,21 @@ const WHITE: [f32; 3] = [1.0; 3];
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct LayerSurface {
+    pub(crate) layer_shader: bool,
     /// The layer's diffuse colour, which its tint multiplies.
     pub diffuse: [f32; 3],
     /// The layer's specular colour.
     pub specular: [f32; 3],
-    /// The texture slots of the layer's own file, in file order: its diffuse map in `TexSlot1`
-    /// and its normal map in `TexSlot2`, with their `TexMod` tiling.
+    /// The child material's texture slots and modifiers in authored order.
     pub textures: Vec<TextureSlot>,
+}
+
+impl LayerSurface {
+    /// Whether the selected child material uses the Layer shader.
+    #[must_use]
+    pub const fn is_layer_shader(&self) -> bool {
+        self.layer_shader
+    }
 }
 
 impl MaterialLayer {
@@ -27,14 +38,16 @@ impl MaterialLayer {
     #[must_use]
     pub fn tint(&self) -> [f32; 3] {
         self.attribute("TintColor")
-            .and_then(vector)
+            .and_then(mtl_number::vector)
             .unwrap_or(WHITE)
     }
 
     /// Returns the layer's `GlossMult`, 1 when it is missing or malformed.
     #[must_use]
     pub fn gloss_mult(&self) -> f32 {
-        self.attribute("GlossMult").and_then(scalar).unwrap_or(1.0)
+        self.attribute("GlossMult")
+            .and_then(mtl_number::scalar)
+            .unwrap_or(1.0)
     }
 }
 
@@ -46,7 +59,7 @@ impl Material {
         self.public_params
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case("WearBlendBase"))
-            .and_then(|(_, value)| scalar(value))
+            .and_then(|(_, value)| mtl_number::scalar(value))
             .unwrap_or(0.0)
     }
 }
@@ -62,8 +75,8 @@ pub(crate) fn resolve(
     let mut budget = cache.budget();
     let mut unresolved: Vec<String> = Vec::new();
     let mut listed: HashSet<String> = HashSet::new();
-    for material in &mut library.materials {
-        for layer in &mut material.layers {
+    for (material_index, material) in library.materials.iter_mut().enumerate() {
+        for (layer_index, layer) in material.layers.iter_mut().enumerate() {
             let Some(path) = layer
                 .attribute("Path")
                 .map(str::trim)
@@ -72,8 +85,17 @@ pub(crate) fn resolve(
                 continue;
             };
             let path = path.to_owned();
-            let submaterial = layer.attribute("Submtl").map(str::trim).unwrap_or_default();
-            let surface = cache.surface(&path, submaterial, companions, &mut budget);
+            let submaterial = layer.attribute("Submtl").map_or_default(str::trim);
+            let (source, origin) = cache.surface(&path, submaterial, companions, &mut budget);
+            let (surface, source_material) = source.unzip();
+            companions.observe_material(
+                MaterialCompanionUse::Layer {
+                    material: material_index,
+                    layer: layer_index,
+                    source_material,
+                },
+                origin.as_ref(),
+            );
             if surface.is_none() && unresolved.len() < MAX_LAYER_FILES {
                 let normal = format!(
                     "{}|{}",

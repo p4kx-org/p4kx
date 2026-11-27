@@ -32,15 +32,77 @@ additive animations can be composed onto a base.
 - **Checker.** The testkit's GLB checker compares the `min` and `max` of the key times with the
   first and last time (the claim of ADR-0046), not only that they exist.
 - **Additive animations stay uncomposed.** ADR-0046 still holds: they are written only when
-  named, with the note that the pose needs a base. Composing them needs two facts the data does
-  not give. Which pose the offsets apply to (the bind pose, or the matching frame of a base
-  animation) and the order of the multiplication (offset times base, or base times offset) are
-  engine behaviour; the keys of the 1,475 additive `.caf` files and 1,905 database animations
-  lie near the identity (docs/model-animations.md) whichever convention is right, so no
-  measurement on the Archive tells the conventions apart, and no field of the records read so far
-  names a base. Writing a guess would pose a skeleton wrongly without any sign of it. This is
-  reopened if a base is named by a source (an animation graph or `.chrparams` entry) and a
-  convention is confirmed against the game.
+  named, with the note that the pose needs a base. Rotation composition requires an observed
+  base pose, the time and weight of the additive frame and the order of the product.
+  The installed MotionIdle option below binds a base clip and an additive clip to one
+  authored plan. The sampled source keys distinguish two possible products. A runtime
+  reference must determine which product the game applies to this plan.
+
+## Scoped installed source check
+
+LIVE `13220821` and PTU `13260598` each supplied the original controller and
+Mannequin animation database at uniquely admitted physical entries. The LIVE
+payloads matched the retained CRC-verified copies. The PTU extraction verified
+the CRC of both current entries and read 185,457 decoded bytes. The Archive stamps
+and manifest digests were stable across the checks.
+
+The animation database was byte-identical across Builds. Both controllers named
+the same fragment-definition selector and scope. The matching scope carried two
+alternative fragments, each with one direct animation layer, one named clip and one
+blend declaration. A direct base clip remains unidentified in the inspected
+declarations. Binding the scope to a physical rig and its owning DBA or CAF, and
+discriminating the composition order in an observed pose, remain open under #668.
+
+The retained original payloads also contain a separate fragment outside that
+single-layer scope. Re-decoding the byte-identical databases found 64 options
+per Build. Exactly one option declared two direct animation layers with
+different named clips and two blend declarations. Both original controllers
+resolve the fragment to a declared scope. Its layer declarations provide no
+additive flag or explicit base selector. The scope and context definitions
+supply no physical rig or clip path. The option identifies a source candidate
+for binding to a rig and original clip headers before comparing a game pose.
+
+On LIVE 13220821 two original Mannequin Preview setups bind the same controller
+and root ADB to two physical rig entries across two of the relevant contexts.
+The verified root ADB has one original SubADB link to the candidate database
+and explicitly admits the selected fragment. This establishes the authored
+editor setup for those contexts. Gameplay can bind the contexts separately.
+
+The adjacent CHRPARAMS files do not explicitly name either candidate clip or
+include another CHRPARAMS. An exact basename lookup under their CAF masks
+found no loose entry and no matching path field in the verified 0x902 CAF
+image. The same-build track-database survey CRC-verified all 181 entries
+reached by the two files' literal selectors and observed Archive glob matches.
+Neither exact alias stem occurs among the 6,452 metadata names. The survey
+reads no controller blocks or keyframes. Runtime alias resolution, base
+selection and multiplication order remain unresolved.
+
+An additional directory pass on the same installed LIVE Build checked the two
+exact alias stems in the adjoining Rig CHRPARAMS folders for the authored
+`.aim`, `.bspace` and `.comb` families. It found no matching Entries. That
+pass used the original names and verified the Archive and manifest stamps
+before and after the read.
+
+## LIVE MotionIdle comparison
+
+On LIVE 13220821 the original animation database
+`Data/Animations/Mannequin/ADB/Players/playerMotionAnims.adb` matched the
+retained candidate byte for byte after physical Entry and CRC verification.
+The selected `MotionIdle` option names
+`stocked_alerted_stand_idle_turn360_raised` in the lower layer and
+`nw_neutral_stand_foot_shuffle_03_add` in the upper layer. The original
+clip headers in the two verified LIVE DBA files identify the lower clip
+as ordinary and the upper clip as additive. The upper declaration has
+zero speed and weight. The manual animation controller takes the upper
+layer's playback time and weight from `ShuffleTime` and `ShuffleWeight`
+on scope layer 1.
+
+The two named clips share 29 rotation controllers. Across 307 pairs
+of jointly stored rotation keys at the same source frame, the largest
+angle between the two quaternion products at unit weight was 4.88°
+at source frame 23 on controller `B328DB12`. This comparison nominates
+a discriminating source frame. A runtime reference still needs the bound
+actor rig, actual base time, `ShuffleTime` and a nonzero `ShuffleWeight`.
 
 ## Consequences
 

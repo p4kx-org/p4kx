@@ -1,20 +1,39 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, TreeBuilder};
+use std::convert::Infallible;
 
-use crate::contract_stats::ItemStats;
+use p4kx_extraction::{DataForge, DataForgeError, Record, RecordTree, TreeBuilder, Value};
+
+use crate::catalog_v3::catalog_durability;
+use crate::contract_stats::{AmmoStats, ItemStatBlocks, ItemStats, ItemStatsFields};
 use crate::record_fields::{component, structure, text};
 
 mod gear;
 mod mining;
 mod parts;
+#[cfg(test)]
+mod physical_link_tests;
 mod resources;
+mod scoped;
 mod walk;
 mod weapon;
 
+pub(crate) use scoped::read_scoped;
+pub(crate) use weapon::{
+    AMMO_CONTAINER, MagazineRead, MagazineRoute, PRIMARY_MAGAZINE_FIELD, WEAPON_COMPONENT, ammo,
+    with_primary_magazine,
+};
+
 const POWER_PLANT: &str = "PowerPlant";
 const COOLER: &str = "Cooler";
+
+/// An authored stat link and its exact decoded physical target.
+#[derive(Clone, Copy)]
+pub(crate) struct LinkedStatTarget<'read, 'source> {
+    pub(crate) selector: &'read Value<'source>,
+    pub(crate) record: Record<'source>,
+}
 
 /// Returns the stat blocks of the item `tree`, `None` when it has none of the blocks.
 ///
@@ -28,54 +47,76 @@ pub(crate) fn read<'f>(
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
 ) -> Option<ItemStats<'f>> {
+    read_with_sources(
+        tree,
+        forge,
+        trees,
+        || catalog_durability::legacy_health(tree),
+        |target, trees| {
+            Ok::<_, Infallible>(trees.build(&target.record).ok().map(|tree| ammo(&tree)))
+        },
+        |_| Ok(()),
+        |_, _| Ok(()),
+    )
+    .unwrap_or_else(|error| match error {})
+}
+
+pub(crate) fn read_with_sources<'f, E>(
+    tree: &RecordTree<'f>,
+    forge: &'f DataForge<'f>,
+    trees: &mut TreeBuilder<'f>,
+    health: impl FnOnce() -> Option<f32>,
+    ammunition: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        &mut TreeBuilder<'f>,
+    ) -> Result<Option<AmmoStats>, E>,
+    observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
+    observe_resistance: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        Result<&RecordTree<'f>, &DataForgeError>,
+    ) -> Result<(), E>,
+) -> Result<Option<ItemStats<'f>>, E> {
     let attach = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let kind = text(attach, "Type");
     let is = |name: &str| kind.is_some_and(|kind| kind.eq_ignore_ascii_case(name));
-    let weapon = weapon::weapon(tree, forge, trees);
+    let weapon = weapon::weapon(tree, forge, trees, ammunition, observe_magazine)?;
     let shield = parts::shield(tree);
     let quantum_drive = parts::quantum_drive(tree);
     let resource_states = resources::states(tree);
     let power_plant = is(POWER_PLANT).then(|| resources::power_plant(&resource_states));
     let cooler = is(COOLER).then(|| resources::cooler(&resource_states));
     let missile = parts::missile(tree);
-    let armor = gear::armor(tree, forge, trees);
+    let armor = gear::armor(tree, forge, trees, observe_resistance)?;
     let clothing = gear::clothing(tree);
     let radar = gear::radar(tree);
     let tractor_beam = gear::tractor_beam(tree);
     let weapon_modifier = gear::weapon_modifier(tree);
     let mining_laser = mining::laser(tree);
     let mining_modifier = mining::modifier_block(tree);
-    if weapon.is_none()
-        && shield.is_none()
-        && quantum_drive.is_none()
-        && power_plant.is_none()
-        && cooler.is_none()
-        && missile.is_none()
-        && armor.is_none()
-        && clothing.is_none()
-        && radar.is_none()
-        && tractor_beam.is_none()
-        && weapon_modifier.is_none()
-        && mining_laser.is_none()
-        && mining_modifier.is_none()
-    {
-        return None;
-    }
-    Some(ItemStats {
+    let mut stats = ItemStats {
         weapon,
         shield,
         quantum_drive,
-        power_plant,
-        cooler,
-        missile,
-        armor,
-        clothing,
-        radar,
-        tractor_beam,
-        weapon_modifier,
-        mining_laser,
-        mining_modifier,
-        health: parts::health(tree),
-        resource_states,
-    })
+        fields: ItemStatsFields {
+            power_plant,
+            cooler,
+            blocks: ItemStatBlocks {
+                missile,
+                armor,
+                clothing,
+                radar,
+                tractor_beam,
+                weapon_modifier,
+                mining_laser,
+                mining_modifier,
+                health: None,
+            },
+            resource_states,
+        },
+    };
+    if !stats.has_specialist() {
+        return Ok(None);
+    }
+    stats.fields.blocks.health = health();
+    Ok(Some(stats))
 }

@@ -92,7 +92,7 @@ impl KindCounts {
 pub struct SchemaCounts {
     /// The struct changes.
     pub structs: KindCounts,
-    /// The property changes of the changed structs.
+    /// The property changes in added, removed and changed structs.
     pub properties: KindCounts,
     /// The enum changes.
     pub enums: KindCounts,
@@ -151,7 +151,7 @@ impl fmt::Display for PropertyAspect {
     }
 }
 
-/// One added, removed or changed property of a changed struct.
+/// One added, removed or changed property declared by a compared struct.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct PropertyChange {
     /// The property name.
@@ -190,11 +190,14 @@ pub struct StructChange {
     /// The Records on each side whose struct is this struct or inherits from it; `0` on the side
     /// that lacks the struct.
     pub records: SideCounts,
+    /// The directly mapped instances of this struct on each side, including nested instances.
+    /// An absent struct has a count of `0`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mapped_instances: Option<SideCounts>,
     /// The parents, present when a changed struct inherits from another struct than before.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<ParentChange>,
-    /// The properties the struct declares itself that differ, ordered by name; empty for an added
-    /// or removed struct.
+    /// The properties the struct declares itself that differ, ordered by name.
     pub properties: Vec<PropertyChange>,
 }
 

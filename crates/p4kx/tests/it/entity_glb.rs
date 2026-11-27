@@ -7,7 +7,8 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use p4kx_testkit::gltf::Node;
-use p4kx_testkit::{ArchiveBuilder, CheckedGlb, TestEntry, assembly_entries, check_glb};
+use p4kx_testkit::{ArchiveBuilder, CheckedGlb, TestEntry, assembly_entries, check_glb, test_key};
+use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -97,16 +98,120 @@ fn the_json_report_has_a_stable_shape() -> TestResult {
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let mut shaped: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut shaped: Value = serde_json::from_str(&run.stdout)?;
     for key in ["archive", "out"] {
-        shaped[key] = serde_json::Value::String(format!("<{key}>"));
+        shaped[key] = Value::String(format!("<{key}>"));
     }
+    let fields = shaped.as_object_mut().ok_or("the report is an object")?;
+    assert!(fields.remove("fieldOrigins").is_some());
+    assert!(fields.remove("provenance").is_some());
     insta::assert_snapshot!(serde_json::to_string_pretty(&shaped)?);
     let checked = check_glb(&std::fs::read(&out)?)?;
     assert_eq!(
         checked.document.nodes().len(),
         17,
         "6 part nodes and the 11 nodes of 4 models"
+    );
+    Ok(())
+}
+
+fn check_identity_evidence(report: &Value, encrypted: bool) -> TestResult {
+    let uses = report
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("source uses")?;
+    let fields = &report["fieldOrigins"];
+    for (path, member, role) in [
+        ("/guid", "guid", "payload"),
+        ("/entity", "recordName", "conversion"),
+    ] {
+        let origin = fields.get(path).ok_or("selected Record field origin")?;
+        assert_eq!(origin["containsEncryptedSource"], encrypted, "{path}");
+        assert_eq!(origin["sourceSetComplete"], true, "{path}");
+        let refs = origin["sourceUsesRefs"].as_array().ok_or("identity uses")?;
+        assert!(
+            uses.iter().any(|usage| {
+                usage.get("id").is_some_and(|id| refs.contains(id))
+                    && usage["role"] == role
+                    && usage
+                        .pointer("/location/recordIndex")
+                        .and_then(Value::as_u64)
+                        == Some(0)
+                    && usage.pointer("/location/field").and_then(Value::as_str) == Some(member)
+            }),
+            "{path} binds the original selected Record's {member}"
+        );
+    }
+    assert_eq!(
+        fields["/nodes"],
+        json!({"containsEncryptedSource": null, "sourceSetComplete": false, "sourceUsesRefs": []}),
+        "the selected Record does not prove the contributors to the emitted node count"
+    );
+    Ok(())
+}
+
+#[test]
+fn json_identity_uses_the_actual_dataforge_without_classifying_geometry_counts() -> TestResult {
+    let mut outputs = Vec::new();
+    for encrypted in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let entries = assembly_entries()
+            .into_iter()
+            .map(|entry| {
+                if encrypted && entry.path() == "Data\\Game2.dcb" {
+                    entry.encrypted()
+                } else {
+                    entry
+                }
+            })
+            .collect();
+        let archive = write_archive(dir.path(), entries)?;
+        let out = dir.path().join("ship.glb");
+        let run = glb(&archive, &out, &["--key", &test_key().to_hex()], true)?;
+        assert_eq!(run.code, Some(0), "{}", run.stderr);
+        check_identity_evidence(&serde_json::from_str(&run.stdout)?, encrypted)?;
+        outputs.push(std::fs::read(out)?);
+    }
+    assert_eq!(outputs.first(), outputs.get(1), "GLB bytes are unchanged");
+    Ok(())
+}
+
+#[test]
+fn physical_fallback_preserves_the_authored_library_failure() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut entries = assembly_entries();
+    entries.retain(|entry| !entry.path().ends_with("ship.mtl"));
+    entries.push(TestEntry::stored(
+        "Data/Materials/material_default.mtl",
+        br#"<Material Name="archive-fallback" Shader="Illum" Diffuse="0.1,0.2,0.3"/>"#,
+    ));
+    let archive = write_archive(dir.path(), entries)?;
+    let out = dir.path().join("physical.glb");
+    let run = glb(&archive, &out, &[], true)?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let report: Value = serde_json::from_str(&run.stdout)?;
+    assert_eq!(
+        report["default_material"]["state"], "resolved",
+        "actual archive lookup"
+    );
+    assert_eq!(
+        report["default_material"]["source"]["contains_encrypted_source"], false,
+        "the original fallback Entry is unencrypted"
+    );
+    assert!(
+        report["issues"]
+            .as_array()
+            .ok_or("assembly issues")?
+            .iter()
+            .any(|issue| issue["kind"] == "material_library"),
+        "authored library remains independently missing"
+    );
+    let glb = check_glb(&std::fs::read(&out)?)?;
+    assert!(
+        glb.document
+            .materials()
+            .any(|material| material.name() == Some("archive-fallback")),
+        "the combined scene uses the physical material"
     );
     Ok(())
 }

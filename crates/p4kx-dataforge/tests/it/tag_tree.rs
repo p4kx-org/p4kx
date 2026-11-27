@@ -212,7 +212,6 @@ fn issues_count_what_the_database_does_not_hold_together() -> TestResult {
         );
         assert_eq!(issues.unlisted(), 4, "Stray, Leaf, LoopX and LoopY");
         assert_eq!(issues.unreadable(), 0, "every Tag Record reads");
-        assert_eq!(issues.too_deep(), 0, "nothing is deep");
         assert!(!issues.is_clean());
         Ok(())
     })
@@ -362,5 +361,5 @@ fn json_annotates_tag_references_only() -> TestResult {
 }
 
 fn guid_text(value: u128) -> String {
-    guid(value).map(|guid| guid.to_string()).unwrap_or_default()
+    guid(value).map_or_default(|guid| guid.to_string())
 }

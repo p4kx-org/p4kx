@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! The tint of the native Windows frame through the Desktop Window Manager.
-//!
-//! This is the only module of the workspace that contains unsafe code.
 
 #![expect(unsafe_code, reason = "DwmSetWindowAttribute is a foreign function")]
 

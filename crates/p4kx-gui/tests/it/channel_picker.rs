@@ -148,6 +148,9 @@ fn dropping_a_folder_adds_it_as_a_manual_entry() -> TestResult {
         .input_mut()
         .dropped_files
         .push(Arc::new(Dropped(extra.path().to_path_buf())));
+    wait_for(&mut harness, "the dropped manual Channel", |harness| {
+        harness.query_by_label("HOTFIX").is_some()
+    })?;
     harness.run_quiet();
 
     let (model, requests) = harness.state();
@@ -174,6 +177,9 @@ fn an_added_archive_is_listed_as_a_channel() -> TestResult {
 
     let added = harness.state_mut().0.add_manual(archive.clone());
     let again = harness.state_mut().0.add_manual(archive.clone());
+    wait_for(&mut harness, "the added manual Archive", |harness| {
+        harness.query_by_label("EPTU").is_some()
+    })?;
     harness.run_quiet();
 
     assert!(added, "added");

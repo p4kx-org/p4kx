@@ -4,6 +4,8 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::manifest_body_zones::BodyZoneMap;
+
 /// Where a skinned part of a rig comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -42,6 +44,13 @@ pub struct Rig {
     pub parts: Vec<RigPart>,
     /// The animations in the GLB file, in order.
     pub animations: Vec<RigClip>,
+    /// Source uses of the emitted bone links and transforms for rigid worn parts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::rig_mount_provenance::WornMountProvenance>")]
+    pub worn_mount_provenance: Option<serde_json::Value>,
+    /// The opt-in mapping from body zones and worn parts to emitted Character geometry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_zones: Option<BodyZoneMap>,
 }
 
 /// One skin worn on the skeleton of a Character or creature.

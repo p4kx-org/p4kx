@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::Result;
 use p4kx_assembly::{Armour, BodyVariant, Head, PartOrigin};
 use p4kx_blender::{Issue, PackageSummary};
-use p4kx_extraction::AnimationSet;
+use p4kx_extraction::{AnimationSet, EntryOrigin};
 use serde::Serialize;
 
 use crate::armour_loadout::{LoadoutJson, ReplacedJson, Selection};
@@ -22,6 +22,7 @@ pub(super) struct Shown<'a> {
     pub(super) args: &'a CharacterPackageArgs,
     pub(super) name: &'a str,
     pub(super) head: Option<&'a Head>,
+    pub(super) default_chf: Option<&'a EntryOrigin>,
     pub(super) variant: BodyVariant,
     pub(super) selection: &'a Selection<'a>,
     pub(super) armour: &'a Armour,
@@ -37,10 +38,18 @@ struct PartJson<'a> {
 }
 
 #[derive(Serialize)]
+struct DefaultChfJson<'a> {
+    path: &'a str,
+    entry_index: usize,
+}
+
+#[derive(Serialize)]
 struct PackageJson<'a> {
     archive: String,
     name: &'a str,
     chf: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_chf: Option<DefaultChfJson<'a>>,
     body: &'static str,
     rig: Option<&'static str>,
     skeleton: &'a str,
@@ -88,11 +97,15 @@ fn json_of<'a>(shown: &'a Shown<'a>, summary: &'a PackageSummary) -> PackageJson
         archive: json::path(shown.archive),
         name: shown.name,
         chf: shown.args.chf.as_deref().map(json::path),
+        default_chf: shown.default_chf.map(|origin| DefaultChfJson {
+            path: origin.entry().path(),
+            entry_index: origin.entry().index(),
+        }),
         body: shown.variant.code(),
         rig: shown.head.map(Head::rig),
         skeleton: shown.armour.skeleton_file(),
         out: json::path(&shown.args.out),
-        lod: shown.args.lod,
+        lod: shown.args.output.lod,
         loadout: shown.selection.loadout.as_ref(),
         replaced: shown
             .selection
@@ -130,6 +143,14 @@ fn json_of<'a>(shown: &'a Shown<'a>, summary: &'a PackageSummary) -> PackageJson
 fn text(shown: &Shown<'_>, summary: &PackageSummary) -> io::Result<()> {
     let mut out = BufWriter::new(io::stdout().lock());
     shown.selection.print(&mut out)?;
+    if let Some(origin) = shown.default_chf {
+        writeln!(
+            out,
+            "default CHF {} (Entry {})",
+            one_line(origin.entry().path()),
+            origin.entry().index()
+        )?;
+    }
     writeln!(
         out,
         "wrote {} of {} on the {} body: {} parts, {} bones, {} skinned meshes, {} materials, {} morph targets, {} animations, {} vertices, {} triangles, {} files, {} bytes",

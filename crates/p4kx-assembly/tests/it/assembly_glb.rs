@@ -9,12 +9,20 @@ use assembly_support::{TestResult, assemble, entries, fixture};
 use p4kx_extraction::Archive;
 use p4kx_gltf::{GlbOptions, GlbSummary};
 use p4kx_testkit::gltf::{Node, Semantic};
-use p4kx_testkit::{CheckedGlb, check_glb};
+use p4kx_testkit::{CheckedGlb, TestEntry, check_glb, repeated_gimbal_assembly_entries};
 
 fn export(lod: u32) -> Result<(CheckedGlb, GlbSummary), Box<dyn std::error::Error>> {
-    let fixture = fixture(entries())?;
+    export_entries(entries(), "TEST_Ship", lod)
+}
+
+fn export_entries(
+    entries: Vec<TestEntry>,
+    entity: &str,
+    lod: u32,
+) -> Result<(CheckedGlb, GlbSummary), Box<dyn std::error::Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
-    let assembly = assemble(&archive, "TEST_Ship", lod)?;
+    let assembly = assemble(&archive, entity, lod)?;
     let mut bytes = Vec::new();
     let summary = assembly.write_glb(&GlbOptions::default().with_lod(lod), &mut bytes)?;
     Ok((check_glb(&bytes)?, summary))
@@ -73,6 +81,98 @@ fn the_glb_holds_a_node_per_part_named_after_port_and_entity_in_the_loadout_hier
         "no geometry, no mesh"
     );
     Ok(())
+}
+
+#[test]
+fn repeated_gimbals_keep_their_own_nested_weapon_nodes() -> TestResult {
+    let entity = "TEST_Dual_Gimbal_Ship";
+    let (glb, _) = export_entries(repeated_gimbal_assembly_entries(), entity, 0)?;
+    let ship = node(&glb, entity)?;
+    assert_eq!(
+        ship.children()
+            .filter(|child| child
+                .name()
+                .is_some_and(|name| name.ends_with("/TEST_Mount")))
+            .count(),
+        2
+    );
+
+    let left = node(&glb, "hardpoint_gimbal_left/TEST_Mount")?;
+    let right = node(&glb, "hardpoint_gimbal_right/TEST_Mount")?;
+    assert_ne!(left.index(), right.index());
+    let half = std::f32::consts::FRAC_1_SQRT_2;
+    let mut weapon_indices = Vec::new();
+    let mut weapon_meshes = Vec::new();
+    for (gimbal, origin, rotation, weapon_origin) in [
+        (
+            left,
+            [0.0, 1.0, -4.0],
+            [0.0, half, 0.0, half],
+            [0.0, 1.5, -4.0],
+        ),
+        (
+            right,
+            [3.0, 2.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [3.0, 2.5, 0.0],
+        ),
+    ] {
+        let weapon = weapon_on_gimbal(&ship, &gimbal, origin, rotation, weapon_origin)?;
+        weapon_indices.push(weapon.index());
+        let mesh = weapon
+            .children()
+            .flat_map(|model| model.children())
+            .find_map(|child| child.mesh())
+            .ok_or("weapon model mesh")?;
+        weapon_meshes.push(mesh.index());
+    }
+    assert_ne!(weapon_indices[0], weapon_indices[1]);
+    assert_eq!(weapon_meshes[0], weapon_meshes[1]);
+    assert_eq!(
+        glb.document
+            .nodes()
+            .filter(|part| part.name() == Some("hardpoint_class_2/TEST_Gun"))
+            .count(),
+        2
+    );
+    Ok(())
+}
+
+fn weapon_on_gimbal<'document>(
+    ship: &Node<'document>,
+    gimbal: &Node<'document>,
+    origin: [f32; 3],
+    rotation: [f32; 4],
+    weapon_origin: [f32; 3],
+) -> Result<Node<'document>, Box<dyn std::error::Error>> {
+    assert!(
+        ship.children().any(|child| child.index() == gimbal.index()),
+        "the gimbal wrapper is a direct child of the ship"
+    );
+    let (translation, quaternion, scale) = gimbal.transform().decomposed();
+    assert!(close(&translation, &origin), "{translation:?}");
+    assert!(close(&quaternion, &rotation), "{quaternion:?}");
+    assert!(close(&scale, &[1.0; 3]), "{scale:?}");
+
+    let mut children = gimbal
+        .children()
+        .filter(|child| child.name() == Some("hardpoint_class_2/TEST_Gun"));
+    let weapon = children.next().ok_or("each gimbal must own a weapon")?;
+    assert!(
+        children.next().is_none(),
+        "each gimbal must own only one weapon"
+    );
+    let (local, _, _) = weapon.transform().decomposed();
+    assert!(close(&local, &[0.0, 0.5, 0.0]), "{local:?}");
+    let [_, [up_x, up_y, up_z, _], _, [x, y, z, _]] = gimbal.transform().matrix();
+    let [_, vertical_offset, _] = local;
+    let world = [
+        vertical_offset.mul_add(up_x, x),
+        vertical_offset.mul_add(up_y, y),
+        vertical_offset.mul_add(up_z, z),
+    ];
+    assert!(close(&world, &weapon_origin), "{world:?}");
+    Ok(weapon)
 }
 
 #[test]

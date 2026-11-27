@@ -8,9 +8,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
-    Archive, CancelToken, ConflictPolicy, ExtractOptions, ExtractionReport, Progress, extract,
+    Archive, CancelToken, ConflictPolicy, ExtractOptions, ExtractionError, ExtractionReport,
+    PathLimit, Progress, check_path_length, extract,
 };
 use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
+
+#[path = "conversion_receipt_collision.rs"]
+mod receipt_collision;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -37,13 +41,19 @@ struct Fixture {
 }
 
 fn fixture(entries: Vec<TestEntry>) -> Result<Fixture, Box<dyn Error>> {
+    fixture_for_target(|_| Ok(entries))
+}
+
+fn fixture_for_target(
+    entries: impl FnOnce(&Path) -> Result<Vec<TestEntry>, Box<dyn Error>>,
+) -> Result<Fixture, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    entries
+    let target = dir.path().join("out");
+    entries(&target)?
         .into_iter()
         .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
         .write_to(&path)?;
-    let target = dir.path().join("out");
     fs::create_dir(&target)?;
     Ok(Fixture {
         archive: Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?,
@@ -187,10 +197,68 @@ fn an_entry_that_fails_to_convert_is_reported_and_the_rest_continues() -> TestRe
         b"old",
         "the existing file is kept"
     );
+    let mut outputs = fs::read_dir(fixture.target.join("Data"))?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<Vec<_>, _>>()?;
+    outputs.sort_unstable();
     assert_eq!(
-        fs::read_dir(fixture.target.join("Data"))?.count(),
-        2,
-        "no partial file is left"
+        outputs,
+        ["broken.xml", "ship.xml", "ship.xml.p4kx-origin.jsonl"].map(std::ffi::OsString::from),
+        "only the successful file receives a companion and no partial output is left"
+    );
+    Ok(())
+}
+
+#[test]
+fn converted_cryxml_survives_an_overlong_companion_path() -> TestResult {
+    const OUTPUT_UNITS: usize = 250;
+    const ORIGIN_SUFFIX: &str = ".p4kx-origin.jsonl";
+
+    let fixture = fixture_for_target(|target| {
+        let template = std::path::absolute(target)?.join("Data").join(".xml");
+        let fixed_units = template.to_string_lossy().encode_utf16().count() + 1;
+        let stem_units = OUTPUT_UNITS
+            .checked_sub(fixed_units)
+            .filter(|size| *size != 0)
+            .ok_or("the fixture target must leave room for the XML filename")?;
+        let entry = format!("Data\\{}.xml", "s".repeat(stem_units));
+        Ok(vec![TestEntry::stored(entry, little())])
+    })?;
+    let entry = fixture.archive.entries().first().ok_or("fixture Entry")?;
+    let relative = entry.path().replace('\\', "/");
+    let target = std::path::absolute(&fixture.target)?;
+    let output = target.join(&relative);
+    check_path_length(&output)?;
+    let receipt = target.join(format!("{relative}{ORIGIN_SUFFIX}"));
+    let limit = check_path_length(&receipt).expect_err("the fixture companion exceeds the limit");
+
+    let report = run(&fixture, true, ConflictPolicy::Overwrite);
+
+    assert_eq!(fs::read(output)?, SHIP_XML.as_bytes(), "complete XML");
+    assert_eq!(
+        (report.extracted(), report.converted()),
+        (1, Some(1)),
+        "the converted payload was committed"
+    );
+    assert!(!receipt.exists(), "the overlong companion was not written");
+    let [artifact] = report.cryxml_artifacts() else {
+        return Err("one converted artifact expected".into());
+    };
+    assert!(
+        artifact.origin_receipt.is_none(),
+        "no receipt was published"
+    );
+    let [failure] = report.failures() else {
+        return Err("one companion path failure expected".into());
+    };
+    assert_eq!(failure.path(), entry.path(), "the original Entry");
+    assert!(
+        matches!(
+            failure.error(),
+            ExtractionError::Write { path, source }
+                if path == &receipt && source.get_ref().and_then(|cause| cause.downcast_ref::<PathLimit>()) == Some(&limit)
+        ),
+        "the only failure identifies the exact companion path and its unit limit: {failure:?}"
     );
     Ok(())
 }

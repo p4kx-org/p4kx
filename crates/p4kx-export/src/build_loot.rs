@@ -4,11 +4,11 @@
 use p4kx_extraction::{Archive, CancelToken};
 
 use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::crafting_warning::CraftingWarning;
 use crate::harvest_locations::Objects;
 use crate::loot_containers::{Located, locate};
-use crate::loot_walk::MAX_CONTAINERS;
 use crate::starmap_containers::Placements;
 
 /// Finds the containers below the system containers that are placed with a multi config and
@@ -21,31 +21,38 @@ use crate::starmap_containers::Placements;
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn add_loot_containers(
     archive: &Archive,
-    placements: &Placements,
+    placements: &mut Placements,
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
+    capture: &EntryCapture<'_>,
 ) -> Result<(), CatalogError> {
+    crate::entry_source::dependencies(
+        &placements.ledger,
+        &mut collected.ledger,
+        crate::Kind::LootContainers,
+    );
     let located = locate(
         archive,
-        &placements.opened,
+        &std::mem::take(&mut placements.opened),
         &Objects::new(&collected.starmap_objects),
         cancel,
-    );
+        capture,
+    )?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
     let Located {
+        ledger,
         containers,
+        original_documents,
         unreadable,
-        beyond_limit,
         several,
     } = located;
-    let mut details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
-    if beyond_limit > 0 {
-        details.push(format!(
-            "{beyond_limit} containers beyond the limit of {MAX_CONTAINERS} are not read"
-        ));
-    }
+    collected.ledger.merge(ledger);
+    collected
+        .ledger
+        .merge(std::mem::take(&mut placements.ledger));
+    let details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
     if !details.is_empty() {
         collected
             .warnings
@@ -63,5 +70,6 @@ pub(crate) fn add_loot_containers(
             });
     }
     collected.loot_containers = containers;
+    collected.loot_entity_container_documents = original_documents;
     Ok(())
 }

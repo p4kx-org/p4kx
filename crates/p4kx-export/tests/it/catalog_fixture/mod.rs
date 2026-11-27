@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A synthetic Archive with manufacturers, items and ships for the Basetool catalog tests.
+//! A synthetic Archive with manufacturers, items and ships for the P4KX catalog tests.
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -236,29 +236,39 @@ fn item(spec: &ItemSpec, maker: Maker) -> TestRecord {
 }
 
 fn ship(guid: u128, class: &str, path: &str, maker: Maker) -> TestRecord {
+    let career = if guid == ROVER {
+        ""
+    } else {
+        "@vehicle_focus_transporter"
+    };
     entity(
         guid,
         class,
         path,
-        vec![TestValue::Struct(
-            TestInstance::new("VehicleComponentParams")
-                .value(
-                    "vehicleDefinition",
-                    TestValue::text("scripts/entities/vehicles/implementations/xml/acas_ship.xml"),
-                )
-                .value("crewSize", TestValue::Int32(2))
-                .value("vehicleName", TestValue::text("@vehicle_NameACAS_Ship"))
-                .value(
-                    "vehicleDescription",
-                    TestValue::text("@vehicle_DescACAS_Ship"),
-                )
-                .value(
-                    "vehicleCareer",
-                    TestValue::text("@vehicle_focus_transporter"),
-                )
-                .value("vehicleRole", TestValue::text("@LOC_PLACEHOLDER"))
-                .value("manufacturer", maker.value()),
-        )],
+        vec![
+            TestValue::Struct(
+                TestInstance::new("VehicleComponentParams")
+                    .value(
+                        "vehicleDefinition",
+                        TestValue::text(
+                            "scripts/entities/vehicles/implementations/xml/acas_ship.xml",
+                        ),
+                    )
+                    .value("crewSize", TestValue::Int32(2))
+                    .value("vehicleName", TestValue::text("@vehicle_NameACAS_Ship"))
+                    .value(
+                        "vehicleDescription",
+                        TestValue::text("@vehicle_DescACAS_Ship"),
+                    )
+                    .value("vehicleCareer", TestValue::text(career))
+                    .value("vehicleRole", TestValue::text("@LOC_PLACEHOLDER"))
+                    .value("manufacturer", maker.value()),
+            ),
+            TestValue::Struct(TestInstance::new("VehicleComponentParams").value(
+                "vehicleName",
+                TestValue::text("@fixture_unused_second_vehicle_name"),
+            )),
+        ],
     )
 }
 

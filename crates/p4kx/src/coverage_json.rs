@@ -5,7 +5,8 @@ use std::io;
 use std::path::Path;
 
 use p4kx_extraction::{
-    ComponentCoverage, CoverageReport, EntryCoverage, ObjectCoverage, SampleExport, TypeCoverage,
+    ComponentCoverage, EntryCoverage, FieldOrigins, ObjectCoverage, ObservedCoverage, SampleExport,
+    SourceInventory, TypeCoverage,
 };
 use serde::Serialize;
 
@@ -18,6 +19,9 @@ struct Document<'a> {
     components: Vec<ComponentJson<'a>>,
     starmap_types: Vec<ObjectJson<'a>>,
     entries: Vec<EntryJson<'a>>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: &'a FieldOrigins,
+    provenance: &'a SourceInventory,
 }
 
 #[derive(Serialize)]
@@ -144,7 +148,8 @@ impl<'a> From<&'a EntryCoverage> for EntryJson<'a> {
 }
 
 /// Prints the report as one line of JSON.
-pub(crate) fn print(archive: &Path, report: &CoverageReport) -> io::Result<()> {
+pub(crate) fn print(archive: &Path, observed: &ObservedCoverage) -> io::Result<()> {
+    let report = observed.report();
     crate::json::print(&Document {
         archive: crate::json::path(archive),
         complete: report.is_complete(),
@@ -153,5 +158,7 @@ pub(crate) fn print(archive: &Path, report: &CoverageReport) -> io::Result<()> {
         components: report.components.iter().map(ComponentJson::from).collect(),
         starmap_types: report.objects.iter().map(ObjectJson::from).collect(),
         entries: report.entries.iter().map(EntryJson::from).collect(),
+        field_origins: observed.fields(),
+        provenance: observed.inventory(),
     })
 }

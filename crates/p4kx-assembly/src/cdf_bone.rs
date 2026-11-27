@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_foundation::read_text_number;
+use std::sync::Arc;
 
+use p4kx_extraction::model::character_definition::{AttachmentPose, AttachmentPoseSelection};
+
+use crate::CdfAttachmentSite;
 use crate::cdf::slashes;
 use crate::markup::Element;
-use crate::read::narrow;
 
 /// A bone attachment (`CA_BONE`) of a character definition: a rigid model bound to a bone of the
 /// skeleton and offset from it.
@@ -19,10 +21,10 @@ pub(crate) struct BoneAttachment {
     pub(crate) bone: String,
     /// The material library that replaces the one the model names.
     pub(crate) material: Option<String>,
-    /// The offset from the bone in metres (`RelPosition`).
     pub(crate) position: [f32; 3],
-    /// The rotation from the bone as a quaternion `[w, x, y, z]` (`RelRotation`).
     pub(crate) rotation: [f32; 4],
+    pub(crate) pose_selection: AttachmentPoseSelection,
+    pub(crate) sources: Option<Arc<[CdfAttachmentSite]>>,
 }
 
 impl BoneAttachment {
@@ -38,14 +40,7 @@ impl BoneAttachment {
         let (true, Some(bone)) = (is_bone, bone) else {
             return None;
         };
-        let position = match element.attribute("RelPosition") {
-            Some(text) => numbers::<3>(text)?,
-            None => [0.0; 3],
-        };
-        let rotation = match element.attribute("RelRotation") {
-            Some(text) => numbers::<4>(text).filter(|q| q.iter().any(|part| *part != 0.0))?,
-            None => [1.0, 0.0, 0.0, 0.0],
-        };
+        let pose = AttachmentPose::read(|field| element.attribute(field.name()));
         let binding = slashes(binding);
         let name = element
             .attribute("AName")
@@ -56,22 +51,12 @@ impl BoneAttachment {
             bone: bone.to_owned(),
             material: element.attribute("Material").map(slashes),
             binding,
-            position,
-            rotation,
+            position: pose.position?,
+            rotation: pose.rotation_wxyz?,
+            pose_selection: pose.selection(),
+            sources: None,
         })
     }
-}
-
-/// Reads `N` comma-separated numbers, or `None` for another count, an unreadable number or one
-/// that is not finite as an `f32`.
-fn numbers<const N: usize>(text: &str) -> Option<[f32; N]> {
-    let mut out = [0.0_f32; N];
-    let mut parts = text.split(',');
-    for slot in &mut out {
-        let number = read_text_number(parts.next()?).filter(|number| !number.is_partial())?;
-        *slot = Some(narrow(number.value())).filter(|value| value.is_finite())?;
-    }
-    parts.next().is_none().then_some(out)
 }
 
 /// Returns the file name of `path` without its extension.

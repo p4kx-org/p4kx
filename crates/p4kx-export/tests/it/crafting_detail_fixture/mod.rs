@@ -34,7 +34,7 @@ pub(crate) const GLOBAL: u128 = 0x1200_0000_0000_4000_8000_0000_0000_0002;
 
 pub(super) const CRAFTING: &str = "libs/foundry/records/crafting";
 
-fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
+pub(crate) fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Resource")
             .value("context", TestValue::Array(context))
@@ -50,7 +50,7 @@ fn resource(guid: u128, scu: f32, context: Vec<TestValue>) -> TestValue {
     )
 }
 
-fn item(guid: u128, units: i32) -> TestValue {
+pub(crate) fn item(guid: u128, units: i32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Item")
             .value("quantity", TestValue::Int32(units))
@@ -58,7 +58,7 @@ fn item(guid: u128, units: i32) -> TestValue {
     )
 }
 
-fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
+pub(crate) fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCost_Select")
             .value("count", TestValue::Int32(count))
@@ -74,21 +74,21 @@ fn select(count: i32, debug: &str, options: Vec<TestValue>) -> TestValue {
     )
 }
 
-fn multiplier(factor: f32) -> TestValue {
+pub(crate) fn multiplier(factor: f32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCostContext_QuantityMultiplier")
             .value("multiplier", TestValue::Single(factor)),
     )
 }
 
-fn inclusion(option: &str) -> TestValue {
+pub(crate) fn inclusion(option: &str) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingCostContext_ResultCompositionInclusion")
             .value("option", TestValue::text(option)),
     )
 }
 
-fn modifiers() -> TestValue {
+pub(crate) fn modifiers() -> TestValue {
     let linear = TestInstance::new("CraftingGameplayPropertyModifierValueRange_Linear")
         .value("startQuality", TestValue::Int32(0))
         .value("endQuality", TestValue::Int32(1000))
@@ -119,7 +119,7 @@ fn modifiers() -> TestValue {
     )
 }
 
-pub(super) fn time(minutes: i32, seconds: f32) -> TestValue {
+pub(crate) fn time(minutes: i32, seconds: f32) -> TestValue {
     TestValue::Struct(
         TestInstance::new("TimeValue_Partitioned")
             .value("days", TestValue::Int32(0))
@@ -317,8 +317,12 @@ pub(crate) fn ambiguous_database() -> DataForgeBuilder {
 
 /// Returns the DataForge of the fixture.
 pub(crate) fn database() -> DataForgeBuilder {
-    let builder = structures::structures(DataForgeBuilder::new().version(8));
-    let builder = [IRON, GOLD, PRODUCT_A, PRODUCT_B, BLACKLISTED, PYRO]
+    with_crafting_detail(DataForgeBuilder::new().version(8))
+}
+
+pub(super) fn with_crafting_detail(builder: DataForgeBuilder) -> DataForgeBuilder {
+    let builder = structures::structures(builder);
+    let builder = [IRON, GOLD, PRODUCT_A, PRODUCT_B, BLACKLISTED]
         .into_iter()
         .zip(1_u32..)
         .fold(builder, |builder, (guid, number)| {
@@ -329,5 +333,47 @@ pub(crate) fn database() -> DataForgeBuilder {
                 format!("libs/foundry/records/stubs/stub{number}.xml"),
             ))
         });
+    let builder = builder.record(TestRecord::new(
+        PYRO,
+        "StarMapObject",
+        "StarMapObject.FixtureLocation",
+        "libs/foundry/records/stubs/fixture_location.xml",
+    ));
     records::dismantle_and_global(records::quality(records::rewards(blueprints(builder))))
+}
+
+const QUALITY_POSITION: u128 = 0xa114_4000_0000_4000_8000_0000_0000_0001;
+
+pub(super) fn position_database() -> DataForgeBuilder {
+    let selection = select(
+        1,
+        "",
+        vec![
+            TestValue::Null,
+            select(
+                1,
+                "",
+                vec![TestValue::Null, resource(IRON, 1.0, vec![modifiers()])],
+            ),
+        ],
+    );
+    let ordinal_tier = tier(
+        time(1, 0.0),
+        TestValue::Null,
+        vec![TestValue::Null, selection],
+    );
+    database().record(blueprint(
+        QUALITY_POSITION,
+        "FixtureQualityPosition",
+        "bp_craft_quality_position",
+        PRODUCT_A,
+        vec![
+            tier(time(0, 0.0), TestValue::Null, Vec::new()),
+            ordinal_tier,
+        ],
+    ))
+}
+
+pub(super) const fn quality_position_guid() -> u128 {
+    QUALITY_POSITION
 }

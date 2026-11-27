@@ -4,18 +4,20 @@
 //! Textures of scene parts: embedded once however many parts use them, at the chosen mip, with
 //! the palette of a part as the factor over the shared image.
 
+use std::collections::BTreeSet;
+
 use p4kx_gltf::{
     GlbOptions, MaterialMode, Scene, SceneNode, ScenePart, TextureLoadError, TextureRole,
-    write_scene_glb,
+    write_scene_glb, write_scene_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, TintEntry, TintPalette, Transform};
-use p4kx_testkit::{TestMtlMaterial, check_glb};
+use p4kx_testkit::{TestMtlMaterial, check_glb, gltf::Semantic};
 
 use crate::scene_support::{
-    TestResult, base_colours, close, library, read_cube, translation, write,
+    TestResult, add_cube_tangents, base_colours, close, library, read_cube, translation, write,
 };
 use crate::textures::support::{
-    Stub, base_image, near, plain, plate, plate_stub, texture, textured,
+    Stub, add_uvless_mesh, base_image, near, plain, plate, plate_stub, texture, textured,
 };
 
 fn scene_of<'m>(
@@ -77,6 +79,43 @@ fn the_parts_of_a_scene_embed_the_images_they_share_once() -> TestResult {
     assert_eq!(two.shared_meshes, 0, "two libraries, two meshes");
     assert!(two.shared_textures > one.shared_textures, "{one:?} {two:?}");
     assert_eq!(two.textured_materials, 2 * one.textured_materials);
+    Ok(())
+}
+
+pub(crate) fn mixed_uv_glb() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut model = read_cube()?;
+    add_uvless_mesh(&mut model)?;
+    add_cube_tangents(&mut model)?;
+
+    let status = library(&plates());
+    let stub = plate_stub(
+        [200, 100, 50, 255],
+        [128, 128, 255, 255],
+        [255, 255, 255, 255],
+    )?;
+    let scene = scene_of(&model, &[&status])?;
+    let mut bytes = Vec::new();
+    write_scene_glb_with(&scene, &textured(), &stub, &mut bytes)?;
+    Ok(bytes)
+}
+
+#[test]
+fn textures_bind_only_to_primitives_with_texture_coordinates() -> TestResult {
+    let bytes = mixed_uv_glb()?;
+    let glb = check_glb(&bytes)?;
+    assert!(glb.document.images().len() > 0);
+    let mut bindings = BTreeSet::new();
+    for primitive in glb.document.meshes().flat_map(|mesh| mesh.primitives()) {
+        let material = primitive.material();
+        let pbr = material.pbr_metallic_roughness();
+        let has_uvs = primitive.get(&Semantic::TexCoords(0)).is_some();
+        assert_eq!(pbr.base_color_texture().is_some(), has_uvs);
+        assert_eq!(pbr.metallic_roughness_texture().is_some(), has_uvs);
+        assert_eq!(material.normal_texture().is_some(), has_uvs);
+        assert_eq!(primitive.get(&Semantic::Tangents).is_some(), has_uvs);
+        bindings.insert(has_uvs);
+    }
+    assert_eq!(bindings, BTreeSet::from([false, true]));
     Ok(())
 }
 
@@ -314,7 +353,7 @@ fn a_stencil_decal_that_takes_the_decal_colours_is_painted_with_those_of_each_li
     let second = palette("second", [[0.0, 0.0, 1.0]; 3]);
     let stub = Stub::default().with(
         "objects/test/logo_stencil.dds",
-        &texture([255, 0, 0, 255], false)?,
+        &texture([255, 0, 255, 255], false)?,
     );
 
     let (glb, summary) = write(
@@ -335,7 +374,7 @@ fn a_stencil_decal_that_takes_the_decal_colours_is_painted_with_those_of_each_li
         .collect::<Result<_, _>>()?;
     assert!(
         near(pixels[0], [255, 0, 0, 255]),
-        "the red mask is red: {pixels:?}"
+        "the red mask covers the blue mask in the first livery: {pixels:?}"
     );
     assert!(near(pixels[1], [0, 0, 255, 255]), "{pixels:?}");
     for logo in &logos {

@@ -43,6 +43,12 @@ impl CancelToken {
     pub fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::Relaxed)
     }
+
+    /// Returns the shared cancellation flag for synchronous guarded operations.
+    #[must_use]
+    pub fn flag(&self) -> &AtomicBool {
+        &self.0
+    }
 }
 
 /// How far an Extraction has come.
@@ -61,6 +67,8 @@ pub struct Progress {
 /// The settings of one Extraction.
 #[derive(Clone, Copy, Default)]
 pub struct ExtractOptions<'a> {
+    /// Immutable source-origin evidence shared by an Archive-backed output job.
+    pub protection: Option<&'a p4kx_guard::ArchiveWriteProtection>,
     /// What to do with files that already exist.
     pub policy: ConflictPolicy,
     /// Converts `CryXml` Entries to UTF-8 XML, split DDS textures as `textures` says, WEM sounds

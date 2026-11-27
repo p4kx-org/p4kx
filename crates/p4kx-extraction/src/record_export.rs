@@ -2,26 +2,47 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
-use std::fs;
-use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml, TreeBuilder};
+use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml};
 use rayon::prelude::*;
 
-use crate::counting::holds_sized;
 use crate::dependent::split_dependent;
-use crate::entry_path::relative_path;
-use crate::folder_cache::FolderCache;
-use crate::portable_name::{check_path_length, fold};
+use crate::portable_name::fold;
 use crate::record_files::RecordFiles;
-use crate::record_format::RecordFileFormat;
+use crate::record_format::{RecordFileFormat, xml_receipt};
 use crate::record_plan::RecordFilePlan;
-use crate::write::{create_temporary, read_existing_error, write_error};
 use crate::{
-    ConflictPolicy, ExtractionError, RecordExportError, RecordExportOptions, RecordExportReport,
-    RecordFailure, RecordRenamed,
+    ConflictPolicy, DataForgeEntry, ExtractionError, RecordExportError, RecordExportOptions,
+    RecordExportProvenance, RecordExportReport, RecordRenamed,
 };
+
+#[path = "record_export_accounting.rs"]
+mod accounting;
+use accounting::summarise;
+
+#[path = "record_json_export.rs"]
+mod json_export;
+pub use json_export::{
+    export_annotated_record_json_files, export_planned_record_json_files_with_origins,
+    export_record_json_files_with_origins,
+};
+
+#[path = "record_xml_export.rs"]
+mod xml_export;
+pub use xml_export::{
+    export_annotated_record_xml_files, export_localized_record_xml_files,
+    export_planned_record_xml_files_with_origins, export_record_xml_files_with_origins,
+};
+
+#[path = "record_export_sources.rs"]
+mod sources;
+pub use sources::RecordExportSources;
+
+#[path = "record_artifact_writer.rs"]
+mod writer;
+pub(crate) use writer::replace_record;
+use writer::{Observation, Scratch, Writer};
 
 /// Writes `records` of `forge` as Record XML, one file per Record, below the existing folder
 /// `target`; [`export_record_files`] with [`RecordXml`].
@@ -54,7 +75,7 @@ pub fn export_record_files<F: RecordFileFormat>(
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
     let plan = RecordFiles::plan(forge, F::EXTENSION);
-    write_with_options::<F>(forge, &plan, records, target, options)
+    write_with_options::<F>(forge, &plan, records, target, options, false, None)
 }
 
 /// Writes `records` of `forge` like [`export_record_files`], with the files of `plan`.
@@ -69,11 +90,86 @@ pub fn export_planned_record_files<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
-    if plan.fits(forge) {
-        write_with_options::<F>(forge, plan.files(), records, target, options)
+    write_planned(forge, plan, records, target, options, false, None)
+}
+
+/// Writes the planned Records and retains the definition positions of the committed files.
+#[must_use]
+pub fn export_planned_record_files_with_receipt<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+) -> RecordExportReport {
+    write_planned(forge, plan, records, target, options, true, None)
+}
+
+fn write_planned<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+    observation: Option<Observation<'_, F>>,
+) -> RecordExportReport {
+    let rebuilt;
+    let files = if plan.fits(forge) {
+        plan.files()
     } else {
-        export_record_files::<F>(forge, records, target, options)
+        rebuilt = RecordFiles::plan(forge, F::EXTENSION);
+        &rebuilt
+    };
+    write_with_options::<F>(
+        forge,
+        files,
+        records,
+        target,
+        options,
+        retain_receipt,
+        observation,
+    )
+}
+
+fn write_observed<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    observation: Observation<'_, F>,
+    plan: Option<&RecordFilePlan<F>>,
+) -> Result<RecordExportReport, ExtractionError> {
+    if options.annotations().is_active() {
+        return Err(crate::write::write_error(
+            target.to_path_buf(),
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Record annotation sources were not supplied",
+            ),
+        ));
     }
+    if let Some(plan) = plan {
+        return Ok(write_planned(
+            forge,
+            plan,
+            records,
+            target,
+            options,
+            true,
+            Some(observation),
+        ));
+    }
+    let plan = RecordFiles::plan(forge, F::EXTENSION);
+    Ok(write_with_options::<F>(
+        forge,
+        &plan,
+        records,
+        target,
+        options,
+        false,
+        Some(observation),
+    ))
 }
 
 fn write_with_options<F: RecordFileFormat>(
@@ -82,9 +178,13 @@ fn write_with_options<F: RecordFileFormat>(
     records: &[Record<'_>],
     target: &Path,
     options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+    observation: Option<Observation<'_, F>>,
 ) -> RecordExportReport {
     let (cancel, progress) = (options.cancel, options.progress);
     let run = RecordRun {
+        protection: options.protection,
+        cancel: options.cancel,
         policy: options.policy,
         annotations: options.annotations(),
         stop: &|| cancel.is_some_and(crate::CancelToken::is_cancelled),
@@ -94,35 +194,72 @@ fn write_with_options<F: RecordFileFormat>(
             }
         },
     };
-    write_records::<F>(forge, plan, records, target, &run)
+    write_records_inner::<F>(
+        forge,
+        plan,
+        records,
+        target,
+        &run,
+        retain_receipt,
+        observation,
+    )
 }
 
 /// How a run writes Record files: the Conflict policy, whether to stop before the next Record,
 /// and what to call once a Record ended.
 pub(crate) struct RecordRun<'a> {
+    pub(crate) protection: Option<&'a crate::ArchiveWriteProtection>,
+    pub(crate) cancel: Option<&'a crate::CancelToken>,
     pub(crate) policy: ConflictPolicy,
     pub(crate) annotations: Annotations<'a>,
     pub(crate) stop: &'a (dyn Fn() -> bool + Sync),
     pub(crate) ended: &'a (dyn Fn() + Sync),
 }
 
-/// Writes `records` of `forge` in the format `F` to the files of `plan` like
-/// [`export_record_files`], under the control of `run`.
-pub(crate) fn write_records<'f, F: RecordFileFormat>(
+/// Writes converted Record XML files and their source evidence under the extraction run.
+pub(crate) fn write_converted_record_xml(
+    input: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    target: &Path,
+    run: &RecordRun<'_>,
+) -> RecordExportReport {
+    let plan = RecordFiles::plan(forge, RecordXml::EXTENSION);
+    let observation = Some(Observation::new(input, &xml_receipt::render));
+    let mut report = write_records_inner(forge, &plan, records, target, run, true, observation);
+    let indices = report.take_written_record_indices();
+    report.written_provenance = Some(
+        RecordExportProvenance::capture_count(input.origin_of(forge), indices, report.written())
+            .map(Box::new),
+    );
+    report
+}
+
+fn write_records_inner<'f, F: RecordFileFormat>(
     forge: &DataForge<'_>,
     plan: &RecordFiles,
     records: &[Record<'f>],
     target: &Path,
     run: &RecordRun<'_>,
+    retain_receipt: bool,
+    observation: Option<Observation<'_, F>>,
 ) -> RecordExportReport {
-    if let Err(refused) = p4kx_guard::ensure_writable(target) {
+    let written_record_indices = retain_receipt.then(Vec::new);
+    if let Err(refused) = crate::check_protected_output(target, run.protection, run.cancel) {
+        if refused.is_cancelled() {
+            return RecordExportReport {
+                cancelled: records.len(),
+                written_record_indices,
+                ..RecordExportReport::default()
+            };
+        }
         let outcomes = (0..records.len())
             .map(|index| {
                 let error = ExtractionError::Installation(refused.clone());
                 (index, RecordOutcome::Failed(error.into()))
             })
             .collect();
-        return summarise(records, outcomes);
+        return summarise(records, outcomes, written_record_indices);
     }
     let files = select_files(forge, plan, records);
     let (independent, dependent) = split_dependent(files.iter().map(|file| match file {
@@ -130,13 +267,12 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
         Selected::Taken(_) | Selected::Unsafe => "",
     }));
     let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
-    let writer = Writer {
-        target: &absolute,
-        policy: run.policy,
-        annotations: run.annotations,
-        stop: run.stop,
-        folders: FolderCache::default(),
+    let reserved = if observation.is_some() {
+        companion_folders(&files)
+    } else {
+        HashSet::new()
     };
+    let writer = Writer::new(run, &absolute, forge, observation, reserved);
     let ended = run.ended;
     let run = |scratch: &mut Scratch<'f, F>, index: usize| {
         let outcome = match (records.get(index), files.get(index)) {
@@ -161,7 +297,7 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
     let mut scratch = Scratch::default();
     outcomes.extend(dependent.into_iter().map(|index| run(&mut scratch, index)));
     outcomes.sort_unstable_by_key(|(index, _)| *index);
-    let mut report = summarise(records, outcomes);
+    let mut report = summarise(records, outcomes, written_record_indices);
     report.renamed = renamed(forge, plan, records);
     report
 }
@@ -204,41 +340,6 @@ fn select_files<'p>(
         .collect()
 }
 
-fn summarise(records: &[Record<'_>], outcomes: Vec<(usize, RecordOutcome)>) -> RecordExportReport {
-    let mut report = RecordExportReport::default();
-    for (index, outcome) in outcomes {
-        let errors = match outcome {
-            RecordOutcome::Written { errors } => {
-                report.written += 1;
-                errors
-            }
-            RecordOutcome::Kept { file, errors } => {
-                report.skipped.push(file);
-                errors
-            }
-            RecordOutcome::Cancelled => {
-                report.cancelled += 1;
-                0
-            }
-            RecordOutcome::Failed(error) => {
-                let record = records.get(index);
-                report.failures.push(RecordFailure {
-                    guid: record.map(Record::guid).unwrap_or_default(),
-                    record_path: record
-                        .and_then(|record| record.record_path().ok())
-                        .unwrap_or_default()
-                        .to_owned(),
-                    error,
-                });
-                0
-            }
-        };
-        report.error_values += errors;
-        report.records_with_errors += usize::from(errors > 0);
-    }
-    report
-}
-
 /// The file a selected Record is written to, if it can be.
 #[derive(Clone, Copy)]
 enum Selected<'p> {
@@ -247,128 +348,36 @@ enum Selected<'p> {
     Unsafe,
 }
 
+fn companion_folders(files: &[Selected<'_>]) -> HashSet<String> {
+    files
+        .iter()
+        .filter_map(|file| match file {
+            Selected::File(path) => Some(*path),
+            _ => None,
+        })
+        .flat_map(|path| {
+            path.match_indices('/')
+                .filter_map(move |(end, _)| path.get(..end))
+        })
+        .filter(|folder| {
+            folder.rsplit('/').next().is_some_and(|part| {
+                crate::file_receipt::is_companion_name(std::ffi::OsStr::new(part))
+            })
+        })
+        .map(|folder| fold(folder).collect())
+        .collect()
+}
+
 enum RecordOutcome {
-    Written { errors: usize },
-    Kept { file: String, errors: usize },
+    Written {
+        errors: usize,
+        receipt: Option<PathBuf>,
+        origin_failure: Option<ExtractionError>,
+    },
+    Kept {
+        file: String,
+        errors: usize,
+    },
     Cancelled,
     Failed(RecordExportError),
-}
-
-impl<F: Default> Default for Scratch<'_, F> {
-    fn default() -> Self {
-        Self {
-            trees: TreeBuilder::default(),
-            format: F::default(),
-            bytes: Vec::new(),
-            read: Vec::new(),
-        }
-    }
-}
-
-struct Scratch<'f, F> {
-    trees: TreeBuilder<'f>,
-    format: F,
-    bytes: Vec<u8>,
-    read: Vec<u8>,
-}
-
-struct Writer<'a> {
-    target: &'a Path,
-    policy: ConflictPolicy,
-    annotations: Annotations<'a>,
-    stop: &'a (dyn Fn() -> bool + Sync),
-    folders: FolderCache,
-}
-
-impl Writer<'_> {
-    fn write<'f, F: RecordFileFormat>(
-        &self,
-        record: &Record<'f>,
-        file: &str,
-        scratch: &mut Scratch<'f, F>,
-    ) -> RecordOutcome {
-        if (self.stop)() {
-            return RecordOutcome::Cancelled;
-        }
-        match self.try_write(record, file, scratch) {
-            Ok(outcome) => outcome,
-            Err(error) => RecordOutcome::Failed(error),
-        }
-    }
-
-    fn try_write<'f, F: RecordFileFormat>(
-        &self,
-        record: &Record<'f>,
-        file: &str,
-        scratch: &mut Scratch<'f, F>,
-    ) -> Result<RecordOutcome, RecordExportError> {
-        let relative = relative_path(file)?;
-        check_path_length(&self.target.join(&relative)).map_err(ExtractionError::from)?;
-        let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
-        let tree = scratch.trees.build(record)?;
-        let errors = tree.error_count();
-        let folder = self.folders.folder(self.target, relative.parent())?;
-        let destination = folder.join(name);
-        scratch.bytes.clear();
-        scratch
-            .format
-            .write_file(&tree, self.annotations, &mut scratch.bytes)
-            .map_err(|source| write_error(destination.clone(), source))?;
-        if self.keep(&destination, scratch)? {
-            return Ok(RecordOutcome::Kept {
-                file: file.to_owned(),
-                errors,
-            });
-        }
-        let (temporary, mut part) = create_temporary(&folder)?;
-        let written = part
-            .write_all(&scratch.bytes)
-            .map_err(|source| write_error(temporary.clone(), source))
-            .and_then(|()| {
-                drop(part);
-                fs::rename(&temporary, &destination)
-                    .map_err(|source| write_error(destination.clone(), source))
-            });
-        if let Err(error) = written {
-            let _ignored = fs::remove_file(&temporary);
-            return Err(error.into());
-        }
-        Ok(RecordOutcome::Written { errors })
-    }
-
-    fn keep<F>(
-        &self,
-        destination: &Path,
-        scratch: &mut Scratch<'_, F>,
-    ) -> Result<bool, ExtractionError> {
-        let metadata = match fs::symlink_metadata(destination) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-            Err(source) => return Err(read_existing_error(destination, source)),
-        };
-        if !metadata.is_file() {
-            return Err(write_error(
-                destination.to_path_buf(),
-                io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "a folder or link is in the way",
-                ),
-            ));
-        }
-        match self.policy {
-            ConflictPolicy::Skip => Ok(true),
-            ConflictPolicy::Overwrite => Ok(false),
-            ConflictPolicy::IfChanged => {
-                let bytes = &scratch.bytes;
-                holds_sized(
-                    destination,
-                    metadata.len(),
-                    bytes.len() as u64,
-                    || crc32c::crc32c(bytes),
-                    &mut scratch.read,
-                )
-                .map_err(|source| read_existing_error(destination, source))
-            }
-        }
-    }
 }

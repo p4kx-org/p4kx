@@ -21,8 +21,11 @@
 
 mod annotations;
 mod build;
+mod data_mapping;
 mod dataforge;
 mod error;
+mod field_escapes;
+mod field_storage;
 mod fields;
 mod flat;
 mod flat_cells;
@@ -34,17 +37,35 @@ mod json;
 mod json_text;
 mod kinds;
 mod layout;
+mod layout_cursor;
+mod layout_source;
 mod location;
 mod nested;
+mod pointer_offsets;
+mod positioned_record;
+mod positioned_reference;
+mod positioned_reference_members;
+mod positioned_sites;
+mod positioned_sources;
 mod probe;
 pub mod query;
+mod read_observer;
 mod record;
+mod record_metadata;
+mod record_path_observation;
 mod record_table;
 mod reference_index;
+mod reference_origin;
 mod rows;
 mod scalar;
 mod schema;
 mod slot;
+mod source_layout_allocation;
+mod source_layout_index;
+mod source_layout_properties;
+#[cfg(test)]
+mod source_layout_tests;
+mod source_layout_validation;
 mod strings;
 mod survey;
 mod table;
@@ -52,44 +73,85 @@ mod tag_build;
 mod tags;
 mod texts;
 mod tree;
+mod tree_cursor;
+mod tree_owner;
 mod value;
+mod value_clone;
+mod value_debug;
+mod value_drain;
+mod value_eq;
 mod value_error;
 mod value_json;
 mod value_text;
 mod weak;
 mod xml;
 mod xml_text;
-mod xml_write;
 
 pub use annotations::{Annotations, TAG_TYPE, TagResolver};
-pub use build::{MAX_NESTING_DEPTH, MAX_RECORD_VALUES, TreeBuilder};
+pub use build::TreeBuilder;
+pub use data_mapping::DataMappingDeclaration;
 pub use dataforge::DataForge;
 pub use error::DataForgeError;
+pub use field_storage::FieldStorage;
 pub use fields::{
-    FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, MAX_DISTINCT_VALUES,
-    MAX_FIELD_PATHS, Number,
+    FieldKind, FieldStat, FieldStatistics, FieldStatisticsCoverageState,
+    FieldStatisticsDistinctUse, FieldStatisticsError, FieldStatisticsFingerprint,
+    FieldStatisticsGap, FieldStatisticsInput, FieldStatisticsMetricCoverage,
+    FieldStatisticsObservation, FieldStatisticsOperand, FieldStatisticsReducedRow,
+    FieldStatisticsReduction, FieldStatisticsRouteEdge, FieldStatisticsRouteTarget,
+    FieldStatisticsScalarRead, FieldStatisticsSlot, FieldStatisticsSourceScope, FieldStatisticsUse,
+    FieldStatisticsValue, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, Number,
 };
-pub use flat::{FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatFormat, FlatValues};
-pub use flat_cells::{CSV_BYTE_ORDER_MARK, write_csv_cell};
+pub use flat::{
+    FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatColumn, FlatColumnSpan, FlatFormat,
+    FlatRowObservation, FlatValues,
+};
+pub use flat_cells::{CSV_BYTE_ORDER_MARK, CsvCellMode, write_csv_cell, write_csv_cell_with_mode};
 pub use guid::{Guid, InvalidGuid};
-pub use header::{SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
+pub use header::{DataForgeHeaderField, SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};
-pub use json::{JsonLayout, RecordJson};
+pub use json::{
+    JsonLayout, RecordJson, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
+    RecordJsonSource, RecordJsonStep, RecordJsonUse, RecordJsonUseRole,
+};
 pub use kinds::{DataType, ValueKind};
-pub use layout::{MAX_INHERITANCE_DEPTH, MAX_RECORD_FIELDS};
+pub use layout_source::LayoutSource;
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
+pub use positioned_record::PositionedRecord;
+pub use positioned_reference::PositionedReferenceSources;
+pub use positioned_reference_members::{RecordJsonReferenceMember, RecordJsonReferenceSources};
+pub use positioned_sites::{PositionedFields, PositionedValue};
+pub use positioned_sources::PositionedSources;
 pub use probe::PointerProbe;
+pub use read_observer::CanonicalReadObserver;
 pub use record::Record;
-pub use reference_index::{FileGraph, IndexedReference, MAX_INDEXED_REFERENCES, ReferenceIndex};
+pub use record_metadata::{RecordMetadata, RecordText};
+pub use record_path_observation::{RecordOrderingName, RecordPathObservation};
+pub use reference_index::{
+    FileGraph, IndexedReference, IndexedReferenceOrigin, MAX_INDEXED_REFERENCES, ObservedFileEdge,
+    ObservedFileGraph, ObservedReferenceIndex, ReferenceIndex, ReferenceIndexError,
+    ReferenceScanGap,
+};
+pub use reference_origin::ReferenceOrigin;
+pub use scalar::ScalarSource;
 pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
+#[expect(
+    deprecated,
+    reason = "Public compatibility for the released Tag constants"
+)]
+pub use tags::{MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES};
 pub use tags::{
-    MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, MAX_TAG_TEXT_BYTES, TAG_DATABASE_TYPE,
-    TAG_PATH_SEPARATOR, Tag, TagTree, TagTreeIssues,
+    TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagPath, TagPathEdgeKind,
+    TagPathIncoming, TagRelationIssue, TagTree, TagTreeIssues,
 };
-pub use texts::{Resolution, TextResolver};
+pub use texts::{LocalizationInput, ObservedResolution, Resolution, TextResolver};
 pub use tree::RecordTree;
+pub use tree_cursor::ValueVisit;
 pub use value::{Field, Value};
 pub use value_error::ValueError;
-pub use xml::{RECORD_XML_NAMESPACE, RecordXml};
+pub use xml::{
+    RECORD_XML_NAMESPACE, RecordXml, RecordXmlHeaderMember, RecordXmlObserver, RecordXmlSite,
+    RecordXmlSpan, RecordXmlToken, RecordXmlValueMember,
+};

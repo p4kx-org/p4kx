@@ -172,7 +172,7 @@ fn named_movie(url: &str, paths: &[(&str, &str)]) -> Result<Outcome, Box<dyn Err
 }
 
 #[test]
-fn the_two_best_candidates_are_tried_in_turn_and_no_third() -> TestResult {
+fn ranked_candidates_are_tried_until_one_exports_the_requested_font() -> TestResult {
     let best = "Data\\UI\\Screens\\SWF\\X.swf";
     let second = "Data\\UI\\Q\\X.swf";
     let third = "Data\\UI\\R\\X.swf";
@@ -183,11 +183,16 @@ fn the_two_best_candidates_are_tried_in_turn_and_no_third() -> TestResult {
     assert_eq!(movies, [best, second]);
     assert!(issues.is_empty(), "{issues:?}");
     assert_eq!(drawn, GREEN);
-    let (movies, issues, _) = named_movie(
+    let (movies, issues, drawn) = named_movie(
         "X.swf",
         &[(best, "$Other"), (second, "$Other"), (third, "$Font")],
     )?;
-    assert_eq!(movies, [best, second], "the third is never read");
-    assert_eq!(issues, [ImportIssue::NoSuchExport]);
+    assert_eq!(
+        movies,
+        [best, second, third],
+        "the third owns the requested export"
+    );
+    assert!(issues.is_empty(), "{issues:?}");
+    assert_eq!(drawn, GREEN, "the successful candidate supplied the glyph");
     Ok(())
 }

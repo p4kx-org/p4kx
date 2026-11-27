@@ -1,19 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
 use std::sync::Arc;
 
+use crate::reference_origin::ReferenceOrigin;
+use crate::tree_cursor::{Cursor, ValueVisit};
+use crate::tree_owner::TreeOwner;
 use crate::{Field, Guid, Location, Value};
 
 /// A struct inside a Record, or the Record's own fields: an inline class, the target of a strong
 /// pointer, or the root of a [`RecordTree`](crate::RecordTree).
-#[derive(Debug, Clone, PartialEq)]
 pub struct StructValue<'f> {
     pub(crate) type_name: &'f str,
+    pub(crate) struct_index: u32,
     pub(crate) fields: Vec<Field<'f>>,
 }
 
 impl<'f> StructValue<'f> {
+    pub(crate) fn into_fields(mut self) -> Vec<Field<'f>> {
+        std::mem::take(&mut self.fields)
+    }
     /// Returns the name of the struct, which for a strong pointer may derive from the declared
     /// one.
     #[must_use]
@@ -21,10 +28,25 @@ impl<'f> StructValue<'f> {
         self.type_name
     }
 
+    /// Returns the physical definition index in the source struct table.
+    #[must_use]
+    pub const fn struct_index(&self) -> u32 {
+        self.struct_index
+    }
+
     /// Returns the fields in declaration order, the inherited ones first.
     #[must_use]
     pub fn fields(&self) -> &[Field<'f>] {
         &self.fields
+    }
+
+    /// Visits each owned value in preorder, with fields and arrays in stored order.
+    /// References are leaves and do not traverse into their targets.
+    pub fn visit_owned_values(&self, mut visit: impl FnMut(ValueVisit<'_, '_, 'f>)) {
+        let mut cursor = Cursor::new(self.fields());
+        while let Some(value) = cursor.next() {
+            visit(value);
+        }
     }
 
     /// Returns the value of the first field called `name`, or `None` when there is none.
@@ -41,15 +63,53 @@ impl<'f> StructValue<'f> {
 ///
 /// A Reference field links to another Record. A weak pointer links into the Record that holds
 /// it: to the same GUID and record path, with the [`location`](Self::location) of the instance.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Reference<'f> {
+    pub(crate) owner: TreeOwner<'f>,
+    pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
     pub(crate) type_name: &'f str,
     pub(crate) location: Option<Arc<Location<'f>>>,
 }
 
+impl PartialEq for Reference<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_index == other.record_index
+            && self.guid == other.guid
+            && self.record_path == other.record_path
+            && self.type_name == other.type_name
+            && self.location == other.location
+    }
+}
+
+impl Eq for Reference<'_> {}
+
+impl fmt::Debug for Reference<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Reference")
+            .field("record_index", &self.record_index)
+            .field("guid", &self.guid)
+            .field("record_path", &self.record_path)
+            .field("type_name", &self.type_name)
+            .field("location", &self.location)
+            .finish()
+    }
+}
+
 impl<'f> Reference<'f> {
+    /// Borrows the original paired target admission without looking it up again.
+    #[must_use]
+    pub const fn original_target(&self) -> ReferenceOrigin<'_, 'f> {
+        ReferenceOrigin::new(self)
+    }
+
+    /// Returns the actual target Record position in source definition order.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
     /// Returns the GUID of the target Record.
     #[must_use]
     pub const fn guid(&self) -> Guid {

@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use p4kx_model::{
-    CompanionError, CompanionPath, MAX_LAYER_FILES, MAX_LAYERS, MaterialLibrary, MaterialStatus,
-    PaletteSlot, TintEntry, TintPalette,
+    CompanionError, CompanionPath, MAX_LAYER_FILES, MaterialLibrary, MaterialStatus, PaletteSlot,
+    TintEntry, TintPalette,
 };
 use p4kx_testkit::{TestMtl, TestMtlMaterial};
 
@@ -194,7 +194,8 @@ fn a_path_that_leaves_the_data_folder_is_not_fetched() -> TestResult {
 
 #[test]
 fn the_files_one_library_makes_the_reader_fetch_are_limited() -> TestResult {
-    let layers_per_material = MAX_LAYERS;
+    const MATERIAL_GROUPS_BEFORE_LIMIT: usize = 4;
+    let layers_per_material = MAX_LAYER_FILES / MATERIAL_GROUPS_BEFORE_LIMIT;
     let materials = MAX_LAYER_FILES / layers_per_material + 2;
     let paths: Vec<String> = (0..materials * layers_per_material)
         .map(|at| format!("materials/layers/l{at}.mtl"))

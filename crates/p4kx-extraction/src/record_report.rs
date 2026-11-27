@@ -2,15 +2,21 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
+use std::path::PathBuf;
 
 use p4kx_dataforge::{Annotations, DataForgeError, Guid, TagResolver, TextResolver};
 use thiserror::Error;
 
-use crate::{CancelToken, ConflictPolicy, ExtractionError, NameRule};
+use crate::{
+    CancelToken, ConflictPolicy, ExtractionError, NameRule, RecordExportProvenance,
+    RecordExportProvenanceError,
+};
 
 /// The settings of one Record export.
 #[derive(Clone, Copy, Default)]
 pub struct RecordExportOptions<'a> {
+    /// Source-origin protection of an Archive-backed export job.
+    pub protection: Option<&'a crate::ArchiveWriteProtection>,
     /// What to do with files that already exist.
     pub policy: ConflictPolicy,
     /// Stops the run once cancelled.
@@ -39,6 +45,7 @@ impl<'a> RecordExportOptions<'a> {
 impl fmt::Debug for RecordExportOptions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecordExportOptions")
+            .field("protection", &self.protection)
             .field("policy", &self.policy)
             .field("cancel", &self.cancel)
             .field("progress", &self.progress.is_some())
@@ -168,13 +175,58 @@ pub struct RecordExportReport {
     pub(crate) cancelled: usize,
     pub(crate) error_values: usize,
     pub(crate) records_with_errors: usize,
+    pub(crate) written_record_indices: Option<Vec<u32>>,
+    pub(crate) written_provenance:
+        Option<Result<Box<RecordExportProvenance>, RecordExportProvenanceError>>,
+    pub(crate) origin_receipts: Vec<PathBuf>,
+    pub(crate) origin_failures: Vec<ExtractionError>,
 }
 
 impl RecordExportReport {
+    /// Returns the field companions committed by this run.
+    #[must_use]
+    pub fn origin_receipts(&self) -> &[PathBuf] {
+        &self.origin_receipts
+    }
+
+    /// Returns failures publishing origin evidence for committed Record files.
+    #[must_use]
+    pub fn origin_failures(&self) -> &[ExtractionError] {
+        &self.origin_failures
+    }
+
+    /// Takes the published companion paths.
+    #[must_use]
+    pub fn take_origin_receipts(&mut self) -> Vec<PathBuf> {
+        std::mem::take(&mut self.origin_receipts)
+    }
+
+    /// Takes the companion failures from committed Record files.
+    #[must_use]
+    pub fn take_origin_failures(&mut self) -> Vec<ExtractionError> {
+        std::mem::take(&mut self.origin_failures)
+    }
+
     /// Returns the number of Records written.
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Returns the written count's original definition evidence for a DataForge conversion.
+    #[must_use]
+    pub fn written_provenance(
+        &self,
+    ) -> Option<Result<&RecordExportProvenance, RecordExportProvenanceError>> {
+        self.written_provenance
+            .as_ref()
+            .map(|origin| origin.as_deref().map_err(|error| *error))
+    }
+
+    /// Takes the original definition indices of the Records committed by this run, when requested.
+    #[must_use]
+    pub const fn take_written_record_indices(&mut self) -> Option<Vec<u32>> {
+        self.written_record_indices.take()
     }
 
     /// Returns the files, relative to the target, whose existing file was kept.

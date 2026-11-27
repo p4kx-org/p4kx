@@ -1,4 +1,4 @@
-# A text preset takes its font and size from the standard text field canvas
+# A text preset takes its font, size and fallback colour from the standard text field canvas
 
 Decided for issue #992. Amends ADR-0101 ("The Archive holds no font style or size for the presets
 of text fields") and the open item "Text sizes" of ADR-0306.
@@ -36,8 +36,17 @@ the cascade set no size, 60 % of the box (`text style Heading1 names no font sty
   default entry, field by field. The brand is that of the screen and is looked up in the standard
   canvas, not in the canvas that holds the field, so a nested canvas without brand styles gets the
   brand's entry too; a brand the standard canvas lacks gets the default.
-- Only entries that select exactly one preset tag count. Other modifiers of those entries (colour,
-  alignment, spacing) are not applied here.
+- Only entries that select exactly one preset tag count. An authored preset `FillColor` supplies
+  text colour where the cascade and widget supply none. This fallback is independent of the
+  font-size decision. The active palette resolves the authored slot and alpha. A missing preset
+  colour leaves the text without a colour.
+- LIVE RSI entries for the Heading1 and Title1 presets author the palette-slot FillColor used by
+  the General and GeneralLarge template labels. The corresponding default preset entries supply
+  font, size and spacing. The General template's shared RSI label rule sets alpha, font and
+  padding and supplies no FillColor.
+- An observed still includes the exact standard Canvas branch, entry and modifier as a source
+  use when the renderer accepts glyph paint using the preset colour. Measuring the text and
+  selecting a stronger colour do not contribute a preset-colour use.
 - A preset with no entry or no size is listed as `text style <preset> has no font size in the
   Archive: taken from the height of the widget`; a missing standard canvas is listed once as
   `standard text field not found in the Archive`.
@@ -52,5 +61,5 @@ repository, so no render was set beside them.
 
 ## Not done
 
-The line spacing of the default entry, the colours the entries set and the preset fonts of other
-widget types are not read.
+The line spacing and alignment of preset entries and the preset fonts of other widget types are
+not read.

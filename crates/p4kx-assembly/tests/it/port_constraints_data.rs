@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A port definition carries the data placement and fit need: the tags, the detach direction and
-//! whether the item keeps its own orientation.
+//! Port constraints and static attachment transforms.
 
 use std::error::Error;
 
-use p4kx_assembly::{EntityNode, LoadoutResolver, PortDefinition};
+use p4kx_assembly::{Assembly, EntityNode, LoadoutResolver, Placement, PortDefinition};
 use p4kx_dataforge::DataForge;
+use p4kx_extraction::Archive;
+use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{DataForgeBuilder, TestEntity, TestPort, entity_schema};
+
+use crate::assembly_support::{assemble, fixture};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -35,7 +38,7 @@ fn definition<'n>(node: &'n EntityNode, port: &str) -> Result<&'n PortDefinition
 }
 
 #[test]
-fn a_gimbal_port_keeps_its_orientation_and_a_plain_port_does_not() -> TestResult {
+fn the_entity_attachment_flag_is_read_as_stored() -> TestResult {
     let ship = resolve(vec![
         TestPort::new("gimbal").entity_attachment(true),
         TestPort::new("fixed").entity_attachment(false),
@@ -71,5 +74,73 @@ fn the_tags_of_a_port_are_read_as_stored() -> TestResult {
     let rack = definition(&ship, "rack")?;
     assert_eq!(rack.port_tags(), "Missile Rack");
     assert_eq!(rack.required_tags(), "$Paint_Base");
+    Ok(())
+}
+
+#[test]
+fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestResult {
+    let fixture = fixture(p4kx_testkit::static_relay_entries())?;
+    let archive = Archive::open(&fixture.path)?;
+    let assembly = assemble(&archive, "TEST_Relay", 0)?;
+    let attached = assembly
+        .part_at("slot")
+        .ok_or("attached fuse at static slot")?;
+    assert_eq!(
+        attached.placement(),
+        &Placement::PortNode,
+        "the model's slot node supplies the placement"
+    );
+    assert_eq!(
+        attached.world().rows,
+        [
+            [0.0, -1.0, 0.0, 9.0],
+            [0.0, 0.0, -1.0, 7.0],
+            [1.0, 0.0, 0.0, 16.0],
+        ],
+        "the static fuse composes the frame's X rotation with the socket's Z rotation and offset"
+    );
+    verify_glb_socket(&assembly)
+}
+
+fn verify_glb_socket(assembly: &Assembly) -> TestResult {
+    let mut bytes = Vec::new();
+    assembly.write_glb(&GlbOptions::default(), &mut bytes)?;
+    let glb = p4kx_testkit::check_glb(&bytes)?;
+    let relay = glb
+        .document
+        .nodes()
+        .find(|node| node.name() == Some("TEST_Relay"))
+        .ok_or("static GLB relay node")?;
+    let fuse = relay
+        .children()
+        .find(|node| node.name() == Some("slot/TEST_Fuse"))
+        .ok_or("GLB fuse attached to its relay")?;
+    let model_root = fuse
+        .children()
+        .find(|node| node.name() == Some("cube"))
+        .ok_or("the authored fuse model root is below its attachment")?;
+    assert!(
+        model_root
+            .children()
+            .any(|node| node.name() == Some("cube_mesh") && node.mesh().is_some()),
+        "the attached model retains its drawable geometry"
+    );
+
+    // glTF columns are the original Z-up basis and translation expressed in Y-up axes.
+    let expected = [
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+        [9.0, 16.0, -7.0, 1.0],
+    ];
+    let matrix = fuse.transform().matrix();
+    assert!(
+        matrix
+            .into_iter()
+            .flatten()
+            .zip(expected.into_iter().flatten())
+            .all(|(actual, wanted)| (actual - wanted).abs() < 1e-5),
+        "the full socket transform reaches GLB: {matrix:?}"
+    );
     Ok(())
 }

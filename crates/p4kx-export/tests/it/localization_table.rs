@@ -103,6 +103,21 @@ fn raw_csv_keeps_the_exact_keys_and_texts() -> TestResult {
 }
 
 #[test]
+fn strict_csv_writes_ascii_without_a_bom_and_quotes_empty_fields() -> TestResult {
+    let (keys, text) = written(
+        TableFormat::CsvStrict,
+        &[Language::German, Language::English],
+    )?;
+    assert_eq!(keys, 4, "four keys");
+    assert_eq!(
+        text,
+        "key,de,en\r\nA_key,\"\",\"line\nbreak\"\r\nb_key,B de,\"B, \"\"quoted\"\"\"\r\nonly_de,\"\",\"\"\r\nonly_en,\"\",x\r\n",
+        "strict CSV"
+    );
+    Ok(())
+}
+
+#[test]
 fn keys_without_a_text_in_the_chosen_languages_are_left_out() -> TestResult {
     let (keys, text) = written(TableFormat::Csv, &[Language::German])?;
     assert_eq!(keys, 2, "two keys have a German line");

@@ -5,17 +5,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use p4kx_assembly::{ArchiveModels, Armour};
+use p4kx_assembly::Armour;
 use p4kx_blender::PackageSummary;
-use p4kx_extraction::{
-    CancelToken, ConversionError, GlbOptions, GlbSummary, GltfError, MaterialMode, write_replacing,
-};
+use p4kx_extraction::{CancelToken, ConversionError, GlbOptions, GlbSummary, MaterialMode};
 use p4kx_settings::ModelMaterials;
 
 use super::package;
 use super::task::{Polled, Task};
-use crate::assembly_export::{Observed, PartIssue, StoppableTextures, failure_of};
+use crate::assembly_export::{PartIssue, failure_of};
 use crate::{AssemblyExportForm, EntryIndex, ModelExportFailure, NoEntries};
+
+mod glb;
 
 /// Where the Character comes from, as the manifest of a package records it.
 #[derive(Debug, Clone, Default)]
@@ -69,6 +69,7 @@ pub struct CharacterExportSummary {
     pub(super) written: GlbSummary,
     pub(super) issues: Vec<PartIssue>,
     pub(super) package: Option<PackageSummary>,
+    pub(super) origin_receipt: Option<PathBuf>,
 }
 
 impl CharacterExportSummary {
@@ -76,6 +77,12 @@ impl CharacterExportSummary {
     #[must_use]
     pub const fn package(&self) -> Option<&PackageSummary> {
         self.package.as_ref()
+    }
+
+    /// Returns the origin receipt for a single-file GLB export.
+    #[must_use]
+    pub fn origin_receipt(&self) -> Option<&Path> {
+        self.origin_receipt.as_deref()
     }
 
     /// Returns the GLB file or the package folder that was written.
@@ -126,11 +133,11 @@ impl CharacterExportSummary {
 pub enum CharacterExportStatus<'a> {
     /// The export runs; the bytes written so far, always 0 for a package.
     Running(u64),
-    /// The file or package was written.
+    /// The GLB and its receipt or the full package were written.
     Finished(&'a CharacterExportSummary),
     /// The export was cancelled; nothing was written.
     Cancelled,
-    /// Nothing was written, for the reason given.
+    /// The file, its origin receipt or the package could not be published.
     Failed(&'a ModelExportFailure),
 }
 
@@ -309,36 +316,8 @@ fn run(index: &EntryIndex, request: &Request, cancel: &CancelToken, written: &At
     let Ok(archive) = index.entries_archive() else {
         return NoEntries.into();
     };
-    let models = ArchiveModels::new(archive);
-    let archive_textures = models.textures();
-    let textures = StoppableTextures {
-        textures: &archive_textures,
-        cancel,
-    };
-    let options = request.options();
-    let outcome = write_replacing(&request.file, |writer| {
-        let mut observed = Observed {
-            inner: writer,
-            cancel,
-            written,
-        };
-        request
-            .armour
-            .write_glb_with(&options, &textures, &mut observed)
-            .map_err(|error| match error {
-                GltfError::Write(_) if cancel.is_cancelled() => ConversionError::Cancelled,
-                GltfError::Write(source) => ConversionError::Write {
-                    path: request.file.clone(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: request.name.clone(),
-                    source,
-                },
-            })
-    });
-    match outcome {
-        Ok(summary) => Ended::Written(Box::new(CharacterExportSummary {
+    match glb::publish(archive, request, cancel, written) {
+        Ok((summary, receipt)) => Ended::Written(Box::new(CharacterExportSummary {
             file: request.file.clone(),
             name: request.name.clone(),
             parts: request.armour.parts().len(),
@@ -346,6 +325,7 @@ fn run(index: &EntryIndex, request: &Request, cancel: &CancelToken, written: &At
             written: summary,
             issues: request.armour.issues().iter().map(PartIssue::of).collect(),
             package: None,
+            origin_receipt: Some(receipt),
         })),
         Err(ConversionError::Cancelled) => Ended::Cancelled,
         Err(error) => Ended::Failed(failure_of(index, &error)),

@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::EntityNode;
-use p4kx_dataforge::{Guid, Location, Step, StructValue, Value};
+use p4kx_assembly::{Attachment, EntityNode, PortNode};
+use p4kx_dataforge::{Guid, Location, StructValue, Value};
 use serde::Serialize;
 
 use crate::assets::ScreenAssets;
 use crate::canvas::CANVAS_TYPE;
 use crate::compose::ScreenComposer;
 use crate::inspect::{ElementCount, inspect};
-
-const MAX_WALK_DEPTH: usize = 64;
+use crate::screen_asset_inputs::ScreenAssetInputs;
+use crate::screen_listing_inputs::{
+    AttachmentInput, CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens,
+    ScreenInput, ValueInput,
+};
 
 /// One `BuildingBlocks` screen an Entity of a Loadout shows.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -66,8 +69,21 @@ pub struct EntityScreens {
 }
 
 struct Found {
-    canvases: Vec<(String, Guid)>,
-    movies: Vec<String>,
+    canvases: Vec<FoundCanvas>,
+    movies: Vec<FoundMovie>,
+}
+
+struct FoundCanvas {
+    field: String,
+    guid: Guid,
+    ordinal: usize,
+    target_record: u32,
+    stored_guid: bool,
+}
+
+struct FoundMovie {
+    path: String,
+    ordinal: usize,
 }
 
 impl ScreenComposer<'_, '_> {
@@ -77,49 +93,125 @@ impl ScreenComposer<'_, '_> {
     /// A canvas that cannot be read is kept with an empty size and no assets, so the listing
     /// shows that the Record refers to it.
     pub fn screens_of(&mut self, root: &EntityNode) -> EntityScreens {
+        self.list_screens(root, None)
+    }
+
+    /// Lists the same rows and retains the original logical inputs selected during the read.
+    pub fn screens_of_observed(&mut self, root: &EntityNode) -> ObservedEntityScreens {
+        let mut inputs = EntityScreenInputs::default();
+        let listing = self.list_screens(root, Some(&mut inputs));
+        ObservedEntityScreens { listing, inputs }
+    }
+
+    fn list_screens(
+        &mut self,
+        root: &EntityNode,
+        mut inputs: Option<&mut EntityScreenInputs>,
+    ) -> EntityScreens {
+        let brand = self.brand_selection(root.class_name());
+        if let Some(inputs) = inputs.as_deref_mut() {
+            inputs.entity_record = root.record_index();
+            inputs.brand_style_record = brand.as_ref().map(|brand| brand.record_index);
+        }
         let mut listed = EntityScreens {
             entity: root.class_name().to_owned(),
-            brand: self.brand_of(root.class_name()),
+            brand: brand.map(|brand| brand.code),
             ..EntityScreens::default()
         };
-        let mut nodes: Vec<(String, &EntityNode)> = vec![(String::new(), root)];
-        for entry in root.loadout() {
-            if let Some(node) = entry.entity() {
-                nodes.push((entry.path().to_owned(), node));
+        self.list_entity("", root, None, &mut listed, inputs.as_deref_mut());
+        root.visit_ports(|path, route| {
+            if let Some(port) = route.last()
+                && let Attachment::Entity(child) = port.attachment()
+            {
+                self.list_entity(path, child, Some(route), &mut listed, inputs.as_deref_mut());
             }
-        }
-        for (port, node) in nodes {
-            let Some(tree) = self
-                .store()
-                .forge()
-                .record_by_guid(node.guid())
-                .and_then(|record| record.tree().ok())
-            else {
-                continue;
-            };
-            let found = find(tree.root());
-            for movie in found.movies {
-                listed.movies.push(MovieUse {
-                    port: port.clone(),
-                    entity: node.class_name().to_owned(),
-                    movie,
-                });
-            }
-            for (field, guid) in found.canvases {
-                let screen = self.screen(&port, node, field, guid);
-                listed.screens.push(screen);
-            }
-        }
+        });
         listed
     }
 
-    fn screen(&mut self, port: &str, node: &EntityNode, field: String, guid: Guid) -> Screen {
+    fn list_entity(
+        &mut self,
+        port: &str,
+        node: &EntityNode,
+        route: Option<&[&PortNode]>,
+        listed: &mut EntityScreens,
+        mut inputs: Option<&mut EntityScreenInputs>,
+    ) {
+        let Some(tree) = self
+            .store()
+            .forge()
+            .record_by_guid(node.guid())
+            .and_then(|record| record.tree().ok())
+        else {
+            return;
+        };
+        let found = find(tree.root());
+        if found.canvases.is_empty() && found.movies.is_empty() {
+            return;
+        }
+        let attachment_route = inputs.as_deref_mut().zip(route).map(|(inputs, route)| {
+            let index = inputs.attachment_routes.len();
+            inputs.attachment_routes.push(AttachmentInput::read(route));
+            index
+        });
+        let source = |ordinal| ValueInput {
+            record_index: tree.record_index(),
+            ordinal,
+        };
+        for movie in found.movies {
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.movies.push(MovieInput {
+                    entity_record: node.record_index(),
+                    movie_path: source(movie.ordinal),
+                    attachment_route,
+                });
+            }
+            listed.movies.push(MovieUse {
+                port: port.to_owned(),
+                entity: node.class_name().to_owned(),
+                movie: movie.path,
+            });
+        }
+        for canvas in found.canvases {
+            let reference = source(canvas.ordinal);
+            let target_record = canvas.target_record;
+            let stored_guid = canvas.stored_guid;
+            let mut assets = ScreenAssetInputs::default();
+            let observed = inputs.is_some().then_some(&mut assets);
+            let (screen, canvas) = self.screen(port, node, canvas, observed);
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.screens.push(ScreenInput {
+                    entity_record: node.record_index(),
+                    reference,
+                    target_record,
+                    stored_guid,
+                    canvas,
+                    assets,
+                    attachment_route,
+                });
+            }
+            listed.screens.push(screen);
+        }
+    }
+
+    fn screen(
+        &mut self,
+        port: &str,
+        node: &EntityNode,
+        FoundCanvas {
+            field,
+            guid,
+            target_record,
+            ..
+        }: FoundCanvas,
+        inputs: Option<&mut ScreenAssetInputs>,
+    ) -> (Screen, CanvasInput) {
         let canvas = self.store().get(guid);
         let (assets, elements) = canvas.as_ref().map_or_else(
             || (ScreenAssets::default(), Vec::new()),
-            |_| inspect(self.store(), guid),
+            |_| inspect(self.store(), guid, inputs),
         );
-        Screen {
+        let listed = Screen {
             port: port.to_owned(),
             entity: node.class_name().to_owned(),
             entity_record_path: node.record_path().to_owned(),
@@ -132,7 +224,17 @@ impl ScreenComposer<'_, '_> {
             height: canvas.as_ref().map_or(0.0, |canvas| canvas.size[1]),
             assets,
             elements,
-        }
+        };
+        let input = match canvas {
+            Some(canvas) if canvas.record_index == target_record => CanvasInput::Read {
+                record_index: canvas.record_index,
+                width_read: canvas.size_fields[0],
+                height_read: canvas.size_fields[1],
+            },
+            Some(_) => CanvasInput::Unproved,
+            None => CanvasInput::Unreadable,
+        };
+        (listed, input)
     }
 }
 
@@ -141,51 +243,92 @@ fn find(root: &StructValue<'_>) -> Found {
         canvases: Vec::new(),
         movies: Vec::new(),
     };
-    let mut steps = Vec::new();
-    visit_struct(root, &mut steps, &mut found, 0);
+    root.visit_owned_values(|visit| match visit.value() {
+        Value::Reference(reference) if reference.type_name() == CANVAS_TYPE => {
+            let target = reference.original_target();
+            found.canvases.push(FoundCanvas {
+                field: Location::new(visit.steps()).to_string(),
+                guid: reference.guid(),
+                ordinal: visit.ordinal(),
+                target_record: target.record_index(),
+                stored_guid: target.instance_location().is_none(),
+            });
+        }
+        Value::String(text) if visit.field_name() == "moviePath" && !text.is_empty() => {
+            found.movies.push(FoundMovie {
+                path: (*text).to_owned(),
+                ordinal: visit.ordinal(),
+            });
+        }
+        _ => {}
+    });
     found
 }
 
-fn visit_struct<'f>(
-    structure: &StructValue<'f>,
-    steps: &mut Vec<Step<'f>>,
-    found: &mut Found,
-    depth: usize,
-) {
-    for field in structure.fields() {
-        steps.push(Step::Field(field.name()));
-        visit(field.name(), field.value(), steps, found, depth + 1);
-        steps.pop();
-    }
-}
+#[cfg(test)]
+mod tests {
+    use p4kx_dataforge::DataForge;
+    use p4kx_testkit::{
+        DataForgeBuilder, TestCanvas, TestInstance, TestRecord, TestStruct, TestType, TestValue,
+        entity_schema, screens_schema,
+    };
 
-fn visit<'f>(
-    name: &str,
-    value: &Value<'f>,
-    steps: &mut Vec<Step<'f>>,
-    found: &mut Found,
-    depth: usize,
-) {
-    if depth > MAX_WALK_DEPTH {
-        return;
-    }
-    match value {
-        Value::Reference(reference) if reference.type_name() == CANVAS_TYPE => {
-            found
-                .canvases
-                .push((Location::new(steps).to_string(), reference.guid()));
+    use super::find;
+    use crate::assets::WidgetAssets;
+
+    #[test]
+    fn deep_owned_fields_still_supply_screen_references_and_asset_paths()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const DEPTH: usize = 96;
+        const CANVAS: u128 = 0x2a8c_7d22_ee36_478c_8fa2_af44_b63f_c7a3;
+        const MOVIE: &str = "Data/UI/synthetic/deep.gfx";
+        let mut source = screens_schema(entity_schema(DataForgeBuilder::new()))
+            .structure(
+                TestStruct::new("Leaf")
+                    .field("moviePath", TestType::String)
+                    .field("canvas", TestType::Reference),
+            )
+            .record(TestCanvas::new(CANVAS, "deep", 9.0, 7.0).record());
+        let mut nested = TestInstance::new("Leaf")
+            .value("moviePath", TestValue::text(MOVIE))
+            .value("canvas", TestValue::Reference(CANVAS));
+        let mut type_name = "Leaf".to_owned();
+        for depth in 0..DEPTH {
+            let parent = format!("Owned{depth}");
+            source = source
+                .structure(TestStruct::new(&parent).field("child", TestType::Class(type_name)));
+            nested = TestInstance::new(&parent).value("child", TestValue::Struct(nested));
+            type_name = parent;
         }
-        Value::String(text) if name == "moviePath" && !text.is_empty() => {
-            found.movies.push((*text).to_owned());
-        }
-        Value::Struct(structure) => visit_struct(structure, steps, found, depth),
-        Value::Array(items) => {
-            for (index, item) in (0_u32..).zip(items.iter()) {
-                steps.push(Step::Element(index));
-                visit(name, item, steps, found, depth + 1);
-                steps.pop();
-            }
-        }
-        _ => {}
+        let bytes = source
+            .structure(TestStruct::new("Owner").field("child", TestType::Class(type_name)))
+            .record(
+                TestRecord::new(CANVAS + 1, "Owner", "Owner.Sample", "synthetic/owner.xml")
+                    .value("child", TestValue::Struct(nested)),
+            )
+            .build();
+        let forge = DataForge::open(&bytes)?;
+        let record = forge
+            .records_at_path("synthetic/owner")
+            .next()
+            .ok_or("owner")?;
+        let tree = record.tree()?;
+
+        let found = find(tree.root());
+        assert_eq!(
+            found.movies.first().map(|movie| movie.path.as_str()),
+            Some(MOVIE)
+        );
+        assert_eq!(
+            found.canvases.first().map(|canvas| canvas.field.as_str()),
+            Some(format!("{}canvas", "child.".repeat(DEPTH + 1)).as_str()),
+        );
+        assert_eq!(found.canvases.len(), 1);
+        let assets = WidgetAssets::scan(tree.root());
+        assert_eq!(
+            assets.movies.first().map(|asset| asset.value.as_str()),
+            Some(MOVIE)
+        );
+        Ok(())
     }
 }

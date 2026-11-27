@@ -100,10 +100,16 @@ spread between processes, so "no separate switch" (ADR-0034) stays.
 
 ## Real-Archive tests
 
-`cargo test --release --workspace --locked -- --ignored` (see CLAUDE.md) includes
-`verified_reads_of_every_compression_and_encryption_state_find_no_mismatch` in `p4kx-archive`,
-which reads a sample of each compression and encryption kind with `Archive::open_entry_verified`
-(CRC-32C and SHA-256, so it needs `P4KX_ARCHIVE_KEY`), and
-`every_entry_states_a_sha_256_that_plain_entries_match_while_streaming`, which needs no key,
-and `a_sample_of_a_real_archive_verifies_without_a_mismatch` in `p4kx-extraction`, which runs
-`verify` over every 997th Entry.
+Use the [real-Archive setup](../CLAUDE.md#real-test-data) and select the relevant check.
+
+- `p4kx-archive` verifies a sample of each compression and encryption kind with
+  `Archive::open_entry_verified` (CRC-32C and SHA-256). This check needs the configured Archive key.
+- `p4kx-archive` checks that every Entry states a SHA-256 digest and compares it with the bytes
+  of cleartext Entries while streaming.
+- `p4kx-extraction` runs `verify` over every 997th Entry.
+
+```powershell
+cargo test --release --locked -p p4kx-archive --test real_archive -- archive::verified_reads_of_every_compression_and_encryption_state_find_no_mismatch --ignored --exact
+cargo test --release --locked -p p4kx-archive --test real_archive -- archive::every_entry_states_a_sha_256_that_plain_entries_match_while_streaming --ignored --exact
+cargo test --release --locked -p p4kx-extraction --test real_archive -- verify::a_sample_of_a_real_archive_verifies_without_a_mismatch --ignored --exact
+```

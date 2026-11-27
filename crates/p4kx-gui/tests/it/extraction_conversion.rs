@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use p4kx_gui::{Language, Model, ui};
+use p4kx_gui::{ExtractionStatus, Language, Model, ui};
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, TestElement, TestEntry,
     TestRecord, TestStruct, TestType, TestValue,
@@ -187,6 +187,36 @@ fn the_switch_writes_the_dataforge_as_records_and_the_summary_counts_them() -> T
         "the Record with an error value is written"
     );
     assert!(!out.join("Data/Game2.dcb").exists(), "no raw .dcb");
+    let Some(ExtractionStatus::Finished(summary)) = harness
+        .state()
+        .extraction()
+        .map(p4kx_gui::Extraction::status)
+    else {
+        return Err("finished Extraction summary".into());
+    };
+    let proof = summary
+        .record_written_origin()
+        .ok_or("record count proof")??;
+    assert_eq!(
+        proof.written.contains_encrypted_source(),
+        Some(false),
+        "plain DataForge"
+    );
+    let mut count_uses = proof
+        .inventory()
+        .iter_uses()
+        .filter(|usage| proof.written.source_uses_refs().contains(usage.id()));
+    let usage = count_uses.next().ok_or("committed definition range")?;
+    assert!(count_uses.next().is_none(), "one contiguous range");
+    assert_eq!(
+        usage.location(),
+        &p4kx_extraction::SourceLocation::Subresource {
+            namespace: "dataforgeRecordTable".into(),
+            indices: vec![0, 2],
+            field: "committedDefinitions".into(),
+        },
+        "the GUI count uses the same committed positions"
+    );
     Ok(())
 }
 

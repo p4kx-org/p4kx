@@ -14,6 +14,9 @@ use p4kx_testkit::{
 };
 use predicates::prelude::{PredicateBooleanExt, predicate};
 
+#[path = "grep_origins_cases.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn forge() -> Vec<u8> {

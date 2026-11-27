@@ -3,25 +3,40 @@
 
 use std::sync::Arc;
 
-use egui::{
-    Align2, Color32, CornerRadius, Galley, Id, Rect, Response, Role, ScrollArea, Sense, Ui,
-    WidgetInfo, pos2, vec2,
-};
+use egui::{Galley, Id, Rect, ScrollArea, Sense, Ui, vec2};
+
+use p4kx_extraction::{FieldOrigin, MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
 
 use super::model_info_rows::{Rows, facts, tables};
-use super::model_preview;
+use super::{model_preview, source_origin};
 use crate::theme::desktop::{
     DETAIL_COLUMN_GAP, DETAIL_ROW_GAP, PANEL_TITLE_MARGIN_BOTTOM, PANEL_TITLE_MARGIN_TOP,
-    PANEL_TITLE_PADDING_BOTTOM, ROW_HEIGHT, ZEBRA,
+    PANEL_TITLE_PADDING_BOTTOM,
 };
 use crate::theme::palette;
 use crate::widgets::frames;
-use crate::widgets::rows::paint_divider;
 use crate::widgets::text::hairline_below;
 use crate::widgets::tooltip;
-use crate::{Language, ModelInfo, ModelPreview, Texts};
+use crate::{
+    AnimationCountProvenance, Language, ModelInfo, ModelInfoProvenance, ModelInfoText as T,
+    ModelPreview, Texts,
+};
+
+#[path = "model_info_grid.rs"]
+mod grid;
+
+#[derive(Clone, Copy)]
+struct Origins<'a> {
+    model: Option<&'a ModelInfoProvenance>,
+    animation_count: Option<&'a FieldOrigin>,
+}
 
 pub(super) type Labelled = (String, Arc<Galley>);
+pub(super) struct Fact {
+    pub(super) name: T,
+    pub(super) key: Labelled,
+    pub(super) value: Labelled,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Key {
@@ -36,7 +51,7 @@ struct Key {
 pub(super) struct Laid {
     key: Key,
     key_width: f32,
-    pub(super) facts: Vec<(Labelled, Labelled)>,
+    pub(super) facts: Vec<Fact>,
     pub(super) tables: Vec<Table>,
 }
 
@@ -45,6 +60,13 @@ pub(super) struct Table {
     pub(super) heading: Labelled,
     pub(super) head: Vec<Labelled>,
     pub(super) rows: Vec<Vec<Labelled>>,
+    pub(super) kind: TableKind,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum TableKind {
+    Lods,
+    UnreadChunks,
 }
 
 /// Shows the Info tab of the model at `path`: what its file holds, or why there is nothing to
@@ -54,11 +76,18 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, path: &str, preview: &ModelPrevie
         model_preview::unread(ui, texts, path, preview.status());
         return;
     };
+    let origins = Origins {
+        model: preview.info_provenance().and_then(Result::ok),
+        animation_count: preview
+            .animation_count_provenance()
+            .and_then(Result::ok)
+            .map(AnimationCountProvenance::origin),
+    };
     frames::preview_body().show(ui, |ui| {
         ScrollArea::vertical()
             .id_salt("model-info")
             .auto_shrink(false)
-            .show(ui, |ui| Laid::get(ui, texts, info).show(ui));
+            .show(ui, |ui| Laid::get(ui, texts, info).show(ui, texts, origins));
     });
 }
 
@@ -92,14 +121,14 @@ impl Laid {
         laid
     }
 
-    fn show(&self, ui: &mut Ui) {
+    fn show(&self, ui: &mut Ui, texts: &Texts, origins: Origins<'_>) {
         ui.spacing_mut().item_spacing.y = 0.0;
         let key_width = self.key_width;
-        for (index, (key, value)) in self.facts.iter().enumerate() {
+        for (index, data) in self.facts.iter().enumerate() {
             if index > 0 {
                 ui.add_space(DETAIL_ROW_GAP);
             }
-            fact(ui, index, (key, value), key_width);
+            fact(ui, index, data, key_width, texts, origins);
         }
         for (index, table) in self.tables.iter().enumerate() {
             ui.add_space(PANEL_TITLE_MARGIN_TOP);
@@ -109,7 +138,7 @@ impl Laid {
             );
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
             let text_rect = rect.with_max_y(rect.bottom() - PANEL_TITLE_PADDING_BOTTOM);
-            labelled(
+            grid::labelled(
                 ui,
                 (1, index, 0),
                 &table.heading,
@@ -117,12 +146,24 @@ impl Laid {
             );
             hairline_below(ui, rect);
             ui.add_space(PANEL_TITLE_MARGIN_BOTTOM);
-            grid(ui, index, table);
+            grid::show(ui, index, table, texts, origins.model);
         }
     }
 }
 
-fn fact(ui: &mut Ui, index: usize, (key, value): (&Labelled, &Labelled), key_width: f32) {
+fn fact(
+    ui: &mut Ui,
+    index: usize,
+    Fact { name, key, value }: &Fact,
+    key_width: f32,
+    texts: &Texts,
+    Origins {
+        model: origins,
+        animation_count,
+    }: Origins<'_>,
+) {
+    let proof = fact_origin(*name, origins);
+
     let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
     let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
@@ -132,86 +173,96 @@ fn fact(ui: &mut Ui, index: usize, (key, value): (&Labelled, &Labelled), key_wid
         cell.with_min_y(content.bottom() - galley.size().y)
             .with_max_y(content.bottom())
     };
-    labelled(
+    grid::labelled(
         ui,
         (0, index, 0),
         key,
         (on_baseline(key_rect, &key.1), palette::GRAY_2_TEXT),
     );
-    let shown = labelled(
+    let shown = grid::labelled(
         ui,
         (0, index, 1),
         value,
         (on_baseline(value_rect, &value.1), palette::DATA_FG),
     );
-    if value.1.elided {
+    let proof =
+        proof.or_else(|| (*name == T::Animations).then_some((T::Animations, animation_count)));
+    if value.1.elided || proof.is_some() || matches!(name, T::Materials | T::Chunks) {
         tooltip::hover(shown, |ui| {
-            tooltip::line(ui, value.0.as_str());
+            if value.1.elided {
+                tooltip::line(ui, value.0.as_str());
+            }
+            if let Some((field, origin)) = proof {
+                source_origin::row(ui, texts, field, origin);
+            }
+            match name {
+                T::Materials => material_origins(
+                    ui,
+                    texts,
+                    origins.map(ModelInfoProvenance::material_library),
+                ),
+                T::Chunks => chunk_count_origins(ui, texts, origins),
+                _ => {}
+            }
         });
     }
     hairline_below(ui, key_rect);
     hairline_below(ui, value_rect);
 }
 
-fn grid(ui: &mut Ui, table: usize, data: &Table) {
-    let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
-    let painter = ui.painter();
-    painter.rect_filled(head, CornerRadius::ZERO, palette::SURFACE_INPUT);
-    let rule = Rect::from_min_max(pos2(head.left(), head.bottom() - 2.0), head.max);
-    painter.rect_filled(rule, CornerRadius::ZERO, palette::PRIMARY);
-    cells(ui, (2, table, 0), head, &data.head);
-    for (index, row) in data.rows.iter().enumerate() {
-        let (rect, _) =
-            ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
-        if ui.rect_contains_pointer(rect) {
-            ui.painter()
-                .rect_filled(rect, CornerRadius::ZERO, palette::CONTROL_BG);
-        } else if index % 2 == 1 {
-            ui.painter().rect_filled(rect, CornerRadius::ZERO, ZEBRA);
-        }
-        paint_divider(ui.painter(), rect);
-        cells(ui, (3, table, index + 1), rect, row);
+fn fact_origin(
+    name: T,
+    origins: Option<&ModelInfoProvenance>,
+) -> Option<(T, Option<&FieldOrigin>)> {
+    let summary = origins.map(ModelInfoProvenance::mesh_summary);
+    let topology = summary.map(|summary| &summary.topology);
+    let (label, origin) = match name {
+        T::Nodes => (name, origins.map(ModelInfoProvenance::node_count)),
+        T::Meshes => (name, topology.and_then(|proof| proof.meshes_by_lod.first())),
+        T::Lods => (name, topology.map(|proof| &proof.lod_count)),
+        T::Geometry => (name, topology.map(|proof| &proof.geometry)),
+        T::Bones => (name, origins.map(ModelInfoProvenance::bone_count)),
+        T::MaterialIds => (
+            T::ListedMaterialIds,
+            summary.map(|proof| &proof.material_ids),
+        ),
+
+        _ => return None,
+    };
+    Some((label, origin))
+}
+
+fn chunk_count_origins(ui: &mut Ui, texts: &Texts, origins: Option<&ModelInfoProvenance>) {
+    let usage = origins.map(ModelInfoProvenance::chunk_usage);
+    for (label, origin) in [
+        (
+            T::ChunksTotal,
+            origins.map(ModelInfoProvenance::chunk_total),
+        ),
+        (T::ChunksRead, usage.map(|origin| &origin.read)),
+        (T::ChunksSkipped, usage.map(|origin| &origin.skipped)),
+        (T::ChunksUnknown, usage.map(|origin| &origin.unknown)),
+    ] {
+        source_origin::row(ui, texts, label, origin);
     }
 }
 
-fn cells(ui: &Ui, (section, table, row): (u8, usize, usize), rect: Rect, cells: &[Labelled]) {
-    let columns = u16::try_from(cells.len()).map_or(1.0, f32::from).max(1.0);
-    let width = rect.width() / columns;
-    for ((column, step), cell) in (0_usize..).zip(0_u16..).zip(cells) {
-        let left = f32::from(step).mul_add(width, rect.left());
-        let cell_rect = Rect::from_min_size(pos2(left, rect.top()), vec2(width, rect.height()))
-            .shrink2(vec2(crate::theme::desktop::CELL_PADDING_X, 0.0));
-        let shown = labelled(
-            ui,
-            (section, table * 1_000_000 + row, column),
-            cell,
-            (cell_rect, palette::GRAY_1),
-        );
-        if cell.1.elided {
-            tooltip::hover(shown, |ui| {
-                tooltip::line(ui, cell.0.as_str());
-            });
-        }
+fn material_origins(ui: &mut Ui, texts: &Texts, origins: Option<&MaterialSummaryOrigins>) {
+    if let Some(path) = origins.and_then(|summary| summary.path.as_ref()) {
+        source_origin::row(ui, texts, T::Materials, Some(path));
     }
-}
-
-fn labelled(
-    ui: &Ui,
-    salt: (u8, usize, usize),
-    (name, galley): &Labelled,
-    (rect, colour): (Rect, Color32),
-) -> Response {
-    let at = Align2::LEFT_CENTER
-        .align_size_within_rect(galley.size(), rect)
-        .min;
-    let response = ui.interact(
-        rect,
-        ui.scope_id().with(("model-info-text", salt)),
-        Sense::hover(),
+    source_origin::row(
+        ui,
+        texts,
+        T::MaterialsStatus,
+        origins.map(|summary| &summary.status),
     );
-    response.widget_info(|| WidgetInfo::labeled(Role::Label, true, name));
-    ui.painter().galley(at, Arc::clone(galley), colour);
-    response
+    let (label, origin) = match origins.and_then(|summary| summary.detail.as_ref()) {
+        Some(MaterialSummaryDetailOrigin::Single(origin)) => (T::MaterialSingle, origin),
+        Some(MaterialSummaryDetailOrigin::Count(origin)) => (T::MaterialCount, origin),
+        _ => return,
+    };
+    source_origin::row(ui, texts, label, Some(origin));
 }
 
 #[cfg(test)]
@@ -286,12 +337,9 @@ mod tests {
         let widest = laid
             .facts
             .iter()
-            .map(|(_, (_, galley))| galley.size().x)
+            .map(|fact| fact.value.1.size().x)
             .fold(0.0, f32::max);
-        assert!(
-            laid.facts.iter().any(|(_, (_, galley))| galley.elided),
-            "elided"
-        );
+        assert!(laid.facts.iter().any(|fact| fact.value.1.elided), "elided");
         assert!(
             widest + laid.key_width + DETAIL_COLUMN_GAP <= ctx.content_rect().width(),
             "{widest} fits next to the key column"

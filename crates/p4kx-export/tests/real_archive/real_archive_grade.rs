@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The letter of an item grade in the Basetool catalog of a real Archive; runs with `--ignored`
+//! The letter of an item grade in the P4KX catalog of a real Archive; runs with `--ignored`
 //! when `P4KX_DATA_P4K` names one.
 
 use std::collections::BTreeMap;
@@ -12,6 +12,10 @@ use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
+
+use crate::real_archive_canonical_texts::{
+    ItemPresentationIndex, TextDomain, TextIndex, TextReferenceShape,
+};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -39,23 +43,33 @@ fn integer_of(letter: &str) -> Option<i64> {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let items = catalog["items"].as_array().ok_or("the items array")?;
+    let presentation = ItemPresentationIndex::new(&catalog)?;
+    let texts = TextIndex::new(&catalog)?;
     let mut counts: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for item in items {
-        let grade = &item["grade"];
-        assert!(
-            grade.is_null() || grade.as_i64().is_some_and(|value| (1..=7).contains(&value)),
-            "grade is null or 1 to 7: {grade}"
-        );
-        let Some(kind) = item["type"]
-            .as_str()
+        let grade = presentation.grade(item)?;
+        let Some(kind) = presentation
+            .item_type(item)?
             .filter(|kind| LETTER_TYPES.contains(kind))
         else {
             continue;
         };
-        let Some(expected) = item["description"]["en"]
+        let Some(carrier) = presentation.description(item)? else {
+            continue;
+        };
+        let Some(text) =
+            texts.reference(carrier, TextDomain::GameText, TextReferenceShape::Required)?
+        else {
+            continue;
+        };
+        let Some(expected) = text
+            .shown("en")?
             .as_str()
             .and_then(letter_of)
             .and_then(integer_of)
@@ -64,7 +78,7 @@ fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
         };
         let entry = counts.entry(kind).or_default();
         entry.0 += 1;
-        entry.1 += usize::from(grade.as_i64() == Some(expected));
+        entry.1 += usize::from(grade == Some(expected));
     }
     for kind in LETTER_TYPES {
         let (lettered, agreeing) = counts.get(kind).copied().ok_or("a lettered type")?;

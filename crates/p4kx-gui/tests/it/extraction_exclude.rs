@@ -5,6 +5,7 @@
 //! of a texture, and the problems they report.
 
 use crate::common;
+use crate::extraction_outputs::assert_receipted_outputs;
 
 use common::{TestResult, check, files_below, finished, setup, setup_with};
 use p4kx_gui::{ExtractionScope, Model, TargetKind};
@@ -48,12 +49,7 @@ fn the_exclusion_leaves_matching_entries_out_of_the_checked_ones() -> TestResult
 
     assert!(started, "two Entries remain");
     assert_eq!(summary.extracted(), 2, "the ship is left out");
-    assert_eq!(
-        files_below(&out)?,
-        ["Data\\Objects\\anchor.cgf", "readme.txt"],
-        "case and separator kind do not matter"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Objects\\anchor.cgf", "readme.txt"])
 }
 
 #[test]
@@ -71,8 +67,7 @@ fn one_filter_per_line_and_blank_lines_are_ignored() -> TestResult {
     let summary = finished(&mut model)?;
 
     assert_eq!(summary.extracted(), 1, "only the anchor remains");
-    assert_eq!(files_below(&out)?, ["Data\\Objects\\anchor.cgf"]);
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Objects\\anchor.cgf"])
 }
 
 #[test]
@@ -164,8 +159,7 @@ fn an_excluded_texture_header_takes_its_parts_with_it() -> TestResult {
 
     assert_eq!(summary.extracted(), 1, "only readme.txt");
     assert_eq!(summary.excluded_parts(), 0, "no texture stays");
-    assert_eq!(files_below(&out)?, ["readme.txt"]);
-    Ok(())
+    assert_receipted_outputs(&out, &["readme.txt"])
 }
 
 #[test]
@@ -198,10 +192,5 @@ fn excluded_parts_are_not_reported_without_a_conversion() -> TestResult {
         0,
         "the parts are simply not written"
     );
-    assert_eq!(
-        files_below(&out)?,
-        ["Data\\Textures\\panel_diff.dds", "readme.txt"],
-        "header and readme, no parts"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &[PANEL, "readme.txt"])
 }

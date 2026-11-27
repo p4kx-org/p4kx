@@ -9,11 +9,7 @@ use crate::glb::CheckedGlb;
 /// lights exist, colours lie in 0 to 1, intensities are finite and not negative, ranges are
 /// positive, spot cone angles satisfy 0 <= inner < outer <= pi/2, and every light is used.
 pub(crate) fn check_lights(glb: &CheckedGlb) -> Result<(), String> {
-    let lights: Vec<_> = glb
-        .document
-        .lights()
-        .map(Iterator::collect)
-        .unwrap_or_default();
+    let lights: Vec<_> = glb.document.lights().map_or_default(Iterator::collect);
     let used = glb
         .document
         .extensions_used()

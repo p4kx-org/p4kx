@@ -8,9 +8,9 @@ use flate2::read::ZlibDecoder;
 use lzma_rs::decompress::{Options, UnpackedSize};
 use p4kx_foundation::ParseError;
 
-use crate::GfxError;
 use crate::geometry::Rect;
 use crate::reader::TagReader;
+use crate::{GfxError, MovieSource, MovieSpan};
 
 /// The length of the file header before the movie header: signature, version and length.
 pub(crate) const FILE_HEADER_LEN: usize = 8;
@@ -110,36 +110,58 @@ pub struct Header {
     pub frame_count: u16,
 }
 
-/// Reads the file header, decompresses the movie and reads the movie header.
-///
-/// Returns the header, the whole uncompressed movie with the file header in front, and the
-/// offset of the first tag.
-pub(crate) fn read_movie(bytes: Vec<u8>) -> Result<(Header, Vec<u8>, usize), GfxError> {
+pub(crate) struct DecodedMovie {
+    pub(crate) header: Header,
+    pub(crate) data: Vec<u8>,
+    pub(crate) tags: usize,
+    pub(crate) source: MovieSource,
+}
+
+pub(crate) fn read_movie(bytes: Vec<u8>) -> Result<DecodedMovie, GfxError> {
     let (signature, version, declared_len) = read_file_header(&bytes)?;
     let declared = usize::try_from(declared_len).unwrap_or(usize::MAX);
-    let data = match signature.compression() {
+    let input_length = bytes.len();
+    let (data, compressed) = match signature.compression() {
         Compression::None => {
             let mut bytes = bytes;
             bytes.truncate(declared);
-            bytes
+            (bytes, None)
         }
-        compression => decompress(&bytes, declared, compression)?,
+        compression => {
+            let (data, consumed) = decompress(&bytes, declared, compression)?;
+            (data, Some(consumed))
+        }
     };
     let body = data.get(FILE_HEADER_LEN..).unwrap_or_default();
     let mut reader = TagReader::new(body, FILE_HEADER_LEN);
     let frame_size = reader.rect()?;
+    let stage = MovieSpan::new(FILE_HEADER_LEN, reader.offset());
     let rate = reader.u16()?;
+    let frame_rate = MovieSpan::new(stage.end(), reader.offset());
     let frame_count = reader.u16()?;
-    let header = Header {
-        signature,
-        version,
-        declared_len,
-        frame_size,
-        frame_rate: f32::from(rate >> 8) + f32::from(rate & 0xFF) / 256.0,
-        frame_count,
-    };
     let tags = reader.offset();
-    Ok((header, data, tags))
+    Ok(DecodedMovie {
+        header: Header {
+            signature,
+            version,
+            declared_len,
+            frame_size,
+            frame_rate: f32::from(rate >> 8) + f32::from(rate & 0xFF) / 256.0,
+            frame_count,
+        },
+        data,
+        tags,
+        source: MovieSource {
+            signature: MovieSpan::new(0, 3),
+            version: MovieSpan::new(3, 4),
+            declared_length: MovieSpan::new(4, FILE_HEADER_LEN),
+            input_length,
+            compressed,
+            stage,
+            frame_rate,
+            frame_count: MovieSpan::new(frame_rate.end(), tags),
+        },
+    })
 }
 
 /// Reads the signature, the version and the declared uncompressed length of the file header.
@@ -173,7 +195,7 @@ fn decompress(
     bytes: &[u8],
     declared: usize,
     compression: Compression,
-) -> Result<Vec<u8>, GfxError> {
+) -> Result<(Vec<u8>, MovieSpan), GfxError> {
     if declared as u64 > MAX_MOVIE_LEN {
         return Err(GfxError::TooLarge {
             limit: MAX_MOVIE_LEN,
@@ -184,15 +206,19 @@ fn decompress(
     let mut data = Vec::with_capacity(capacity);
     data.extend_from_slice(bytes.get(..FILE_HEADER_LEN).unwrap_or_default());
     let compressed = bytes.get(FILE_HEADER_LEN..).unwrap_or_default();
-    match compression {
+    let consumed = match compression {
         Compression::None | Compression::Zlib => {
-            ZlibDecoder::new(compressed)
+            let mut decoder = ZlibDecoder::new(compressed);
+            (&mut decoder)
                 .take(body_len as u64)
                 .read_to_end(&mut data)
                 .map_err(|error| decompress_error(&error))?;
+            let read = usize::try_from(decoder.total_in()).unwrap_or(compressed.len());
+            MovieSpan::new(FILE_HEADER_LEN, FILE_HEADER_LEN + read)
         }
         Compression::Lzma => {
             let mut input = bytes.get(LZMA_PROPERTIES_START..).unwrap_or_default();
+            let input_len = input.len();
             let options = Options {
                 unpacked_size: UnpackedSize::UseProvided(Some(body_len as u64)),
                 memlimit: Some(body_len.max(1)),
@@ -203,9 +229,13 @@ fn decompress(
                     message: error.to_string(),
                 },
             )?;
+            MovieSpan::new(
+                LZMA_PROPERTIES_START,
+                LZMA_PROPERTIES_START + input_len - input.len(),
+            )
         }
-    }
-    Ok(data)
+    };
+    Ok((data, consumed))
 }
 
 fn decompress_error(error: &io::Error) -> GfxError {

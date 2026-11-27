@@ -82,8 +82,13 @@ fn ogg_of_a_vorbis_entry_plays_for_the_sound_s_duration() -> TestResult {
         .assert()
         .code(0)
         .stdout(predicate::str::contains("as Ogg Vorbis"))
-        .stdout(predicate::str::contains("1.000 s"));
+        .stdout(predicate::str::contains("1.000 s"))
+        .stdout(predicate::str::contains("source origins:"));
 
+    assert!(
+        dir.path().join("300.ogg.p4kx-origin.jsonl").is_file(),
+        "text mode publishes its companion"
+    );
     let ogg = fs::read(&out)?;
     assert_eq!(ogg.get(..4), Some(&b"OggS"[..]), "an Ogg file");
     assert_eq!(last_granule(&ogg), Some(48_000), "one second at 48 kHz");

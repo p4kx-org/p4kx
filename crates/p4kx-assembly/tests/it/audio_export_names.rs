@@ -5,7 +5,10 @@
 
 use std::error::Error;
 
-use p4kx_assembly::audio::{ArchiveAudio, ExportOptions, ExportReport, SoundFormat};
+use p4kx_assembly::audio::{
+    ArchiveAudio, ExportFailureKind, ExportOptions, ExportReport, ExportReportCapture,
+    ExportReportOrigins, ExportWatch, SoundFormat,
+};
 use p4kx_extraction::{Archive, ConflictPolicy, check_part};
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestCodec, TestEntry, TestHircObject, TestWem, test_signal,
@@ -23,6 +26,13 @@ const OPTIONS: ExportOptions = ExportOptions {
 /// Exports the sound of each trigger of `names`, which all post one event, into the folder
 /// `folder` of a temporary directory, and checks that every file name passes `check_part`.
 fn export(names: &[&str], folder: &str) -> Result<ExportReport, Box<dyn Error>> {
+    export_with_origins(names, folder).map(|(report, _)| report)
+}
+
+fn export_with_origins(
+    names: &[&str],
+    folder: &str,
+) -> Result<(ExportReport, ExportReportOrigins), Box<dyn Error>> {
     let wem = TestWem::pcm(TestCodec::WwisePcm, 1, 48_000, &test_signal(480, 1)).bytes();
     let size = u32::try_from(wem.len())?;
     let bank = TestBank::new(wwise_short_id("Bank"))
@@ -53,12 +63,18 @@ fn export(names: &[&str], folder: &str) -> Result<ExportReport, Box<dyn Error>> 
         .collect::<Result<_, _>>()?;
     let triggers: Vec<_> = resolved.iter().collect();
     let out = tempfile::tempdir()?;
-    let report = audio.export_sounds(&triggers, &out.path().join(folder), OPTIONS)?;
+    let (report, origins) = audio.export_sounds_watched_with_report_origins(
+        &triggers,
+        &out.path().join(folder),
+        OPTIONS,
+        &ExportWatch::default(),
+        ExportReportCapture::FileSizes,
+    )?;
     for sound in &report.sounds {
         let name = sound.path.file_name().and_then(|name| name.to_str());
         assert_eq!(check_part(name.ok_or("a name")?), Ok(()), "{name:?}");
     }
-    Ok(report)
+    Ok((report, origins))
 }
 
 fn names(report: &ExportReport) -> Vec<&str> {
@@ -98,12 +114,23 @@ fn a_name_too_long_for_a_file_name_becomes_sound() -> TestResult {
 #[test]
 fn a_sound_whose_path_exceeds_the_limit_is_reported_and_the_others_are_written() -> TestResult {
     let long = "T".repeat(220);
-    let report = export(&[&long, "Play_X"], &"F".repeat(30))?;
+    let (report, origins) = export_with_origins(&[&long, "Play_X"], &"F".repeat(30))?;
     assert_eq!(names(&report), ["Play_X.wav"]);
     let [failure] = report.failures.as_slice() else {
         return Err(format!("one sound fails: {:?}", report.failures).into());
     };
-    assert_eq!(failure.trigger, long);
+    let [origin] = origins.failures() else {
+        return Err("one bound job failure".into());
+    };
+    assert_eq!(
+        (origin.trigger_ordinal, origin.variant_ordinal, origin.kind),
+        (0, 0, ExportFailureKind::Job),
+        "the failed write keeps its original job position"
+    );
+    assert_eq!(
+        failure.trigger, long,
+        "the existing failure carries its trigger name"
+    );
     assert_eq!(failure.wem_id, Some(7001));
     assert!(
         failure.reason.contains("UTF-16 units"),

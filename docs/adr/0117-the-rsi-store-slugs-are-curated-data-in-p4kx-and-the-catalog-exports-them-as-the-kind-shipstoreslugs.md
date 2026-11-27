@@ -21,7 +21,7 @@ had no matching class name. `variantOf` (#325) groups cosmetic variants but does
   price or media, in the file or in the catalog; the store name is a short name.
 - **Matching never guesses.** A slug is mapped by name, manufacturer and variant against the
   `player` ships of the `LIVE` Archive. An ambiguous name stays unmapped. The rules are in
-  `docs/basetool-catalog.md`.
+  `docs/catalog.md`.
 - **A slug that maps nothing is not exported,** and neither are the slugs of ships the game does not
   have. A slug whose ship no longer exists stays in the file marked `retired`, and is exported
   flagged with a `null` `shipGuid` and `className`, so the Basetool can tell a retired ship from an
@@ -33,7 +33,20 @@ had no matching class name. `variantOf` (#325) groups cosmetic variants but does
 - **A refresh is done by a human.** The tool fetches nothing. The public store list is fetched
   once by a person, reduced to identifiers, and new slugs are added to the file unmapped; the
   matching, the stale list and the test then say what remains. The steps are in
-  `docs/basetool-catalog.md`.
+  `docs/catalog.md`.
+
+### Reviewed pledge production status
+
+Catalog v3 also carries `shipStorePledges`, keyed by RSI ship ID. It keeps the exact slug,
+short name, RSI manufacturer code and production status of each reviewed non-flight-ready
+pledge. Its snapshot records the official source, date of capture, source digest, candidate
+review date, curated revision and review scope. It is bundled and exported for every Channel
+and Filter. The store identity refresh reviews the snapshot by hand under ADR-0245.
+
+`shipStoreSlugs` keeps its existing selection and retirement rules. A curated pledge row and
+a physical Ship row can coexist. The Archive supplies the original Ship identity and
+`playability`. Absence in the two Store datasets leaves the Store status and mapping unknown
+to the consumer.
 
 ## Considered Options
 

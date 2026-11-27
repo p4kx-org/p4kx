@@ -53,7 +53,7 @@ fn every_tint_palette_states_decal_colours_and_some_set_their_own() -> TestResul
             *found += usize::from(!is_white(colour));
         }
         if example.is_none() && decal.iter().any(|colour| !is_white(*colour)) {
-            example = Some((palette.name.clone(), decal));
+            example = Some((palette.name, decal));
         }
     }
 
