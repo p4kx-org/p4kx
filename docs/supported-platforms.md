@@ -71,10 +71,11 @@ The Blender add-on exchange job requires every focused job and did not run.
 [CI run](https://github.com/p4kx-org/p4kx/actions/runs/45993359457) ·
 [Linux AMD64 setup](https://github.com/p4kx-org/p4kx/actions/runs/45993359457/job/140486861647)
 
-Linux Rust setup installs the ALSA headers from the runner's Ubuntu sources
-and preserves the cached indexes for its other repositories. A local Ubuntu
-24.04 AMD64 check verified that an unrelated fixture source was excluded and
-the simulated ALSA install could select the native package.
+Linux CI installs its ALSA, native fixture, desktop validation and Blender
+dependencies from the runner's Ubuntu sources. The refresh preserves cached
+indexes for the other repositories. A local Ubuntu 24.04 AMD64 check excluded
+an unrelated fixture source and resolved all four package lists with APT
+simulation. A failed refresh prevents the helper from starting the install.
 
 ## Package identity and update links
 

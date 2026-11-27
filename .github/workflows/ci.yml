@@ -99,7 +99,9 @@ jobs:
         run: cargo xtask notices
       - name: The desktop file is valid
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends desktop-file-utils && desktop-file-validate packaging/linux/p4kx.desktop
+        run: |
+          .github/scripts/install-ubuntu-ci-packages.ps1 -Packages desktop-file-utils
+          desktop-file-validate packaging/linux/p4kx.desktop
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /
@@ -256,7 +258,10 @@ jobs:
         run: python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET
       - name: Install system libraries of the bpy module
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libxi6 libxrender1 libsm6 libxxf86vm1 libxfixes3 libxkbcommon0
+        run: >-
+          ../.github/scripts/install-ubuntu-ci-packages.ps1
+          -Packages libgl1,libxi6,libxrender1,libsm6,libxxf86vm1,libxfixes3,libxkbcommon0
+          -IncludeRecommended
       - name: Import synthetic packages in native Blender 5.2 and 5.3
         if: matrix.os != 'linux' || matrix.arch != 'arm64'
         run: |
