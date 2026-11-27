@@ -103,7 +103,12 @@ fn check_references(rows: &[MediaRecord], base: &Path) -> TestResult {
             assert_eq!(row.data.pointer(field), Some(&value), "exact field {field}");
         }
         let evidence = field_uses(base, ordinal, "/data/payload/path/original/value", 0, true)?;
-        for namespace in ["dataforgeDecodedBytes", "dataforgeArrayElement"] {
+        for namespace in [
+            "dataforgeDecodedBytes",
+            "dataforgeArrayElement",
+            "dataforgeDataMapping",
+            "dataforgeHeader",
+        ] {
             assert!(
                 evidence.iter().any(|site| {
                     site.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)

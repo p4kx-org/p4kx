@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::query::QuerySource;
-use p4kx_extraction::{Record, SourceUseRole, Value as ForgeValue};
+use p4kx_extraction::{DataForge, Record, SourceUseRole, Value as ForgeValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -162,6 +162,7 @@ pub(super) struct GridOccurrence<'database, 'sites> {
     pub(super) component_index: u32,
     pub(super) field: &'static str,
     pub(super) state: PathState<'database>,
+    pub(super) forge: &'sites DataForge<'database>,
     pub(super) sites: &'sites [QuerySource],
 }
 
@@ -203,6 +204,7 @@ pub(super) fn occurrence(
         component_index,
         field,
         state,
+        forge,
         sites,
     } = data;
     let record_index = u64::from(record.index());
@@ -214,7 +216,7 @@ pub(super) fn occurrence(
         let original = record_field(originals, record_index, field, writer)?;
         origins::at(&mut prepared, path, original, writer)?;
     }
-    let evidence = path_evidence(originals, record_index, field, sites, writer)?;
+    let evidence = path_evidence(originals, record_index, field, forge, sites, writer)?;
     origins::at(
         &mut prepared,
         "/subresource/indices",

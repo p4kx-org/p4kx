@@ -4,9 +4,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use p4kx_extraction::query::QuerySource;
+use p4kx_extraction::query_source_evidence;
 use p4kx_extraction::{
-    InputScope, SourceCoordinateOmission, SourceEncryptionState, SourceLocation, SourceUse,
-    SourceUseRole, SourceUses,
+    DataForge, InputScope, SourceCoordinateOmission, SourceEncryptionState, SourceLocation,
+    SourceUse, SourceUseRole, SourceUses,
 };
 
 use crate::origin_contributions::{OriginContributions, OriginCut, SharedUseSet};
@@ -103,6 +105,27 @@ impl OriginCapture {
         self.add_original(input, scope, site, role)
     }
 
+    pub(crate) fn add_query_inputs(
+        &mut self,
+        input: &MediaOriginInput,
+        forge: &DataForge<'_>,
+        sites: &[QuerySource],
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.require_owner(&input.owner, writer)?;
+        let scope = input.scope.for_scope(InputScope::Payload);
+        let bound = query_source_evidence::bind_cell_inputs(forge, &scope, sites.iter().copied())
+            .map_err(origin_error::evidence)?;
+        self.complete &= bound.is_complete();
+        if input.details_limited && bound.uses().iter().any(|used| contributes(used.role())) {
+            self.cut(OriginCut::InputMetadata);
+        }
+        for used in bound.uses().iter().cloned() {
+            self.retain(used, self.limit)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn add_original(
         &mut self,
         input: &MediaOriginInput,
@@ -113,10 +136,7 @@ impl OriginCapture {
         if !self.owner.is_same_inventory(&input.owner) {
             return Err(origin_error::foreign());
         }
-        let contributes = matches!(
-            role,
-            SourceUseRole::Payload | SourceUseRole::Selector | SourceUseRole::Conversion
-        );
+        let contributes = contributes(role);
         if input.details_limited && contributes {
             self.cut(OriginCut::InputMetadata);
         }
@@ -253,10 +273,7 @@ impl OriginCapture {
     }
 
     fn retain(&mut self, actual: SourceUse, limit: u64) -> Result<(), MediaError> {
-        if !matches!(
-            actual.role(),
-            SourceUseRole::Payload | SourceUseRole::Selector | SourceUseRole::Conversion
-        ) {
+        if !contributes(actual.role()) {
             return Ok(());
         }
         if self.cut {
@@ -324,6 +341,13 @@ impl OriginCapture {
             self.cuts.push(cut);
         }
     }
+}
+
+fn contributes(role: SourceUseRole) -> bool {
+    matches!(
+        role,
+        SourceUseRole::Payload | SourceUseRole::Selector | SourceUseRole::Conversion
+    )
 }
 
 fn witness_rank(actual: &SourceUse) -> u8 {

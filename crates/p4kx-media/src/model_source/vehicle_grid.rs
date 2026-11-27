@@ -105,7 +105,9 @@ impl Dispatch<'_, '_> {
         };
         budget.metadata(0, row.visited_elements() as u64, limits, writer.checkpoint)?;
         match row.cells() {
-            Ok([Some(Value::Array(values))]) => self.occurrences(&row, values, writer),
+            Ok([Some(Value::Array(values))]) => {
+                self.occurrences(compiled.dataforge(), &row, values, writer)
+            }
             Ok([Some(Value::Error(ValueError::PathTooWide { .. }))]) => Err(MediaError::Limit {
                 budget: "metadata_work",
                 limit: limits.metadata_work,
@@ -120,10 +122,11 @@ impl Dispatch<'_, '_> {
         }
     }
 
-    fn occurrences(
+    fn occurrences<'database>(
         &mut self,
-        row: &Row<'_>,
-        values: &[Value<'_>],
+        forge: &DataForge<'database>,
+        row: &Row<'database>,
+        values: &[Value<'database>],
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let sources = row
@@ -156,6 +159,7 @@ impl Dispatch<'_, '_> {
                     record: row.record(),
                     component_index,
                     field: FIELD,
+                    forge,
                     state,
                     sites,
                 },
