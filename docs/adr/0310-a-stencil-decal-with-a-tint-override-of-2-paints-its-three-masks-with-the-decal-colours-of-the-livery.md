@@ -42,7 +42,7 @@ Screenshots and registered texture measurements cover one livery of one vehicle.
   stencil where blue supplies the coverage. The rear marking uses the same source texture.
   Registering the screenshot to the rear UVs using only the blue "URSA" glyphs matched 99.16% of
   2,634 held-out samples there. In the separate rear "+MEDIVAC" band, 215 samples with strong
-  red and blue masks and negligible green showed the red palette colour. The blue-only control
+  red and blue masks and zero green showed the red palette colour. The blue-only control
   showed the grey palette colour. This establishes red above blue there and leaves mixed green
   coverage unresolved.
 - **MISC Freelancer, standard livery** (consistent with `misc_freelancer_dur_default`): the emblem
@@ -100,4 +100,6 @@ measurements and rerun on any Archive. The Blender package format is 1.7.
 
 The synthetic overlap and fallback cases are checked in the GLB exporter and in isolated Blender
 renders of the source-built package. Blender 5.2.5 LTS (5f2fd03c4701) matched the expected linear
-colour and coverage at all eight stations in each case.
+colour and coverage at all eight sampled texels in each case. The real-Archive Ursa test passed
+with 24 decal materials and 2,490 palettes on LIVE 13220821, and 24 decal materials and 2,562
+palettes on PTU 13284307.
