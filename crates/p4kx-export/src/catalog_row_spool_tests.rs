@@ -12,7 +12,6 @@ use serde_json::json;
 use serde_json::value::RawValue;
 
 use super::{IndexedRowSpoolWriter, RowSpool, RowSpoolError, RowSpoolWriter};
-use crate::CatalogError;
 
 #[path = "catalog_row_spool_frame_tests.rs"]
 mod frames;

@@ -27,10 +27,10 @@ mod room_declarations;
 mod scoped_coverage;
 #[path = "catalog_facility_interior_placement_sdk.rs"]
 mod scoped_placement;
-#[path = "catalog_facility_interior_visit_sdk.rs"]
-mod visit_placement;
 #[path = "catalog_facility_ship_frame.rs"]
 mod ship_frame;
+#[path = "catalog_facility_interior_visit_sdk.rs"]
+mod visit_placement;
 
 #[test]
 fn catalog_links_original_soc_entity_slots_to_their_physical_facility_owner() -> TestResult {
