@@ -3599,6 +3599,23 @@ processes showed 45.8% lower elapsed time. The earlier PTU measurement shares
 the host with other builds, so its elapsed time is contextual. The separate
 Full retained comparison covers occurrence and contributor parity.
 
+The retained LIVE 13220821 comparison used the same a518 verifier, its exact
+Marker receipt, and the complete Normal Full Catalog from
+`84e0a9ca95ca03da3cae281e24240be9377c7ea5`. The installed Archive stayed stable
+and the 1,576,271,368-byte compressed frame hash was verified before replay.
+
+The test matched all 20,630 ordered placements for 1,033 physical Ships,
+including the terminal census, values and immediate encryption markers. It
+reconciled 108,961 distinct contributing source uses with one original
+physical source. The census retains 67 incomplete owners, 56 owners with
+empty present placements and 80 skipped leftovers.
+
+The scoped Full visit and evidence comparison took 1,177.618 s. The bounded
+process, including the 95,109,379,589-byte decoded Catalog replay, took
+3,271.411 s. It peaked at 1,091,399,680 bytes of private commit and
+1,023,107,072 bytes of working set. The receipt SHA-256 is
+`768ed7de2c51a782a2f1d8b055cc84da6802d880947b2df047614555b7935e51`.
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for
