@@ -1197,3 +1197,34 @@ Minimum host availability was 41,197,506,560 B physical memory and
 61,723,824,128 B commit headroom. A guarded one-job synthetic compilation
 shared the host during the readback. The terminal receipt SHA-256 is
 `eb72449baf43783075f6676cb86f304f12187b6d39690657d1108350c49cd90b`.
+
+### Packaged PTU Full readback
+
+The same independent verifier replayed the packaged PTU 13284307 frame
+with one worker and kept the installed Archive closed. Both passes
+verified 98,173,166,243 decoded bytes with SHA-256
+`6b0e94358ad66f58c5f56ba4239624490b4d83e05b29ce4450ee31e4ba9c7f2b`.
+The compressed frame hash matched the producer seal after replay.
+
+| Verified PTU inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,254,383 |
+| Variant source-use sets | 513 |
+| Sourced cells | 98,388,081 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+| Counted document sections | 254 |
+
+The verifier exited 0 in 6,346.079 s. Peak private commit was
+8,727,318,528 B, peak working set was 8,664,616,960 B and process write
+transfers were 24,172 B. Minimum host availability was 38,635,184,128 B
+physical memory and 58,139,856,896 B commit headroom. Guarded synthetic
+compilation shared the host during part of the replay.
+
+The PTU terminal receipt SHA-256 is
+`6aeb71a97d01ec97f9511450dc4aa2ae53af0a57c765bd5702c142b9f8f330af`.
+The paired terminal receipt binds both producer frames and both completed
+readbacks. Its SHA-256 is
+`4c86d9dc8463682ce6054c9880b2ed825a2c400364699489464bd8d3650f3bde`.
