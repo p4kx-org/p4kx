@@ -7,9 +7,13 @@
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
 use p4kx_gui::{Fact, Language, Model, UiDetail, UiFilesStatus, UiSize, UiText, WorkTab};
+use p4kx_testkit::{TestEntry, test_key};
 
-use crate::tagging::{harness, wait_until};
-use crate::ui_tabbing::{PLAIN, TestResult, drawn, listed, opened, pick_file, position_of};
+use crate::tagging::{archive, harness, wait_until};
+use crate::ui_tabbing::{
+    PANEL, PLAIN, TestResult, assert_clear_stage_origins, drawn, listed, opened, panel_movie,
+    pick_file, position_of,
+};
 
 const WINDOW: [f32; 2] = [1280.0, 800.0];
 
@@ -128,6 +132,17 @@ fn a_picked_movie_is_drawn_off_the_ui_thread_with_its_contents() -> TestResult {
     assert_eq!((rendered.width(), rendered.height()), (64, 32), "the stage");
     assert_eq!(pixel(model, 8, 8), Some([255, 0, 0, 255]), "the red half");
     assert_eq!(pixel(model, 48, 8), Some([0, 0, 0, 0]), "the missing fill");
+    let origins = rendered.origins();
+    assert_eq!(
+        origins.image.contains_encrypted_source(),
+        None,
+        "missing bitmap"
+    );
+    assert!(
+        !origins.image.source_uses_refs().is_empty(),
+        "the recorded paints still have origins"
+    );
+    assert_clear_stage_origins(origins);
     let contents = model.ui().contents().ok_or("no contents")?;
     assert!(
         contents
@@ -221,12 +236,71 @@ fn a_movie_drawn_completely_says_so() -> TestResult {
         "nothing left out"
     );
     assert_eq!(pixel(model, 4, 4), Some([0, 0, 255, 255]), "blue");
+    let origins = model.ui().rendered().ok_or("no picture")?.origins();
+    assert_eq!(
+        origins.image.contains_encrypted_source(),
+        Some(false),
+        "complete clear picture"
+    );
+    assert!(
+        window
+            .harness
+            .query_by_label_contains("Unencrypted source data")
+            .is_some(),
+        "the displayed picture exposes its marker"
+    );
     assert!(
         window
             .harness
             .query_by_label("Everything was drawn.")
             .is_some(),
         "said"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_movie_with_an_omission_retains_proved_encryption() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let path = archive(
+        folder.path(),
+        vec![TestEntry::stored(PANEL, panel_movie()).encrypted()],
+    )?;
+    let mut model = Model::new(Language::BritishEnglish);
+    model.set_archive_key(Some(test_key()));
+    let mut harness = harness(model);
+    harness.state_mut().open(path, || {});
+    wait_until(&mut harness, |model| model.browser().is_some())?;
+    harness.state_mut().set_work_tab(WorkTab::Ui);
+    wait_until(&mut harness, |model| {
+        position_of(model, "panel.gfx").is_some()
+    })?;
+    let position = position_of(harness.state(), "panel.gfx").ok_or("movie is not listed")?;
+    harness.state_mut().ui_mut().select_file(position);
+    wait_until(&mut harness, drawn)?;
+
+    let picture = harness.state().ui().rendered().ok_or("no picture")?;
+    let origins = picture.origins();
+    assert!(!origins.image.source_set_complete(), "an input is missing");
+    assert_eq!(
+        origins.image.contains_encrypted_source(),
+        Some(true),
+        "the actual encrypted movie still contributes"
+    );
+    assert_eq!(
+        origins.report.contains_encrypted_source(),
+        None,
+        "aggregate report has its own evidence"
+    );
+    assert_eq!(
+        pixel(harness.state(), 8, 8),
+        Some([255, 0, 0, 255]),
+        "known paint stays visible"
+    );
+    assert!(
+        harness
+            .query_by_label_contains("Includes encrypted source data")
+            .is_some()
     );
     Ok(())
 }
@@ -280,6 +354,15 @@ fn the_size_and_the_background_redraw_the_picture() -> TestResult {
         "the aspect ratio of the stage is kept"
     );
     assert_eq!(pixel(model, 800, 100), Some([0, 0, 0, 0]), "transparent");
+    let origins = model.ui().rendered().ok_or("no resized picture")?.origins();
+    assert!(
+        origins.width.source_uses_refs().is_empty(),
+        "the width belongs to the new explicit setting"
+    );
+    assert!(
+        !origins.height.source_uses_refs().is_empty(),
+        "the height still uses the stage aspect ratio"
+    );
 
     window
         .harness

@@ -40,7 +40,8 @@ pub struct UiRenderBitmapSources {
     pub provenance: SourceInventory,
     /// Aggregate origin of the encoded PNG payload.
     pub artifact_origin: FieldOrigin,
-    pub(crate) summary: RenderSummaryOrigins,
+    /// The sources of the movie name, dimensions and render diagnostics.
+    pub summary_origins: RenderSummaryOrigins,
 }
 
 impl UiMovie<'_> {
@@ -83,7 +84,7 @@ impl UiMovie<'_> {
             localizations: evidence.localizations,
             provenance: evidence.provenance,
             artifact_origin: evidence.artifact_origin,
-            summary: evidence.summary,
+            summary_origins: evidence.summary,
         })
     }
 }

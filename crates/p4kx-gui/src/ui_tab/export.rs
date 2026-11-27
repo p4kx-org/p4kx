@@ -8,12 +8,13 @@ use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, FieldOrigin, PublishedUiRender, ScreenTexts,
     SourceInventory, WriteProtectionError, is_same_file,
 };
-use p4kx_screens::{ArchiveScreen, ArchiveScreenError, ScreenError, StillFormat, StillRequest};
+use p4kx_screens::{ArchiveScreen, StillFormat, StillRequest};
 
 use super::job::{Job, Poll};
 use super::render::{Fail, RenderKey, UiSource, checkpoint, open_movie, reason};
 use super::report::UiReport;
 use super::settings::UiFormat;
+use super::still;
 use crate::EntryIndex;
 use crate::UiText;
 
@@ -326,20 +327,11 @@ fn write_screen(
             UiFormat::Svg => StillFormat::Svg,
         },
     };
-    let draw = |texts: &ScreenTexts| {
-        let mut warnings = Vec::new();
-        screen
-            .render(texts, &asked, cancel, &mut warnings)
-            .map(|drawn| (drawn, warnings))
-    };
+    let draw = |texts: &ScreenTexts| still::draw(&screen, texts, &asked, cancel);
     let (drawn, warnings) = request
         .texts
         .as_deref()
-        .map_or_else(|| draw(&screen.load_texts(key.language)), draw)
-        .map_err(|error| match error {
-            ArchiveScreenError::Draw(ScreenError::Stopped) => Fail::Stopped,
-            other => reason(&other),
-        })?;
+        .map_or_else(|| draw(&screen.load_texts(key.language)), draw)?;
     checkpoint(cancel)?;
     if index.watch().check().is_err() {
         return Err(Fail::ArchiveChanged);

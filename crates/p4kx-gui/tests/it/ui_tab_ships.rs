@@ -6,6 +6,7 @@
 
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
+use p4kx_extraction::SourceLocation;
 use p4kx_gui::{Language, RowDetail, ShipPick, UiMode, UiPower, UiScreensStatus, UiSource, UiText};
 
 use crate::tagging::wait_until;
@@ -80,6 +81,28 @@ fn a_picked_ship_lists_its_screens_and_draws_the_first() -> TestResult {
     assert_eq!(ship.picked(), Some(0), "the first screen is picked");
     let rendered = model.ui().rendered().ok_or("no picture")?;
     assert_eq!((rendered.width(), rendered.height()), (200, 100), "canvas");
+    let origins = rendered.origins();
+    for (dimension, expected) in [(&origins.width, "size.x"), (&origins.height, "size.y")] {
+        assert!(
+            origins.inventory.iter_uses().any(|usage| {
+                dimension.source_uses_refs().contains(usage.id())
+                    && matches!(usage.location(), SourceLocation::DataForge { field, .. } if field == expected)
+            }),
+            "the original canvas field supplies {expected}"
+        );
+    }
+    assert!(
+        origins.inventory.iter_uses().any(|usage| {
+            origins.image.source_uses_refs().contains(usage.id())
+                && matches!(usage.location(), SourceLocation::Subresource { namespace, .. } if namespace == "dataForgeBytes")
+        }),
+        "the displayed pixels use the original DataForge"
+    );
+    assert_eq!(
+        origins.content_omissions.len(),
+        rendered.report().content_omissions().len(),
+        "the structured diagnostics and their evidence agree"
+    );
     assert!(
         near(pixel(model, 100, 90), [10, 16, 24, 255]),
         "the background of the brand style: {:?}",

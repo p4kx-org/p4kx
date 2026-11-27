@@ -363,6 +363,13 @@ values identify the exact canvas Record fields used to derive them.
 Explicit dimensions and command options have their own tool-authored origins.
 A report value whose contributors cannot be established has a null marker.
 
+The in-memory UI tab preview retains the observed drawing inputs, independent
+width and height origins, and source inventory for the displayed Movie or
+Screen. The picture's tooltip and accessibility label show the encryption
+marker. A Screen also retains field evidence for each structured omission.
+An aggregate render diagnostic has unknown provenance when its complete
+contributors cannot be identified.
+
 The UI tab exposes the committed companion path, artifact origin, and
 independent summary-field origins for Movie and Screen exports. The export
 status tooltip shows the companion path and the artifact's encryption marker.

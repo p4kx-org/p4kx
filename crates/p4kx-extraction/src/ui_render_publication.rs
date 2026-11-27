@@ -73,7 +73,7 @@ impl UiMovie<'_> {
             Ok(Prepared {
                 render: observed.render,
                 artifact: observed.artifact_origin,
-                summary: observed.summary,
+                summary: observed.summary_origins,
                 inventory: observed.provenance,
             })
         })

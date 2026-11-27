@@ -145,6 +145,7 @@ impl UiTab {
                     serial: self.serial,
                     source: key.source,
                     image: Arc::new(built.image),
+                    origins: built.origins,
                     report: built.report,
                     contents: built.contents,
                 });

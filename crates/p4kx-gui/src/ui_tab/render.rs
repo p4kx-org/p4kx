@@ -5,8 +5,11 @@ use std::sync::Arc;
 
 use egui::ColorImage;
 use p4kx_extraction::gfx::RasterOptions;
-use p4kx_extraction::{CancelToken, LocalizationEntry, ScreenTexts, UiMovie, WriteProtectionError};
-use p4kx_screens::{StillFormat, StillRequest, Variable};
+use p4kx_extraction::{
+    CancelToken, FieldOrigin, LocalizationEntry, ScreenTexts, SourceInventory, UiMovie,
+    WriteProtectionError,
+};
+use p4kx_screens::{ArchiveScreen, ContentOmissionOrigin, StillFormat, StillRequest, Variable};
 
 use super::contents::UiContents;
 use super::report::UiReport;
@@ -55,6 +58,7 @@ pub struct UiRendered {
     pub(super) serial: u64,
     pub(super) source: UiSource,
     pub(super) image: Arc<ColorImage>,
+    pub(super) origins: UiPreviewOrigins,
     pub(super) report: UiReport,
     pub(super) contents: Option<UiContents>,
 }
@@ -76,6 +80,12 @@ impl UiRendered {
     #[must_use]
     pub const fn image(&self) -> &Arc<ColorImage> {
         &self.image
+    }
+
+    /// Returns source evidence for the displayed picture and its dimensions.
+    #[must_use]
+    pub const fn origins(&self) -> &UiPreviewOrigins {
+        &self.origins
     }
 
     /// Returns the width of the picture in pixels.
@@ -104,10 +114,29 @@ impl UiRendered {
     }
 }
 
+/// Sources and uses observed while drawing a UI preview.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct UiPreviewOrigins {
+    /// Original inputs used to draw the pixels.
+    pub image: FieldOrigin,
+    /// The original source or explicit option that selected the width.
+    pub width: FieldOrigin,
+    /// The original source or explicit option that selected the height.
+    pub height: FieldOrigin,
+    /// Evidence for aggregate render diagnostics whose contributors may be incomplete.
+    pub report: FieldOrigin,
+    /// Original field origins in the order of the Screen report's structured omissions.
+    pub content_omissions: Vec<ContentOmissionOrigin>,
+    /// Physical source declarations and uses referenced by the fields.
+    pub inventory: SourceInventory,
+}
+
 /// A picture drawn on the background thread.
 #[derive(Debug)]
 pub(super) struct Built {
     pub(super) image: ColorImage,
+    pub(super) origins: UiPreviewOrigins,
     pub(super) report: UiReport,
     pub(super) contents: Option<UiContents>,
     pub(super) texts: Option<Arc<ScreenTexts>>,
@@ -202,12 +231,23 @@ fn movie(
 ) -> Result<Built, Fail> {
     let (movie, warnings) = open_movie(index, path, key.language)?;
     checkpoint(cancel)?;
-    let render = movie.render(&key.raster()).map_err(|e| reason(&e))?;
+    let drawn = movie
+        .render_with_bitmap_sources(&key.raster())
+        .map_err(|error| reason(&error))?;
     checkpoint(cancel)?;
+    let render = &drawn.render;
     let assets = movie.movie().assets();
     let contents = UiContents::of_movie(&movie, &assets);
     Ok(Built {
         image: pixels(&render.image),
+        origins: UiPreviewOrigins {
+            image: drawn.artifact_origin,
+            width: drawn.summary_origins.width,
+            height: drawn.summary_origins.height,
+            report: drawn.summary_origins.unknown,
+            content_omissions: Vec::new(),
+            inventory: drawn.provenance,
+        },
         report: UiReport::of_movie(
             &render.skipped,
             &render.bitmap_failures,
@@ -228,11 +268,9 @@ fn screen(
 ) -> Result<Built, Fail> {
     let source = index.forge().read(index, || {})?;
     checkpoint(cancel)?;
-    let forge = source.entry.open().map_err(|e| reason(&e))?;
-    let texts = match cached {
-        Some(texts) => texts,
-        None => Arc::new(still::load_texts(index, &forge, key.language)?),
-    };
+    let archive = index.entries_archive().map_err(|error| reason(&error))?;
+    let screen = ArchiveScreen::new(archive, &source.entry).map_err(|error| reason(&error))?;
+    let texts = cached.unwrap_or_else(|| Arc::new(screen.load_texts(key.language)));
     checkpoint(cancel)?;
     let request = StillRequest {
         screen: canvas,
@@ -241,13 +279,25 @@ fn screen(
         raster: key.raster(),
         format: StillFormat::Png,
     };
-    let (still, warnings) = still::draw(index, &forge, &texts, &request, cancel)?;
+    let (drawn, warnings) = still::draw(&screen, &texts, &request, cancel)?;
+    let still = drawn.still();
     let image = still
         .image()
+        .map(pixels)
         .ok_or_else(|| Fail::Reason("no pixels".to_owned()))?;
+    let report = UiReport::of_still(still, &warnings);
+    let origin = drawn.into_origin();
     Ok(Built {
-        image: pixels(image),
-        report: UiReport::of_still(&still, &warnings),
+        image,
+        origins: UiPreviewOrigins {
+            image: origin.artifact,
+            width: origin.width,
+            height: origin.height,
+            report: origin.unknown,
+            content_omissions: origin.content_omissions,
+            inventory: origin.provenance,
+        },
+        report,
         contents: None,
         texts: Some(texts),
     })

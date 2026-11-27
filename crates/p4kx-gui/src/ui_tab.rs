@@ -26,7 +26,7 @@ pub use export::{UiExport, UiExportOrigins, UiExportStatus, UiExportSummary};
 pub use files::FileList;
 pub(crate) use output_picture::OutputPicture;
 pub use pick::{ShipPick, UiScreensStatus};
-pub use render::{UiRendered, UiSource};
+pub use render::{UiPreviewOrigins, UiRendered, UiSource};
 pub use report::{ReportLine, UiReport};
 pub use settings::{UiBackground, UiFormat, UiPower, UiSettings, UiSize};
 pub use ships::ShipList;
