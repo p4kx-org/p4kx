@@ -851,3 +851,30 @@ outcome remain unknown.
 [ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/job/140456588362) ·
 [Before-Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15190712078) ·
 [Launch evidence](https://github.com/p4kx-org/p4kx/actions/runs/45978787079/artifacts/15191555821)
+
+### Native Windows checkpoints on 8a58c8d2f
+
+Release run 45993359530 built both packages from PR head
+`8a58c8d2ff2cabe73c8e5daf6e07f47a165a2956` and tested merge
+`127366f76ca889b4d90b380a613d37a90c872cd5`. The two post-launch
+checkpoints bind the original requests to native processes on each CPU.
+
+- On AMD64, the journal closed the historical uninstall at sequence 89 and
+  reached baseline restore at sequence 90, 22.259 seconds into the worker.
+  The live archive SHA-256 is
+  `9f0a8471481500864dce9d7e21c7ebc5ef20248b1351550eb5447f180b2f8888`.
+  [Job](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/job/140509389808) ·
+  [Checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/artifacts/15197752889)
+- On ARM64, the journal closed one native `msiexec/wait` and entered
+  `msiexec/post-capture` at sequence 53, 11.955 seconds into the worker.
+  The live archive SHA-256 is
+  `ee4d4680f1a523b5b237fcce568814993df8abada527eb66dccfafa742a1db42`.
+  [Job](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/job/140509389802) ·
+  [Checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45993359530/artifacts/15198485377)
+
+At 12:53:44 UTC, both jobs still showed their original active step beyond
+the collection cutoff. The ARM64 artifact was already available at 12:40:37
+UTC while GitHub still reported the checkpoint upload in progress. AMD64
+still reported the original Finish wait. Both checkpoints record lifecycle
+progress. The terminal receipts and executed Windows packages were absent
+at this observation.
