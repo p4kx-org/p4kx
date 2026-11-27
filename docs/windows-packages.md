@@ -876,5 +876,16 @@ At 12:53:44 UTC, both jobs still showed their original active step beyond
 the collection cutoff. The ARM64 artifact was already available at 12:40:37
 UTC while GitHub still reported the checkpoint upload in progress. AMD64
 still reported the original Finish wait. Both checkpoints record lifecycle
-progress. The terminal receipts and executed Windows packages were absent
-at this observation.
+progress.
+
+Both jobs started at 12:37:10 UTC and GitHub cancelled both at 13:32:10 UTC.
+The sole annotation for each job cited its 45-minute execution limit.
+GitHub still listed the steps above as in progress. The per-job log
+endpoints returned HTTP 404, and the run retained no original Finish
+receipt or executed Windows release payload. The installer outcome and
+the cause of the hosted stall remain unverified.
+
+Local Windows AMD64 synthetic Finish checks passed the original launch
+and receipt binding, timeout and negative-receipt cases, and the bounded
+watchdog cleanup. They used harmless workers and a synthetic runner
+identity.
