@@ -65,6 +65,7 @@ pub struct ExtractionSummary {
     not_converted: usize,
     merged_texture_receipts: Vec<String>,
     file_origin_receipts: Vec<String>,
+    record_origin_failures: Vec<String>,
 }
 
 impl ExtractionSummary {
@@ -94,6 +95,7 @@ impl ExtractionSummary {
     }
 
     pub(crate) fn new(target: PathBuf, report: &ExtractionReport) -> Self {
+        let file_origin_receipts = file_origin_receipts(report, &target);
         Self {
             target,
             extracted: report.extracted(),
@@ -117,19 +119,14 @@ impl ExtractionSummary {
                 .iter()
                 .map(|artifact| artifact.origin_receipt.clone())
                 .collect(),
-            file_origin_receipts: report
-                .raw_artifacts()
-                .iter()
-                .chain(report.cryxml_artifacts())
-                .filter_map(|artifact| artifact.origin_receipt.as_ref())
-                .chain(
-                    report
-                        .sound_artifacts()
-                        .iter()
-                        .map(|artifact| &artifact.origin_receipt),
-                )
-                .cloned()
-                .collect(),
+            file_origin_receipts,
+            record_origin_failures: report.records().map_or_default(|records| {
+                records
+                    .origin_failures()
+                    .iter()
+                    .map(|error| describe(error))
+                    .collect()
+            }),
         }
     }
 
@@ -217,10 +214,16 @@ impl ExtractionSummary {
         self.not_converted
     }
 
-    /// Borrows the relative companions for unchanged files, converted CryXml and audio.
+    /// Borrows the relative companions for extracted files, CryXml, audio and Record XML.
     #[must_use]
     pub fn file_origin_receipts(&self) -> &[String] {
         &self.file_origin_receipts
+    }
+
+    /// Borrows the failures publishing companions for committed Record XML files.
+    #[must_use]
+    pub fn record_origin_failures(&self) -> &[String] {
+        &self.record_origin_failures
     }
 
     pub(crate) fn merged_texture_receipts(&self) -> &[String] {
@@ -231,6 +234,35 @@ impl ExtractionSummary {
         self.excluded_parts = excluded_parts;
         self
     }
+}
+
+fn file_origin_receipts(report: &ExtractionReport, target: &Path) -> Vec<String> {
+    let mut receipts: Vec<String> = report
+        .raw_artifacts()
+        .iter()
+        .chain(report.cryxml_artifacts())
+        .filter_map(|artifact| artifact.origin_receipt.as_ref())
+        .chain(
+            report
+                .sound_artifacts()
+                .iter()
+                .map(|artifact| &artifact.origin_receipt),
+        )
+        .cloned()
+        .collect();
+    if let Some(records) = report.records()
+        && !records.origin_receipts().is_empty()
+    {
+        let root = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
+        receipts.extend(records.origin_receipts().iter().map(|receipt| {
+            receipt
+                .strip_prefix(&root)
+                .unwrap_or(receipt)
+                .to_string_lossy()
+                .replace('\\', "/")
+        }));
+    }
+    receipts
 }
 
 fn failed_entries(failures: &[EntryFailure]) -> Vec<FailedEntry> {

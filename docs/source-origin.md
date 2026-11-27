@@ -112,6 +112,9 @@ The JSON report lists committed companions relative to the extraction target
 under `records.origin_receipts`. A companion publication failure is reported
 under `records.origin_failures` with the committed Record XML still available.
 Skip and unchanged decisions retain the existing file and companion.
+The GUI Extraction and folder conversion summaries list the committed Record
+companions alongside the other file receipts and show companion publication
+failures alongside the Record totals.
 
 ## Record files
 

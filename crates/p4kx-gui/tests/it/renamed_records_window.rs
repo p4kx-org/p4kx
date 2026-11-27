@@ -120,13 +120,17 @@ fn extracted(
     language: Language,
     renderer: Option<WgpuTestRenderer>,
     labels: [&str; 4],
+    extra_entry: Option<TestEntry>,
 ) -> Result<Run, Box<dyn std::error::Error>> {
     let [shown, existing, start, confirm] = labels;
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", forge().build()))
-        .write_to(&path)?;
+    let mut archive =
+        ArchiveBuilder::new().entry(TestEntry::zstd("Data\\Game2.dcb", forge().build()));
+    if let Some(entry) = extra_entry {
+        archive = archive.entry(entry);
+    }
+    archive.write_to(&path)?;
     let out = dir.path().join("out");
     fs::create_dir(&out)?;
     let mut model = Model::new(language);
@@ -172,7 +176,7 @@ fn the_extraction_summary_lists_the_renamed_records_and_counts_no_failure() -> T
             GERMAN_REASON,
         ),
     ] {
-        let (_dir, harness) = extracted(language, None, labels)?;
+        let (_dir, harness) = extracted(language, None, labels, None)?;
 
         let Some(ExtractionStatus::Finished(summary)) =
             harness.state().extraction().map(Extraction::status)
@@ -180,10 +184,57 @@ fn the_extraction_summary_lists_the_renamed_records_and_counts_no_failure() -> T
             return Err("no summary".into());
         };
         assert!(summary.record_failures().is_empty(), "no Record failed");
+        assert!(
+            summary.record_origin_failures().is_empty(),
+            "no receipt failed"
+        );
+        assert_eq!(summary.file_origin_receipts().len(), 2, "both receipts");
+        for receipt in summary.file_origin_receipts() {
+            assert!(std::path::Path::new(receipt).is_relative(), "{receipt}");
+            assert!(summary.target().join(receipt).is_file(), "{receipt}");
+        }
+        let receipt_heading = match language {
+            Language::German => "Herkunftsbelege für Dateien (2)",
+            _ => "File origin receipts (2)",
+        };
+        harness.get_by_label(receipt_heading);
         harness.get_by_label(counts);
         harness.get_by_label(heading);
         harness.get_by_label(&format!("{GUID_LINE}{reason}"));
     }
+    Ok(())
+}
+
+#[test]
+fn a_failed_origin_receipt_stays_visible_alongside_the_written_records() -> TestResult {
+    const RECORD: &str = "Data/records/shared/Item.fine.xml";
+    const RECEIPT: &str = "Data/records/shared/Item.fine.xml.p4kx-origin.jsonl";
+    let native_bytes = b"native entry";
+    let native = TestEntry::stored(RECEIPT.replace('/', "\\"), native_bytes.to_vec());
+    let (_dir, harness) = extracted(Language::BritishEnglish, None, ENGLISH, Some(native))?;
+    let Some(ExtractionStatus::Finished(summary)) =
+        harness.state().extraction().map(Extraction::status)
+    else {
+        return Err("no summary".into());
+    };
+    assert_eq!(summary.records().ok_or("no Record summary")?.written, 2);
+    assert!(
+        summary.record_failures().is_empty(),
+        "both Records were written"
+    );
+    assert!(
+        summary.target().join(RECORD).is_file(),
+        "committed Record XML"
+    );
+    assert_eq!(fs::read(summary.target().join(RECEIPT))?, native_bytes);
+    let [failure] = summary.record_origin_failures() else {
+        return Err("expected exactly one companion failure".into());
+    };
+    assert!(
+        failure.contains("Item.fine.xml.p4kx-origin.jsonl"),
+        "{failure}"
+    );
+    harness.get_by_label("Origin receipt failures (1)");
     Ok(())
 }
 
@@ -211,7 +262,7 @@ fn both_summaries_are_drawn() -> TestResult {
             return Ok(());
         };
         let renderer = WgpuTestRenderer::from_render_state(state);
-        let (_dir, mut harness) = extracted(language, Some(renderer), labels)?;
+        let (_dir, mut harness) = extracted(language, Some(renderer), labels, None)?;
         draw(&mut harness, &format!("renamed-extraction-{tag}.png"))?;
     }
     Ok(())
