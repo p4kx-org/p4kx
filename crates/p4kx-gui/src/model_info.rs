@@ -133,16 +133,12 @@ impl ModelInfo {
     #[must_use]
     pub fn of(model: &Model) -> Self {
         let mut chunks = ChunkCounts::default();
-        let mut unread = Vec::new();
         for chunk in &model.chunks {
             chunks.total += 1;
             match chunk.usage {
                 ChunkUsage::Read => chunks.read += 1,
                 ChunkUsage::Skipped => chunks.skipped += 1,
                 ChunkUsage::Unknown => chunks.unknown += 1,
-            }
-            if chunk.usage != ChunkUsage::Read && unread.len() < MAX_LISTED_CHUNKS {
-                unread.push(note(chunk));
             }
         }
         Self {
@@ -151,7 +147,7 @@ impl ModelInfo {
             geometry: model.geometry.as_deref().map(printable),
             nodes: model.nodes.len(),
             chunks,
-            unread,
+            unread: listed_chunks(model).map(|(_, chunk)| note(chunk)).collect(),
             lods: model
                 .lods
                 .iter()
@@ -204,6 +200,15 @@ pub(crate) fn printable(text: &str) -> String {
             }
         })
         .collect()
+}
+
+pub(crate) fn listed_chunks(model: &Model) -> impl Iterator<Item = (usize, &ModelChunk)> {
+    model
+        .chunks
+        .iter()
+        .enumerate()
+        .filter(|(_, chunk)| chunk.usage != ChunkUsage::Read)
+        .take(MAX_LISTED_CHUNKS)
 }
 
 fn note(chunk: &ModelChunk) -> ChunkNote {

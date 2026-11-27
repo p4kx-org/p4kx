@@ -45,6 +45,45 @@ pub fn model_chunk_count_origin(
     Ok(uses.origin(&contributors, false))
 }
 
+/// Immediate origins of one emitted chunk summary.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ModelChunkOrigins {
+    /// Numeric chunk type.
+    pub type_id: FieldOrigin,
+    /// Name or absence of a known chunk type.
+    pub kind: FieldOrigin,
+    /// Position in the source file's chunk table.
+    pub index: FieldOrigin,
+    /// Role of the physical model or geometry file.
+    pub file: FieldOrigin,
+    /// Classification by the model reader.
+    pub usage: FieldOrigin,
+}
+
+/// Captures one chunk summary from the admitted model and its physical file.
+///
+/// # Errors
+/// Returns an invalid chunk position or source evidence error.
+pub fn capture_chunk_origins(
+    source: &ModelSource,
+    index: usize,
+    uses: &SourceUses,
+) -> io::Result<ModelChunkOrigins> {
+    let [type_id, kind, index, file, usage] = match ChunkTypeEvidence::capture(source, index, uses)?
+    {
+        Some(evidence) => evidence.origins(source, uses)?,
+        None => std::array::from_fn(|_| uses.origin(&[], false)),
+    };
+    Ok(ModelChunkOrigins {
+        type_id,
+        kind,
+        index,
+        file,
+        usage,
+    })
+}
+
 /// Writes chunk identity, file role and reader-use origins at the output path.
 ///
 /// # Errors
@@ -56,14 +95,14 @@ pub fn write_chunk_origins(
     uses: &SourceUses,
     fields: &mut FieldOrigins,
 ) -> io::Result<()> {
-    let origins = match ChunkTypeEvidence::capture(source, index, uses)? {
-        Some(evidence) => evidence.origins(source, uses)?,
-        None => std::array::from_fn(|_| uses.origin(&[], false)),
-    };
-    for (name, origin) in ["type_id", "type", "index", "file", "usage"]
-        .into_iter()
-        .zip(origins)
-    {
+    let origins = capture_chunk_origins(source, index, uses)?;
+    for (name, origin) in [
+        ("type_id", origins.type_id),
+        ("type", origins.kind),
+        ("index", origins.index),
+        ("file", origins.file),
+        ("usage", origins.usage),
+    ] {
         insert_origin(fields, chunk_path, name, origin)?;
     }
     Ok(())

@@ -985,6 +985,7 @@ model-info-animations = Animations
 model-info-animations-unread = Not read
 model-info-animations-reading = Reading…
 model-info-chunks = Chunks
+model-info-chunks-total = Total chunks
 model-info-chunks-value = { $total } ({ $read } read, { $skipped } skipped, { $unknown } unknown)
 model-info-materials-unnamed = None named
 model-info-materials-loaded = { $library }, { $count ->

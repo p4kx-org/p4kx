@@ -8,8 +8,10 @@ use egui::{
     WidgetInfo, pos2, vec2,
 };
 
+use p4kx_extraction::FieldOrigin;
+
 use super::model_info_rows::{Rows, facts, tables};
-use super::model_preview;
+use super::{model_preview, source_origin};
 use crate::theme::desktop::{
     DETAIL_COLUMN_GAP, DETAIL_ROW_GAP, PANEL_TITLE_MARGIN_BOTTOM, PANEL_TITLE_MARGIN_TOP,
     PANEL_TITLE_PADDING_BOTTOM, ROW_HEIGHT, ZEBRA,
@@ -19,9 +21,14 @@ use crate::widgets::frames;
 use crate::widgets::rows::paint_divider;
 use crate::widgets::text::hairline_below;
 use crate::widgets::tooltip;
-use crate::{Language, ModelInfo, ModelPreview, Texts};
+use crate::{Language, ModelInfo, ModelInfoProvenance, ModelInfoText as T, ModelPreview, Texts};
 
 pub(super) type Labelled = (String, Arc<Galley>);
+pub(super) struct Fact {
+    pub(super) name: T,
+    pub(super) key: Labelled,
+    pub(super) value: Labelled,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Key {
@@ -36,7 +43,7 @@ struct Key {
 pub(super) struct Laid {
     key: Key,
     key_width: f32,
-    pub(super) facts: Vec<(Labelled, Labelled)>,
+    pub(super) facts: Vec<Fact>,
     pub(super) tables: Vec<Table>,
 }
 
@@ -45,6 +52,7 @@ pub(super) struct Table {
     pub(super) heading: Labelled,
     pub(super) head: Vec<Labelled>,
     pub(super) rows: Vec<Vec<Labelled>>,
+    pub(super) chunk_notes: bool,
 }
 
 /// Shows the Info tab of the model at `path`: what its file holds, or why there is nothing to
@@ -54,11 +62,12 @@ pub(super) fn show(ui: &mut Ui, texts: &Texts, path: &str, preview: &ModelPrevie
         model_preview::unread(ui, texts, path, preview.status());
         return;
     };
+    let origins = preview.info_provenance().and_then(Result::ok);
     frames::preview_body().show(ui, |ui| {
         ScrollArea::vertical()
             .id_salt("model-info")
             .auto_shrink(false)
-            .show(ui, |ui| Laid::get(ui, texts, info).show(ui));
+            .show(ui, |ui| Laid::get(ui, texts, info).show(ui, texts, origins));
     });
 }
 
@@ -92,14 +101,14 @@ impl Laid {
         laid
     }
 
-    fn show(&self, ui: &mut Ui) {
+    fn show(&self, ui: &mut Ui, texts: &Texts, origins: Option<&ModelInfoProvenance>) {
         ui.spacing_mut().item_spacing.y = 0.0;
         let key_width = self.key_width;
-        for (index, (key, value)) in self.facts.iter().enumerate() {
+        for (index, data) in self.facts.iter().enumerate() {
             if index > 0 {
                 ui.add_space(DETAIL_ROW_GAP);
             }
-            fact(ui, index, (key, value), key_width);
+            fact(ui, index, data, key_width, texts, origins);
         }
         for (index, table) in self.tables.iter().enumerate() {
             ui.add_space(PANEL_TITLE_MARGIN_TOP);
@@ -117,12 +126,28 @@ impl Laid {
             );
             hairline_below(ui, rect);
             ui.add_space(PANEL_TITLE_MARGIN_BOTTOM);
-            grid(ui, index, table);
+            grid(ui, index, table, texts, origins);
         }
     }
 }
 
-fn fact(ui: &mut Ui, index: usize, (key, value): (&Labelled, &Labelled), key_width: f32) {
+fn fact(
+    ui: &mut Ui,
+    index: usize,
+    Fact { name, key, value }: &Fact,
+    key_width: f32,
+    texts: &Texts,
+    origins: Option<&ModelInfoProvenance>,
+) {
+    let proof = match name {
+        T::Nodes => Some((T::Nodes, origins.map(ModelInfoProvenance::node_count))),
+        T::Bones => Some((T::Bones, origins.map(ModelInfoProvenance::bone_count))),
+        T::Chunks => Some((
+            T::ChunksTotal,
+            origins.map(ModelInfoProvenance::chunk_total),
+        )),
+        _ => None,
+    };
     let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
     let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
@@ -144,22 +169,33 @@ fn fact(ui: &mut Ui, index: usize, (key, value): (&Labelled, &Labelled), key_wid
         value,
         (on_baseline(value_rect, &value.1), palette::DATA_FG),
     );
-    if value.1.elided {
+    if value.1.elided || proof.is_some() {
         tooltip::hover(shown, |ui| {
-            tooltip::line(ui, value.0.as_str());
+            if value.1.elided {
+                tooltip::line(ui, value.0.as_str());
+            }
+            if let Some((field, origin)) = proof {
+                source_origin::row(ui, texts, field, origin);
+            }
         });
     }
     hairline_below(ui, key_rect);
     hairline_below(ui, value_rect);
 }
 
-fn grid(ui: &mut Ui, table: usize, data: &Table) {
+fn grid(
+    ui: &mut Ui,
+    table: usize,
+    data: &Table,
+    texts: &Texts,
+    origins: Option<&ModelInfoProvenance>,
+) {
     let (head, _) = ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
     let painter = ui.painter();
     painter.rect_filled(head, CornerRadius::ZERO, palette::SURFACE_INPUT);
     let rule = Rect::from_min_max(pos2(head.left(), head.bottom() - 2.0), head.max);
     painter.rect_filled(rule, CornerRadius::ZERO, palette::PRIMARY);
-    cells(ui, (2, table, 0), head, &data.head);
+    cells(ui, (2, table, 0), head, &data.head, None);
     for (index, row) in data.rows.iter().enumerate() {
         let (rect, _) =
             ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
@@ -170,11 +206,35 @@ fn grid(ui: &mut Ui, table: usize, data: &Table) {
             ui.painter().rect_filled(rect, CornerRadius::ZERO, ZEBRA);
         }
         paint_divider(ui.painter(), rect);
-        cells(ui, (3, table, index + 1), rect, row);
+        let markers = data.chunk_notes.then(|| {
+            let fields = origins
+                .and_then(|origins| origins.unread_chunks().get(index))
+                .map(|origins| {
+                    [
+                        &origins.file,
+                        &origins.kind,
+                        &origins.type_id,
+                        &origins.usage,
+                    ]
+                });
+            ChunkMarkers { texts, fields }
+        });
+        cells(ui, (3, table, index + 1), rect, row, markers.as_ref());
     }
 }
 
-fn cells(ui: &Ui, (section, table, row): (u8, usize, usize), rect: Rect, cells: &[Labelled]) {
+struct ChunkMarkers<'a> {
+    texts: &'a Texts,
+    fields: Option<[&'a FieldOrigin; 4]>,
+}
+
+fn cells(
+    ui: &Ui,
+    (section, table, row): (u8, usize, usize),
+    rect: Rect,
+    cells: &[Labelled],
+    markers: Option<&ChunkMarkers<'_>>,
+) {
     let columns = u16::try_from(cells.len()).map_or(1.0, f32::from).max(1.0);
     let width = rect.width() / columns;
     for ((column, step), cell) in (0_usize..).zip(0_u16..).zip(cells) {
@@ -187,9 +247,19 @@ fn cells(ui: &Ui, (section, table, row): (u8, usize, usize), rect: Rect, cells: 
             cell,
             (cell_rect, palette::GRAY_1),
         );
-        if cell.1.elided {
+        if cell.1.elided || markers.is_some() {
             tooltip::hover(shown, |ui| {
-                tooltip::line(ui, cell.0.as_str());
+                if cell.1.elided {
+                    tooltip::line(ui, cell.0.as_str());
+                }
+                if let Some(markers) = markers {
+                    let origin = markers
+                        .fields
+                        .as_ref()
+                        .and_then(|fields| fields.get(column))
+                        .copied();
+                    tooltip::line(ui, markers.texts.get(source_origin::label(origin)));
+                }
             });
         }
     }
@@ -286,12 +356,9 @@ mod tests {
         let widest = laid
             .facts
             .iter()
-            .map(|(_, (_, galley))| galley.size().x)
+            .map(|fact| fact.value.1.size().x)
             .fold(0.0, f32::max);
-        assert!(
-            laid.facts.iter().any(|(_, (_, galley))| galley.elided),
-            "elided"
-        );
+        assert!(laid.facts.iter().any(|fact| fact.value.1.elided), "elided");
         assert!(
             widest + laid.key_width + DETAIL_COLUMN_GAP <= ctx.content_rect().width(),
             "{widest} fits next to the key column"

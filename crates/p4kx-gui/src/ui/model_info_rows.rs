@@ -3,7 +3,7 @@
 
 use egui::Ui;
 
-use super::model_info::{Labelled, Table};
+use super::model_info::{Fact, Labelled, Table};
 use crate::theme::desktop::{
     CELL_PADDING_X, DETAIL_COLUMN_GAP, DETAIL_KEY_MIN_WIDTH, DETAIL_KEY_TRACKING,
     DETAIL_VALUE_SIZE, PANEL_TITLE_SIZE, ROW_FONT, TABLE_HEAD_SIZE, TABLE_HEAD_TRACKING,
@@ -64,7 +64,7 @@ impl Rows<'_> {
 
 /// Returns the width of the key column and the key and value of every fact of `info`, the values
 /// cut with an ellipsis at the column they are drawn in.
-pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<(Labelled, Labelled)>) {
+pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<Fact>) {
     let texts = rows.texts;
     let geometry = info
         .geometry
@@ -112,10 +112,14 @@ pub(super) fn facts(rows: &Rows<'_>, info: &ModelInfo) -> (f32, Vec<(Labelled, L
     let facts = keys
         .into_iter()
         .zip(facts)
-        .map(|(key, (_, value))| {
+        .map(|(key, (name, value))| {
             let value_text = plain(&value, DETAIL_VALUE_SIZE, Weight::Light);
             let galley = line(rows.ui, value_text, value_width);
-            (key, (value, galley))
+            Fact {
+                name,
+                key,
+                value: (value, galley),
+            }
         })
         .collect();
     (key_width, facts)
@@ -192,6 +196,7 @@ pub(super) fn tables(rows: &Rows<'_>, info: &ModelInfo) -> Vec<Table> {
         heading: rows.heading(texts.get(T::LodsHeading)),
         head: rows.head(&columns),
         rows: lods,
+        chunk_notes: false,
     }];
     if !info.unread.is_empty() {
         tables.push(unread(rows, info));
@@ -234,6 +239,7 @@ fn unread(rows: &Rows<'_>, info: &ModelInfo) -> Table {
             .heading(texts.format(T::ChunksHeading, &[("number", rows.number(number).into())])),
         head: rows.head(&columns),
         rows: cells,
+        chunk_notes: true,
     }
 }
 

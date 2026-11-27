@@ -11,5 +11,7 @@ mod export_cancel;
 mod export_origins;
 mod export_window;
 mod info;
+mod info_chunk_origins;
 mod info_lod_source_render;
 mod info_render;
+mod info_rig_origins;

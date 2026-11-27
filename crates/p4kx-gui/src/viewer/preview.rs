@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::error::Error;
+use std::io;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 
-use p4kx_extraction::model::{LodSelection, companion_file_names};
-use p4kx_extraction::{CancelToken, Entry, ModelSource, PathIndex};
-
+use p4kx_extraction::{CancelToken, ModelSource, PathIndex};
 use p4kx_render::{Camera, Scene, SceneError, Skeleton};
 
+use super::model_info_provenance::ModelInfoProvenance;
 use super::playback::Playback;
 use super::preview_animations::{Animated, can_animate, read as read_animations};
-use crate::model::describe;
 use crate::{AnimationCount, EntryIndex, ModelInfo};
+
+mod archive_read;
 
 /// The largest model file or geometry companion, in bytes, the viewer reads.
 pub const MODEL_FILE_LIMIT: u64 = 256 * 1024 * 1024;
@@ -60,6 +60,7 @@ enum Event {
 struct Loaded {
     info: ModelInfo,
     scene: Result<Scene, SceneError>,
+    info_provenance: io::Result<ModelInfoProvenance>,
 }
 
 #[derive(Debug)]
@@ -83,6 +84,7 @@ pub struct ModelPreview {
     events: Option<Receiver<Event>>,
     state: State,
     info: Option<Arc<ModelInfo>>,
+    info_provenance: Option<io::Result<ModelInfoProvenance>>,
     camera: Option<Camera>,
     playback: Option<Playback>,
 }
@@ -107,7 +109,7 @@ impl ModelPreview {
                         wake();
                     }
                 };
-                load(&thread_index, id, &thread_stop, &send);
+                archive_read::load(&thread_index, id, &thread_stop, &send);
             });
         let (events, state) = match spawned {
             Ok(_handle) => (Some(events), State::Loading),
@@ -118,6 +120,7 @@ impl ModelPreview {
             events,
             state,
             info: None,
+            info_provenance: None,
             camera: None,
             playback: None,
         }
@@ -127,6 +130,12 @@ impl ModelPreview {
     #[must_use]
     pub const fn info(&self) -> Option<&Arc<ModelInfo>> {
         self.info.as_ref()
+    }
+
+    /// Returns the original inputs of the visible model facts.
+    #[must_use]
+    pub fn info_provenance(&self) -> Option<Result<&ModelInfoProvenance, &io::Error>> {
+        self.info_provenance.as_ref().map(Result::as_ref)
     }
 
     /// Returns where the preview stands.
@@ -213,8 +222,13 @@ impl ModelPreview {
             Event::ArchiveChanged => self.drop_model(State::ArchiveChanged),
             Event::FileTooLarge(size) => self.drop_model(State::FileTooLarge(size)),
             Event::Read(read) => {
-                let Loaded { info, scene } = *read;
+                let Loaded {
+                    info,
+                    scene,
+                    info_provenance,
+                } = *read;
                 self.info = Some(Arc::new(info));
+                self.info_provenance = Some(info_provenance);
                 self.state = match scene {
                     Ok(scene) => {
                         self.camera = Some(Camera::framing(scene.bounds()));
@@ -239,6 +253,7 @@ impl ModelPreview {
         self.state = state;
         self.events = None;
         self.info = None;
+        self.info_provenance = None;
         self.camera = None;
         self.playback = None;
     }
@@ -268,37 +283,14 @@ impl Drop for ModelPreview {
     }
 }
 
-fn load(index: &EntryIndex, id: u32, stop: &CancelToken, send: &impl Fn(Event)) {
-    let Some(entry) = index.entry(id) else {
-        return send(Event::Failed(None));
-    };
-    if index.watch().check().is_err() {
-        return send(Event::ArchiveChanged);
-    }
-    let Some(paths) = index.path_index() else {
-        return send(Event::Failed(None));
-    };
-    if let Some(size) = oversized_file(&paths, entry) {
-        return send(Event::FileTooLarge(size));
-    }
-    if stop.is_cancelled() {
-        return;
-    }
-    let source = match ModelSource::from_index_with(&paths, entry.path(), LodSelection::All)
-        .or_else(|_| ModelSource::from_index_with(&paths, entry.path(), LodSelection::Only(0)))
-    {
-        Ok(source) => source,
-        Err(error) => {
-            return send(if index.watch().check().is_err() {
-                Event::ArchiveChanged
-            } else {
-                Event::Failed(Some(reason(&error, entry.path())))
-            });
-        }
-    };
-    if stop.is_cancelled() {
-        return;
-    }
+fn finish_model(
+    index: &EntryIndex,
+    paths: &PathIndex<'_>,
+    path: &str,
+    source: &ModelSource,
+    stop: &CancelToken,
+    send: &impl Fn(Event),
+) {
     let scene = Scene::from_model(source.model());
     if stop.is_cancelled() {
         return;
@@ -318,11 +310,22 @@ fn load(index: &EntryIndex, id: u32, stop: &CancelToken, send: &impl Fn(Event)) 
         AnimationCount::Counted(0)
     };
     let info = ModelInfo::of(source.model()).with_animations(count);
-    send(Event::Read(Box::new(Loaded { info, scene })));
+    let info_provenance = ModelInfoProvenance::capture(source);
+    if stop.is_cancelled() {
+        return;
+    }
+    if index.watch().check().is_err() {
+        return send(Event::ArchiveChanged);
+    }
+    send(Event::Read(Box::new(Loaded {
+        info,
+        scene,
+        info_provenance,
+    })));
     if !animatable {
         return;
     }
-    let Some(animated) = read_animations(&paths, entry.path(), skeleton.as_ref(), stop) else {
+    let Some(animated) = read_animations(paths, path, skeleton.as_ref(), stop) else {
         return;
     };
     if index.watch().check().is_err() {
@@ -331,30 +334,12 @@ fn load(index: &EntryIndex, id: u32, stop: &CancelToken, send: &impl Fn(Event)) 
     send(Event::Animations(animated));
 }
 
-fn oversized_file(paths: &PathIndex<'_>, entry: &Entry) -> Option<u64> {
-    let path = entry.path();
-    companion_file_names(path)
-        .iter()
-        .filter_map(|companion| paths.find(companion))
-        .chain(Some(entry))
-        .map(Entry::uncompressed_size)
-        .find(|&size| size > MODEL_FILE_LIMIT)
-}
-
-fn reason(error: &dyn Error, path: &str) -> String {
-    let described = describe(error);
-    described
-        .strip_prefix(path)
-        .and_then(|rest| rest.strip_prefix(": "))
-        .map_or_else(|| described.clone(), str::to_owned)
-}
-
 #[cfg(test)]
 mod events_tests;
 
 #[cfg(test)]
 mod tests {
-    use super::{is_model_path, reason};
+    use super::is_model_path;
 
     #[test]
     fn model_files_are_recognised_by_extension_ignoring_case() {
@@ -365,26 +350,6 @@ mod tests {
         ] {
             assert!(is_model_path(path), "{path}");
         }
-    }
-
-    #[derive(Debug, thiserror::Error)]
-    #[error("{0}")]
-    struct Named(String);
-
-    #[test]
-    fn the_reason_does_not_repeat_the_path_the_message_names() {
-        let error = Named("Data\\Objects\\a.cgf: not a chunk file".to_owned());
-
-        assert_eq!(
-            reason(&error, "Data\\Objects\\a.cgf"),
-            "not a chunk file",
-            "path dropped"
-        );
-        assert_eq!(
-            reason(&error, "Data\\Objects\\b.cgf"),
-            "Data\\Objects\\a.cgf: not a chunk file",
-            "another path stays"
-        );
     }
 
     #[test]

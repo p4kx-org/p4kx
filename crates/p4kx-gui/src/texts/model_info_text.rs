@@ -34,6 +34,8 @@ pub enum ModelInfoText {
     AnimationsReading,
     /// The key of the chunks.
     Chunks,
+    /// The label of the total chunk count in its origin tooltip.
+    ChunksTotal,
     /// The counts of the chunks; takes `total`, `read`, `skipped` and `unknown`.
     ChunksValue,
     /// The model names no material library.
@@ -85,7 +87,7 @@ pub enum ModelInfoText {
 
 impl ModelInfoText {
     /// Every text of the Info tab.
-    pub(crate) const ALL: [Self; 37] = [
+    pub(crate) const ALL: [Self; 38] = [
         Self::Tab,
         Self::Geometry,
         Self::GeometryInFile,
@@ -100,6 +102,7 @@ impl ModelInfoText {
         Self::AnimationsUnread,
         Self::AnimationsReading,
         Self::Chunks,
+        Self::ChunksTotal,
         Self::ChunksValue,
         Self::MaterialsUnnamed,
         Self::MaterialsLoaded,
@@ -143,6 +146,7 @@ impl ModelInfoText {
             Self::AnimationsUnread => "model-info-animations-unread",
             Self::AnimationsReading => "model-info-animations-reading",
             Self::Chunks => "model-info-chunks",
+            Self::ChunksTotal => "model-info-chunks-total",
             Self::ChunksValue => "model-info-chunks-value",
             Self::MaterialsUnnamed => "model-info-materials-unnamed",
             Self::MaterialsLoaded => "model-info-materials-loaded",

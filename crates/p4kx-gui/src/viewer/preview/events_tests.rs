@@ -18,6 +18,7 @@ fn read_while_counting() -> (ModelPreview, Sender<Event>) {
         events: Some(events),
         state: State::Loading,
         info: None,
+        info_provenance: None,
         camera: None,
         playback: None,
     };
@@ -26,7 +27,11 @@ fn read_while_counting() -> (ModelPreview, Sender<Event>) {
     let scene = Scene::from_model(&model);
     assert!(
         sender
-            .send(Event::Read(Box::new(Loaded { info, scene })))
+            .send(Event::Read(Box::new(Loaded {
+                info,
+                scene,
+                info_provenance: Err(std::io::Error::other("unbound synthetic model")),
+            })))
             .is_ok(),
         "sent"
     );
@@ -55,6 +60,10 @@ fn the_second_event_fills_the_count_and_the_playback() {
     assert!(preview.poll(), "the count arrived");
 
     assert!(!preview.is_reading_animations(), "counted");
+    assert!(
+        matches!(preview.info_provenance(), Some(Err(_))),
+        "the original model provenance state is preserved"
+    );
     assert_eq!(
         preview.info().map(|info| info.animations),
         Some(AnimationCount::Counted(1)),
@@ -80,6 +89,23 @@ fn a_reader_that_ends_while_counting_leaves_the_count_unread() {
         preview.info().map(|info| info.animations),
         Some(AnimationCount::Unread),
         "not read"
+    );
+}
+
+#[test]
+fn an_archive_change_discards_model_info_and_its_provenance() {
+    let (mut preview, sender) = read_while_counting();
+    assert!(
+        preview.info_provenance().is_some(),
+        "the source state arrived"
+    );
+    assert!(sender.send(Event::ArchiveChanged).is_ok(), "sent");
+
+    assert!(preview.poll(), "the change was noticed");
+    assert!(preview.info().is_none(), "the model info was discarded");
+    assert!(
+        preview.info_provenance().is_none(),
+        "the associated sources were discarded"
     );
 }
 

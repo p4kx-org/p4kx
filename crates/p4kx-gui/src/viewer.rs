@@ -7,12 +7,14 @@
 
 #[cfg(test)]
 mod fixtures;
+mod model_info_provenance;
 mod paint;
 mod playback;
 mod preview;
 mod preview_animations;
 mod support;
 
+pub use model_info_provenance::ModelInfoProvenance;
 pub(crate) use p4kx_render::{AssemblyDraw, Look, Subject, hidden_mask};
 pub use p4kx_render::{
     AssemblyScene, Bounds, BuildError, BuildOptions, Camera, DrawList, GpuReport, GroupDraw, Hooks,
