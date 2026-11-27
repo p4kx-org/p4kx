@@ -1444,6 +1444,7 @@ ui-export-done-incomplete =
         [one] Wrote { $file }: { $width } × { $height } px, with { $number } thing left out (see the Left out tab)
        *[other] Wrote { $file }: { $width } × { $height } px, with { $number } things left out (see the Left out tab)
     }
+ui-export-origin-receipt = Source receipt: { $file }
 ui-export-failed = The export failed: { $reason }
 ui-export-stopped = The export stopped without a result.
 ui-export-is-archive = The file is the open Archive, which is never overwritten.

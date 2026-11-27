@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ScreenTexts, WriteProtectionError, is_same_file,
+    ArchiveWriteProtection, CancelToken, FieldOrigin, PublishedUiRender, ScreenTexts,
+    SourceInventory, WriteProtectionError, is_same_file,
 };
 use p4kx_screens::{ArchiveScreen, ArchiveScreenError, ScreenError, StillFormat, StillRequest};
 
@@ -18,6 +19,7 @@ use crate::UiText;
 
 /// What an export wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct UiExportSummary {
     /// The file written.
     pub file: PathBuf,
@@ -27,6 +29,64 @@ pub struct UiExportSummary {
     pub height: u32,
     /// How many things the render left out, as the report of the picture lists them.
     pub left_out: usize,
+    origin_receipt: PathBuf,
+    origins: UiExportOrigins,
+}
+
+impl UiExportSummary {
+    /// Returns the companion bound to the committed file.
+    #[must_use]
+    pub fn origin_receipt(&self) -> &Path {
+        &self.origin_receipt
+    }
+
+    /// Returns the field origins and inventory of this result.
+    #[must_use]
+    pub const fn origins(&self) -> &UiExportOrigins {
+        &self.origins
+    }
+
+    fn movie<T>(
+        file: &Path,
+        [width, height]: [u32; 2],
+        report: &UiReport,
+        published: PublishedUiRender<T>,
+    ) -> Self {
+        let summary = published.summary_origins;
+        Self {
+            file: file.to_owned(),
+            width,
+            height,
+            left_out: counted(report),
+            origin_receipt: published.origin_receipt,
+            origins: UiExportOrigins {
+                artifact: published.artifact_origin,
+                file: summary.tool_authored,
+                width: summary.width,
+                height: summary.height,
+                left_out: summary.unknown,
+                inventory: published.provenance,
+            },
+        }
+    }
+}
+
+/// Field origins for a UI export and its summary values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct UiExportOrigins {
+    /// Actual source contributors to the encoded file.
+    pub artifact: FieldOrigin,
+    /// The destination path supplied by the caller.
+    pub file: FieldOrigin,
+    /// The original source or explicit option that selected the width.
+    pub width: FieldOrigin,
+    /// The original source or explicit option that selected the height.
+    pub height: FieldOrigin,
+    /// Evidence for the omission count, which can be incomplete.
+    pub left_out: FieldOrigin,
+    /// The original source and use inventory referenced by the fields.
+    pub inventory: SourceInventory,
 }
 
 /// Where an export stands.
@@ -204,41 +264,40 @@ fn write(
     checkpoint(cancel)?;
     match &key.source {
         UiSource::Movie(path) => {
-            let (movie, warnings) = open_movie(index, path, key.language)?;
+            let (movie, _) = open_movie(index, path, key.language)?;
             checkpoint(cancel)?;
             let options = key.raster();
-            let (width, height, report) = match request.format {
+            let summary = match request.format {
                 UiFormat::Png => {
-                    let done = movie
-                        .render_to_file(&options, file)
-                        .map_err(|e| reason(&e))?;
+                    let published = movie
+                        .render_to_file_with_origin_until(&options, file, cancel)
+                        .map_err(|error| reason(&error))?;
+                    let done = &published.render;
                     let report = UiReport::of_movie(
                         &done.skipped,
                         &done.bitmap_failures,
                         &done.tag_failures,
                         &done.imports,
                     );
-                    (done.image.width(), done.image.height(), report)
+                    let size = [done.image.width(), done.image.height()];
+                    UiExportSummary::movie(file, size, &report, published)
                 }
                 UiFormat::Svg => {
-                    let done = movie
-                        .render_svg_to_file(&options, file)
-                        .map_err(|e| reason(&e))?;
+                    let published = movie
+                        .render_svg_to_file_with_origin_until(&options, file, cancel)
+                        .map_err(|error| reason(&error))?;
+                    let done = &published.render;
                     let report = UiReport::of_movie(
                         &done.skipped,
                         &done.bitmap_failures,
                         &done.tag_failures,
                         &done.imports,
                     );
-                    (done.width, done.height, report)
+                    let size = [done.width, done.height];
+                    UiExportSummary::movie(file, size, &report, published)
                 }
             };
-            Ok(UiExportSummary {
-                file: file.clone(),
-                width,
-                height,
-                left_out: counted(&report.warned(&warnings)),
-            })
+            Ok(summary)
         }
         UiSource::Screen { canvas, brand } => {
             write_screen(index, (request, cancel), (canvas, brand.as_deref()))
@@ -287,14 +346,27 @@ fn write_screen(
     }
     let protection =
         ArchiveWriteProtection::new(index.path(), cancel.flag()).map_err(|error| reason(&error))?;
-    drawn
+    let origin_receipt = drawn
         .publish(file, &protection, cancel)
         .map_err(|error| reason(&error))?;
     let still = drawn.still();
+    let width = still.width();
+    let height = still.height();
+    let left_out = counted(&UiReport::of_still(still, &warnings));
+    let origin = drawn.into_origin();
     Ok(UiExportSummary {
         file: file.clone(),
-        width: still.width(),
-        height: still.height(),
-        left_out: counted(&UiReport::of_still(still, &warnings)),
+        width,
+        height,
+        left_out,
+        origin_receipt,
+        origins: UiExportOrigins {
+            artifact: origin.artifact,
+            file: origin.tool_authored,
+            width: origin.width,
+            height: origin.height,
+            left_out: origin.unknown,
+            inventory: origin.provenance,
+        },
     })
 }

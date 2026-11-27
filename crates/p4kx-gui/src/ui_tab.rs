@@ -22,7 +22,7 @@ use p4kx_assembly::EntityCatalogue;
 use p4kx_extraction::ScreenTexts;
 
 pub use contents::{ContentRow, Fact, MAX_CONTENT_ROWS, Note, RowDetail, UiContents};
-pub use export::{UiExport, UiExportStatus, UiExportSummary};
+pub use export::{UiExport, UiExportOrigins, UiExportStatus, UiExportSummary};
 pub use files::FileList;
 pub(crate) use output_picture::OutputPicture;
 pub use pick::{ShipPick, UiScreensStatus};

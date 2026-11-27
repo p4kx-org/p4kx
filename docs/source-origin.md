@@ -363,6 +363,14 @@ values identify the exact canvas Record fields used to derive them.
 Explicit dimensions and command options have their own tool-authored origins.
 A report value whose contributors cannot be established has a null marker.
 
+The UI tab exposes the committed companion path, artifact origin, and
+independent summary-field origins for Movie and Screen exports. The export
+status tooltip shows the companion path and the artifact's encryption marker.
+The displayed omission count has unknown origins when its contributing
+diagnostics cannot be bound. Movie publication and Screen publication both
+honour the GUI's cancellation token. A Movie SVG is one document with any
+bitmap data embedded.
+
 ## Standalone WAV
 
 The WAV sibling companion addresses each source-based header or loop value

@@ -161,6 +161,12 @@ impl ArchiveScreenRender {
         &self.origin
     }
 
+    /// Returns the original evidence and releases the rendered content.
+    #[must_use]
+    pub fn into_origin(self) -> ScreenRenderOrigin {
+        self.origin
+    }
+
     /// Publishes the image or document with its byte-bound sibling receipt.
     ///
     /// # Errors

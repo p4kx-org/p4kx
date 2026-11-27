@@ -195,7 +195,7 @@ fn the_extraction_summary_lists_the_renamed_records_and_counts_no_failure() -> T
         }
         let receipt_heading = match language {
             Language::German => "Herkunftsbelege für Dateien (2)",
-            _ => "File origin receipts (2)",
+            Language::BritishEnglish => "File origin receipts (2)",
         };
         harness.get_by_label(receipt_heading);
         harness.get_by_label(counts);

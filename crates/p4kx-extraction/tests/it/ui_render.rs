@@ -8,7 +8,7 @@ use std::error::Error;
 use std::path::Path;
 
 use p4kx_extraction::gfx::{Background, CanvasSize, RasterOptions, SkipReason};
-use p4kx_extraction::{Archive, ConversionError, Texture, UiMovie};
+use p4kx_extraction::{Archive, CancelToken, ConversionError, Texture, UiMovie};
 use p4kx_testkit::{
     ArchiveBuilder, SplitDds, TestEntry, TestFill, TestMovie, TestPlace, TestShape,
     TestShapeRecord, TestSignature, TestTextureFormat, external_image_body, sub_image_body,
@@ -93,6 +93,65 @@ fn archive(dir: &Path) -> Result<Archive, Box<dyn Error>> {
         &path,
         Some(p4kx_testkit::test_key()),
     )?)
+}
+
+#[test]
+fn cancelled_movie_publication_preserves_the_previous_artifact_and_companion() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let movie = UiMovie::from_archive(&archive, MOVIE)?;
+    let options = RasterOptions {
+        size: CanvasSize::Stage,
+        background: Background::Transparent,
+    };
+    let changed = RasterOptions {
+        size: CanvasSize::Width(29),
+        ..options
+    };
+    let cancel = CancelToken::new();
+    cancel.cancel();
+
+    for (output, companion) in [
+        ("panel.png", "panel.png.p4kx-origin.jsonl"),
+        ("panel.svg", "panel.svg.p4kx-origin.jsonl"),
+    ] {
+        let file = dir.path().join(output);
+        let receipt = dir.path().join(companion);
+        let svg = Path::new(output)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("svg"));
+        if svg {
+            movie.render_svg_to_file(&options, &file)?;
+        } else {
+            movie.render_to_file(&options, &file)?;
+        }
+        let prior_file = std::fs::read(&file)?;
+        let prior_receipt = std::fs::read(&receipt)?;
+        let result = if svg {
+            movie
+                .render_svg_to_file_with_origin_until(&changed, &file, &cancel)
+                .map(|_| ())
+        } else {
+            movie
+                .render_to_file_with_origin_until(&changed, &file, &cancel)
+                .map(|_| ())
+        };
+        assert!(
+            result.is_err(),
+            "{output}: cancellation refuses publication"
+        );
+        assert_eq!(
+            std::fs::read(&file)?,
+            prior_file,
+            "{output}: original payload"
+        );
+        assert_eq!(
+            std::fs::read(&receipt)?,
+            prior_receipt,
+            "{output}: original receipt"
+        );
+    }
+    Ok(())
 }
 
 #[test]

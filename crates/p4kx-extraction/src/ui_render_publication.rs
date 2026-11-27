@@ -10,8 +10,8 @@ use super::ui_render_frame_evidence::BackendInputs;
 use super::ui_render_summary::RenderSummaryOrigins;
 use crate::output_file::write_error;
 use crate::{
-    ConversionError, FieldOrigin, FileReceipt, OriginOutputAddress, SourceInventory, UiMovie,
-    UiRender, UiSvg, write_origin_companion,
+    CancelToken, ConversionError, FieldOrigin, FileReceipt, OriginOutputAddress, SourceInventory,
+    UiMovie, UiRender, UiSvg, write_origin_companion,
 };
 
 /// A committed UI render, its byte-bound receipt, and source evidence for its summary.
@@ -48,9 +48,23 @@ impl UiMovie<'_> {
         options: &RasterOptions,
         out: &Path,
     ) -> Result<PublishedUiRender<UiRender>, ConversionError> {
+        self.render_to_file_with_origin_until(options, out, &CancelToken::new())
+    }
+
+    /// Publishes a first-frame PNG with its origin companion under the supplied cancellation token.
+    ///
+    /// # Errors
+    ///
+    /// Returns render, output protection, cancellation, or publication errors.
+    pub fn render_to_file_with_origin_until(
+        &self,
+        options: &RasterOptions,
+        out: &Path,
+        cancel: &CancelToken,
+    ) -> Result<PublishedUiRender<UiRender>, ConversionError> {
         self.check_output(out)?;
         let observed = self.render_with_bitmap_sources(options)?;
-        self.publish_render(out, |writer| {
+        self.publish_render(out, cancel, |writer| {
             observed
                 .render
                 .image
@@ -75,10 +89,24 @@ impl UiMovie<'_> {
         options: &RasterOptions,
         out: &Path,
     ) -> Result<PublishedUiRender<UiSvg>, ConversionError> {
+        self.render_svg_to_file_with_origin_until(options, out, &CancelToken::new())
+    }
+
+    /// Publishes a first-frame SVG with its origin companion under the supplied cancellation token.
+    ///
+    /// # Errors
+    ///
+    /// Returns render, output protection, cancellation, or publication errors.
+    pub fn render_svg_to_file_with_origin_until(
+        &self,
+        options: &RasterOptions,
+        out: &Path,
+        cancel: &CancelToken,
+    ) -> Result<PublishedUiRender<UiSvg>, ConversionError> {
         self.check_output(out)?;
         let observed = self.movie().assets_observed();
         let frame = self.compose_frame_with_assets(options, observed.assets, true)?;
-        self.publish_render(out, |writer| {
+        self.publish_render(out, cancel, |writer| {
             let observed_svg = frame
                 .scene
                 .write_svg_observed(&frame.bitmaps.images, options, Some(&self.title()), writer)
@@ -115,10 +143,11 @@ impl UiMovie<'_> {
     fn publish_render<T>(
         &self,
         out: &Path,
+        cancel: &CancelToken,
         write: impl FnOnce(&mut dyn Write) -> io::Result<Prepared<T>>,
     ) -> Result<PublishedUiRender<T>, ConversionError> {
         let protection = self.write_protection()?;
-        let receipt = FileReceipt::new(out, protection, protection)
+        let receipt = FileReceipt::new_with_cancel(out, protection, protection, cancel.clone())
             .map_err(|error| write_error(out, error))?;
         let prepared = receipt
             .publish(write, |writer, binding, result| {

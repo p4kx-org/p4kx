@@ -1444,6 +1444,7 @@ ui-export-done-incomplete =
         [one] { $file } geschrieben: { $width } × { $height } px, { $number } Ding ausgelassen (siehe Reiter „Ausgelassen“)
        *[other] { $file } geschrieben: { $width } × { $height } px, { $number } Dinge ausgelassen (siehe Reiter „Ausgelassen“)
     }
+ui-export-origin-receipt = Herkunftsnachweis: { $file }
 ui-export-failed = Der Export ist fehlgeschlagen: { $reason }
 ui-export-stopped = Der Export wurde ohne Ergebnis beendet.
 ui-export-is-archive = Die Datei ist das geöffnete Archiv und wird nie überschrieben.

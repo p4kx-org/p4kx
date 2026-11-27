@@ -131,6 +131,8 @@ ui_texts! {
     /// The export wrote the file but left elements out; takes `file`, `width`, `height`, `count`
     /// and `number`.
     ExportDoneIncomplete = "ui-export-done-incomplete";
+    /// The committed origin companion path; takes `file`.
+    ExportOriginReceipt = "ui-export-origin-receipt";
     /// The export failed; takes `reason`.
     ExportFailed = "ui-export-failed";
     /// The export stopped without a result.
