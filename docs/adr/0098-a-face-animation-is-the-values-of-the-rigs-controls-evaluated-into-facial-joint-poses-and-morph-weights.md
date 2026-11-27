@@ -88,9 +88,11 @@ original frame times, translations and morph weights. The private verification r
 row of original Euler radians to its CAF frame and mapped RigLogic joint. A candidate remains
 unselected until comparison with an independent reference resolves the difference.
 
-On PTU 13284307 the audio of a captured MFD mission dialogue identifies one authored take from
-66 examined takes. Its associated face CAF retains 1,213 frame times at 30 fps in each of four
-exported actions. The archived DNA rig binds all 179 joints. In the capture, two held-out MFD
+On PTU 13284307 the audio of Gilly's captured MFD mission dialogue identifies one authored
+voice take from 66 examined takes. The matched event binds its associated face CAF. The
+fitted voice offsets are 551.307 and 551.334 seconds in the two recorded channels. The face
+CAF retains 1,213 frame times at 30 fps in each of four exported actions. The archived DNA
+rig binds all 179 joints. In the capture, two held-out MFD
 markers align within one rectified pixel across eight sampled frames. Isolated Blender 5.2.5 LTS
 imports preserved all 5,584 original head vertex positions and their index order. At 16 landmarks
 and 11 source frames, the differences between the four actions reached 0.47 to 1.24 mm in the
@@ -108,8 +110,25 @@ database has an empty fragment list. Three retained Patrol-accept voices share
 the current event and payload identifiers. Their greatest absolute waveform
 correlation was 0.073 across the two capture windows. The matched dialogue
 from the preceding example reached 0.543 with the same sequential OBS decode,
-and 0.030 after reversing the voice waveform. Walton's exact payload and face
-clip clock remain undetermined.
+and 0.030 after reversing the voice waveform.
+
+An exact read of nine nominated PTU voice payloads matched the second
+Walton window to its authored mission-abandonment take. The forward waveform
+correlations were 0.562 and 0.557 in the two recorded channels. The reversed
+control reached absolute correlations of 0.078 and 0.081. The waveform offsets
+place the take near 422.54 seconds in the capture. Its authored event binds the
+associated face CAF.
+All 143 bound PTU voice payloads were compared across the two Walton
+windows. This was the only whole-take match. For the first window, a
+diagnostic split trained on the leading half of a 1.76-second prefix and
+kept the interchannel delay fixed from the independently matched take.
+The leading candidate reached mean correlation 0.410 on the held-out half, versus
+0.107 for the next forward candidate and 0.111 for the strongest
+reversed control. It remains a plausible partial match. It fell below
+the required whole-take bounds.
+
+The sound offset establishes the voice clock. The CAF frame clock
+requires its own check.
 
 The physical MFD camera can be registered independently in these windows.
 Across four held-out comparisons the casing's 90th-percentile error was
@@ -119,6 +138,20 @@ pixel. Tracking fixed groups on the head gave 2.59 to 4.20 pixels of
 registration does not calibrate the virtual head camera. Rotation selection
 requires an exact voice and CAF binding and independently calibrated head
 projection and timing.
+
+The matched Walton clip has 210 authored frames at 30 fps. Both the native
+package and Blender 5.2.5 LTS replay retained all four candidate actions
+and all 5,584 original head vertex positions and their order. Across the
+candidate pairs, sampled visible-landmark differences reached 0.274 to
+1.020 mm in source space.
+
+In the two sampled Walton video windows, the display controls passed.
+The independently held-out head controls passed on 9 of 51 and 29 of 50
+frames, below the 70% admission threshold. Blind anatomical-group fits at
+426 and 427 seconds gave best errors of 8.39 and 7.33 rectified pixels,
+while the largest candidate projection across all 210 frames was 2.20
+pixels. Walton's face timing and head projection therefore leave the
+rotation convention unresolved.
 
 The 495 activations are also the weights of the morph targets: the targets of the head are the
 blendshapes that move a vertex, in the order of their numbers, and the build keeps the number of
