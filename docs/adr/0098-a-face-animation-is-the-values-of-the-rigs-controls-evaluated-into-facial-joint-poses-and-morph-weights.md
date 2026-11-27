@@ -88,6 +88,13 @@ original frame times, translations and morph weights. The private verification r
 row of original Euler radians to its CAF frame and mapped RigLogic joint. A candidate remains
 unselected until comparison with an independent reference resolves the difference.
 
+On PTU 13284307 the audio of a captured MFD mission dialogue identifies one authored take from
+66 examined takes. Its associated face CAF retains 1,213 frame times at 30 fps in each of four
+exported actions. The archived DNA rig binds all 179 joints. In the capture, two held-out MFD
+markers align within one rectified pixel across eight sampled frames. This fixes the display
+plane registration. The CAF-to-video clock, the runtime rig initialization and the projection of
+the face still require independent evidence before the candidate comparison can select an order.
+
 The 495 activations are also the weights of the morph targets: the targets of the head are the
 blendshapes that move a vertex, in the order of their numbers, and the build keeps the number of
 each, so target `k` takes the activation of blendshape `numbers[k]`.
