@@ -208,21 +208,20 @@ digest, the original receipt chain and the closed journal. The original terminal
 before package evidence and payload publication. The detached observer
 controls exercise startup and timeout paths with harmless native workers.
 
-On hosted ARM64, a best-effort upload preserves the original phase checkpoints
-and caller results for phases 01 through 03 before the Finish supervisor starts.
-This artifact contains the compact observation metadata. The upload has a
-one-minute limit inside the existing job budget, and release acceptance still
-requires the original terminal result and native runtime checks.
+On both native Windows targets, a best-effort upload preserves the original phase
+checkpoints and caller results for phases 01 through 03 before the Finish
+supervisor starts. The upload has a one-minute limit inside the existing job
+budget. Release acceptance still requires the original terminal result and
+native runtime checks.
 
-After launching the original Finish supervisor, the Windows consumer takes
-one read-only checkpoint and uploads a separate immutable `-finish-live`
-artifact. The checkpoint binds the original request, exact supervisor launch,
-bounded phase journal and supervisor identity. It records supervisor and
-original parent liveness, any observed receipt hashes and the allowlisted
-runner image and version values when the host supplies them. Sampling and
-upload each have a one-minute step limit. Required Wait and CollectFinish
-validation retain their original allowance and proceed when optional
-evidence is unavailable.
+After launching the original Finish supervisor, the Windows consumer takes one
+read-only checkpoint on the runner. The one-minute capture binds the original
+request, launch, bounded phase journal and live process identities. It also
+records any observed receipt hashes and allowlisted runner image values.
+Wait and CollectFinish follow the capture with their existing allowances. The
+final lifecycle artifact carries the six allowlisted checkpoint paths alongside
+the original terminal evidence. If the runner exits before that upload, the
+earlier phase and launch artifacts remain available when already published.
 
 The native AMD64 checkpoint passively follows the current product uninstall
 after the historical upgrade for up to 15 seconds within the original observer

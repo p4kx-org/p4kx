@@ -245,22 +245,6 @@ jobs:
           P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
           P4KX_MSI_FINISH_LAUNCH_DIGEST: ${{ steps.msi-finish-start.outputs.launch_digest }}
         run: .github/scripts/observe-msi-finish-launch.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -LaunchDigest $env:P4KX_MSI_FINISH_LAUNCH_DIGEST
-      - name: Preserve the live original MSI checkpoint
-        if: ${{ always() && !cancelled() && steps.msi-finish-live.outcome == 'success' }}
-        continue-on-error: true
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-live
-          path: |
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/post-launch.json
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/checkpoint.json
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/phase-journal.jsonl
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/original-diagnostic-inputs.json
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-result.json
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-wait-result.json
-          if-no-files-found: error
-          overwrite: false
       - name: Wait for the original MSI Finish receipt
         id: msi-finish-wait
         if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
@@ -293,6 +277,12 @@ jobs:
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final
           path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/post-launch.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/checkpoint.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/phase-journal.jsonl
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/original-diagnostic-inputs.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-result.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/finish-wait-result.json
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/snapshots/09/*
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/*
