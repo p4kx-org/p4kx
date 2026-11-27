@@ -11,7 +11,6 @@ use p4kx_extraction::{CancelToken, DataForgeError, Filter, Record, RecordTree};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::ammo_definition::{self, AmmoSelection, PreparedAmmoDefinition};
 use crate::catalog_v3::catalog_item_components::resolution::MagazineDependencies;
-use crate::contract_stats::AmmoStats;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_evidence_lock;
 use crate::export_field_inspection::FieldInspection;
@@ -19,7 +18,7 @@ use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
-use crate::{CatalogError, ExportAccountingError, Kind, item_stats};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 /// Retains one admitted Ammo read per demanded physical Record during a catalog scan.
 pub(super) struct AmmoReads<'options, 'input, 'source> {
@@ -49,7 +48,6 @@ enum AmmoRead<'source> {
 }
 
 struct ReadableAmmo<'source> {
-    compatibility: AmmoStats,
     inspection: FieldInspection,
     definition: Option<CanonicalAmmo<'source>>,
 }
@@ -109,41 +107,21 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         })
     }
 
-    pub(super) fn dependency(
-        &self,
-        record: &Record<'source>,
-        ledger: &mut ExportLedger,
-    ) -> Result<Option<AmmoStats>, CatalogError> {
-        self.with_dependency(record, ledger, |read| match read {
-            AmmoRead::Readable(read) => Some(read.compatibility.clone()),
-            AmmoRead::Unreadable(_) => None,
-        })
-    }
-
-    pub(super) fn retain_projectile_dependency(
+    pub(super) fn retain_dependency(
         &self,
         record: &Record<'source>,
         ledger: &mut ExportLedger,
     ) -> Result<(), CatalogError> {
-        self.with_dependency(record, ledger, |_| ())
-    }
-
-    fn with_dependency<T>(
-        &self,
-        record: &Record<'source>,
-        ledger: &mut ExportLedger,
-        inspect: impl FnOnce(&AmmoRead<'source>) -> T,
-    ) -> Result<T, CatalogError> {
         self.with(record, |state, admission| {
             let read = state
                 .read
                 .as_ref()
                 .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
             if !state.dependency_observed {
-                retain_dependency(ledger, admission, read)?;
+                record_dependency(ledger, admission, read)?;
                 state.dependency_observed = true;
             }
-            Ok(inspect(read))
+            Ok(())
         })
     }
 
@@ -230,7 +208,6 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         tree: &RecordTree<'source>,
         admission: &RecordObservation<'_, 'source>,
     ) -> Result<ReadableAmmo<'source>, CatalogError> {
-        let compatibility = item_stats::ammo(tree);
         let mut inspected = crate::export_field_walk::inspect_observed(
             Some(self.projection.original()),
             tree,
@@ -246,7 +223,6 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
         let selection = AmmoSelection::for_reached_record(admission.record(), self.filter);
         let definition = self.prepare_definition(tree, admission, selection)?;
         Ok(ReadableAmmo {
-            compatibility,
             inspection,
             definition: Some(definition),
         })
@@ -288,7 +264,7 @@ impl<'options, 'input, 'source> AmmoReads<'options, 'input, 'source> {
     }
 }
 
-fn retain_dependency(
+fn record_dependency(
     ledger: &mut ExportLedger,
     admission: &RecordObservation<'_, '_>,
     read: &AmmoRead<'_>,

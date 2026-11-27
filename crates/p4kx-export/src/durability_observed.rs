@@ -15,8 +15,6 @@ use crate::catalog_number_capture::{AuthoredNumberOwner, CapturedNumber};
 use crate::catalog_read::original::{
     OriginalDatum, OriginalFlowFields, OriginalValueFact, OriginalValuePart,
 };
-use crate::record_fields::number_value;
-use crate::resource_float::ResourceFloat32;
 use crate::source_fields::{FieldCapture, FieldError, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -64,11 +62,6 @@ pub enum AuthoredRestriction<'source, T> {
     Typed(T),
     /// The original value uses another representation retained as source data.
     Original(crate::source_value_catalog::SourceArenaOutput<'source>),
-}
-
-pub(super) struct ReadHealth {
-    pub(super) value: SourcedValue<ResourceFloat32>,
-    pub(super) legacy_value: Option<f32>,
 }
 
 /// Reads typed members in one admitted Record or owned struct.
@@ -133,17 +126,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             number_owner: AuthoredNumberOwner::Configuration,
             ..Self::definition(originals, input, capture, numbers)
         }
-    }
-
-    pub(super) fn health(&self, notes: &mut Vec<FieldError>) -> Result<ReadHealth, CatalogError> {
-        let mut legacy_value = None;
-        let value = self.single_observed("Health", notes, |value| {
-            legacy_value = number_value(value);
-        })?;
-        Ok(ReadHealth {
-            value,
-            legacy_value,
-        })
     }
 
     pub(super) fn boolean(

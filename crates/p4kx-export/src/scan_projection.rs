@@ -240,13 +240,13 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                     std::mem::take(&mut read.notes),
                     ledger,
                 )?;
-                self.item_stats_with_magazines(tree, trees, admission, originals, read, ledger)?;
+                self.item_ammunition(tree, trees, admission, originals, read, ledger)?;
                 crate::item::item(tree, definition, originals, &self.projection)
             },
         )
     }
 
-    fn item_stats_with_magazines(
+    fn item_ammunition(
         &self,
         tree: &RecordTree<'f>,
         trees: &mut TreeBuilder<'f>,
@@ -256,55 +256,43 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<(), CatalogError> {
         let cancel = self.scan.options.cancel;
-        let health = read.legacy_health;
         let reader = LinkedAmmunitionReader {
             projection: &self.projection,
             forge: self.scan.forge,
             cancel,
         };
         let mut projectile_ledger = ExportLedger::default();
-        let mut observed_magazine = false;
-        let _ = item_stats::read_with_sources(
-            tree,
-            self.scan.forge,
-            trees,
-            || health,
-            |target, _| self.scan.ammo.dependency(&target.record, ledger),
-            |observed| {
-                observed_magazine = true;
-                if let Some(row) = resolution::read(
-                    self.projection.original(),
-                    admission.record(),
-                    tree,
-                    originals,
-                    observed,
-                    cancel,
-                    Some(&self.scan.ammo.magazines),
-                )? {
+        let selections =
+            item_stats::with_primary_magazine(tree, self.scan.forge, trees, |_, magazine, _| {
+                if let Some(observed) = magazine
+                    && let Some(row) = resolution::read(
+                        self.projection.original(),
+                        admission.record(),
+                        tree,
+                        originals,
+                        observed,
+                        cancel,
+                        Some(&self.scan.ammo.magazines),
+                    )?
+                {
                     read.rows.magazine_resolutions.push(row);
                 }
-                read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
+                let selections = catalog_weapon_projectile_ammo::read(
                     originals,
                     &reader,
                     &read.rows.weapon_actions,
                     &read.rows.ammo_bindings,
-                    Some(observed),
+                    magazine,
                     &mut projectile_ledger,
                 )?;
-                Ok(())
-            },
-            |_, _| Ok(()),
-        )?;
-        if !observed_magazine {
-            read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
-                originals,
-                &reader,
-                &read.rows.weapon_actions,
-                &read.rows.ammo_bindings,
-                None,
-                &mut projectile_ledger,
-            )?;
-        }
+                if let Some(target) =
+                    magazine.and_then(|observed| observed.ammunition_target(self.scan.forge))
+                {
+                    self.scan.ammo.retain_dependency(&target.record, ledger)?;
+                }
+                Ok::<_, CatalogError>(selections)
+            })?;
+        read.rows.projectile_ammo_selections = selections.unwrap_or_default();
         ledger.merge(projectile_ledger);
         self.retain_projectile_ammo(&read.rows.projectile_ammo_selections, ledger)?;
         Ok(())
@@ -326,9 +314,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 .forge
                 .record(index)
                 .ok_or(ExportAccountingError::MissingPhysicalReferenceTarget { index })?;
-            self.scan
-                .ammo
-                .retain_projectile_dependency(&record, ledger)?;
+            self.scan.ammo.retain_dependency(&record, ledger)?;
         }
         Ok(())
     }

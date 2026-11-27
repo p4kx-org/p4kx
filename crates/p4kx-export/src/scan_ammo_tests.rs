@@ -9,8 +9,10 @@ use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestT
 use super::AmmoReads;
 use crate::Kind;
 use crate::build::original_input::test_support::{self, TestResult};
+use crate::catalog_v3::ammo_definition::AmmoSelection;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::resource_float::ResourceFloat32;
 use crate::scan_health::ScanError;
 
 #[test]
@@ -20,15 +22,9 @@ fn ammo_memo_materializes_one_genuine_physical_tree_across_roles() -> TestResult
         let second = forge.record(1).ok_or("second physical definition")?;
         let reads = AmmoReads::new(projection, None, None);
         let mut dependency = ExportLedger::default();
-        reads.retain_projectile_dependency(&first, &mut dependency)?;
-        let compatibility = reads
-            .dependency(&first, &mut dependency)?
-            .ok_or("actual legacy ammunition")?;
-        assert_eq!(compatibility.speed, Some(11.0), "original finite speed");
+        reads.retain_dependency(&first, &mut dependency)?;
         let mut repeated = ExportLedger::default();
-        reads
-            .dependency(&first, &mut repeated)?
-            .ok_or("same dependency")?;
+        reads.retain_dependency(&first, &mut repeated)?;
         let mut selected = ExportLedger::default();
         let row = reads.selected(&first, &mut selected)?;
         assert_eq!(row.physical_index, 0, "selected same original Record");
@@ -60,6 +56,14 @@ fn ammo_memo_materializes_one_genuine_physical_tree_across_roles() -> TestResult
             2,
             "one build per physical index"
         );
+        assert_eq!(
+            row.into_definition()
+                .speed()
+                .value()
+                .and_then(ResourceFloat32::finite),
+            Some(11.0),
+            "original finite speed"
+        );
         Ok(())
     })
 }
@@ -72,19 +76,8 @@ fn ammo_memo_preserves_filtered_dependency_and_caches_actual_read_failure() -> T
         let filter = Filter::parse("*/selected_*")?;
         let reads = AmmoReads::new(projection, Some(&filter), None);
         let mut ledger = ExportLedger::default();
-        let compatibility = reads
-            .dependency(&filtered, &mut ledger)?
-            .ok_or("filtered dependency remains readable")?;
-        assert_eq!(compatibility.speed, Some(11.0), "original dependency value");
-        assert!(
-            matches!(
-                reads.selected(&filtered, &mut ledger),
-                Err(ScanError::Fatal(_))
-            ),
-            "a dependency cannot manufacture a selected Ammo row"
-        );
-        let failed = reads.dependency(&malformed, &mut ledger)?;
-        assert!(failed.is_none(), "unreadable dependency leaves legacy null");
+        reads.retain_dependency(&filtered, &mut ledger)?;
+        reads.retain_dependency(&malformed, &mut ledger)?;
         let Err(ScanError::Source(error)) = reads.selected(&malformed, &mut ledger) else {
             return Err("actual canonical source read failure".into());
         };
@@ -111,6 +104,21 @@ fn ammo_memo_preserves_filtered_dependency_and_caches_actual_read_failure() -> T
                     && source.disposition == SourceDisposition::ReadFailed
             }),
             "dependency failure reaches the original shared ledger"
+        );
+        let rows = reads.dependency_rows(&mut ledger)?;
+        assert_eq!(rows.len(), 1, "only the readable dependency is emitted");
+        let row = rows
+            .into_iter()
+            .next()
+            .ok_or("readable filtered dependency")?;
+        assert_eq!(row.selection(), AmmoSelection::Dependency, "filtered role");
+        assert_eq!(
+            row.into_definition()
+                .speed()
+                .value()
+                .and_then(ResourceFloat32::finite),
+            Some(11.0),
+            "original dependency value"
         );
         Ok(())
     })

@@ -134,7 +134,7 @@ impl<'source> PreparedAmmoDefinition<'source> {
     }
 }
 
-/// Projects typed inputs from the same admitted tree used by the legacy view.
+/// Projects typed inputs from one admitted Ammo definition.
 pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
     tree: &RecordTree<'source>,

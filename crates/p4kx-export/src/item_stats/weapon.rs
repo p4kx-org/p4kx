@@ -53,6 +53,15 @@ impl<'read, 'source> MagazineRead<'read, 'source> {
         (self.weapon, self.route)
     }
 
+    /// Resolves the selected container's original `AmmoParams` Record.
+    pub(crate) fn ammunition_target(
+        self,
+        forge: &'source DataForge<'source>,
+    ) -> Option<LinkedStatTarget<'read, 'source>> {
+        let selector = self.container()?.field(AMMO_PARAMS_FIELD)?;
+        linked_target(selector, AMMO_PARAMS, forge)
+    }
+
     const fn container(self) -> Option<&'read StructValue<'source>> {
         let value = match self.route {
             MagazineRoute::Own(value) => Some(value),
@@ -95,26 +104,6 @@ pub(super) fn linked_target<'read, 'source>(
         .map(|record| LinkedStatTarget { selector, record })
 }
 
-/// Returns the capacity and ammunition of the container of `tree`.
-fn loaded<'f, E>(
-    container: Option<&StructValue<'f>>,
-    forge: &'f DataForge<'f>,
-    trees: &mut TreeBuilder<'f>,
-    ammunition: impl FnOnce(
-        LinkedStatTarget<'_, 'f>,
-        &mut TreeBuilder<'f>,
-    ) -> Result<Option<AmmoStats>, E>,
-) -> Result<(Option<i64>, Option<AmmoStats>), E> {
-    let target = container
-        .and_then(|fields| fields.field(AMMO_PARAMS_FIELD))
-        .and_then(|selector| linked_target(selector, AMMO_PARAMS, forge));
-    let ammo = match target {
-        Some(target) => ammunition(target, trees)?,
-        None => None,
-    };
-    Ok((integer(container, AMMO_CAPACITY_FIELD), ammo))
-}
-
 /// Returns the weapon block of the item `tree`; `None` without a weapon component.
 ///
 /// A ship weapon holds its ammo container itself; a personal weapon links the magazine entity
@@ -135,12 +124,14 @@ pub(super) fn weapon<'f, E>(
         if let Some(magazine) = magazine {
             observe_magazine(magazine)?;
         }
-        let (ammo_capacity, ammo) = loaded(
+        let ammo = match magazine.and_then(|observed| observed.ammunition_target(forge)) {
+            Some(target) => ammunition(target, trees)?,
+            None => None,
+        };
+        let ammo_capacity = integer(
             magazine.and_then(MagazineRead::container),
-            forge,
-            trees,
-            ammunition,
-        )?;
+            AMMO_CAPACITY_FIELD,
+        );
         Ok(WeaponStats {
             fire_actions,
             ammo_capacity,

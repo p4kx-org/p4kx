@@ -128,29 +128,22 @@ impl<'source> DurabilityRows<'source> {
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
-    ) -> Result<Option<f32>, CatalogError> {
+    ) -> Result<(), CatalogError> {
         match kind {
-            DurabilityComponent::Health => {
-                let (fields, legacy) = HealthFields::read(source, notes)?;
-                let first = self.health.is_empty();
-                self.health.push(Durability { owner, fields });
-                Ok(if first { legacy } else { None })
-            }
-            DurabilityComponent::Degradation => {
-                self.degradation.push(Degradation {
-                    owner,
-                    fields: DegradationFields::read(source, notes)?,
-                });
-                Ok(None)
-            }
-            DurabilityComponent::Distortion => {
-                self.distortion.push(Distortion {
-                    owner,
-                    fields: DistortionFields::read(source, notes)?,
-                });
-                Ok(None)
-            }
+            DurabilityComponent::Health => self.health.push(Durability {
+                owner,
+                fields: HealthFields::read(source, notes)?,
+            }),
+            DurabilityComponent::Degradation => self.degradation.push(Degradation {
+                owner,
+                fields: DegradationFields::read(source, notes)?,
+            }),
+            DurabilityComponent::Distortion => self.distortion.push(Distortion {
+                owner,
+                fields: DistortionFields::read(source, notes)?,
+            }),
         }
+        Ok(())
     }
 
     pub(crate) fn stage_health(

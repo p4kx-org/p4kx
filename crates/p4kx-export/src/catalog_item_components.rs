@@ -149,7 +149,6 @@ pub(crate) struct ItemComponentTables<'source> {
 pub(crate) struct ItemComponentsRead<'source> {
     pub(crate) rows: ItemComponentRows<'source>,
     pub(crate) notes: Vec<FieldError>,
-    pub(crate) legacy_health: Option<f32>,
 }
 
 impl<'source> ItemComponentsRead<'source> {
@@ -162,13 +161,9 @@ impl<'source> ItemComponentsRead<'source> {
     ) -> Result<(), CatalogError> {
         match kind {
             Component::Durability(kind) => {
-                if let Some(legacy) =
-                    self.rows
-                        .durability
-                        .push(kind, owner, observed, &mut self.notes)?
-                {
-                    self.legacy_health = Some(legacy);
-                }
+                self.rows
+                    .durability
+                    .push(kind, owner, observed, &mut self.notes)?;
             }
             Component::Emp => {
                 self.rows

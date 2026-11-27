@@ -15,18 +15,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         name: &str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
-        self.single_observed(name, notes, |_| {})
-    }
-
-    pub(super) fn single_observed(
-        &self,
-        name: &str,
-        notes: &mut Vec<FieldError>,
-        observed: impl FnOnce(&Value<'source>),
-    ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
         self.scalar(name, "a nullable Single", notes, |fact| {
-            let value = fact.value();
-            observed(value);
             self.original_single(fact)
         })
     }
