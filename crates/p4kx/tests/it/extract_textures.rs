@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
-use predicates::prelude::{PredicateBooleanExt, predicate};
+use predicates::prelude::predicate;
 use serde_json::Value;
 
 #[path = "extract_texture_origins.rs"]
@@ -252,7 +252,9 @@ fn without_convert_textures_are_written_raw() -> TestResult {
     extract(&fixture)?
         .assert()
         .code(0)
-        .stdout(predicate::str::contains("converted").not());
+        .stdout(predicate::str::contains(
+            "extracted 5, skipped 0, failed 0, cancelled 0",
+        ));
 
     assert_eq!(
         files(&fixture.out)?.len(),

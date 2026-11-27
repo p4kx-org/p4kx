@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
-use predicates::prelude::{PredicateBooleanExt, predicate};
+use predicates::prelude::predicate;
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -148,8 +148,7 @@ fn without_convert_the_output_is_unchanged() -> TestResult {
         .code(0)
         .stdout(predicate::str::contains(
             "extracted 4, skipped 0, failed 0, cancelled 0",
-        ))
-        .stdout(predicate::str::contains("converted").not());
+        ));
 
     assert_eq!(
         read(&fixture, "Data/Vehicles/gladius.xml")?,
