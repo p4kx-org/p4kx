@@ -55,4 +55,10 @@ runs:
     - name: Install the native ALSA headers
       if: runner.os == 'Linux'
       shell: pwsh
-      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev
+      run: |
+        $ubuntuSources = @(
+          '-o', 'Dir::Etc::SourceList=/etc/apt/sources.list.d/ubuntu.sources'
+          '-o', 'Dir::Etc::SourceParts=-'
+        )
+        sudo apt-get @ubuntuSources update --no-list-cleanup &&
+          sudo apt-get @ubuntuSources install --yes --no-install-recommends libasound2-dev
