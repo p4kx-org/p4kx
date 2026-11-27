@@ -82,7 +82,7 @@ impl<'f> QueryRun<'_, 'f> {
             .rows_of(self.records.get(start..end).unwrap_or_default(), false)
     }
 
-    /// Returns rows with the original inputs used by each selected cell.
+    /// Returns rows with the observed original root and cell inputs.
     #[must_use]
     pub fn rows_observed(&self, range: Range<usize>) -> Vec<Row<'f>> {
         let end = range.end.min(self.records.len());
@@ -95,9 +95,20 @@ impl<'f> QueryRun<'_, 'f> {
     /// is reached.
     #[must_use]
     pub fn pages(&self, page_size: NonZeroUsize) -> Pages<'_, 'f> {
+        self.pages_with_sources(page_size, false)
+    }
+
+    /// Returns bounded pages with the observed original root and cell inputs.
+    #[must_use]
+    pub fn pages_observed(&self, page_size: NonZeroUsize) -> Pages<'_, 'f> {
+        self.pages_with_sources(page_size, true)
+    }
+
+    fn pages_with_sources(&self, page_size: NonZeroUsize, observe: bool) -> Pages<'_, 'f> {
         Pages {
             query: self.query,
             chunks: self.records.chunks(page_size.get()),
+            observe,
         }
     }
 }
@@ -107,6 +118,7 @@ impl<'f> QueryRun<'_, 'f> {
 pub struct Pages<'r, 'f> {
     query: &'r CompiledQuery<'f>,
     chunks: Chunks<'r, u32>,
+    observe: bool,
 }
 
 impl<'f> Iterator for Pages<'_, 'f> {
@@ -114,7 +126,7 @@ impl<'f> Iterator for Pages<'_, 'f> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let chunk = self.chunks.next()?;
-        Some(self.query.rows_of(chunk, false))
+        Some(self.query.rows_of(chunk, self.observe))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -130,6 +142,7 @@ pub struct Row<'f> {
     cells: Result<Vec<Option<Value<'f>>>, DataForgeError>,
     unresolved: usize,
     visited_elements: usize,
+    root_sources: Option<Vec<QuerySource>>,
     sources: Option<Vec<QueryCellSources>>,
 }
 
@@ -161,6 +174,12 @@ impl<'f> Row<'f> {
     #[must_use]
     pub fn cell_sources(&self) -> Option<&[QueryCellSources]> {
         self.sources.as_deref()
+    }
+
+    /// Returns original selectors observed when opening this row's instance.
+    #[must_use]
+    pub fn root_sources(&self) -> Option<&[QuerySource]> {
+        self.root_sources.as_deref()
     }
 
     /// Returns how many array elements the selected columns admitted during this row read.
@@ -233,35 +252,41 @@ impl<'f> CompiledQuery<'f> {
         let record = self.forge.record(index)?;
         let Scratch { state, recordings } = scratch;
         state.reset();
+        let mut root_sources = observe.then(Vec::new);
+        let root_observer = root_sources
+            .as_mut()
+            .map(|inputs| move |source| inputs.push(source));
         let mut sources = observe.then(Vec::new);
         let cells = match self.plan_of(index)? {
             _ if self.columns.is_empty() && self.predicate.is_none() => Ok(Vec::new()),
             Plan::Broken(error) => Err(error.clone()),
             Plan::Read {
                 columns, shared, ..
-            } => self.instance_of(index).map(|place| {
-                let groups = self.share_prefixes.then_some(shared);
-                if let Some(groups) = groups {
-                    groups.reset(recordings, observe);
-                }
-                columns
-                    .iter()
-                    .enumerate()
-                    .map(|(at, column)| {
-                        let mut trace = observe.then(CellTrace::default);
-                        let value = column.as_ref().map(|reader| {
-                            let prefix = groups.and_then(|groups| {
-                                groups.prefix_of(at, reader, self.forge, place, recordings)
+            } => self
+                .instance_of_observed(index, root_observer)
+                .map(|place| {
+                    let groups = self.share_prefixes.then_some(shared);
+                    if let Some(groups) = groups {
+                        groups.reset(recordings, observe);
+                    }
+                    columns
+                        .iter()
+                        .enumerate()
+                        .map(|(at, column)| {
+                            let mut trace = observe.then(CellTrace::default);
+                            let value = column.as_ref().map(|reader| {
+                                let prefix = groups.and_then(|groups| {
+                                    groups.prefix_of(at, reader, self.forge, place, recordings)
+                                });
+                                reader.cell(self.forge, place, state, prefix, trace.as_mut())
                             });
-                            reader.cell(self.forge, place, state, prefix, trace.as_mut())
-                        });
-                        if let Some((sources, trace)) = sources.as_mut().zip(trace) {
-                            sources.push(trace.finish());
-                        }
-                        value
-                    })
-                    .collect()
-            }),
+                            if let Some((sources, trace)) = sources.as_mut().zip(trace) {
+                                sources.push(trace.finish());
+                            }
+                            value
+                        })
+                        .collect()
+                }),
         };
         Some(Row {
             record,
@@ -269,32 +294,29 @@ impl<'f> CompiledQuery<'f> {
             cells,
             unresolved: state.unresolved(),
             visited_elements: state.visited(),
+            root_sources,
             sources,
         })
     }
 
-    /// Returns the Record's instance, which the Record tree reads its values from.
-    pub(super) fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
-        self.instance_of_observed(index, None)
-    }
-
+    /// Returns the original Record instance and observes its physical selectors when requested.
     pub(super) fn instance_of_observed(
         &self,
         index: u32,
-        observe: Option<&(dyn Fn(QuerySource) + Sync)>,
+        mut observe: Option<impl FnMut(QuerySource)>,
     ) -> Result<Place<'f>, DataForgeError> {
         let forge = self.forge;
         let def = forge
             .record_def(index)
             .ok_or_else(|| out_of_range("Record", index as usize, "Record", index.into()))?;
         let instance = u32::from(def.instance_index);
-        if let Some(observe) = observe {
+        if let Some(observe) = observe.as_mut() {
             observe(QuerySource::Record { index });
             observe(QuerySource::RecordType { index });
         }
-        let bytes = instance_source::read(forge, def.struct_index, instance, observe)
+        let bytes = instance_source::read(forge, def.struct_index, instance, observe.as_mut())
             .ok_or_else(|| out_of_range("Record", index as usize, "instance", instance.into()))?;
-        if let Some(observe) = observe {
+        if let Some(mut observe) = observe {
             observe(QuerySource::Instance {
                 structure: def.struct_index,
                 instance,

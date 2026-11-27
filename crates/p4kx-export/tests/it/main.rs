@@ -66,6 +66,7 @@ mod catalog_npc_spawns;
 mod catalog_paints;
 mod catalog_playability;
 mod catalog_procedural_planet_audio;
+mod catalog_provenance_consumer;
 mod catalog_quantization;
 mod catalog_recovery;
 mod catalog_reputation;

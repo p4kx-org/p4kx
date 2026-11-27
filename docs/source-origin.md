@@ -96,18 +96,49 @@ include the original reference scan and retain incomplete evidence when the
 scan has gaps. If the source positions cannot be kept, navigation and queries
 continue with unknown provenance where the positions are required.
 
-## Record JSON files
+## DataForge Records in bulk conversion
 
-The unannotated per-Record JSON export publishes a sibling
-.p4kx-origin.jsonl companion for each written file. Its JSON Pointers address
-the emitted fields and its digest binds the original JSON bytes. The
-dcb export --json summary lists newly published paths under origin_receipts
-and reports companion failures separately under origin_failures.
+`p4kx extract --convert` and `p4kx convert` publish a
+`<name>.xml.p4kx-origin.jsonl` companion for each newly written DataForge
+Record XML. The companion uses the decoded DataForge selected during the
+extraction or folder conversion. Each XML address covers the emitted field
+bytes. A loose DataForge file supplies its file identity and unknown Archive
+encryption.
 
-Keep decisions retain the existing file and its companion. Before a
-replacement of an individual Record JSON file, the writer retires its owned
-companion. A later companion publication failure leaves the committed JSON
-available for inspection.
+The JSON report lists committed companions relative to the extraction target
+under `records.origin_receipts`. A companion publication failure is reported
+under `records.origin_failures` with the committed Record XML still available.
+Skip and unchanged decisions retain the existing file and companion.
+
+## Record files
+
+`p4kx dcb export --format json` writes a sibling `.p4kx-origin.jsonl` file.
+Its JSON Pointers address emitted fields, translations or tag paths. The
+translation retains the selected language Entry and the original key. The tag
+path retains the original Record and the selected edges of the tag tree.
+
+Record XML exports address half-open ranges in the committed document.
+A written empty value keeps its byte position. With `--lang`, each translation
+keeps its selected language lookup and a missing key keeps the missing-text
+decision. For a standalone DataForge with a separate `--archive`, output
+protection covers both the DataForge file and the Archive that supplied
+the language.
+
+The compact and flat NDJSON exports address the physical line and a
+JSON Pointer relative to that line. Flat CSV addresses the emitted cell
+bytes and its logical row and column. See [Record JSON](record-json.md#files)
+and [Flat value export](record-flat.md#field-origins).
+
+`dcb export --json` lists committed companions under `origin_receipts` and
+reports publication failures under `origin_failures`. Skip and unchanged
+decisions retain the file and companion. On replacement the writer retires its
+owned companion before installing the new artifact. A companion error after
+that leaves the committed Record file available.
+
+The GUI Record export uses the same companions for per-Record files and
+single-file CSV and NDJSON. The result lists committed companion paths
+and companion failures alongside the Record counts. Its written-Record
+summary provides the positions of the original committed definitions.
 
 ## Companion records
 
@@ -243,6 +274,30 @@ Use `--origin-out <file>` for a durable stdout receipt or `--origin-stderr`
 for a JSONL block after any localisation notes. Both preserve the original
 JSON or CSV stdout bytes. Require the terminal record and verify the binding
 before using origin markers.
+
+## DataForge Query results
+
+`p4kx dcb query --out <file> --origin-receipt` publishes
+`<file>.p4kx-origin.jsonl` beside a JSON, CSV or table result. The
+`--json` file summary reports the companion basename in `originReceipt`.
+With stdout, use `--origin-out <file>` for a durable companion or
+`--origin-stderr` for the JSONL block after any failed-Record diagnostics.
+Verify the terminal record, byte length and digest before using the markers.
+
+JSON addresses identify properties and emitted array elements with JSON
+Pointers. CSV and table addresses use `/<row>/<column>` and half-open byte
+ranges. Positions start at zero, and column zero contains the Record path.
+Ranges cover the emitted cell, including CSV quoting and any formula prefix.
+An empty or trimmed cell can have a zero-length range.
+
+Value cells cite the physical Record instance selectors and observed field
+traversal and payload. A resolved pointer can include the consulted DataForge
+mapping prefix and struct sizes that locate its target. A failed traversal
+keeps the known attempted inputs and marks the field evidence incomplete.
+A standalone DataForge file retains original file evidence with unknown
+Archive encryption. Rows that fail to read have a diagnostic and no output row.
+The companion addresses emitted values. Query selection and table formatting
+metadata sit outside the cell evidence contract.
 
 ## CHF conversion
 

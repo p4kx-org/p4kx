@@ -116,3 +116,12 @@ Record JSON. Values are never changed for spreadsheets.
 ## Not offered
 
 SQLite is not an output of the export ([ADR-0112](adr/0112-the-flat-value-export-is-csv-and-ndjson-and-offers-no-sqlite-output.md)).
+
+## Field origins
+
+The CLI and GUI flat exports write a `.p4kx-origin.jsonl` sibling bound to the
+complete CSV or NDJSON file. CSV addresses retain the emitted cell's byte
+range and the logical field path `/rows/<row>/<column>`. The row ordinal
+starts at zero and excludes the column header. NDJSON addresses use a
+zero-based physical line and a JSON Pointer relative to it. Localized
+cells retain the selected language lookup as well as the DataForge key.

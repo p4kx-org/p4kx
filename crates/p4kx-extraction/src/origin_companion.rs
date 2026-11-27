@@ -144,6 +144,13 @@ pub enum OriginOutputAddress {
         /// Exact field path.
         path: FieldPath,
     },
+    /// A typed field in one emitted NDJSON line.
+    NdjsonField {
+        /// Zero-based line in the artifact.
+        line: DecimalU64,
+        /// JSON Pointer relative to that line's JSON value.
+        path: FieldPath,
+    },
     /// A field within the GLB JSON chunk.
     GlbJsonField {
         /// Exact JSON Pointer relative to the root of the JSON chunk.

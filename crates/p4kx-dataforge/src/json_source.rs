@@ -3,7 +3,7 @@
 
 use std::io;
 
-use crate::{Guid, Resolution};
+use crate::{Guid, ObservedResolution, Resolution};
 
 /// Observes original inputs at addresses emitted by the canonical Record JSON writer.
 pub trait RecordJsonObserver {
@@ -45,6 +45,27 @@ pub trait RecordJsonObserver {
         _selectors_complete: bool,
     ) -> io::Result<()> {
         self.reference_value(pointer, selectors, false)
+    }
+
+    /// Receives a localisation decision, its resolver input and its original Record selectors.
+    ///
+    /// # Errors
+    /// Returns an error to stop emission at this value.
+    fn localization_observed(
+        &mut self,
+        pointer: &str,
+        key: &str,
+        observed: &ObservedResolution<'_>,
+        selectors: &[RecordJsonUse],
+        selectors_complete: bool,
+    ) -> io::Result<()> {
+        self.localization(
+            pointer,
+            key,
+            observed.resolution(),
+            selectors,
+            selectors_complete,
+        )
     }
 
     /// Receives the chosen tag path, its target GUID and the original selecting Reference.

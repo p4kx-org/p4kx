@@ -8,11 +8,9 @@ use std::thread;
 use std::time::Duration;
 
 use p4kx_export::RecordFilePlans;
-use p4kx_extraction::TagTree;
 use p4kx_extraction::query::QuerySchema;
-use p4kx_extraction::{DataForgeEntry, ReferenceIndex};
+use p4kx_extraction::{DataForgeEntry, ObservedTagTree, ReferenceIndex, TagTree};
 
-use super::ObservedTagTree;
 use crate::ModelExportFailure;
 use crate::model::describe;
 
@@ -130,7 +128,10 @@ impl ForgeSource {
         &self,
         stop: &dyn Fn() -> bool,
     ) -> Result<Option<Arc<TagTree>>, ReadFailure> {
-        Ok(self.observed_tags(stop)?.map(|kept| Arc::clone(&kept.tree)))
+        Ok(self
+            .observed_tags(stop)?
+            .as_deref()
+            .map(ObservedTagTree::shared_tree))
     }
 
     pub(crate) fn observed_tags(
@@ -150,7 +151,9 @@ impl ForgeSource {
             .entry
             .open()
             .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
-        let Some(built) = ObservedTagTree::build(&forge, stop) else {
+        let built = ObservedTagTree::build(Arc::clone(&self.entry), &forge, stop)
+            .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
+        let Some(built) = built else {
             return Ok(None);
         };
         self.tags_builds.fetch_add(1, Ordering::Relaxed);

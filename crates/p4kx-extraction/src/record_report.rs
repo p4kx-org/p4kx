@@ -190,6 +190,18 @@ impl RecordExportReport {
         &self.origin_failures
     }
 
+    /// Takes the published companion paths.
+    #[must_use]
+    pub fn take_origin_receipts(&mut self) -> Vec<PathBuf> {
+        std::mem::take(&mut self.origin_receipts)
+    }
+
+    /// Takes the companion failures from committed Record files.
+    #[must_use]
+    pub fn take_origin_failures(&mut self) -> Vec<ExtractionError> {
+        std::mem::take(&mut self.origin_failures)
+    }
+
     /// Returns the number of Records written.
     #[must_use]
     pub const fn written(&self) -> usize {

@@ -245,18 +245,18 @@ fn follow<'f>(
         return unresolved(sink, bytes);
     };
     let record = forge.record_by_guid(guid);
-    if let Some(observe) = sink.predicate_observer() {
+    if let Some(mut observe) = sink.input_observer() {
         observe(QuerySource::RecordLookup {
             kind: RecordNameKind::Guid,
             end: forge.record_count() as u64,
         });
     }
     let Some(record) = record else {
-        sink.predicate_bytes(forge, bytes, QueryByteUse::DanglingReference);
+        sink.observe_input_bytes(forge, bytes, QueryByteUse::DanglingReference);
         return unresolved(sink, bytes);
     };
     let index = record.index();
-    if let Some(observe) = sink.predicate_observer() {
+    if let Some(mut observe) = sink.input_observer() {
         observe(QuerySource::ReferenceTarget {
             index,
             kind: RecordNameKind::Guid,
@@ -332,12 +332,7 @@ fn instance<'f>(
     mismatch: impl FnOnce(u32) -> ValueError,
     sink: &mut impl Sink<'f>,
 ) -> Reached<'f> {
-    let target = instance_source::read(
-        forge,
-        struct_index,
-        instance_index,
-        sink.predicate_observer(),
-    );
+    let target = instance_source::read(forge, struct_index, instance_index, sink.input_observer());
     let Some(target) = target else {
         return Reached::Value(Value::Error(ValueError::InvalidPointer {
             struct_index,
@@ -367,12 +362,12 @@ pub(super) fn derives<'source>(
     forge: &'source DataForge<'source>,
     struct_index: u32,
     targets: &[usize],
-    sink: &impl Sink<'source>,
+    sink: &mut impl Sink<'source>,
 ) -> bool {
     let Ok(index) = usize::try_from(struct_index) else {
         return false;
     };
-    let Some(observe) = sink.predicate_observer() else {
+    let Some(mut observe) = sink.input_observer() else {
         return ancestors_include(forge, index, targets);
     };
     ancestors_include_observed(forge, index, targets, |step| {

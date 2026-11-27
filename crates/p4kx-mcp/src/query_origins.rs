@@ -3,7 +3,8 @@
 
 use std::slice;
 
-use p4kx_extraction::query::{CompiledQuery, RECORD_PATH_COLUMN, Row};
+use p4kx_extraction::query::{CompiledQuery, QuerySource, RECORD_PATH_COLUMN, Row};
+use p4kx_extraction::query_source_evidence::{self, QueryCellEvidence};
 use p4kx_extraction::{DataForgeOrigin, FieldPath, SourceUse, SourceUseRole, Value};
 
 use crate::forge_origins::{EvidenceError, ForgeOrigins, site};
@@ -193,37 +194,77 @@ fn row_cells(
     values: &[Option<Value<'_>>],
 ) -> Result<(), EvidenceError> {
     let original = row.cell_sources().unwrap_or_default();
+    let record = row.record().index();
+    let root = query_source_evidence::bind_row_root_inputs(
+        page.compiled.dataforge(),
+        &origins.scope,
+        row,
+    )?;
     for &column in page.columns {
         let Some(name) = page.compiled.columns().get(column) else {
             continue;
         };
         let field = field_path(at, name)?;
+        let value = values.get(column).and_then(Option::as_ref);
         let Some(cell) = original.get(column) else {
-            bind_missing(origins, &field, row.record().index())?;
+            bind_missing(origins, &field, record, false)?;
             continue;
         };
-        let mut sources = uses(origins, cell.traversed(), SourceUseRole::Payload)?;
+        let matching_values = value.is_none_or(
+            |value| !matches!(value, Value::Array(items) if cell.values().len() != items.len()),
+        );
+        let observed = query_source_evidence::bind_cell_inputs(
+            page.compiled.dataforge(),
+            &origins.scope,
+            cell.traversed(),
+        )?
+        .with_row_root(&root);
+        let complete = matching_values && observed.is_complete() && origins.complete;
+        let sources = observed.uses();
         if sources.is_empty() {
-            sources.push(record_site(
-                origins,
-                row.record().index(),
-                "sourceType",
-                SourceUseRole::Selector,
-            )?);
+            bind_missing(origins, &field, record, complete && value.is_none())?;
+        } else {
+            bind(origins, &field, sources, complete)?;
         }
-        bind(origins, &field, &sources, origins.complete)?;
-        match values.get(column).and_then(Option::as_ref) {
+        match value {
             Some(Value::Array(items)) => {
-                for (ordinal, (route, item)) in cell.values().iter().zip(items.iter()).enumerate() {
-                    let uses = uses(origins, route.iter().copied(), SourceUseRole::Payload)?;
-                    let at = format!("{field}/{ordinal}");
-                    bind(origins, &at, &uses, origins.complete)?;
-                    error_fields(origins, &at, item, &uses)?;
-                }
+                let routes = if matching_values { cell.values() } else { &[] };
+                array_elements(origins, page, &root, &field, routes, items)?;
             }
-            Some(value) => error_fields(origins, &field, value, &sources)?,
+            Some(value) => error_fields(
+                origins,
+                &field,
+                value,
+                sources,
+                complete && !sources.is_empty(),
+            )?,
             None => {}
         }
+    }
+    Ok(())
+}
+
+fn array_elements(
+    origins: &mut ForgeOrigins,
+    page: &PageEvidence<'_, '_>,
+    root: &QueryCellEvidence,
+    at: &str,
+    routes: &[Box<[QuerySource]>],
+    items: &[Value<'_>],
+) -> Result<(), EvidenceError> {
+    for (ordinal, item) in items.iter().enumerate() {
+        let route: &[QuerySource] = routes.get(ordinal).map_or_default(AsRef::as_ref);
+        let observed = query_source_evidence::bind_cell_inputs(
+            page.compiled.dataforge(),
+            &origins.scope,
+            route.iter().copied(),
+        )?
+        .with_row_root(root);
+        let sources = observed.uses();
+        let complete = origins.complete && observed.is_complete() && !sources.is_empty();
+        let field = format!("{at}/{ordinal}");
+        bind(origins, &field, sources, complete)?;
+        error_fields(origins, &field, item, sources, complete)?;
     }
     Ok(())
 }
@@ -233,19 +274,25 @@ fn error_fields(
     path: &str,
     value: &Value<'_>,
     sources: &[SourceUse],
+    complete: bool,
 ) -> Result<(), EvidenceError> {
     if let Value::Error(error) = value {
-        bind(origins, &format!("{path}/error"), sources, origins.complete)?;
+        bind(origins, &format!("{path}/error"), sources, complete)?;
         if error.dangling_guid().is_some() {
-            bind(origins, &format!("{path}/guid"), sources, origins.complete)?;
+            bind(origins, &format!("{path}/guid"), sources, complete)?;
         }
     }
     Ok(())
 }
 
-fn bind_missing(origins: &mut ForgeOrigins, path: &str, record: u32) -> Result<(), EvidenceError> {
+fn bind_missing(
+    origins: &mut ForgeOrigins,
+    path: &str,
+    record: u32,
+    complete: bool,
+) -> Result<(), EvidenceError> {
     let layout = record_site(origins, record, "sourceType", SourceUseRole::Selector)?;
-    bind(origins, path, &[layout], origins.complete)
+    bind(origins, path, &[layout], complete)
 }
 
 fn failed_row(

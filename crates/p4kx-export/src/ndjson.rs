@@ -3,12 +3,12 @@
 
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::ndjson_output::Output;
 use p4kx_extraction::{
-    Annotations, CancelToken, ConflictPolicy, DataForge, ExtractionError, Record,
-    RecordExportError, RecordExportOptions, RecordFailure, TreeBuilder,
+    CancelToken, ConflictPolicy, DataForge, ExtractionError, ObservedTagTree, Record,
+    RecordExportError, RecordExportOptions, RecordFailure, RecordLocalization, RecordStreamInput,
 };
 use rayon::prelude::*;
 
@@ -21,43 +21,15 @@ const BATCH_BYTES: usize = 64 << 20;
 const PART_LEN: usize = 64;
 const READ_BUFFER_LEN: usize = 64 << 10;
 
-/// One selected Record, in the order of the file.
-struct Line<'r, 'f> {
-    record: &'r Record<'f>,
-}
+#[path = "record_stream_part.rs"]
+mod part;
+use part::{Line, Part, Scratch};
 
-/// The lines of one part of a batch and what happened to its Records.
-struct Part<'r, 'f> {
-    bytes: Vec<u8>,
-    error_counts: Vec<usize>,
-    failures: Vec<(&'r Record<'f>, RecordExportError)>,
-    receipt: Option<RecordExportReceipt>,
-}
-
-impl Part<'_, '_> {
-    fn account(self, summary: &mut RecordExportSummary) {
-        if let (Some(receipt), Some(part)) = (&mut summary.receipt, self.receipt) {
-            receipt.indices.extend(part.indices);
-            receipt.rowless_indices.extend(part.rowless_indices);
-        }
-        summary.written = summary.written.saturating_add(self.error_counts.len());
-        for errors in self.error_counts {
-            summary.error_values = summary.error_values.saturating_add(errors);
-            summary.records_with_errors = summary
-                .records_with_errors
-                .saturating_add(usize::from(errors > 0));
-        }
-        summary.failures.extend(
-            self.failures
-                .into_iter()
-                .map(|(record, error)| failure(record, error)),
-        );
-    }
-}
-
-struct Scratch<'f> {
-    trees: TreeBuilder<'f>,
-    lines: LineWriter,
+#[derive(Clone, Copy)]
+pub(crate) struct StreamEvidence<'input, 'database, 'locale> {
+    pub(crate) input: RecordStreamInput<'input, 'database>,
+    pub(crate) locale: Option<&'locale RecordLocalization<'locale>>,
+    pub(crate) tags: Option<&'locale ObservedTagTree>,
 }
 
 /// Writes a single-file form of a Record export, see [`crate::write_record_export`].
@@ -68,6 +40,7 @@ pub(crate) fn write(
     target: &Path,
     options: &RecordExportOptions<'_>,
     retain_receipt: bool,
+    original: Option<StreamEvidence<'_, '_, '_>>,
 ) -> RecordExportSummary {
     let mut summary = RecordExportSummary {
         form,
@@ -80,7 +53,7 @@ pub(crate) fn write(
         summary.cancelled = lines.len();
         return summary;
     }
-    if let Err(error) = run(&lines, target, options, &mut summary) {
+    if let Err(error) = run(&lines, target, options, &mut summary, original) {
         discard(&mut summary);
         if matches!(&error, ExtractionError::Installation(cause) if cause.is_cancelled()) {
             summary.cancelled = lines
@@ -98,6 +71,7 @@ fn run(
     target: &Path,
     options: &RecordExportOptions<'_>,
     summary: &mut RecordExportSummary,
+    original: Option<StreamEvidence<'_, '_, '_>>,
 ) -> Result<(), ExtractionError> {
     p4kx_extraction::check_protected_output(target, options.protection, options.cancel)?;
     let file = summary.form.file().unwrap_or(NDJSON_FILE);
@@ -107,7 +81,7 @@ fn run(
         summary.skipped.push(file.to_owned());
         return Ok(());
     }
-    let mut output = Output::create(target, options)?;
+    let mut output = Output::create(target, options, original.map(|binding| binding.input))?;
     let result = write_output(
         lines,
         &mut output,
@@ -115,26 +89,27 @@ fn run(
         existing,
         options,
         summary,
-        file,
+        original,
     );
     output.complete(result, options.cancel)
 }
 
-fn write_output(
+fn write_output<'input>(
     lines: &[Line<'_, '_>],
-    output: &mut Output,
+    output: &mut Output<'input>,
     destination: &Path,
     existing: Option<u64>,
     options: &RecordExportOptions<'_>,
     summary: &mut RecordExportSummary,
-    file: &str,
+    original: Option<StreamEvidence<'input, '_, '_>>,
 ) -> Result<(), ExtractionError> {
+    let file = summary.form.file().unwrap_or(NDJSON_FILE);
     let mut header = Vec::new();
     LineWriter::new(summary.form)
         .header(options.texts.is_some(), &mut header)
         .and_then(|()| output.append(&header))
         .map_err(|error| write_error(destination, error))?;
-    if !stream(lines, output, destination, options, summary)? {
+    if !stream(lines, output, destination, options, summary, original)? {
         return Ok(());
     }
     let kept = match existing {
@@ -149,7 +124,12 @@ fn write_output(
         summary.clear_receipt();
         return Ok(());
     }
-    if output.persist(destination, existing.is_some(), options)? {
+    if let Some(committed) =
+        output.persist_record_stream(destination, existing.is_some(), options)?
+    {
+        summary.origin_receipts.extend(committed.companion);
+        summary.origin_failures.extend(committed.origin_failure);
+    } else {
         summary.skipped.push(file.to_owned());
         discard(summary);
     }
@@ -158,12 +138,13 @@ fn write_output(
 
 /// Builds and writes `lines` in batches of at most [`BATCH_LEN`] Records, sized from the previous
 /// batch to hold about [`BATCH_BYTES`]; returns `false` when the run was cancelled.
-fn stream(
+fn stream<'input>(
     lines: &[Line<'_, '_>],
-    output: &mut Output,
+    output: &mut Output<'input>,
     destination: &Path,
     options: &RecordExportOptions<'_>,
     summary: &mut RecordExportSummary,
+    original: Option<StreamEvidence<'input, '_, '_>>,
 ) -> Result<bool, ExtractionError> {
     let form = summary.form;
     let retain_receipt = summary.receipt.is_some();
@@ -179,36 +160,17 @@ fn stream(
             summary.cancelled = lines.len().saturating_sub(failed_lines);
             return Ok(false);
         }
-        let parts: Vec<Part<'_, '_>> = batch
+        let parts: Vec<Part<'_, '_, '_, '_>> = batch
             .par_chunks(PART_LEN)
             .map_init(
-                || Scratch {
-                    trees: TreeBuilder::new(),
-                    lines: LineWriter::new(form),
-                },
-                |scratch, lines| {
-                    write_part(
-                        scratch,
-                        lines,
-                        options.progress,
-                        options.annotations(),
-                        form,
-                        retain_receipt,
-                    )
-                },
+                || Scratch::new(form),
+                |scratch, lines| scratch.write_part(lines, options, form, retain_receipt, original),
             )
             .collect();
         batch_len = next_batch_len(batch.len(), parts.iter().map(|part| part.bytes.len()).sum());
-        for part in parts {
+        for mut part in parts {
             if form == RecordForm::FlatCsvStrict
-                && let Some(source) = part.failures.iter().find_map(|(_, error)| match error {
-                    RecordExportError::Write(ExtractionError::Write { source, .. })
-                        if source.kind() == io::ErrorKind::InvalidData =>
-                    {
-                        Some(source)
-                    }
-                    _ => None,
-                })
+                && let Some(source) = malformed_flat_row(&part)
             {
                 return Err(write_error(
                     destination,
@@ -216,13 +178,24 @@ fn stream(
                 ));
             }
             output
-                .append(&part.bytes)
+                .append_part(&part.bytes, part.origins.take())
                 .map_err(|error| write_error(destination, error))?;
             failed_lines = failed_lines.saturating_add(part.failures.len());
             part.account(summary);
         }
     }
     Ok(true)
+}
+
+fn malformed_flat_row<'a>(part: &'a Part<'_, '_, '_, '_>) -> Option<&'a io::Error> {
+    part.failures.iter().find_map(|(_, error)| match error {
+        RecordExportError::Write(ExtractionError::Write { source, .. })
+            if source.kind() == io::ErrorKind::InvalidData =>
+        {
+            Some(source)
+        }
+        _ => None,
+    })
 }
 
 /// Returns how many Records the next batch takes after `len` Records gave `bytes`.
@@ -266,57 +239,6 @@ fn ordered_lines<'r, 'f>(
         .collect();
     lines.extend(selected.into_iter().flatten().map(|record| Line { record }));
     lines
-}
-
-fn write_part<'r, 'f>(
-    scratch: &mut Scratch<'f>,
-    lines: &[Line<'r, 'f>],
-    progress: Option<&(dyn Fn() + Sync)>,
-    annotations: Annotations<'_>,
-    form: RecordForm,
-    retain_receipt: bool,
-) -> Part<'r, 'f> {
-    let mut part = Part {
-        bytes: Vec::new(),
-        error_counts: Vec::with_capacity(lines.len()),
-        failures: Vec::new(),
-        receipt: retain_receipt.then(RecordExportReceipt::default),
-    };
-    for line in lines {
-        match scratch.trees.build(line.record) {
-            Ok(tree) => {
-                let start = part.bytes.len();
-                match scratch.lines.write(&tree, annotations, &mut part.bytes) {
-                    Ok(()) => {
-                        part.error_counts.push(tree.error_count());
-                        if let Some(receipt) = &mut part.receipt {
-                            let index = line.record.index();
-                            receipt.indices.push(index);
-                            if part.bytes.len() == start {
-                                receipt.rowless_indices.push(index);
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        part.bytes.truncate(start);
-                        part.failures.push((
-                            line.record,
-                            ExtractionError::Write {
-                                path: PathBuf::from(form.file().unwrap_or(NDJSON_FILE)),
-                                source: error,
-                            }
-                            .into(),
-                        ));
-                    }
-                }
-            }
-            Err(error) => part.failures.push((line.record, error.into())),
-        }
-        if let Some(progress) = progress {
-            progress();
-        }
-    }
-    part
 }
 
 /// Returns the size of the file at `path`, or `None` when there is none; a folder or link there

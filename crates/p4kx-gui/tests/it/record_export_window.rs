@@ -6,8 +6,9 @@
 use crate::exporting;
 use crate::waiting::RunQuiet;
 
+use std::ffi::OsStr;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -16,7 +17,9 @@ use exporting::{
     TestResult, database, ended, files_below, many, opened, opened_with, opened_with_key,
     select_node, wait_until,
 };
-use p4kx_gui::{Language, Model, RecordExport, RecordExportStatus, TargetKind, ui};
+use p4kx_gui::{
+    Language, Model, RecordExport, RecordExportStatus, RecordExportSummary, TargetKind, ui,
+};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use tempfile::TempDir;
 
@@ -230,7 +233,16 @@ fn a_typed_filter_selects_the_records_by_record_path() -> TestResult {
 
     assert!(!start_ready, "no Records before a filter is typed");
     harness.get_by_label("Records written 2, skipped 0, failed 0, cancelled 0");
-    assert_eq!(files_below(&out)?.len(), 2, "both weapons as JSON");
+    assert_eq!(
+        files_below(&out)?,
+        [
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json.p4kx-origin.jsonl",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json.p4kx-origin.jsonl",
+        ],
+        "the two selected weapons and their companions"
+    );
     Ok(())
 }
 
@@ -347,15 +359,39 @@ fn an_export_cancelled_while_writing_reports_what_it_wrote() -> TestResult {
     let RecordExportStatus::Finished(summary) = ended(harness.state_mut())? else {
         return Err("no summary".into());
     };
-    let (written, cancelled) = (summary.written(), summary.cancelled());
-    let was_cancelled = summary.was_cancelled();
+    assert!(summary.was_cancelled(), "cancelled");
+    assert!(summary.written() > 0, "some Records were written first");
+    assert!(
+        summary.failures().is_empty(),
+        "cancellation does not report failed Records: {:?}",
+        summary.failures()
+    );
+    assert_eq!(
+        summary.written() + summary.cancelled(),
+        20000,
+        "every Record is accounted for"
+    );
+    assert_cancelled_record_files(&out, summary)?;
     harness.run_quiet();
-
-    assert!(was_cancelled, "cancelled");
-    assert!(written > 0, "some Records were written first");
-    assert_eq!(written + cancelled, 20000, "every Record is accounted for");
-    assert_eq!(files_below(&out)?.len(), written, "the files written");
     harness.get_by_label("Record export cancelled");
     harness.get_by_label(&format!("Target: {}", out.display()));
+    Ok(())
+}
+
+fn assert_cancelled_record_files(out: &Path, summary: &RecordExportSummary) -> TestResult {
+    let files = files_below(out)?;
+    let payloads = files
+        .iter()
+        .filter(|path| Path::new(path).extension() == Some(OsStr::new("json")))
+        .count();
+    let companions = summary.origin_receipts();
+    let written = summary.written();
+    assert_eq!(payloads, written, "committed payload count");
+    let other_files = files.len() - payloads;
+    assert_eq!(other_files, companions.len(), "only companions remain");
+    let all_exist = companions.iter().all(|path| path.is_file());
+    assert!(all_exist, "every reported companion exists");
+    let reported = companions.len() + summary.origin_failures().len();
+    assert!(reported >= written, "missing companions are reported");
     Ok(())
 }

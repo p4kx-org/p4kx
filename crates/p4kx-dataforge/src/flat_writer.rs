@@ -3,29 +3,32 @@
 
 use std::io::{self, Write};
 
+use super::observation::{FlatColumn, FlatColumnSpan, FlatRowObservation};
+use super::output::Cells;
+use super::render;
 use crate::flat_cells::{self, CSV_BYTE_ORDER_MARK, CsvCellMode};
-use crate::texts::annotation;
-use crate::value_json::{write_json_string, write_json_value};
-use crate::{Annotations, Guid, RecordTree, Resolution, Value};
+use crate::{
+    Annotations, Guid, ObservedResolution, PositionedRecord, RecordTree, Resolution, Value,
+};
 
 /// The first columns of a flat value export, in order; the text column follows when texts are on,
 /// and the Record tag column is always the last.
 pub const FLAT_COLUMNS: [&str; 8] = [
-    "record_guid",
-    "record_name",
-    "record_path",
-    "field_path",
-    "array_indices",
-    "kind",
-    "value",
-    "target_path",
+    FlatColumn::RecordGuid.name(),
+    FlatColumn::RecordName.name(),
+    FlatColumn::RecordPath.name(),
+    FlatColumn::FieldPath.name(),
+    FlatColumn::ArrayIndices.name(),
+    FlatColumn::Kind.name(),
+    FlatColumn::Value.name(),
+    FlatColumn::TargetPath.name(),
 ];
 
 /// The name of the last column, which holds the Record tag.
-pub const FLAT_TAG_COLUMN: &str = "record_tag";
+pub const FLAT_TAG_COLUMN: &str = FlatColumn::RecordTag.name();
 
 /// The name of the column that holds the resolved text of a localisation key.
-pub const FLAT_TEXT_COLUMN: &str = "text";
+pub const FLAT_TEXT_COLUMN: &str = FlatColumn::Text.name();
 
 /// How a flat value export is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -77,9 +80,16 @@ pub(super) enum Leaf<'value, 'source> {
 }
 
 /// The output of one Record and what it is written with.
-pub(super) struct Out<'writer, 'annotations, W> {
-    out: &'writer mut W,
-    annotations: Annotations<'annotations>,
+pub(super) struct Out<'writer, 'text, W, const OBSERVED: bool> {
+    pub(super) sink: Cells<&'writer mut W, OBSERVED>,
+    pub(super) prefix_spans: Vec<FlatColumnSpan>,
+    pub(super) annotations: Annotations<'text>,
+}
+
+impl<W: Write, const OBSERVED: bool> Out<'_, '_, W, OBSERVED> {
+    pub(super) const fn spans(&self) -> &[FlatColumnSpan] {
+        self.sink.spans()
+    }
 }
 
 impl FlatValues {
@@ -141,35 +151,73 @@ impl FlatValues {
         annotations: Annotations<'_>,
         out: &mut W,
     ) -> io::Result<()> {
+        let mut out = self.begin::<W, false>(tree, annotations, out)?;
+        self.walk_fields(&mut out, tree.fields(), None, None)
+    }
+
+    /// Writes the same flat bytes while observing the positions used by each emitted row.
+    /// Column spans are relative to this call and include the format's value quoting.
+    ///
+    /// # Errors
+    /// Returns an output, DataForge position or observer error.
+    pub fn write_positioned_observed<'record, 'source, 'text, W: Write>(
+        &mut self,
+        record: &'record PositionedRecord<'source>,
+        annotations: Annotations<'text>,
+        out: &mut W,
+        mut observe: impl for<'row> FnMut(
+            FlatRowObservation<'row, 'record, 'source, 'text>,
+        ) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let tree = record.tree();
+        let positions = record.root_fields().map_err(io::Error::other)?;
+        let mut out = self.begin::<W, true>(tree, annotations, out)?;
+        self.walk_fields(&mut out, tree.fields(), Some(positions), Some(&mut observe))
+    }
+
+    fn begin<'writer, 'text, W: Write, const OBSERVED: bool>(
+        &mut self,
+        tree: &RecordTree<'_>,
+        annotations: Annotations<'text>,
+        out: &'writer mut W,
+    ) -> io::Result<Out<'writer, 'text, W, OBSERVED>> {
         self.path.clear();
         self.indices.clear();
         self.escaped.clear();
         self.prefix.clear();
         self.tag.clear();
+        let mut prefix = Cells::<_, OBSERVED>::new(&mut self.prefix);
         if let Some(mode) = self.format.csv_mode() {
-            write_csv_prefix(&mut self.prefix, tree, mode.verbatim())?;
+            render::write_csv_prefix(&mut prefix, tree, mode.verbatim())?;
             flat_cells::write_csv_cell_with_mode(
                 &mut self.tag,
                 tree.tag().unwrap_or_default(),
                 mode,
             )?;
         } else {
-            write_json_prefix(&mut self.prefix, tree)?;
+            render::write_json_prefix(&mut prefix, tree)?;
         }
-        let mut out = Out { out, annotations };
-        self.walk_fields(&mut out, tree.fields())
+        Ok(Out {
+            sink: Cells::new(out),
+            prefix_spans: prefix.into_spans(),
+            annotations,
+        })
     }
 
-    pub(super) fn write_row<W: Write>(
+    pub(super) fn write_row<'text, W: Write, const OBSERVED: bool>(
         &self,
-        out: &mut Out<'_, '_, W>,
+        out: &mut Out<'_, 'text, W, OBSERVED>,
         leaf: Leaf<'_, '_>,
-    ) -> io::Result<()> {
-        let text = match leaf {
-            Leaf::Value(Value::Locale(key)) => match annotation(&out.annotations, key) {
-                Some(Resolution::Text(text)) => Some(text),
-                _ => None,
-            },
+    ) -> io::Result<Option<ObservedResolution<'text>>> {
+        let localization = match leaf {
+            Leaf::Value(Value::Locale(key)) => out
+                .annotations
+                .texts()
+                .map(|texts| texts.resolve_observed(key)),
+            _ => None,
+        };
+        let text = match localization.as_ref().map(ObservedResolution::resolution) {
+            Some(Resolution::Text(text)) => Some(text.as_ref()),
             _ => None,
         };
         let target = match leaf {
@@ -177,138 +225,10 @@ impl FlatValues {
             _ => None,
         };
         if let Some(mode) = self.format.csv_mode() {
-            self.write_csv_row(out, leaf, target, text.as_deref(), mode)
+            self.write_csv_row(out, leaf, target, text, mode)?;
         } else {
-            self.write_json_row(out, leaf, target, text.as_deref())
+            self.write_json_row(out, leaf, target, text)?;
         }
+        Ok(localization)
     }
-
-    fn write_csv_row<W: Write>(
-        &self,
-        out: &mut Out<'_, '_, W>,
-        leaf: Leaf<'_, '_>,
-        target: Option<&str>,
-        text: Option<&str>,
-        mode: CsvCellMode,
-    ) -> io::Result<()> {
-        let structural = mode.verbatim();
-        let sink = &mut *out.out;
-        sink.write_all(&self.prefix)?;
-        flat_cells::write_csv_cell_with_mode(sink, &self.path, structural)?;
-        sink.write_all(b",")?;
-        if self.indices.is_empty() {
-            flat_cells::write_csv_cell_with_mode(sink, "", structural)?;
-        } else {
-            write_indices(sink, &self.indices)?;
-        }
-        write!(sink, ",{},", kind(leaf))?;
-        match leaf {
-            Leaf::Value(Value::String(text) | Value::Locale(text) | Value::Enum(text)) => {
-                flat_cells::write_csv_cell_with_mode(sink, text, mode)?;
-            }
-            Leaf::Value(Value::Reference(reference)) => write!(sink, "{}", reference.guid())?,
-            Leaf::Dangling(guid) => write!(sink, "{guid}")?,
-            Leaf::Value(scalar) => flat_cells::write_plain(sink, scalar)?,
-        }
-        sink.write_all(b",")?;
-        flat_cells::write_csv_cell_with_mode(sink, target.unwrap_or_default(), structural)?;
-        if out.annotations.texts().is_some() {
-            sink.write_all(b",")?;
-            flat_cells::write_csv_cell_with_mode(sink, text.unwrap_or_default(), mode)?;
-        }
-        sink.write_all(b",")?;
-        sink.write_all(&self.tag)?;
-        sink.write_all(b"\r\n")
-    }
-
-    fn write_json_row<W: Write>(
-        &self,
-        out: &mut Out<'_, '_, W>,
-        leaf: Leaf<'_, '_>,
-        target: Option<&str>,
-        text: Option<&str>,
-    ) -> io::Result<()> {
-        let sink = &mut *out.out;
-        sink.write_all(&self.prefix)?;
-        sink.write_all(b",\"field_path\":")?;
-        write_json_string(sink, &self.path)?;
-        sink.write_all(b",\"array_indices\":\"")?;
-        write_indices(sink, &self.indices)?;
-        write!(sink, "\",\"kind\":\"{}\",\"value\":", kind(leaf))?;
-        match leaf {
-            Leaf::Value(Value::Reference(reference)) => {
-                write!(sink, "\"{}\"", reference.guid())?;
-            }
-            Leaf::Dangling(guid) => write!(sink, "\"{guid}\"")?,
-            Leaf::Value(scalar) => write_json_value(sink, scalar)?,
-        }
-        if let Some(path) = target {
-            sink.write_all(b",\"target_path\":")?;
-            write_json_string(sink, path)?;
-        }
-        if let Some(text) = text {
-            sink.write_all(b",\"text\":")?;
-            write_json_string(sink, text)?;
-        }
-        sink.write_all(b"}\n")
-    }
-}
-
-fn write_csv_prefix(
-    prefix: &mut Vec<u8>,
-    tree: &RecordTree<'_>,
-    mode: CsvCellMode,
-) -> io::Result<()> {
-    write!(prefix, "{},", tree.guid())?;
-    flat_cells::write_csv_cell_with_mode(prefix, tree.name(), mode)?;
-    prefix.push(b',');
-    flat_cells::write_csv_cell_with_mode(prefix, tree.record_path(), mode)?;
-    prefix.push(b',');
-    Ok(())
-}
-
-fn write_json_prefix(prefix: &mut Vec<u8>, tree: &RecordTree<'_>) -> io::Result<()> {
-    write!(
-        prefix,
-        "{{\"record_guid\":\"{}\",\"record_name\":",
-        tree.guid()
-    )?;
-    write_json_string(prefix, tree.name())?;
-    prefix.extend_from_slice(b",\"record_path\":");
-    write_json_string(prefix, tree.record_path())?;
-    if let Some(tag) = tree.tag() {
-        prefix.extend_from_slice(b",\"record_tag\":");
-        write_json_string(prefix, tag)?;
-    }
-    Ok(())
-}
-
-/// Returns the `kind` column of a leaf value.
-const fn kind(leaf: Leaf<'_, '_>) -> &'static str {
-    let Leaf::Value(value) = leaf else {
-        return "reference";
-    };
-    match value {
-        Value::Bool(_) => "bool",
-        Value::Int8(_) | Value::Int16(_) | Value::Int32(_) | Value::Int64(_) => "int",
-        Value::UInt8(_) | Value::UInt16(_) | Value::UInt32(_) | Value::UInt64(_) => "uint",
-        Value::Single(_) => "single",
-        Value::Double(_) => "double",
-        Value::String(_) => "string",
-        Value::Locale(_) => "locale",
-        Value::Enum(_) => "enum",
-        Value::Guid(_) => "guid",
-        Value::Reference(_) => "reference",
-        Value::Struct(_) | Value::Array(_) | Value::Null | Value::Error(_) => "",
-    }
-}
-
-fn write_indices(out: &mut impl Write, indices: &[u32]) -> io::Result<()> {
-    for (position, index) in indices.iter().enumerate() {
-        if position > 0 {
-            out.write_all(b".")?;
-        }
-        write!(out, "{index}")?;
-    }
-    Ok(())
 }

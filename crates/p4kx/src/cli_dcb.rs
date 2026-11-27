@@ -143,6 +143,15 @@ pub(crate) struct DcbQueryArgs {
     /// replaced.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
+    /// Writes a field-origin companion beside the output file.
+    #[arg(long, requires = "out")]
+    pub(crate) origin_receipt: bool,
+    /// Writes the stdout result's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the stdout result's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The values of `p4kx dcb query --format`.

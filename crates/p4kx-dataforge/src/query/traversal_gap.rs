@@ -11,10 +11,10 @@ pub(super) fn readable<'source>(
     bytes: &[u8],
     input: TraversalInput,
     reached: &Reached<'source>,
-    sink: &impl Sink<'source>,
+    sink: &mut impl Sink<'source>,
 ) {
     if matches!(reached, Reached::Value(Value::Error(_))) {
-        sink.predicate_bytes(forge, bytes, QueryByteUse::AttemptedTraversal(input));
+        sink.observe_input_bytes(forge, bytes, QueryByteUse::AttemptedTraversal(input));
     }
 }
 
@@ -25,9 +25,9 @@ pub(super) fn missing<'source>(
     len: u64,
     input: TraversalInput,
     error: ValueError,
-    sink: &impl Sink<'source>,
+    sink: &mut impl Sink<'source>,
 ) -> Reached<'source> {
-    if let Some(observe) = sink.predicate_observer() {
+    if let Some(mut observe) = sink.input_observer() {
         observe(unavailable(forge, place, at, len, input));
     }
     Reached::Value(Value::Error(error))

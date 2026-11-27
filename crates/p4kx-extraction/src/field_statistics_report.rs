@@ -23,8 +23,6 @@ use crate::{
 mod addresses;
 #[path = "field_statistics_report_counts.rs"]
 mod counts;
-#[path = "field_statistics_instance_bounds.rs"]
-mod instance_bounds;
 #[path = "field_statistics_report_rows.rs"]
 mod rows;
 #[path = "field_statistics_report_scan.rs"]

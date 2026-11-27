@@ -167,7 +167,7 @@ fn locale<'source, Writer: Write>(
     slot: Option<ValueSlot<'source>>,
     depth: usize,
 ) -> io::Result<()> {
-    let Some(resolution) = texts::annotation(&out.annotations, key) else {
+    let Some(resolution) = texts::observed_annotation(&out.annotations, key) else {
         observe_key(out, slot, key)?;
         return value_json::write_json_string(out.sink, key);
     };
@@ -175,7 +175,7 @@ fn locale<'source, Writer: Write>(
     out.key(true, depth + 1, "key")?;
     observe_key(out, slot, key)?;
     value_json::write_json_string(out.sink, key)?;
-    if let Resolution::Text(text) = &resolution {
+    if let Resolution::Text(text) = resolution.resolution() {
         out.key(false, depth + 1, "text")?;
         value_json::write_json_string(out.sink, text)?;
     } else {

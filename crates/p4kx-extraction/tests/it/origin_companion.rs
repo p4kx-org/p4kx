@@ -126,6 +126,45 @@ fn emitted_fixture_rows() -> Result<Vec<Value>, Box<dyn Error>> {
 }
 
 #[test]
+fn ndjson_addresses_identify_the_line_and_its_relative_pointer() -> TestResult {
+    let schema = schemars::schema_for!(OriginCompanionRow<'static>).to_value();
+    let validator = jsonschema::validator_for(&schema)?;
+    let origin = SourceUses::new().origin(&[], false);
+    let address = OriginOutputAddress::NdjsonField {
+        line: DecimalU64::new(1),
+        path: FieldPath::parse("/part~1name/0")?,
+    };
+    let row = serde_json::to_value(OriginCompanionRow::Field {
+        address: &address,
+        origin: &origin,
+    })?;
+    assert_eq!(
+        row.get("address"),
+        Some(&json!({"type":"ndjsonField","line":"1","path":"/part~1name/0"})),
+        "the address binds one physical line and a relative pointer"
+    );
+    validator
+        .validate(&row)
+        .map_err(|error| error.to_string())?;
+    let mut numeric_line = row.clone();
+    *numeric_line
+        .pointer_mut("/address/line")
+        .ok_or("address line")? = json!(1);
+    assert!(
+        !validator.is_valid(&numeric_line),
+        "line ordinals are exact decimal strings"
+    );
+    let mut invalid_pointer = row;
+    *invalid_pointer
+        .pointer_mut("/address/path")
+        .ok_or("address path")? = json!("part");
+    assert!(
+        !validator.is_valid(&invalid_pointer),
+        "the field path is a JSON Pointer"
+    );
+    Ok(())
+}
+#[test]
 fn text_fields_require_exact_decimal_ranges_and_a_logical_field() -> TestResult {
     let schema = schemars::schema_for!(OriginCompanionRow<'static>).to_value();
     let validator = jsonschema::validator_for(&schema)?;

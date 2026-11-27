@@ -8,8 +8,6 @@ use p4kx_dataforge::DataForge;
 use crate::query_source_evidence::QuerySourceSite;
 use crate::{SourceLocation, SourceUseRole};
 
-use super::FieldStatisticsReportError;
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Requirement {
     Count,
@@ -18,14 +16,14 @@ enum Requirement {
 }
 
 #[derive(Default)]
-pub(super) struct InstanceBounds(BTreeMap<u32, Requirement>);
+pub(crate) struct InstanceBounds(BTreeMap<u32, Requirement>);
 
 impl InstanceBounds {
-    pub(super) fn count(&mut self, structure: u32) {
+    pub(crate) fn count(&mut self, structure: u32) {
         self.0.entry(structure).or_insert(Requirement::Count);
     }
 
-    pub(super) fn extent(&mut self, structure: u32, resolved: bool) {
+    pub(crate) fn extent(&mut self, structure: u32, resolved: bool) {
         let needed = if resolved {
             Requirement::Placement
         } else {
@@ -37,12 +35,9 @@ impl InstanceBounds {
             .or_insert(needed);
     }
 
-    pub(super) fn sites(
-        mut self,
-        forge: &DataForge<'_>,
-    ) -> Result<Vec<QuerySourceSite>, FieldStatisticsReportError> {
+    pub(crate) fn sites(mut self, forge: &DataForge<'_>) -> Option<Vec<QuerySourceSite>> {
         if self.0.is_empty() {
-            return Ok(Vec::new());
+            return Some(Vec::new());
         }
         let mut fields = self
             .0
@@ -78,7 +73,7 @@ impl InstanceBounds {
             }
         }
         if placements != 0 {
-            return Err(FieldStatisticsReportError::UnboundSelection);
+            return None;
         }
         if prefix_end != 0 {
             fields.extend(
@@ -96,7 +91,7 @@ impl InstanceBounds {
                 "structIndex",
             ));
         }
-        Ok(fields)
+        Some(fields)
     }
 }
 

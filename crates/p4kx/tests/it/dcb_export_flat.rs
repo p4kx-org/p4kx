@@ -12,12 +12,19 @@ use p4kx_testkit::{
     TestType, TestValue,
 };
 
+#[path = "dcb_export_flat_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
 const TRUCK: u128 = 0x50e8_a9f6_f956_4000_8ace_7c0c_a9a9_1f5d;
 
 fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_with_text(dir, "Cart")
+}
+
+fn write_archive_with_text(dir: &Path, text: &str) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     let database = DataForgeBuilder::new()
         .structure(
@@ -42,7 +49,7 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 .value("name", TestValue::text("")),
         )
         .build();
-    let english = GlobalIniBuilder::new().text("vehicle_Cart", "Cart").build();
+    let english = GlobalIniBuilder::new().text("vehicle_Cart", text).build();
     ArchiveBuilder::new()
         .entry(TestEntry::zstd("Data\\Game2.dcb", database))
         .entry(TestEntry::zstd(

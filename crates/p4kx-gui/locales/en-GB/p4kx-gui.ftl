@@ -465,6 +465,7 @@ record-export-summary-errors = Records with error values: { $erroneous }, error 
 record-export-summary-no-match = No Record matches the filter.
 record-export-summary-target = Target: { $path }
 record-export-summary-file-failed = Cannot write { $path }: { $reason }
+record-export-summary-origin-failures = Origin receipt failures ({ $number })
 record-export-summary-failed = Failed ({ $number })
 record-export-summary-skipped = Skipped ({ $number })
 record-export-summary-failure = { $path } ({ $guid }): { $reason }

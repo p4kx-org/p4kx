@@ -71,6 +71,7 @@ mod dcb_file;
 mod dcb_query;
 mod dcb_query_condition;
 mod dcb_query_export;
+mod dcb_query_origins;
 mod dcb_query_output;
 mod dcb_query_paths;
 mod dcb_query_references;

@@ -9,15 +9,21 @@ use anyhow::{Context, Result};
 use p4kx_extraction::query::{
     CompiledQuery, Query, QueryError, QueryErrorKind, QueryRun, ResultFormat, ResultWriter,
 };
-use p4kx_extraction::{QueryExportOptions, export_query, is_same_file};
+use p4kx_extraction::{
+    ArchiveWriteProtection, CancelToken, FileReceipt, OriginArtifactBinding, OriginDigestWriter,
+    StdoutReceipt, is_same_file,
+};
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::cli::{DcbQueryArgs, QueryFormat};
 use crate::dcb_export::FlatConflict;
 use crate::forge_input::ForgeInput;
-use crate::query_rows::{Counts, for_each_row, report_failed};
+use crate::query_rows::{Counts, RowMode, for_each_row};
 use crate::{exit, json, query_file, query_table};
+
+#[path = "dcb_query_origins.rs"]
+mod origins;
 
 /// A Query that cannot be parsed or compiled, with its marked position.
 #[derive(Debug, Error)]
@@ -47,6 +53,8 @@ struct Summary {
     records: u64,
     failed: u64,
     unresolved_references: u64,
+    #[serde(rename = "originReceipt", skip_serializing_if = "Option::is_none")]
+    origin_receipt: Option<String>,
 }
 
 /// A compiled Query with its selected Records, written in one format.
@@ -70,7 +78,7 @@ pub(crate) fn run(args: &DcbQueryArgs, as_json: bool) -> Result<ExitCode> {
     if args.csv_raw && format != QueryFormat::Csv {
         return Err(FlatConflict("--csv-raw needs --format csv").into());
     }
-    if let Some(out) = &args.out
+    if let Some(out) = args.out.as_ref().or(args.origin_out.as_ref())
         && is_same_file(out, &args.archive)
     {
         return Err(OutputIsArchive(out.clone()).into());
@@ -89,14 +97,7 @@ pub(crate) fn run(args: &DcbQueryArgs, as_json: bool) -> Result<ExitCode> {
         format,
         raw: args.csv_raw,
     };
-    let mut counts = Counts::default();
-    match &args.out {
-        None => output.to_stdout(&mut counts)?,
-        Some(out) => {
-            counts = output.to_file(out, input.path())?;
-            print_summary(args, out, format, counts, as_json)?;
-        }
-    }
+    let counts = output.publish(args, &input, as_json)?;
     Ok(ExitCode::from(if counts.failed == 0 {
         exit::SUCCESS
     } else {
@@ -105,6 +106,68 @@ pub(crate) fn run(args: &DcbQueryArgs, as_json: bool) -> Result<ExitCode> {
 }
 
 impl Output<'_, '_, '_> {
+    fn publish(&self, args: &DcbQueryArgs, input: &ForgeInput, as_json: bool) -> Result<Counts> {
+        let mut counts = Counts::default();
+        match &args.out {
+            Some(out) => {
+                let receipt = if args.origin_receipt {
+                    Some(self.to_observed_file(out, input, &mut counts)?)
+                } else {
+                    self.to_file(out, input.path(), &mut counts)?;
+                    None
+                };
+                print_summary(args, out, self.format, counts, as_json, receipt)?;
+            }
+            None if args.origin_stderr || args.origin_out.is_some() => {
+                self.to_observed_stdout(args, input, &mut counts)?;
+            }
+            None => self.to_stdout(&mut counts)?,
+        }
+        Ok(counts)
+    }
+
+    fn to_file(&self, out: &Path, input: &Path, counts: &mut Counts) -> Result<()> {
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(input, cancel.flag())?;
+        query_file::write_replacing_protected(out, Some(&protection), Some(&cancel), |writer| {
+            self.write(writer, false, counts)
+        })
+        .with_context(|| format!("cannot write {}", out.display()))
+    }
+
+    fn to_observed_file(
+        &self,
+        out: &Path,
+        input: &ForgeInput,
+        counts: &mut Counts,
+    ) -> Result<String> {
+        let source = input.source_input()?;
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(input.path(), cancel.flag())?;
+        let receipt =
+            FileReceipt::new_with_cancel(out, Some(&protection), Some(&protection), cancel)?;
+        let name = receipt
+            .path()
+            .file_name()
+            .context("query origin companion basename")?;
+        receipt
+            .publish(
+                |out| {
+                    origins::render(
+                        self.compiled,
+                        self.run,
+                        source,
+                        self.writer_format(false),
+                        out,
+                        counts,
+                    )
+                },
+                |out, binding, result| result.write(out, binding),
+            )
+            .with_context(|| format!("cannot write {}", out.display()))?;
+        Ok(json::path(Path::new(name)))
+    }
+
     const fn csv_format(&self) -> ResultFormat {
         if self.raw {
             ResultFormat::CsvRaw
@@ -113,38 +176,13 @@ impl Output<'_, '_, '_> {
         }
     }
 
-    /// Writes the result to the file `out`, replacing it once complete: CSV and JSON through
-    /// [`export_query`], the table through its own writer.
-    fn to_file(&self, out: &Path, archive: &Path) -> Result<Counts> {
-        let format = match self.format {
-            QueryFormat::Table => {
-                let mut counts = Counts::default();
-                let cancel = p4kx_extraction::CancelToken::new();
-                let protection =
-                    p4kx_extraction::ArchiveWriteProtection::new(archive, cancel.flag())?;
-                query_file::write_replacing_protected(
-                    out,
-                    Some(&protection),
-                    Some(&cancel),
-                    |file| self.write(file, false, &mut counts),
-                )
-                .with_context(|| format!("cannot write {}", out.display()))?;
-                return Ok(counts);
-            }
-            QueryFormat::Csv => self.csv_format(),
-            QueryFormat::CsvStrict => ResultFormat::CsvStrict,
-            QueryFormat::Json => ResultFormat::Json,
-        };
-        let options = QueryExportOptions {
-            failed: Some(&report_failed),
-            ..QueryExportOptions::default()
-        };
-        let export = export_query(self.compiled, self.run, (out, format), archive, &options)?;
-        Ok(Counts {
-            records: export.records,
-            failed: export.failed,
-            unresolved: export.unresolved_references,
-        })
+    const fn writer_format(&self, count_line: bool) -> origins::Format {
+        match self.format {
+            QueryFormat::Table => origins::Format::Table { count_line },
+            QueryFormat::Csv => origins::Format::Flat(self.csv_format()),
+            QueryFormat::CsvStrict => origins::Format::Flat(ResultFormat::CsvStrict),
+            QueryFormat::Json => origins::Format::Flat(ResultFormat::Json),
+        }
     }
 
     /// Writes the result to stdout; a closed pipe ends the output early without an error.
@@ -156,20 +194,56 @@ impl Output<'_, '_, '_> {
         }
     }
 
+    fn to_observed_stdout(
+        &self,
+        args: &DcbQueryArgs,
+        input: &ForgeInput,
+        counts: &mut Counts,
+    ) -> Result<()> {
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(input.path(), cancel.flag())?;
+        let durable = args
+            .origin_out
+            .as_deref()
+            .map(|path| StdoutReceipt::new(path, Some(&protection)))
+            .transpose()?;
+        let source = input.source_input()?;
+        let mut out = OriginDigestWriter::new(BufWriter::new(io::stdout().lock()));
+        let measured = origins::render(
+            self.compiled,
+            self.run,
+            source,
+            self.writer_format(true),
+            &mut out,
+            counts,
+        )
+        .and_then(|companion| Ok((companion, out.finish()?)));
+        let (companion, digest) = match measured {
+            Err(error) if error.kind() == io::ErrorKind::BrokenPipe => return Ok(()),
+            measured => measured?,
+        };
+        let binding = OriginArtifactBinding::Stdout { digest };
+        if let Some(durable) = durable {
+            durable.publish(|out| companion.write(out, &binding))?;
+        }
+        if args.origin_stderr {
+            companion.write(&mut BufWriter::new(io::stderr().lock()), &binding)?;
+        }
+        Ok(())
+    }
+
     /// Writes the result to `out`, page by page, and reports failed Records on stderr; with
     /// `count_line`, a table ends with the number of Records.
     fn write(&self, out: impl Write, count_line: bool, counts: &mut Counts) -> io::Result<()> {
         let columns = self.compiled.columns();
-        let format = match self.format {
-            QueryFormat::Table => {
-                return query_table::write(columns, self.run, out, count_line, counts);
+        let format = match self.writer_format(count_line) {
+            origins::Format::Table { count_line } => {
+                return query_table::write(columns, self.run, out, count_line, counts, None);
             }
-            QueryFormat::Csv => self.csv_format(),
-            QueryFormat::CsvStrict => ResultFormat::CsvStrict,
-            QueryFormat::Json => ResultFormat::Json,
+            origins::Format::Flat(format) => format,
         };
         let mut writer = ResultWriter::new(out, format, columns)?;
-        for_each_row(self.run, counts, |row, cells| {
+        for_each_row(self.run, counts, RowMode::Raw, |row, cells| {
             writer.write_row(row.record_path(), cells)
         })?;
         writer.finish().map(drop)
@@ -193,6 +267,7 @@ fn print_summary(
     format: QueryFormat,
     counts: Counts,
     as_json: bool,
+    origin_receipt: Option<String>,
 ) -> io::Result<()> {
     if as_json {
         return json::print(&Summary {
@@ -202,6 +277,7 @@ fn print_summary(
             records: counts.records,
             failed: counts.failed,
             unresolved_references: counts.unresolved,
+            origin_receipt,
         });
     }
     let written = format!(" written to {}", out.display());

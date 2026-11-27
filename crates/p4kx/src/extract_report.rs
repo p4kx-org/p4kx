@@ -6,7 +6,7 @@ use std::path::Path;
 
 use p4kx_extraction::{
     ConvertedSoundArtifact, EntryFailure, ExtractedFileArtifact, ExtractionReport,
-    MergedTextureArtifact, RawEntryArtifact, TextureArtifacts,
+    MergedTextureArtifact, RawEntryArtifact, RecordExportReport, TextureArtifacts,
 };
 use serde::Serialize;
 
@@ -58,6 +58,10 @@ struct RecordsJson<'a> {
     cancelled: usize,
     error_values: usize,
     records_with_errors: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_receipts: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    origin_failures: Vec<String>,
 }
 
 pub(crate) fn report_json<'a>(
@@ -102,8 +106,27 @@ pub(crate) fn report_json<'a>(
             cancelled: records.cancelled(),
             error_values: records.error_values(),
             records_with_errors: records.records_with_errors(),
+            origin_receipts: record_receipts(records, target),
+            origin_failures: records
+                .origin_failures()
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
         }),
     }
+}
+
+fn record_receipts(records: &RecordExportReport, target: &Path) -> Vec<String> {
+    let root = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
+    let mut paths: Vec<_> = records
+        .origin_receipts()
+        .iter()
+        .map(|receipt| {
+            json::path(receipt.strip_prefix(&root).unwrap_or(receipt)).replace('\\', "/")
+        })
+        .collect();
+    paths.sort_unstable();
+    paths
 }
 
 #[expect(

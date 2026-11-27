@@ -4,18 +4,20 @@
 use std::io::{self, Write};
 
 use super::observation::{
-    Output, RecordXmlHeaderMember as Header, RecordXmlSite as Site, RecordXmlValueMember as Member,
+    Output, RecordXmlHeaderMember as Header, RecordXmlSite as Site, RecordXmlToken as Token,
+    RecordXmlValueMember as Member,
 };
 use super::record_xml::RECORD_XML_NAMESPACE;
 use super::tasks::{Head, Name};
 use super::writer as xml_write;
 use crate::xml_text;
-use crate::{Annotations, Field, Value};
+use crate::{Annotations, Field, PositionedFields, Value};
 
 pub(super) fn open<'tree, 'source>(
     out: &mut Output<'_, 'tree, 'source, impl Write>,
     head: Head<'tree, 'source>,
     fields: &'tree [Field<'source>],
+    positions: Option<&PositionedFields<'tree, 'source>>,
     flags: &[bool],
     depth: usize,
     annotations: Annotations<'_>,
@@ -30,10 +32,11 @@ pub(super) fn open<'tree, 'source>(
     let name = Name {
         text: if plain { type_name } else { fallback },
         origin: plain.then_some(original),
+        position: out.value(),
     };
     xml_write::indent(out, depth)?;
     out.write_all(b"<")?;
-    write_name(out, name)?;
+    write_name(out, name, Token::ElementName)?;
     if let Head::Record(_, true) = head {
         xml_write::attribute(out, "xmlns:p4kx", RECORD_XML_NAMESPACE, None)?;
     }
@@ -41,12 +44,16 @@ pub(super) fn open<'tree, 'source>(
         xml_write::attribute(out, "type", type_name, Some(original))?;
     }
     record_header(out, head)?;
-    for (field, _) in fields
+    for (index, (field, _)) in fields
         .iter()
         .zip(flags)
-        .filter(|(_, attribute)| **attribute)
+        .enumerate()
+        .filter(|(_, (_, attribute))| **attribute)
     {
-        xml_write::write_attribute_field(out, field, annotations)?;
+        let position = positions.and_then(|positions| positions.get(index));
+        out.at(position, |out| {
+            xml_write::write_attribute_field(out, field, annotations)
+        })?;
     }
     if flags.iter().all(|attribute| *attribute) {
         out.write_all(b"/>\n")?;
@@ -96,9 +103,10 @@ pub(super) fn open_field<'tree, 'source>(
         let name = Name {
             text: field.name(),
             origin: original,
+            position: out.value(),
         };
         out.write_all(b"<")?;
-        write_name(out, name)?;
+        write_name(out, name, Token::ElementName)?;
         name
     } else {
         out.write_all(b"<p4kx:field")?;
@@ -106,6 +114,7 @@ pub(super) fn open_field<'tree, 'source>(
         Name {
             text: "p4kx:field",
             origin: None,
+            position: None,
         }
     };
     out.write_all(if empty { b"/>\n" } else { b">\n" })?;
@@ -119,15 +128,20 @@ pub(super) fn close<'tree, 'source>(
 ) -> io::Result<()> {
     xml_write::indent(out, depth)?;
     out.write_all(b"</")?;
-    write_name(out, name)?;
+    write_name(out, name, Token::ClosingElementName)?;
     out.write_all(b">\n")
 }
 
 fn write_name<'tree, 'source>(
     out: &mut Output<'_, 'tree, 'source, impl Write>,
     name: Name<'tree, 'source>,
+    token: Token,
 ) -> io::Result<()> {
-    out.fragment(name.origin, |out| out.write_all(name.text.as_bytes()))
+    out.at(name.position, |out| {
+        out.fragment(name.origin, token, |out| {
+            out.write_all(name.text.as_bytes())
+        })
+    })
 }
 
 pub(super) fn field_leaf<'tree, 'source>(
@@ -163,9 +177,11 @@ pub(super) fn value_leaf<'tree, 'source>(
         }
         Value::Null => {
             out.write_all(b"<")?;
-            out.fragment(Some(Site::member(value, Member::Value)), |out| {
-                out.write_all(b"p4kx:null")
-            })?;
+            out.fragment(
+                Some(Site::member(value, Member::Value)),
+                Token::ElementName,
+                |out| out.write_all(b"p4kx:null"),
+            )?;
             out.write_all(b"/>\n")
         }
         Value::Error(error) => {

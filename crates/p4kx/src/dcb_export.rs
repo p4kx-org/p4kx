@@ -6,13 +6,10 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_export::{
-    Language, RecordExportOptions, RecordExportSummary, RecordFailure, RecordForm,
-    write_record_export,
-};
+use p4kx_export::{Language, RecordExportOptions, RecordExportSummary, RecordFailure, RecordForm};
 use p4kx_extraction::{
-    Archive, DataForge, Filter, LanguageTexts, LocalizationSet, Record, RecordExportReport,
-    TagResolver, TagTree, TextResolver, export_combined, export_record_json_files_with_origins,
+    Archive, ArchiveWriteProtection, DataForge, Filter, LocalizationSet, Record,
+    RecordExportReport, RecordLocalization, TextResolver,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -24,10 +21,15 @@ use crate::json;
 use crate::loc::{LanguageNotInArchive, print_notes};
 use crate::renamed_report::{RenamedJson, renamed_json};
 
+#[path = "dcb_export_publication.rs"]
+mod publication;
 #[path = "dcb_export_report.rs"]
 mod report;
+#[path = "dcb_export_tags.rs"]
+mod tags;
 pub(crate) use report::print_report;
 use report::{Outcome, reason};
+use tags::RecordExportTags;
 
 /// `--combined` with another format than Record XML.
 #[derive(Debug, Error)]
@@ -133,7 +135,10 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
     let input = ForgeInput::open(&args.archive)?;
     let forge = input.entry().open()?;
     let records = select_records(&forge, args.filter.as_deref())?;
-    let tags = args.tags.then(|| TagTree::build(&forge));
+    let tags = args
+        .tags
+        .then(|| RecordExportTags::read(&input, &forge, form))
+        .transpose()?;
     let job = Job {
         args,
         as_json,
@@ -144,7 +149,7 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
         tags: tags.as_ref(),
     };
     let Some(language) = args.lang else {
-        return job.write(None);
+        return job.write(None, None);
     };
     let given = given_text_archive(&input, args.text_archive.as_deref())?;
     let text_archive = given
@@ -152,12 +157,14 @@ pub(crate) fn run(args: &DcbExportArgs, as_json: bool) -> Result<ExitCode> {
         .or_else(|| input.archive())
         .ok_or(TextsNeedArchive)?;
     let set = LocalizationSet::read(text_archive, &[language])?;
-    if set.entry(language).is_none() {
-        return Err(LanguageNotInArchive { language }.into());
+    let entry = set
+        .entry(language)
+        .ok_or(LanguageNotInArchive { language })?;
+    let localization = RecordLocalization::try_new(entry)?;
+    if let Some(note) = localization.note() {
+        print_notes(&[note]);
     }
-    let texts = set.index()?;
-    print_notes(&set.notes(&texts));
-    job.write(Some(&LanguageTexts::new(&texts, language)))
+    job.write(Some(&localization), given.as_ref().map(Archive::path))
 }
 
 /// Opens the Archive `--archive` names, which supplies the localisation texts of a DataForge
@@ -180,17 +187,26 @@ struct Job<'a, 'f> {
     input: &'a ForgeInput,
     forge: &'a DataForge<'f>,
     records: &'a [Record<'f>],
-    tags: Option<&'a TagTree>,
+    tags: Option<&'a RecordExportTags>,
 }
 
 impl Job<'_, '_> {
-    /// Writes the Records with `texts` resolved and prints the report.
-    fn write(&self, texts: Option<&dyn TextResolver>) -> Result<ExitCode> {
+    /// Writes the Records with their selected annotations and prints the report.
+    fn write(
+        &self,
+        localization: Option<&RecordLocalization<'_>>,
+        additional_source: Option<&Path>,
+    ) -> Result<ExitCode> {
         let Self {
             args, input, tags, ..
         } = *self;
         let cancel = cancel_on_interrupt()?;
-        let protection = p4kx_extraction::ArchiveWriteProtection::new(input.path(), cancel.flag())?;
+        let protection = match additional_source {
+            Some(source) => {
+                ArchiveWriteProtection::for_sources(&[input.path(), source], cancel.flag())?
+            }
+            None => ArchiveWriteProtection::new(input.path(), cancel.flag())?,
+        };
         let target =
             prepare_target_protected(args.out.as_deref(), input.archive(), &protection, &cancel)?;
         let options = RecordExportOptions {
@@ -198,11 +214,11 @@ impl Job<'_, '_> {
             policy: policy(args.conflict),
             cancel: Some(&cancel),
             progress: None,
-            texts,
-            tags: tags.map(|tags| tags as &dyn TagResolver),
+            texts: localization.map(|source| source as &dyn TextResolver),
+            tags: tags.map(RecordExportTags::resolver),
         };
         let combined = args.combined.then(|| combined_name(input.entry().path()));
-        let exported = self.publish(&options, &target, combined.as_deref())?;
+        let exported = self.publish(&options, &target, combined.as_deref(), localization)?;
         let report = exported.outcome();
         if let Err(error) = self.print_outcome(&report, &target, combined.as_deref())
             && error.kind() != io::ErrorKind::BrokenPipe
@@ -262,40 +278,6 @@ impl Job<'_, '_> {
                 form,
             )
         }
-    }
-
-    fn publish(
-        &self,
-        options: &RecordExportOptions<'_>,
-        target: &Path,
-        combined: Option<&str>,
-    ) -> Result<ExportedRecords> {
-        if let Some(name) = combined {
-            return Ok(ExportedRecords::Files(export_combined(
-                self.forge,
-                self.records,
-                &target.join(name),
-                options,
-            )?));
-        }
-        if self.form == RecordForm::Json && !options.annotations().is_active() {
-            return Ok(ExportedRecords::Files(
-                export_record_json_files_with_origins(
-                    self.input.entry(),
-                    self.forge,
-                    self.records,
-                    target,
-                    options,
-                )?,
-            ));
-        }
-        Ok(ExportedRecords::Summary(write_record_export(
-            self.forge,
-            self.records,
-            self.form,
-            target,
-            options,
-        )))
     }
 }
 

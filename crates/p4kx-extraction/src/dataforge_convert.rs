@@ -4,16 +4,14 @@
 use std::io::Read;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml};
+use p4kx_dataforge::{Annotations, Record};
 
 use crate::buffers::Buffers;
 use crate::decoded_buffer::{AppendError, DecodedBuffer, MAX_ADDRESSABLE_BYTES};
-use crate::record_export::{RecordRun, write_records};
-use crate::record_files::RecordFiles;
-use crate::record_format::RecordFileFormat;
+use crate::record_export::{RecordRun, write_converted_record_xml};
 use crate::source::SourceEntry;
 use crate::write::{Chunk, EntryWriter, Outcome};
-use crate::{ExtractionError, RecordExportReport};
+use crate::{DataForgeEntry, ExtractionError, RecordExportReport};
 
 impl EntryWriter<'_> {
     /// Converts the DataForge Entry `entry` into one Record XML file per Record below the folder
@@ -53,17 +51,10 @@ impl EntryWriter<'_> {
         }
         let relative = self.relative_path(entry)?;
         let size = entry.uncompressed_size();
-        let expected = DecodedBuffer::new(size).ok_or(ExtractionError::TooLargeToConvert {
-            size,
-            limit: MAX_ADDRESSABLE_BYTES,
-        })?;
-        let bytes = &mut buffers.data;
-        bytes.clear();
-        let mut reader = entry.open_exact(self.verify)?;
-        if !self.read_all(&mut reader, bytes, expected, &mut buffers.chunk, credited)? {
+        let Some(input) = self.read_dataforge(entry, buffers, credited)? else {
             return Ok((Outcome::Cancelled, None));
-        }
-        let forge = DataForge::open(bytes).map_err(ExtractionError::DataForge)?;
+        };
+        let forge = input.open().map_err(ExtractionError::DataForge)?;
         let folder = self.folder(relative.parent())?;
         let records: Vec<Record<'_>> = forge.records().collect();
         let rest = size.saturating_sub(credited.load(Ordering::Relaxed));
@@ -79,14 +70,37 @@ impl EntryWriter<'_> {
                 self.tracker.wrote(share);
             },
         };
-        let plan = RecordFiles::plan(&forge, RecordXml::EXTENSION);
-        let report = write_records::<RecordXml>(&forge, &plan, &records, &folder, &run);
+        let report = write_converted_record_xml(&input, &forge, &records, &folder, &run);
         let outcome = if report.cancelled() > 0 {
             Outcome::Cancelled
         } else {
             Outcome::Converted(None)
         };
         Ok((outcome, Some(report)))
+    }
+
+    fn read_dataforge(
+        &self,
+        entry: &SourceEntry<'_>,
+        buffers: &mut Buffers,
+        credited: &AtomicU64,
+    ) -> Result<Option<DataForgeEntry>, ExtractionError> {
+        let size = entry.uncompressed_size();
+        let expected = DecodedBuffer::new(size).ok_or(ExtractionError::TooLargeToConvert {
+            size,
+            limit: MAX_ADDRESSABLE_BYTES,
+        })?;
+        let bytes = &mut buffers.data;
+        bytes.clear();
+        let mut reader = entry.open_exact(self.verify)?;
+        if !self.read_all(&mut reader, bytes, expected, &mut buffers.chunk, credited)? {
+            return Ok(None);
+        }
+        Ok(Some(DataForgeEntry::from_decoded_source(
+            entry,
+            &reader,
+            std::mem::take(bytes),
+        )))
     }
 
     /// Reads the declared Entry length, crediting half of each received chunk until cancellation.

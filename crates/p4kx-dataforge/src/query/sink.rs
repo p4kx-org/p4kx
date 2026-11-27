@@ -5,8 +5,9 @@ use std::ops::ControlFlow;
 
 use crate::query::MAX_PATH_VALUES;
 use crate::query::reader::{Column, Step, Walk};
-use crate::query::source::{CellTrace, QueryByteUse, QuerySource};
+use crate::query::source::{CellTrace, QueryByteUse, QuerySource, TraversalInput};
 use crate::query::state::WalkState;
+use crate::query::traversal_gap;
 use crate::query::walk::Place;
 use crate::{DataForge, Value, ValueError};
 
@@ -32,6 +33,42 @@ impl<'f> Reached<'f> {
             Self::Value(value) => value,
         }
     }
+
+    pub(super) fn read_projected(
+        self,
+        forge: &'f DataForge<'f>,
+        leaf: &Column,
+        trace: Option<&mut CellTrace>,
+    ) -> Value<'f> {
+        let Some(trace) = trace else {
+            return self.read(forge, leaf);
+        };
+        let depth = trace.depth();
+        let (value, bytes) = match self {
+            Self::Place(place) => {
+                let bytes = leaf.bytes(place);
+                if bytes.is_none() {
+                    trace.route(traversal_gap::unavailable(
+                        forge,
+                        place,
+                        leaf.start,
+                        leaf.end.saturating_sub(leaf.start),
+                        TraversalInput::Value,
+                    ));
+                }
+                let value = leaf.read_observed(
+                    forge,
+                    place,
+                    Some(&mut |source| trace.route(source.into())),
+                );
+                (value, bytes)
+            }
+            Self::Value(value) => (value, None),
+        };
+        trace.value(forge, bytes, &value);
+        trace.restore(depth);
+        value
+    }
 }
 
 /// Where a walk sends what it charges, counts and reaches.
@@ -52,13 +89,17 @@ pub(crate) trait Sink<'f> {
 
     fn route(&mut self, _source: QuerySource) {}
 
-    /// Observes original bounds and failed reads used to evaluate a predicate.
-    fn predicate_observer(&self) -> Option<&(dyn Fn(QuerySource) + Sync)> {
-        None
+    fn observes_input_details(&self) -> bool {
+        self.source_depth().is_some()
     }
 
-    fn predicate_bytes(&self, forge: &DataForge<'_>, bytes: &[u8], kind: QueryByteUse) {
-        if let Some(observe) = self.predicate_observer()
+    fn input_observer(&mut self) -> Option<impl FnMut(QuerySource)> {
+        self.observes_input_details()
+            .then_some(move |source| self.route(source))
+    }
+
+    fn observe_input_bytes(&mut self, forge: &DataForge<'_>, bytes: &[u8], kind: QueryByteUse) {
+        if let Some(mut observe) = self.input_observer()
             && let Some(source) = QuerySource::bytes(forge, bytes, kind)
         {
             observe(source);
@@ -131,11 +172,7 @@ impl<'f> Sink<'f> for Live<'_, 'f> {
     }
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {
-        let bytes = self.trace.as_ref().and_then(|_| reached.bytes(self.leaf));
-        let value = reached.read(self.forge, self.leaf);
-        if let Some(trace) = &mut self.trace {
-            trace.value(self.forge, bytes, &value);
-        }
+        let value = reached.read_projected(self.forge, self.leaf, self.trace.as_deref_mut());
         (self.emit)(value)
     }
 }

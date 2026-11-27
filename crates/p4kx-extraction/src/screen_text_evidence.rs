@@ -7,9 +7,8 @@ use p4kx_archive::EntryOrigin;
 use p4kx_gfx::{Font, FontOrigins, MovieSource, TagItemSite};
 
 use crate::{
-    Archive, GlobalIni, IniEncoding, InputScope, LocalizationEntry, SourceEvidenceError,
-    SourceInput, SourceLocation, SourceUse, SourceUseRole, SourceUses, UiMovie, UiMovieEvidence,
-    UiSourceSite,
+    Archive, GlobalIni, LocalizationEntry, SourceEvidenceError, SourceInput, SourceUse,
+    SourceUseRole, SourceUses, UiMovie, UiMovieEvidence, UiSourceSite,
 };
 
 use SourceUseRole::{Conversion, Selector};
@@ -131,43 +130,5 @@ pub(super) fn localization(
     let Some(value) = ini.resolve(key) else {
         return Ok(false);
     };
-    let text = entry.text();
-    let decoded = text.text();
-    let Some(offset) = (value.as_ptr() as usize).checked_sub(decoded.as_ptr() as usize) else {
-        return Ok(false);
-    };
-    let Some(end) = offset.checked_add(value.len()) else {
-        return Ok(false);
-    };
-    if decoded.get(offset..end) != Some(value) {
-        return Ok(false);
-    }
-    let original = entry.origin();
-    let input = original.map_or(SourceInput::Unknown, SourceInput::Archive);
-    let scope = registry.observe(input, InputScope::Payload)?;
-    let offset = offset as u64;
-    let (namespace, offset) = match (text.encoding(), text.is_lossy()) {
-        (IniEncoding::Utf8, false) => ("globalIniBytes", offset),
-        (IniEncoding::Utf8Bom, false) => ("globalIniBytes", offset + "\u{feff}".len() as u64),
-        _ => {
-            output.push(scope.at(
-                SourceLocation::Subresource {
-                    namespace: "globalIniInputBytes".into(),
-                    indices: vec![0, entry.original_byte_len()],
-                    field: "decodeInput".into(),
-                },
-                Conversion,
-            )?);
-            ("globalIniDecodedBytes", offset)
-        }
-    };
-    output.push(scope.at(
-        SourceLocation::Subresource {
-            namespace: namespace.into(),
-            indices: vec![offset, value.len() as u64],
-            field: "value".into(),
-        },
-        Conversion,
-    )?);
-    Ok(original.is_some())
+    entry.append_value_uses(value, registry, output)
 }

@@ -8,6 +8,9 @@ use std::error::Error;
 use p4kx_dataforge::{DataForge, RecordXml};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
+#[path = "record_xml_localization.rs"]
+mod localization;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const GUID: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;

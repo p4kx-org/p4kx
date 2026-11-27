@@ -229,7 +229,8 @@ fn a_compressed_catalog_shows_both_sizes_in_german() -> TestResult {
 #[test]
 fn a_plain_catalog_shows_one_size() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
-    model.start_catalog(out.join("catalog.json"), || {});
+    let file = out.join("catalog.json");
+    model.start_catalog(file.clone(), || {});
     let mut harness = harness(model);
 
     wait_for_the_end(&mut harness)?;
@@ -239,6 +240,14 @@ fn a_plain_catalog_shows_one_size() -> TestResult {
         harness.query_by_label_contains(" decoded").is_none(),
         "no second size"
     );
+    let document: serde_json::Value = serde_json::from_slice(&std::fs::read(file)?)?;
+    assert_eq!(
+        document.get("format").and_then(serde_json::Value::as_str),
+        Some("p4kx-catalog-markers"),
+        "the default GUI job publishes the marker profile"
+    );
+    let catalog = document.get("catalog").ok_or("catalog output")?;
+    assert!(catalog.get("provenance").is_none(), "no full inventory");
     Ok(())
 }
 

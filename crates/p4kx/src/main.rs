@@ -143,6 +143,7 @@ mod progress;
 mod query_file;
 mod query_rows;
 mod query_table;
+mod query_text_position;
 mod renamed_report;
 mod scene_report_origins;
 mod ships;

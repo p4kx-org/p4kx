@@ -7,9 +7,9 @@ use std::io;
 use crate::positioned_record::ValueSlot;
 use crate::positioned_reference_members::DanglingReferenceMember;
 use crate::{
-    Guid, PositionedRecord, PositionedReferenceSources, PositionedSources,
+    Guid, ObservedResolution, PositionedRecord, PositionedReferenceSources, PositionedSources,
     RecordJsonReferenceMember, RecordJsonReferenceSources, RecordJsonUse, RecordJsonUseRole,
-    Reference, Resolution, StructValue, Value,
+    Reference, StructValue, Value,
 };
 
 use super::source::{RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource};
@@ -204,7 +204,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         &mut self,
         slot: Option<ValueSlot<'source>>,
         key: &str,
-        resolution: &Resolution<'_>,
+        resolution: &ObservedResolution<'_>,
     ) -> io::Result<()> {
         let (sources, local_complete) = self.slot(slot, Some(&Value::Locale(key)));
         let mut selectors = Vec::new();
@@ -212,7 +212,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
             self.append_routes(&mut selectors, RecordJsonUse::selection) && local_complete;
         selectors.extend(sources.into_iter().map(RecordJsonUse::selection));
         self.observer
-            .localization(&self.pointer, key, resolution, &selectors, complete)
+            .localization_observed(&self.pointer, key, resolution, &selectors, complete)
     }
 
     pub(super) fn tag(

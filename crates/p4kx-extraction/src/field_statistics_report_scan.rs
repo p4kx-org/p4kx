@@ -16,13 +16,13 @@ use p4kx_dataforge::{
 use crate::dataforge_layout_evidence;
 use crate::field_statistics_evidence::FieldStatisticsSourceUses;
 use crate::query_admission_evidence::{self, HeaderCensus};
+use crate::query_instance_bounds::InstanceBounds;
 use crate::query_source_evidence::QuerySourceSite;
 use crate::{
     FieldOrigin, SourceEvidenceError, SourceScope, SourceUseRef, SourceUseRole, SourceUses,
 };
 
 use super::counts::{FieldStatisticsCounterProof, ScanAccounting};
-use super::instance_bounds::InstanceBounds;
 use super::rows::{FieldStatisticsRowProof, Rows, Uses};
 use super::{FieldStatisticsReportError, FieldStatisticsSelectionProof};
 
@@ -240,7 +240,9 @@ impl Capture {
         )?;
         let headers = std::mem::take(&mut self.headers);
         self.select(scope, headers.sites())?;
-        let bounds = std::mem::take(&mut self.instance_bounds).sites(forge)?;
+        let bounds = std::mem::take(&mut self.instance_bounds)
+            .sites(forge)
+            .ok_or(FieldStatisticsReportError::UnboundSelection)?;
         self.select(scope, bounds)?;
         for source in self.rows.root_uses() {
             self.selection.insert(source);

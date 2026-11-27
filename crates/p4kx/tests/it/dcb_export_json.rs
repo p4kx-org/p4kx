@@ -12,6 +12,8 @@ use p4kx_testkit::{
     TestValue,
 };
 
+#[path = "dcb_export_ndjson_origins.rs"]
+mod ndjson_origins;
 #[path = "dcb_export_json_origins.rs"]
 mod origins;
 

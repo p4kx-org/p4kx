@@ -18,6 +18,15 @@ pub struct LocalizationNote {
 }
 
 impl LocalizationNote {
+    pub(crate) fn for_entry(entry: &LocalizationEntry, skipped: usize) -> Option<Self> {
+        let lossy = entry.text().is_lossy();
+        (lossy || skipped > 0).then(|| Self {
+            path: entry.path().to_owned(),
+            lossy,
+            skipped,
+        })
+    }
+
     /// Returns the path of the Entry.
     #[must_use]
     pub fn path(&self) -> &str {
@@ -157,12 +166,7 @@ impl LocalizationSet {
                 let skipped = texts
                     .ini(entry.language())
                     .map_or(0, p4kx_localization::GlobalIni::skipped);
-                let lossy = entry.text().is_lossy();
-                (lossy || skipped > 0).then(|| LocalizationNote {
-                    path: entry.path().to_owned(),
-                    lossy,
-                    skipped,
-                })
+                LocalizationNote::for_entry(entry, skipped)
             })
             .collect()
     }
@@ -177,15 +181,7 @@ impl LocalizationSet {
         let files = self
             .entries
             .par_iter()
-            .map(|entry| {
-                let ini = entry
-                    .parse()
-                    .map_err(|source| LocalizationLoadError::Index {
-                        path: entry.path().to_owned(),
-                        source,
-                    })?;
-                Ok((entry.language(), ini))
-            })
+            .map(|entry| Ok((entry.language(), entry.index()?)))
             .collect::<Result<Vec<_>, LocalizationLoadError>>()?;
         Ok(TextSet::new(files))
     }

@@ -3,8 +3,10 @@
 
 use std::io::{self, Write};
 
-use super::observation::{Output, RecordXmlSite as Site, RecordXmlValueMember as Member};
-use crate::texts::annotation;
+use super::observation::{
+    Output, RecordXmlSite as Site, RecordXmlToken as Token, RecordXmlValueMember as Member,
+};
+use crate::texts::observed_annotation;
 use crate::xml_text::{write_display, write_escaped, write_float};
 use crate::{Annotations, Field, Reference, Resolution, Value, ValueError};
 
@@ -45,8 +47,17 @@ fn attribute_value<'out, 'tree, 'source, W: Write>(
     origin: Option<Site<'tree, 'source>>,
     write: impl FnOnce(&mut Output<'out, 'tree, 'source, W>) -> io::Result<()>,
 ) -> io::Result<()> {
+    attribute_contents(out, |out| {
+        out.fragment(origin, Token::AttributeValue, write)
+    })
+}
+
+fn attribute_contents<W: Write>(
+    out: &mut W,
+    contents: impl FnOnce(&mut W) -> io::Result<()>,
+) -> io::Result<()> {
     out.write_all(b"=\"")?;
-    out.fragment(origin, write)?;
+    contents(out)?;
     out.write_all(b"\"")
 }
 
@@ -111,9 +122,11 @@ pub(super) fn write_attribute_field<'tree, 'source>(
 ) -> io::Result<()> {
     let value = field.value();
     out.write_all(b" ")?;
-    out.fragment(Some(Site::member(value, Member::Name)), |out| {
-        out.write_all(field.name().as_bytes())
-    })?;
+    out.fragment(
+        Some(Site::member(value, Member::Name)),
+        Token::AttributeName,
+        |out| out.write_all(field.name().as_bytes()),
+    )?;
     attribute_value(out, Some(Site::member(value, Member::Value)), |out| {
         write_scalar(out, value)
     })?;
@@ -139,10 +152,10 @@ fn localized<'tree, 'source>(
     let Value::Locale(key) = value else {
         return Ok(());
     };
-    let Some(resolved) = annotation(&annotations, key) else {
+    let Some(resolved) = observed_annotation(&annotations, key) else {
         return Ok(());
     };
-    let name: &[u8] = if matches!(resolved, Resolution::Text(_)) {
+    let name: &[u8] = if matches!(resolved.resolution(), Resolution::Text(_)) {
         b"text"
     } else {
         b"missing"
@@ -152,20 +165,20 @@ fn localized<'tree, 'source>(
         out.write_all(b"p4kx:")?;
         out.write_all(name)?;
         out.write_all(b"-")?;
-        out.fragment(Some(Site::member(value, Member::Name)), |out| {
-            out.write_all(field.as_bytes())
-        })?;
+        out.fragment(
+            Some(Site::member(value, Member::Name)),
+            Token::AttributeName,
+            |out| out.write_all(field.as_bytes()),
+        )?;
     } else {
         out.write_all(name)?;
     }
-    attribute_value(
-        out,
-        Some(Site::member(value, Member::Translation)),
-        |out| match resolved {
-            Resolution::Text(text) => write_escaped(out, &text),
+    attribute_contents(out, |out| {
+        out.localized(value, &resolved, |out| match resolved.resolution() {
+            Resolution::Text(text) => write_escaped(out, text),
             _ => out.write_all(b"true"),
-        },
-    )
+        })
+    })
 }
 
 /// Writes the text of a scalar; other values write nothing.

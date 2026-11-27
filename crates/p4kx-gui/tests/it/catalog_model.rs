@@ -191,9 +191,16 @@ fn the_dataforge_read_for_a_catalog_is_kept_for_the_record_export() -> TestResul
     assert!(exported, "the Record export starts");
     assert_eq!(reads(&model), Some(1), "DataForge read once for both");
     assert_eq!(
-        files_in(&out.join("records/libs/foundry/records/scitemmanufacturer"))?.len(),
-        3,
-        "the Record export used it"
+        files_in(&out.join("records/libs/foundry/records/scitemmanufacturer"))?,
+        [
+            "ACAS.json",
+            "ACAS.json.p4kx-origin.jsonl",
+            "DRAK.json",
+            "DRAK.json.p4kx-origin.jsonl",
+            "Test_Maker.json",
+            "Test_Maker.json.p4kx-origin.jsonl",
+        ],
+        "the Record export writes the cached definitions and their companions"
     );
     Ok(())
 }

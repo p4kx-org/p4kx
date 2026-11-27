@@ -9,6 +9,7 @@ use p4kx_dataforge::{DataForge, DataForgeError};
 use thiserror::Error;
 
 use crate::decoded_buffer::{AppendError, DecodedBuffer};
+use crate::source::{SourceEntry, SourceReader};
 use crate::{ArchiveChanged, DataForgeOrigin, DataForgeReadOptions};
 
 /// The Entries that may hold DataForge, the preferred one first.
@@ -25,6 +26,27 @@ pub struct DataForgeEntry {
 }
 
 impl DataForgeEntry {
+    /// Binds the bytes of one completed decoded read to its physical input.
+    pub(crate) fn from_decoded_source(
+        entry: &SourceEntry<'_>,
+        reader: &SourceReader<'_>,
+        bytes: Vec<u8>,
+    ) -> Self {
+        let origin = entry.observed_entry().map_or_else(
+            || {
+                reader
+                    .file_origin()
+                    .map_or(DataForgeOrigin::Unknown, DataForgeOrigin::File)
+            },
+            |entry| DataForgeOrigin::Archive(entry.snapshot()),
+        );
+        Self {
+            path: entry.path().to_owned(),
+            bytes,
+            origin,
+        }
+    }
+
     /// Reads the DataForge Entry of `archive`: `Data\Game2.dcb`, or `Data\Game.dcb` when the
     /// Archive has no `Game2.dcb`.
     ///

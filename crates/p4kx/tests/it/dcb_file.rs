@@ -3,6 +3,11 @@
 
 //! Every `p4kx dcb` command over a DataForge file on disk in place of an Archive.
 
+#[path = "dcb_file_origin_guard.rs"]
+mod origin_guard;
+#[path = "dcb_file_parity.rs"]
+mod parity;
+
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
@@ -175,10 +180,7 @@ fn the_export_of_a_file_and_of_its_archive_are_byte_identical() -> TestResult {
         0,
     )?;
 
-    let exported = files(&from_file)?;
-    assert_eq!(exported.len(), 2, "one file per Record");
-    assert_eq!(exported, files(&from_archive)?);
-    Ok(())
+    parity::assert_record_export_parity(&from_file, &from_archive, None)
 }
 
 #[test]
@@ -263,15 +265,7 @@ fn lang_on_a_file_takes_the_texts_from_the_given_archive() -> TestResult {
         0,
     )?;
 
-    let exported = files(&from_file)?;
-    assert!(
-        exported
-            .values()
-            .any(|bytes| String::from_utf8_lossy(bytes).contains("Cart")),
-        "the text is resolved"
-    );
-    assert_eq!(exported, files(&from_archive)?);
-    Ok(())
+    parity::assert_record_export_parity(&from_file, &from_archive, Some("en"))
 }
 
 #[test]

@@ -67,10 +67,71 @@ fn exported(form: RecordForm, tags: bool) -> Result<String, Box<dyn std::error::
     };
     assert_eq!(summary.written(), 1, "the Gear Record");
     let files = files_below(&out)?;
-    let [file] = files.as_slice() else {
-        return Err(format!("not one file: {files:?}").into());
+    let [file, companion] = files.as_slice() else {
+        return Err(format!("expected one payload and one companion: {files:?}").into());
     };
+    assert_eq!(
+        summary.origin_receipts(),
+        [out.join(companion)],
+        "the companion is exposed"
+    );
+    if tags && form_annotates_tags(form) {
+        verify_exported_tag_proof(&out.join(companion), form)?;
+    }
     Ok(std::fs::read_to_string(out.join(file))?)
+}
+
+fn verify_exported_tag_proof(companion: &std::path::Path, form: RecordForm) -> TestResult {
+    let proof = std::fs::read_to_string(companion)?;
+    let rows: Vec<serde_json::Value> = proof
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    let tag = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/address/path")
+                .and_then(serde_json::Value::as_str)
+                == Some("/mount/tag")
+        })
+        .ok_or("exported tag field")?;
+    let line = tag
+        .pointer("/address/line")
+        .and_then(serde_json::Value::as_str);
+    assert_eq!(
+        line,
+        (form == RecordForm::Ndjson).then_some("0"),
+        "the actual tag field address for {form}"
+    );
+    let sources = tag
+        .get("sourceUsesRefs")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("tag sources")?;
+    for (field, owner) in [("children", "1"), ("tags", "0")] {
+        assert!(
+            rows.iter()
+                .filter_map(|row| row.get("sourceUse"))
+                .any(|source| {
+                    source.get("id").is_some_and(|id| sources.contains(id))
+                        && source.get("role").and_then(serde_json::Value::as_str)
+                            == Some("selector")
+                        && source
+                            .pointer("/location/namespace")
+                            .and_then(serde_json::Value::as_str)
+                            == Some("dataforgeTagRelations")
+                        && source
+                            .pointer("/location/field")
+                            .and_then(serde_json::Value::as_str)
+                            == Some(field)
+                        && source
+                            .pointer("/location/indices/0")
+                            .and_then(serde_json::Value::as_str)
+                            == Some(owner)
+                }),
+            "{form}: original {field} selector is bound to the emitted tag"
+        );
+    }
+    Ok(())
 }
 
 #[test]

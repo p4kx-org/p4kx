@@ -5,6 +5,16 @@ use crate::Field;
 
 /// Appends whether each original field name requires its ordinal escape.
 pub(crate) fn append(fields: &[Field<'_>], escaped: &mut Vec<bool>, order: &mut Vec<usize>) {
+    append_observed(fields, escaped, order, |_, _| {});
+}
+
+/// Appends escape decisions and reports original field pairs causing a duplicate-name escape.
+pub(crate) fn append_observed(
+    fields: &[Field<'_>],
+    escaped: &mut Vec<bool>,
+    order: &mut Vec<usize>,
+    mut collision: impl FnMut(usize, usize),
+) {
     let base = escaped.len();
     escaped.extend(fields.iter().map(|field| field.name().starts_with('$')));
     order.clear();
@@ -17,6 +27,7 @@ pub(crate) fn append(fields: &[Field<'_>], escaped: &mut Vec<bool>, order: &mut 
             && let Some(flag) = escaped.get_mut(base + *second)
         {
             *flag = true;
+            collision(*first, *second);
         }
     }
 }

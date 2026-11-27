@@ -23,6 +23,11 @@ expression: "serde_json::to_string_pretty(&value)?"
     "error_values": 1,
     "exported": 3,
     "failed": [],
+    "origin_receipts": [
+      "Data/libs/foundry/records/anchors/anchor.xml.p4kx-origin.jsonl",
+      "Data/libs/foundry/records/items/boxes/Item.Box.xml.p4kx-origin.jsonl",
+      "Data/libs/foundry/records/items/boxes/Item.Crate.xml.p4kx-origin.jsonl"
+    ],
     "records_with_errors": 1,
     "skipped": []
   },

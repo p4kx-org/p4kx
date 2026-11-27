@@ -5,9 +5,24 @@ use std::io;
 
 use p4kx_dataforge::{Annotations, RecordJson, RecordTree, RecordXml};
 
+#[path = "record_field_receipt.rs"]
+mod field_receipt;
+#[path = "record_flat_fields.rs"]
+mod flat_fields;
+#[path = "record_json_line.rs"]
+pub(crate) mod json_line;
 #[path = "record_json_receipt.rs"]
 mod json_receipt;
+#[path = "record_stream_input.rs"]
+pub(crate) mod record_stream_input;
+#[path = "record_stream_publication.rs"]
+pub(crate) mod record_stream_publication;
+#[path = "record_stream_fields.rs"]
+pub(crate) mod stream_fields;
+#[path = "record_xml_receipt.rs"]
+pub(crate) mod xml_receipt;
 
+pub(crate) use field_receipt::{RecordFieldReceipt, RecordOriginal};
 pub use json_receipt::RecordJsonReceipt;
 
 /// The file format of a Record export with one file per Record: how a Record tree becomes the

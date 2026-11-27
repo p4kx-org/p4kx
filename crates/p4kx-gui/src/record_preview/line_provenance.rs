@@ -254,36 +254,8 @@ impl Capture<'_> {
     }
 
     fn tag(&self, mut route: Route, link: &RecordLink) -> Result<FieldOrigin, SourceEvidenceError> {
-        if let Some(path) = self.tags.and_then(|tree| tree.path(link.guid())) {
-            for part in path {
-                if let Some(bytes) = &part.name {
-                    route.push(self.binding.record_field(
-                        part.record,
-                        "tagName",
-                        SourceUseRole::Conversion,
-                    )?);
-                    self.binding.append(
-                        &mut route,
-                        RecordJsonLocation::of(RecordJsonSource::Bytes {
-                            start: bytes.start,
-                            end: bytes.end,
-                            kind: RecordJsonBytes::Text,
-                        }),
-                    )?;
-                } else {
-                    route.complete = false;
-                }
-                if let Some(edge) = &part.incoming {
-                    route.push(self.binding.site(
-                        SourceLocation::Subresource {
-                            namespace: "dataforgeTagRelations".into(),
-                            indices: vec![u64::from(edge.owner), edge.ordinal as u64],
-                            field: edge.kind.field().into(),
-                        },
-                        SourceUseRole::Selector,
-                    )?);
-                }
-            }
+        if let Some(tags) = &self.tags {
+            route.complete &= tags.append(link.guid(), &mut route.inputs)?;
         } else {
             route.complete = false;
         }

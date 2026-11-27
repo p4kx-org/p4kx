@@ -29,6 +29,9 @@ use crate::{
     RecordExportSummary, RecordExportText as T, RenameText, Text, Texts,
 };
 
+#[path = "record_export_origin_lists.rs"]
+mod origin_lists;
+
 const REFRESH: Duration = Duration::from_millis(100);
 const WINDOW: &str = "record-export-run";
 const OUTCOME: &str = "record-export-outcome";
@@ -345,6 +348,7 @@ fn finished(ui: &mut Ui, texts: &Texts, laid: &Laid, summary: &RecordExportSumma
         None,
         false,
     );
+    origin_lists::show(ui, texts, summary);
 }
 
 pub(super) fn list(

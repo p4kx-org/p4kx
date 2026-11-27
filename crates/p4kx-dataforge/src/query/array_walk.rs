@@ -38,7 +38,7 @@ impl Walk {
         sink.follow_decision(index);
         let [count, first] = words(bytes);
         if let Err(error) = check_range(forge, elements, first, count, sink) {
-            sink.predicate_bytes(
+            sink.observe_input_bytes(
                 forge,
                 bytes,
                 QueryByteUse::AttemptedTraversal(TraversalInput::Array),
@@ -105,13 +105,13 @@ fn check_range<'source>(
     elements: &Elements,
     first: u32,
     count: u32,
-    sink: &impl Sink<'source>,
+    sink: &mut impl Sink<'source>,
 ) -> Result<(), ValueError> {
     let (len, pool) = match elements {
         Elements::Values(kind) => value_pool_bound(forge, *kind, sink),
         Elements::Pointers(_) => value_pool_bound(forge, ValueKind::StrongPointer, sink),
         Elements::Instances(target) => {
-            if let Some(observe) = sink.predicate_observer() {
+            if let Some(mut observe) = sink.input_observer() {
                 observe(QuerySource::InstanceBlockBound { structure: *target });
             }
             let Some(&count) = forge.instance_counts.get(*target as usize) else {
@@ -136,9 +136,9 @@ fn check_range<'source>(
 fn value_pool_bound<'source>(
     forge: &DataForge<'_>,
     kind: ValueKind,
-    sink: &impl Sink<'source>,
+    sink: &mut impl Sink<'source>,
 ) -> (u64, &'static str) {
-    if let Some(observe) = sink.predicate_observer()
+    if let Some(mut observe) = sink.input_observer()
         && let Some(span) = header::value_pool_count_span(kind)
     {
         observe(QuerySource::Bytes {
@@ -174,8 +174,7 @@ fn element_of<'f>(
             if wanted.is_some_and(|wanted| !derives(forge, *target, wanted, sink)) {
                 return None;
             }
-            let instance =
-                instance_source::read(forge, *target, element, sink.predicate_observer());
+            let instance = instance_source::read(forge, *target, element, sink.input_observer());
             instance.map_or_else(
                 || {
                     Reached::Value(Value::Error(ValueError::InvalidPointer {
@@ -206,7 +205,7 @@ fn element_of<'f>(
                 if forge.instance(struct_index, instance_index).is_some()
                     && !derives(forge, struct_index, wanted, sink)
                 {
-                    if let Some(observe) = sink.predicate_observer() {
+                    if let Some(observe) = sink.input_observer() {
                         instance_source::extent(struct_index, instance_index, true, observe);
                     }
                     return None;

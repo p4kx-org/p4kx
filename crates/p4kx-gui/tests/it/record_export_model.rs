@@ -6,6 +6,9 @@
 
 use crate::exporting;
 
+#[path = "record_export_model_origins.rs"]
+mod origins;
+
 use std::fs;
 use std::time::{Duration, Instant};
 
@@ -67,9 +70,11 @@ fn the_selected_record_folder_is_exported_as_json_files() -> TestResult {
         files_below(&out)?,
         [
             "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Ballistic_S1.json.p4kx-origin.jsonl",
             "libs/foundry/records/weapons/AmmoParams.Laser_S1.json",
+            "libs/foundry/records/weapons/AmmoParams.Laser_S1.json.p4kx-origin.jsonl",
         ],
-        "one file per Record under its record path"
+        "one payload and companion per Record under its record path"
     );
     Ok(())
 }
@@ -167,7 +172,7 @@ fn a_new_folder_is_created_inside_the_chosen_folder() -> TestResult {
     let target = summary.target().ok_or("no target")?;
     let created = target.strip_prefix(&out)?.to_string_lossy().into_owned();
     assert!(created.starts_with("SC-EXPORT-"), "a new folder: {created}");
-    assert_eq!(files_below(target)?.len(), 2, "both weapons in it");
+    assert_eq!(files_below(target)?.len(), 4, "two payloads and two proofs");
     assert_eq!(model.extraction_folder(), Some(out.as_path()), "remembered");
     Ok(())
 }
@@ -261,7 +266,7 @@ fn a_second_export_reuses_the_dataforge_read_by_the_first() -> TestResult {
 
     assert!(kept, "kept after the first export");
     assert_eq!(summary.written(), 2, "both ships");
-    assert_eq!(files_below(&out)?.len(), 4, "weapons and ships");
+    assert_eq!(files_below(&out)?.len(), 8, "four payloads and four proofs");
     Ok(())
 }
 

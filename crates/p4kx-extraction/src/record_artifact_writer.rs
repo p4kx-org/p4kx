@@ -18,26 +18,29 @@ use crate::origin_file_io::{self, StageDisposition};
 use crate::output_creation::create_temporary_protected;
 use crate::output_file::StagedOutput;
 use crate::portable_name::{check_path_length, fold};
+use crate::record_format::RecordFieldReceipt;
 use crate::write::write_error;
 use crate::{
     ConflictPolicy, DataForgeEntry, ExtractionError, FileReceipt, OriginDigestWriter,
-    RecordExportError, RecordFileFormat, RecordJsonReceipt,
+    RecordExportError, RecordFileFormat,
 };
 
-type Render<F> = fn(
-    &mut F,
-    &DataForgeEntry,
-    &DataForge<'_>,
-    &PositionedRecord<'_>,
-) -> io::Result<RecordJsonReceipt>;
+type Render<'job, F> = dyn Fn(
+        &mut F,
+        &DataForgeEntry,
+        &DataForge<'_>,
+        &PositionedRecord<'_>,
+    ) -> io::Result<RecordFieldReceipt>
+    + Sync
+    + 'job;
 
 pub(super) struct Observation<'job, F> {
     input: &'job DataForgeEntry,
-    render: Render<F>,
+    render: &'job Render<'job, F>,
 }
 
 impl<'job, F> Observation<'job, F> {
-    pub(super) const fn new(input: &'job DataForgeEntry, render: Render<F>) -> Self {
+    pub(super) const fn new(input: &'job DataForgeEntry, render: &'job Render<'job, F>) -> Self {
         Self { input, render }
     }
 }
@@ -117,7 +120,7 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
         let bytes = rendered
             .receipt
             .as_ref()
-            .map_or(scratch.bytes.as_slice(), RecordJsonReceipt::bytes);
+            .map_or(scratch.bytes.as_slice(), RecordFieldReceipt::bytes);
         if crate::record_existing::keep(&destination, self.run.policy, bytes, &mut scratch.read)? {
             return Ok(rendered.kept(file));
         }
@@ -225,18 +228,20 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
         &self,
         staged: &StagedOutput<'_>,
         digest: crate::OriginArtifactDigest,
-        artifact: &RecordJsonReceipt,
+        artifact: &RecordFieldReceipt,
         companion: &Path,
         rendered: &Rendered,
         file: &str,
     ) -> Result<StageDisposition<RecordOutcome>, ExtractionError> {
         let output = staged.output();
-        let origin = FileReceipt::for_native_staged_replacement(
+        let origin = match FileReceipt::for_native_staged_replacement(
             output,
             self.run.protection,
             self.run.cancel.cloned().unwrap_or_default(),
-        )
-        .map_err(|source| write_error(output.to_path_buf(), source))?;
+        ) {
+            Ok(origin) => origin,
+            Err(source) => return self.before_commit_error(output, source),
+        };
         let publication = origin.publish_staged_with_policy(
             staged,
             digest,
@@ -248,7 +253,7 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
         let (receipt, retirement) = match publication {
             None => return Ok(StageDisposition::Cleanup(rendered.kept(file))),
             Some(StagedReceiptPublication::Uncommitted(error)) => {
-                return Err(write_error(output.to_path_buf(), error));
+                return self.before_commit_error(output, error);
             }
             Some(StagedReceiptPublication::Committed {
                 receipt,
@@ -287,7 +292,9 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
         origin_failure: Option<ExtractionError>,
     ) -> Result<StageDisposition<RecordOutcome>, ExtractionError> {
         let output = staged.output();
-        if !F::EXTENSION.eq_ignore_ascii_case(".json") {
+        if !(F::EXTENSION.eq_ignore_ascii_case(".json")
+            || F::EXTENSION.eq_ignore_ascii_case(".xml"))
+        {
             staged.check()?;
             fs::rename(staged.temporary(), output)
                 .map_err(|source| write_error(output.to_path_buf(), source))?;
@@ -295,9 +302,11 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
                 rendered.written(None, origin_failure),
             ));
         }
-        let held = OrdinaryReplacement::new(output, self.run.protection, self.run.cancel)
-            .map_err(|source| write_error(output.to_path_buf(), source))?;
-        let replaced = replace_json(&held, staged, self.run.policy);
+        let held = match OrdinaryReplacement::new(output, self.run.protection, self.run.cancel) {
+            Ok(held) => held,
+            Err(source) => return self.before_commit_error(output, source),
+        };
+        let replaced = replace_record(&held, staged, self.run.policy);
         let committed = matches!(replaced, Ok(true));
         let placed = held.finish_io(replaced);
         match placed {
@@ -307,8 +316,23 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
                 Ok(self
                     .placed(rendered.written(None, Some(write_error(output.to_path_buf(), error)))))
             }
-            Err(error) => Err(write_error(output.to_path_buf(), error)),
+            Err(error) => self.before_commit_error(output, error),
         }
+    }
+
+    fn before_commit_error(
+        &self,
+        output: &Path,
+        source: io::Error,
+    ) -> Result<StageDisposition<RecordOutcome>, ExtractionError> {
+        if self
+            .run
+            .cancel
+            .is_some_and(|cancel| FileReceipt::is_precommit_cancellation(&source, cancel))
+        {
+            return Ok(StageDisposition::Cleanup(RecordOutcome::Cancelled));
+        }
+        Err(write_error(output.to_path_buf(), source))
     }
 
     fn placed(&self, outcome: RecordOutcome) -> StageDisposition<RecordOutcome> {
@@ -320,7 +344,7 @@ impl<'job, 'source, F: RecordFileFormat> Writer<'job, 'source, F> {
     }
 }
 
-fn replace_json(
+pub(crate) fn replace_record(
     held: &OrdinaryReplacement<'_>,
     staged: &StagedOutput<'_>,
     policy: ConflictPolicy,
@@ -343,7 +367,7 @@ fn replace_json(
 
 struct Rendered {
     errors: usize,
-    receipt: Option<RecordJsonReceipt>,
+    receipt: Option<RecordFieldReceipt>,
 }
 
 impl Rendered {

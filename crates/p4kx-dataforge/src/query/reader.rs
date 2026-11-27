@@ -4,12 +4,12 @@
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use crate::query::sink::Recording;
+use crate::query::sink::{Reached, Recording};
 use crate::query::source::CellTrace;
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
 use crate::scalar::{ScalarSource, read_scalar_with};
-use crate::{DataForge, DataType, Value, ValueKind};
+use crate::{DataForge, DataType, Value, ValueError, ValueKind};
 
 /// Where a scalar lies in the bytes a path has reached, and how it is read.
 #[derive(Debug, Clone, Copy)]
@@ -153,39 +153,44 @@ impl Reader {
         place: Place<'f>,
         state: &mut WalkState,
         prefix: Option<(&Recording<'f>, usize)>,
-        trace: Option<&mut CellTrace>,
+        mut trace: Option<&mut CellTrace>,
     ) -> Value<'f> {
         let walk = match self {
             Self::Column(column) => {
-                let value = column.read(forge, place);
-                if let Some(trace) = trace {
-                    trace.value(forge, column.bytes(place), &value);
-                }
-                return value;
+                return Reached::Place(place).read_projected(forge, column, trace);
             }
             Self::Walk(walk) => walk,
         };
-        let drive = |state: &mut WalkState, emit: &mut dyn FnMut(Value<'f>) -> ControlFlow<()>| {
-            match prefix {
-                Some((recording, steps)) => {
-                    walk.replay(forge, recording, steps, state, emit, trace)
+        let mut drive =
+            |state: &mut WalkState, emit: &mut dyn FnMut(Value<'f>) -> ControlFlow<()>| {
+                let trace = trace.as_deref_mut();
+                match prefix {
+                    Some((recording, steps)) => {
+                        walk.replay(forge, recording, steps, state, emit, trace)
+                    }
+                    None => walk.visit(forge, place, state, emit, trace),
                 }
-                None => walk.visit(forge, place, state, emit, trace),
-            }
-        };
-        if !walk.multi {
+            };
+        let value = if walk.multi {
+            let mut values = Vec::new();
+            let reached = drive(state, &mut |value| {
+                values.push(value);
+                ControlFlow::Continue(())
+            });
+            reached.map_or_else(Value::Error, |()| Value::Array(values.into_boxed_slice()))
+        } else {
             let mut single = Value::Null;
             let reached = drive(state, &mut |value| {
                 single = value;
                 ControlFlow::Break(())
             });
-            return reached.map_or_else(Value::Error, |()| single);
+            reached.map_or_else(Value::Error, |()| single)
+        };
+        if let Some(trace) = trace
+            && let Value::Error(ValueError::PathTooWide { limit }) = &value
+        {
+            trace.row_budget_exhausted(*limit);
         }
-        let mut values = Vec::new();
-        let reached = drive(state, &mut |value| {
-            values.push(value);
-            ControlFlow::Continue(())
-        });
-        reached.map_or_else(Value::Error, |()| Value::Array(values.into_boxed_slice()))
+        value
     }
 }

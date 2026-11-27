@@ -12,10 +12,10 @@ use std::time::SystemTime;
 
 use p4kx_export::{
     CancelToken, ConflictPolicy, RecordExportOptions, RecordForm,
-    write_planned_record_export_with_receipt,
+    write_planned_record_export_with_origins,
 };
 use p4kx_extraction::{
-    ArchiveWriteProtection, DataForge, Filter, Record, TagResolver, TagTree,
+    ArchiveWriteProtection, DataForge, Filter, ObservedTagTree, Record, RecordExportSources,
     create_default_target_protected,
 };
 use rayon::prelude::*;
@@ -64,7 +64,7 @@ type RunResult = Result<RecordExportSummary, String>;
 #[derive(Debug)]
 enum State {
     Running(Receiver<RunResult>),
-    Finished(RecordExportSummary),
+    Finished(Box<RecordExportSummary>),
     Failed(Option<String>),
 }
 
@@ -150,14 +150,16 @@ impl RecordExport {
         if !matches!(self.state, State::Running(_)) || !self.shared.give_up() {
             return false;
         }
-        self.state = State::Finished(RecordExportSummary::nothing_written(self.form, 0, true));
+        self.state = State::Finished(Box::new(RecordExportSummary::nothing_written(
+            self.form, 0, true,
+        )));
         true
     }
 }
 
 fn ended(outcome: Option<RunResult>) -> State {
     match outcome {
-        Some(Ok(summary)) => State::Finished(summary),
+        Some(Ok(summary)) => State::Finished(Box::new(summary)),
         Some(Err(reason)) => State::Failed(Some(reason)),
         None => State::Failed(None),
     }
@@ -232,7 +234,7 @@ impl Job<'_> {
         let records = select(&all, &self.request.selection);
         let stop = || self.cancel.is_cancelled();
         let tags = (self.request.tags && !records.is_empty())
-            .then(|| source.tags(&stop))
+            .then(|| source.observed_tags(&stop))
             .transpose()
             .map_err(ReadFailure::into_reason)?;
         let stopped = matches!(tags, Some(None));
@@ -273,7 +275,7 @@ impl Job<'_> {
         records: &[Record<'_>],
         target: PathBuf,
         protection: &ArchiveWriteProtection,
-        tags: Option<&TagTree>,
+        tags: Option<&ObservedTagTree>,
     ) -> RecordExportSummary {
         self.shared.total.store(records.len(), Ordering::Relaxed);
         self.shared.enter(RecordExportStage::Writing);
@@ -287,10 +289,11 @@ impl Job<'_> {
             cancel: Some(self.cancel),
             progress: Some(&progress),
             texts: None,
-            tags: tags.map(|tags| tags as &dyn TagResolver),
+            tags: None,
             protection: Some(protection),
         };
-        let summary = write_planned_record_export_with_receipt(
+        let summary = write_planned_record_export_with_origins(
+            RecordExportSources::new(source.entry.as_ref(), None, tags),
             forge,
             &source.plans,
             records,

@@ -6,10 +6,12 @@ use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, OnceLock};
 use std::thread;
 
-use p4kx_extraction::{DataForge, Guid, LanguageTexts, TagResolver, TextResolver, TreeBuilder};
+use p4kx_extraction::{
+    DataForge, Guid, LanguageTexts, ObservedTagTree, TagResolver, TextResolver, TreeBuilder,
+};
 
 use super::{RecordPreviewProvenance, RecordView, lines};
-use crate::forge_cache::{ForgeSource, ObservedTagTree, ReadFailure};
+use crate::forge_cache::{ForgeSource, ReadFailure};
 use crate::model::describe;
 use crate::text_cache::TextFailure;
 use crate::{EntryIndex, RecordId, TextLanguage};
@@ -160,7 +162,7 @@ impl<'a> SourceTags<'a> {
 
 impl TagResolver for SourceTags<'_> {
     fn tag_path(&self, guid: Guid) -> Option<&str> {
-        self.tree()?.tree.tag_path(guid)
+        self.tree()?.tag_path(guid)
     }
 }
 

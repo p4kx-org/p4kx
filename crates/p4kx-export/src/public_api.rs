@@ -55,8 +55,10 @@ pub use crate::options::{CatalogOptions, CatalogOutputOptions, CatalogPhase, Cat
 pub use crate::playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use crate::quantization_summary::QuantizationSummary;
 pub use crate::record_export::{
-    RecordFilePlans, write_planned_record_export, write_planned_record_export_with_receipt,
-    write_record_export,
+    RecordFilePlans, write_annotated_ndjson_with_origins, write_ndjson_with_origins,
+    write_planned_record_export, write_planned_record_export_with_origins,
+    write_planned_record_export_with_receipt, write_record_export,
+    write_record_stream_with_origins,
 };
 pub use crate::record_summary::{RecordExportReceipt, RecordExportSummary};
 pub use crate::reduced_basetool::{

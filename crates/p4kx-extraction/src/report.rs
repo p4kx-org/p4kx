@@ -357,12 +357,12 @@ impl ExtractionReport {
         self.records.as_ref()
     }
 
-    /// Returns whether no Entry or Record failed, every texture was converted, the run was not
-    /// cancelled and the Archive did not change.
+    /// Returns whether Entries, Records and their companions completed without cancellation or
+    /// an Archive change.
     #[must_use]
     pub const fn is_complete(&self) -> bool {
         let records = match &self.records {
-            Some(records) => records.is_complete(),
+            Some(records) => records.is_complete() && records.origin_failures.is_empty(),
             None => true,
         };
         records

@@ -15,6 +15,11 @@ use p4kx_testkit::{
 type TestResult = Result<(), Box<dyn Error>>;
 
 const README_RECEIPT: &str = "Data/readme.txt.p4kx-origin.jsonl";
+const RECORD_RECEIPTS: [&str; 3] = [
+    "Data/libs/foundry/records/anchors/anchor.xml.p4kx-origin.jsonl",
+    "Data/libs/foundry/records/items/boxes/Item.Box.xml.p4kx-origin.jsonl",
+    "Data/libs/foundry/records/items/boxes/Item.Crate.xml.p4kx-origin.jsonl",
+];
 
 fn database() -> Vec<u8> {
     DataForgeBuilder::new()
@@ -90,7 +95,10 @@ fn extract(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn 
 
 /// Returns the payload files with their content, in path order.
 fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
-    let checked_companion = root.join(README_RECEIPT);
+    let checked_companions: Vec<_> = std::iter::once(README_RECEIPT)
+        .chain(RECORD_RECEIPTS)
+        .map(|relative| root.join(relative))
+        .collect();
     let mut files = Vec::new();
     let mut folders = vec![root.to_path_buf()];
     while let Some(folder) = folders.pop() {
@@ -98,7 +106,7 @@ fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
             let path = entry?.path();
             if path.is_dir() {
                 folders.push(path);
-            } else if path != checked_companion {
+            } else if !checked_companions.contains(&path) {
                 files.push(path);
             }
         }
@@ -122,6 +130,16 @@ fn convert_writes_the_dataforge_entry_as_record_files() -> TestResult {
     let stdout = extract(&archive, &out, &["--convert"])?;
 
     check_readme_receipt(&out)?;
+    for relative in RECORD_RECEIPTS {
+        let document = fs::read_to_string(out.join(relative))?;
+        let end: serde_json::Value =
+            serde_json::from_str(document.lines().last().ok_or("receipt end")?)?;
+        assert_eq!(
+            end.get("type"),
+            Some(&serde_json::json!("end")),
+            "complete Record receipt {relative}"
+        );
+    }
     insta::assert_snapshot!("convert_dataforge_files", tree(&out)?);
     insta::assert_snapshot!("convert_dataforge_stdout", stdout);
     Ok(())
@@ -176,6 +194,11 @@ fn convert_reports_the_records_as_json() -> TestResult {
     let stdout = extract(&archive, &dir.path().join("out"), &["--convert", "--json"])?;
 
     let value: serde_json::Value = serde_json::from_str(&stdout)?;
+    assert_eq!(
+        value.pointer("/records/origin_receipts"),
+        Some(&serde_json::json!(RECORD_RECEIPTS)),
+        "the summary enumerates the committed Record companions"
+    );
     insta::assert_snapshot!(
         "convert_dataforge_json",
         serde_json::to_string_pretty(&value)?

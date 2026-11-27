@@ -55,8 +55,8 @@ impl<'a> From<&'a RecordExportSummary> for Outcome<'a> {
             error_values: summary.error_values(),
             records_with_errors: summary.records_with_errors(),
             error: summary.error().map(|error| error as &dyn Error),
-            origin_receipts: &[],
-            origin_failures: &[],
+            origin_receipts: summary.origin_receipts(),
+            origin_failures: summary.origin_failures(),
         }
     }
 }

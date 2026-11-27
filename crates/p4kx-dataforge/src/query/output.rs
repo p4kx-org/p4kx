@@ -4,6 +4,7 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::{self, Write};
+use std::ops::Range;
 
 use crate::Value;
 use crate::flat_cells::{self, CSV_BYTE_ORDER_MARK, CsvCellMode};
@@ -103,10 +104,39 @@ impl<W: Write> ResultWriter<W> {
     /// Returns an I/O error or [`io::ErrorKind::InvalidData`] for unsupported strict CSV data.
     pub fn write_row(&mut self, record_path: &str, cells: &[Option<Value<'_>>]) -> io::Result<()> {
         if let Some(mode) = self.format.csv_mode() {
-            self.csv_row(record_path, cells, mode)?;
+            self.csv_row(record_path, cells, mode, |_, _| {})?;
         } else {
             self.json_row(record_path, cells)?;
         }
+        self.rows = self.rows.saturating_add(1);
+        Ok(())
+    }
+
+    /// Writes a CSV row and reports the exact byte interval for each field in column order.
+    ///
+    /// # Errors
+    /// Returns a write error or invalid data when the selected format is not CSV.
+    pub fn write_csv_row_observed(
+        &mut self,
+        record_path: &str,
+        cells: &[Option<Value<'_>>],
+        position: impl Fn(&W) -> u64,
+        mut field: impl FnMut(Range<u64>),
+    ) -> io::Result<()> {
+        let mode = self.format.csv_mode().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "observed CSV row requires CSV format",
+            )
+        })?;
+        let mut start = position(&self.out);
+        self.csv_row(record_path, cells, mode, |start_of_field, writer| {
+            if start_of_field {
+                start = position(writer);
+            } else {
+                field(start..position(writer));
+            }
+        })?;
         self.rows = self.rows.saturating_add(1);
         Ok(())
     }
@@ -149,10 +179,14 @@ impl<W: Write> ResultWriter<W> {
         record_path: &str,
         cells: &[Option<Value<'_>>],
         mode: CsvCellMode,
+        mut boundary: impl FnMut(bool, &W),
     ) -> io::Result<()> {
+        boundary(true, &self.out);
         flat_cells::write_csv_cell_with_mode(&mut self.out, record_path, mode)?;
+        boundary(false, &self.out);
         for index in 0..self.columns {
             self.out.write_all(b",")?;
+            boundary(true, &self.out);
             if let Some(Some(value)) = cells.get(index) {
                 let mut text = std::mem::take(&mut self.text);
                 text.clear();
@@ -181,6 +215,7 @@ impl<W: Write> ResultWriter<W> {
             } else {
                 flat_cells::write_csv_cell_with_mode(&mut self.out, "", mode)?;
             }
+            boundary(false, &self.out);
         }
         self.out.write_all(b"\r\n")
     }

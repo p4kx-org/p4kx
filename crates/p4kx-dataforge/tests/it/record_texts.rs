@@ -8,8 +8,9 @@ use std::error::Error;
 use std::io;
 
 use p4kx_dataforge::{
-    Annotations, DataForge, Guid, JsonLayout, RecordJson, RecordJsonObserver, RecordJsonSource,
-    RecordJsonUse, RecordXml, Resolution, TagResolver, TextResolver, TreeBuilder,
+    Annotations, DataForge, Guid, JsonLayout, LocalizationInput, ObservedResolution, RecordJson,
+    RecordJsonObserver, RecordJsonSource, RecordJsonUse, RecordXml, Resolution, TagResolver,
+    TextResolver, TreeBuilder,
 };
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
@@ -163,6 +164,7 @@ fn the_same_texts_give_byte_identical_output() -> TestResult {
 struct Observations {
     keys: Vec<String>,
     selected: Vec<(String, String)>,
+    inputs: Vec<(String, Option<String>)>,
     tags: Vec<(String, Guid, String)>,
 }
 
@@ -190,6 +192,22 @@ impl RecordJsonObserver for Observations {
             "authored Locale selection at {pointer}"
         );
         self.selected.push((pointer.to_owned(), key.to_owned()));
+        Ok(())
+    }
+
+    fn localization_observed(
+        &mut self,
+        pointer: &str,
+        key: &str,
+        observed: &ObservedResolution<'_>,
+        selectors: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.localization(pointer, key, observed.resolution(), selectors, complete)?;
+        if let LocalizationInput::Lookup(original) = observed.input() {
+            self.inputs
+                .push((pointer.to_owned(), original.map(str::to_owned)));
+        }
         Ok(())
     }
 
@@ -254,6 +272,58 @@ fn observed_json_identifies_the_emitted_localization_members() -> TestResult {
             "stored key {key}"
         );
     }
+    Ok(())
+}
+
+static STATIC_TEXTS: Texts = Texts;
+
+struct ObservedTexts;
+
+impl TextResolver for ObservedTexts {
+    fn resolve<'a>(&'a self, key: &str) -> Resolution<'a> {
+        STATIC_TEXTS.resolve(key)
+    }
+
+    fn resolve_observed<'a>(&'a self, key: &str) -> ObservedResolution<'a> {
+        let resolution = self.resolve(key);
+        let original = match key {
+            "@item_Name" => Some("Crate & \"Co\""),
+            "@item_Desc" => Some("Line one\\nLine two"),
+            _ => None,
+        };
+        ObservedResolution::from_lookup(resolution, original)
+    }
+}
+
+#[test]
+fn json_annotations_carry_the_original_lookup_at_their_output_pointer() -> TestResult {
+    let ordinary = observed(&builder(), Annotations::none().with_texts(Some(&Texts)))?;
+    let retained = observed(
+        &builder(),
+        Annotations::none().with_texts(Some(&ObservedTexts)),
+    )?;
+    assert!(
+        ordinary.inputs.is_empty(),
+        "a generic resolver carries no lookup"
+    );
+    assert_eq!(
+        retained.selected, ordinary.selected,
+        "observed lookup retains the rendered annotations"
+    );
+    assert_eq!(retained.inputs.len(), 5, "only the rendered annotations");
+    assert!(
+        retained.inputs.contains(&(
+            "/path/text".to_owned(),
+            Some("Line one\\nLine two".to_owned())
+        )),
+        "the escaped source and the output address are distinct"
+    );
+    assert!(
+        retained
+            .inputs
+            .contains(&("/lines/1/missing".to_owned(), None)),
+        "the missing array element retains its lookup"
+    );
     Ok(())
 }
 

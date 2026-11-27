@@ -102,7 +102,10 @@ pub use fields::{
     FieldStatisticsScalarRead, FieldStatisticsSlot, FieldStatisticsSourceScope, FieldStatisticsUse,
     FieldStatisticsValue, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, Number,
 };
-pub use flat::{FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatFormat, FlatValues};
+pub use flat::{
+    FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatColumn, FlatColumnSpan, FlatFormat,
+    FlatRowObservation, FlatValues,
+};
 pub use flat_cells::{CSV_BYTE_ORDER_MARK, CsvCellMode, write_csv_cell, write_csv_cell_with_mode};
 pub use guid::{Guid, InvalidGuid};
 pub use header::{DataForgeHeaderField, SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
@@ -143,12 +146,12 @@ pub use tags::{
     TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, Tag, TagBuildEvent, TagPath, TagPathEdgeKind,
     TagPathIncoming, TagRelationIssue, TagTree, TagTreeIssues,
 };
-pub use texts::{Resolution, TextResolver};
+pub use texts::{LocalizationInput, ObservedResolution, Resolution, TextResolver};
 pub use tree::RecordTree;
 pub use tree_cursor::ValueVisit;
 pub use value::{Field, Value};
 pub use value_error::ValueError;
 pub use xml::{
-    RECORD_XML_NAMESPACE, RecordXml, RecordXmlHeaderMember, RecordXmlSite, RecordXmlSpan,
-    RecordXmlValueMember,
+    RECORD_XML_NAMESPACE, RecordXml, RecordXmlHeaderMember, RecordXmlObserver, RecordXmlSite,
+    RecordXmlSpan, RecordXmlToken, RecordXmlValueMember,
 };

@@ -1,26 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File};
-use std::io::{self, BufWriter, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
-use p4kx_dataforge::{
-    Annotations, DataForge, RECORD_XML_NAMESPACE, Record, RecordXml, TreeBuilder,
-};
+use p4kx_dataforge::{DataForge, Record};
 use rayon::prelude::*;
 
-use crate::counting::{Counting, holds};
+use crate::counting::holds;
 use crate::output_creation::create_temporary_protected;
+use crate::output_file::StagedOutput;
+use crate::record_format::xml_receipt::XmlAnnotationSources;
 use crate::write::{read_existing_error, write_error};
 use crate::{
-    CancelToken, ConflictPolicy, ExtractionError, RecordExportError, RecordExportOptions,
-    RecordExportReport, RecordFailure,
+    ConflictPolicy, DataForgeEntry, DataForgeOrigin, ExtractionError, ObservedTagTree,
+    RecordExportError, RecordExportOptions, RecordExportReport, RecordFailure, RecordLocalization,
+    SourceEvidenceError,
 };
 
-const BATCH_LEN: usize = 1024;
-const WRITE_BUFFER_LEN: usize = 256 << 10;
-const HEAD: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<p4kx:records xmlns:p4kx=\"";
+#[path = "record_combined_document.rs"]
+mod document;
+#[path = "record_combined_origin.rs"]
+mod origin;
+
+use document::Document;
 
 /// Writes `records` of `forge` as one Record XML document, the file `file`, in record-path order.
 ///
@@ -46,9 +50,130 @@ pub fn export_combined(
     file: &Path,
     options: &RecordExportOptions<'_>,
 ) -> Result<RecordExportReport, ExtractionError> {
+    export(
+        forge,
+        records,
+        file,
+        options,
+        None,
+        XmlAnnotationSources::default(),
+    )
+}
+
+/// Writes combined Record XML and publishes a companion with original field origins.
+/// Annotations require a separate source binding and use ordinary publication.
+///
+/// # Errors
+/// Returns an output error or an error when `forge` is not opened over `input`.
+pub fn export_combined_with_origins(
+    input: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+) -> Result<RecordExportReport, ExtractionError> {
+    let original = if options.annotations().is_active() {
+        None
+    } else {
+        Some(original_of(input, forge, file)?)
+    };
+    export(
+        forge,
+        records,
+        file,
+        options,
+        original,
+        XmlAnnotationSources::default(),
+    )
+}
+
+/// Writes localized combined Record XML and its field-origin companion.
+///
+/// # Errors
+/// Returns an output error for foreign input or independently supplied annotations.
+pub fn export_localized_combined(
+    input: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+    localization: &RecordLocalization<'_>,
+) -> Result<RecordExportReport, ExtractionError> {
+    export_annotated_combined(
+        input,
+        forge,
+        records,
+        file,
+        options,
+        Some(localization),
+        None,
+    )
+}
+
+/// Writes combined Record XML with observed annotations and its field-origin companion.
+///
+/// # Errors
+/// Returns an output error for foreign input or independently supplied annotations.
+pub fn export_annotated_combined(
+    input: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+    localization: Option<&RecordLocalization<'_>>,
+    tags: Option<&ObservedTagTree>,
+) -> Result<RecordExportReport, ExtractionError> {
+    if options.annotations().is_active() {
+        return Err(write_error(
+            file.to_path_buf(),
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Record annotation sources were not supplied",
+            ),
+        ));
+    }
+    let original = original_of(input, forge, file)?;
+    let sources = XmlAnnotationSources { localization, tags };
+    sources
+        .validate(forge)
+        .map_err(|source| write_error(file.to_path_buf(), source))?;
+    export(forge, records, file, options, Some(original), sources)
+}
+
+fn original_of<'input>(
+    input: &'input DataForgeEntry,
+    forge: &DataForge<'_>,
+    file: &Path,
+) -> Result<&'input DataForgeOrigin, ExtractionError> {
+    input.origin_of(forge).ok_or_else(|| {
+        write_error(
+            file.to_path_buf(),
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                SourceEvidenceError::ForeignEvidence,
+            ),
+        )
+    })
+}
+
+fn export(
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+    original: Option<&DataForgeOrigin>,
+    sources: XmlAnnotationSources<'_, '_>,
+) -> Result<RecordExportReport, ExtractionError> {
     let mut report = RecordExportReport::default();
     let mut selected = records.len();
-    match write_combined(forge, records, file, options, &mut report, &mut selected) {
+    match (Job {
+        forge,
+        file,
+        options,
+        original,
+    })
+    .write(records, sources, &mut report, &mut selected)
+    {
         Ok(()) => Ok(report),
         Err(error) if crate::guard_cancellation::extraction_cancelled(&error) => {
             Ok(RecordExportReport {
@@ -61,70 +186,86 @@ pub fn export_combined(
     }
 }
 
-fn write_combined(
-    forge: &DataForge<'_>,
-    records: &[Record<'_>],
-    file: &Path,
-    options: &RecordExportOptions<'_>,
-    report: &mut RecordExportReport,
-    selected: &mut usize,
-) -> Result<(), ExtractionError> {
-    crate::check_protected_output(file, options.protection, options.cancel)?;
-    let name = file
-        .file_name()
-        .ok_or_else(|| write_error(file.to_path_buf(), io::ErrorKind::InvalidInput.into()))?
-        .to_string_lossy()
-        .into_owned();
-    let existing = existing_file(file)?;
-    if existing && options.policy == ConflictPolicy::Skip {
-        report.skipped.push(name);
-        return Ok(());
-    }
-    let order = order(forge, records, report);
-    let foreign = report.failures.len();
-    *selected = order.len().saturating_add(foreign);
-    let folder = match file.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
-        _ => PathBuf::from("."),
-    };
-    let (temporary, part, ownership) =
-        create_temporary_protected(&folder, options.protection, options.cancel)?;
-    let streamed = Document::new(part, file)
-        .and_then(|document| document.stream(records, &order, options, report));
-    let placed = streamed.and_then(|streamed| {
-        let Some((len, crc)) = streamed else {
-            let failed = report.failures.len().saturating_sub(foreign);
-            *report = RecordExportReport {
-                cancelled: order.len().saturating_sub(failed),
-                failures: report.failures.split_off(0),
-                ..RecordExportReport::default()
-            };
-            return Ok(false);
-        };
-        if existing
-            && options.policy == ConflictPolicy::IfChanged
-            && holds(file, len, crc, &mut Vec::new())
-                .map_err(|source| read_existing_error(file, source))?
-        {
-            report.skipped.push(name);
-            report.written = 0;
-            return Ok(false);
-        }
+struct Job<'a, 'source> {
+    forge: &'a DataForge<'source>,
+    file: &'a Path,
+    options: &'a RecordExportOptions<'a>,
+    original: Option<&'a DataForgeOrigin>,
+}
+
+impl Job<'_, '_> {
+    fn write(
+        &self,
+        records: &[Record<'_>],
+        sources: XmlAnnotationSources<'_, '_>,
+        report: &mut RecordExportReport,
+        selected: &mut usize,
+    ) -> Result<(), ExtractionError> {
+        let (file, options) = (self.file, self.options);
         crate::check_protected_output(file, options.protection, options.cancel)?;
-        ownership.ensure_writable(&temporary, crate::output_file::cancel_flag(options.cancel))?;
-        fs::rename(&temporary, file)
-            .map(|()| true)
-            .map_err(|source| write_error(file.to_path_buf(), source))
-    });
-    if !matches!(placed, Ok(true)) {
-        return crate::output_cleanup::extraction(
-            placed.map(|_| ()),
-            &ownership,
+        let name = file
+            .file_name()
+            .ok_or_else(|| write_error(file.to_path_buf(), io::ErrorKind::InvalidInput.into()))?
+            .to_string_lossy()
+            .into_owned();
+        let existing = existing_file(file)?;
+        if existing && options.policy == ConflictPolicy::Skip {
+            report.skipped.push(name);
+            return Ok(());
+        }
+        let order = order(self.forge, records, report);
+        let foreign = report.failures.len();
+        *selected = order.len().saturating_add(foreign);
+        let folder = match file.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+            _ => PathBuf::from("."),
+        };
+        let (temporary, part, ownership) =
+            create_temporary_protected(&folder, options.protection, options.cancel)?;
+        let streamed = Document::new(part, file, self.original).and_then(|document| {
+            document.stream(self.forge, records, &order, options, sources, report)
+        });
+        let staged = StagedOutput::new(
             &temporary,
+            file,
+            &ownership,
+            options.protection,
             options.cancel,
         );
+        let placed = streamed.and_then(|streamed| {
+            let Some(streamed) = streamed else {
+                cancel_report(report, order.len(), foreign);
+                return Ok(false);
+            };
+            if existing
+                && options.policy == ConflictPolicy::IfChanged
+                && holds(file, streamed.len, streamed.crc, &mut Vec::new())
+                    .map_err(|source| read_existing_error(file, source))?
+            {
+                origin::kept(name, report);
+                return Ok(false);
+            }
+            origin::place(&staged, streamed.origin, options, report, name)
+        });
+        if !matches!(placed, Ok(true)) {
+            return crate::output_cleanup::extraction(
+                placed.map(|_| ()),
+                &ownership,
+                &temporary,
+                options.cancel,
+            );
+        }
+        placed.map(|_| ())
     }
-    placed.map(|_| ())
+}
+
+fn cancel_report(report: &mut RecordExportReport, selected: usize, foreign: usize) {
+    let failed = report.failures.len().saturating_sub(foreign);
+    *report = RecordExportReport {
+        cancelled: selected.saturating_sub(failed),
+        failures: std::mem::take(&mut report.failures),
+        ..RecordExportReport::default()
+    };
 }
 
 /// Returns whether a file is at `file`; a folder or link there is an error.
@@ -183,155 +324,5 @@ fn failure(record: &Record<'_>, error: RecordExportError) -> RecordFailure {
         guid: record.guid(),
         record_path: record.record_path().unwrap_or_default().to_owned(),
         error,
-    }
-}
-
-/// How one Record of a batch was built.
-enum Built {
-    Xml { bytes: Vec<u8>, error_values: usize },
-    Failed(RecordFailure),
-    Cancelled,
-}
-
-#[derive(Default)]
-struct Scratch<'f> {
-    trees: TreeBuilder<'f>,
-    xml: RecordXml,
-}
-
-fn build<'f>(
-    record: &Record<'f>,
-    scratch: &mut Scratch<'f>,
-    cancel: Option<&CancelToken>,
-    annotations: Annotations<'_>,
-    file: &Path,
-) -> Built {
-    if cancel.is_some_and(CancelToken::is_cancelled) {
-        return Built::Cancelled;
-    }
-    let tree = match scratch.trees.build(record) {
-        Ok(tree) => tree,
-        Err(error) => return Built::Failed(failure(record, error.into())),
-    };
-    let mut bytes = Vec::new();
-    match scratch
-        .xml
-        .write_wrapped_element_annotated(&tree, annotations, 1, &mut bytes)
-    {
-        Ok(()) => Built::Xml {
-            bytes,
-            error_values: tree.error_count(),
-        },
-        Err(source) => Built::Failed(failure(
-            record,
-            write_error(file.to_path_buf(), source).into(),
-        )),
-    }
-}
-
-/// The combined document while it is written: the temporary file, with the size and CRC-32C of
-/// what it holds.
-struct Document<'p> {
-    out: Counting<BufWriter<File>>,
-    file: &'p Path,
-    has_records: bool,
-}
-
-impl<'p> Document<'p> {
-    fn new(part: File, file: &'p Path) -> Result<Self, ExtractionError> {
-        let mut document = Self {
-            out: Counting::new(BufWriter::with_capacity(WRITE_BUFFER_LEN, part)),
-            file,
-            has_records: false,
-        };
-        document.put(HEAD)?;
-        document.put(RECORD_XML_NAMESPACE.as_bytes())?;
-        document.put(b"\"")?;
-        Ok(document)
-    }
-
-    /// Writes the Records at `order` batch by batch, building the next batch while the last one
-    /// is written; returns the finished document, or `None` once cancelled.
-    fn stream(
-        mut self,
-        records: &[Record<'_>],
-        order: &[usize],
-        options: &RecordExportOptions<'_>,
-        report: &mut RecordExportReport,
-    ) -> Result<Option<(u64, u32)>, ExtractionError> {
-        let file = self.file;
-        let (cancel, progress, annotations) =
-            (options.cancel, options.progress, options.annotations());
-        let mut pending = Vec::new();
-        for batch in order.chunks(BATCH_LEN) {
-            let (written, next) = rayon::join(
-                || self.put_batch(std::mem::take(&mut pending), report),
-                || {
-                    batch
-                        .par_iter()
-                        .filter_map(|position| records.get(*position))
-                        .map_init(Scratch::default, |scratch, record| {
-                            let built = build(record, scratch, cancel, annotations, file);
-                            if let Some(progress) = progress {
-                                progress();
-                            }
-                            built
-                        })
-                        .collect::<Vec<_>>()
-                },
-            );
-            if !written? {
-                return Ok(None);
-            }
-            pending = next;
-        }
-        if !self.put_batch(pending, report)? {
-            return Ok(None);
-        }
-        self.put(if self.has_records {
-            b"</p4kx:records>\n".as_slice()
-        } else {
-            b"/>\n".as_slice()
-        })?;
-        self.out
-            .flush()
-            .map_err(|source| write_error(self.file.to_path_buf(), source))?;
-        Ok(Some((self.out.len(), self.out.crc())))
-    }
-
-    /// Writes one built batch; returns `false` when a Record of it was cancelled.
-    fn put_batch(
-        &mut self,
-        batch: Vec<Built>,
-        report: &mut RecordExportReport,
-    ) -> Result<bool, ExtractionError> {
-        for built in batch {
-            match built {
-                Built::Xml {
-                    bytes,
-                    error_values,
-                } => {
-                    if !self.has_records {
-                        self.has_records = true;
-                        self.put(b">\n")?;
-                    }
-                    self.put(&bytes)?;
-                    report.written = report.written.saturating_add(1);
-                    report.error_values = report.error_values.saturating_add(error_values);
-                    report.records_with_errors = report
-                        .records_with_errors
-                        .saturating_add(usize::from(error_values > 0));
-                }
-                Built::Failed(failure) => report.failures.push(failure),
-                Built::Cancelled => return Ok(false),
-            }
-        }
-        Ok(true)
-    }
-
-    fn put(&mut self, bytes: &[u8]) -> Result<(), ExtractionError> {
-        self.out
-            .write_all(bytes)
-            .map_err(|source| write_error(self.file.to_path_buf(), source))
     }
 }

@@ -87,8 +87,8 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
         }
     }
 
-    fn predicate_observer(&self) -> Option<&(dyn Fn(QuerySource) + Sync)> {
-        self.control.predicate_observer()
+    fn observes_input_details(&self) -> bool {
+        self.control.predicate_observer().is_some()
     }
 
     fn unresolved(&mut self, _link: &'f [u8]) {}

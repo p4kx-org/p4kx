@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Result, ensure};
 use p4kx_extraction::{
@@ -14,7 +15,7 @@ use p4kx_extraction::{
 pub(crate) struct ForgeInput {
     path: PathBuf,
     archive: Option<Archive>,
-    entry: DataForgeEntry,
+    entry: Arc<DataForgeEntry>,
 }
 
 impl ForgeInput {
@@ -38,7 +39,7 @@ impl ForgeInput {
         Ok(Self {
             path: path.to_path_buf(),
             archive,
-            entry,
+            entry: Arc::new(entry),
         })
     }
 
@@ -53,8 +54,13 @@ impl ForgeInput {
     }
 
     /// Returns the DataForge that was read.
-    pub(crate) const fn entry(&self) -> &DataForgeEntry {
+    pub(crate) fn entry(&self) -> &DataForgeEntry {
         &self.entry
+    }
+
+    /// Shares the exact DataForge input with its observed tag tree.
+    pub(crate) fn shared_entry(&self) -> Arc<DataForgeEntry> {
+        Arc::clone(&self.entry)
     }
 
     /// Returns the physical input that supplied the admitted DataForge bytes.

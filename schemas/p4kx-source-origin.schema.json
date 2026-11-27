@@ -399,6 +399,30 @@
         },
         {
           "additionalProperties": false,
+          "description": "A typed field in one emitted NDJSON line.",
+          "properties": {
+            "line": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Zero-based line in the artifact."
+            },
+            "path": {
+              "$ref": "#/$defs/FieldPath",
+              "description": "JSON Pointer relative to that line's JSON value."
+            },
+            "type": {
+              "const": "ndjsonField",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A field within the GLB JSON chunk.",
           "properties": {
             "path": {

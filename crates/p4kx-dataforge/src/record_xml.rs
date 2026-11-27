@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 
 use super::observation::{Output, RecordXmlSpan};
-use super::tasks::{Fields, Head, Task};
+use super::tasks::{Fields, Head, Items, Structure, Task};
 use super::{classification, sink};
 use crate::{Annotations, Field, RecordTree, Value};
 
@@ -72,7 +72,7 @@ impl RecordXml {
         self.write_document(tree, annotations, &mut out)
     }
 
-    fn write_document<'tree, 'source>(
+    pub(super) fn write_document<'tree, 'source>(
         &mut self,
         tree: &'tree RecordTree<'source>,
         annotations: Annotations<'_>,
@@ -147,7 +147,7 @@ impl RecordXml {
         self.write_record(&mut out, tree, annotations, depth, false)
     }
 
-    fn write_record<'tree, 'source>(
+    pub(super) fn write_record<'tree, 'source>(
         &mut self,
         out: &mut Output<'_, 'tree, 'source, impl Write>,
         tree: &'tree RecordTree<'source>,
@@ -156,11 +156,13 @@ impl RecordXml {
         namespace: bool,
     ) -> io::Result<()> {
         self.attribute.clear();
-        let mut pending = vec![Task::Structure {
+        let mut pending = vec![Task::Structure(Structure {
             head: Head::Record(tree, namespace),
             fields: tree.fields(),
+            positions: out.root_fields()?,
+            container: None,
             depth,
-        }];
+        })];
         while let Some(task) = pending.pop() {
             self.step(out, task, annotations, &mut pending)?;
         }
@@ -175,22 +177,23 @@ impl RecordXml {
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
         match task {
-            Task::Structure {
-                head,
-                fields,
-                depth,
-            } => {
-                self.structure(out, head, fields, depth, annotations, pending)?;
-            }
+            Task::Structure(structure) => out.at(structure.container, |out| {
+                self.structure(out, structure, annotations, pending)
+            })?,
             Task::Fields(fields) => self.fields(out, fields, pending)?,
-            Task::Child(field, depth) => Self::child(out, field, depth, annotations, pending)?,
-            Task::Value(value, depth) => Self::value(out, value, depth, annotations, pending)?,
+            Task::Child(field, position, depth) => out.at(position, |out| {
+                Self::child(out, field, depth, annotations, pending)
+            })?,
+            Task::Value(value, position, depth) => out.at(position, |out| {
+                Self::value(out, value, depth, annotations, pending)
+            })?,
             Task::Items(mut items, depth) => {
-                if let Some(item) = items.next() {
+                if let Some((item, position)) = items.next() {
                     pending.push(Task::Items(items, depth));
-                    pending.push(Task::Value(item, depth));
+                    pending.push(Task::Value(item, position, depth));
                 }
             }
+            Task::LeaveContainer => out.leave(),
             Task::CloseField { name, depth } => sink::close(out, name, depth)?,
         }
         Ok(())
@@ -199,19 +202,41 @@ impl RecordXml {
     fn structure<'tree, 'source>(
         &mut self,
         out: &mut Output<'_, 'tree, 'source, impl Write>,
-        head: Head<'tree, 'source>,
-        fields: &'tree [Field<'source>],
-        depth: usize,
+        structure: Structure<'tree, 'source>,
         annotations: Annotations<'_>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
+        let Structure {
+            head,
+            fields,
+            positions,
+            depth,
+            ..
+        } = structure;
         let base = self.attribute.len();
         classification::classify(fields, &mut self.attribute, &mut self.order);
         let flags = self.attribute.get(base..).unwrap_or_default();
-        if let Some(name) = sink::open(out, head, fields, flags, depth, annotations)? {
-            pending.push(Task::Fields(Fields::new(fields, base, name, depth)));
+        let nested = out.enter()?;
+        if let Some(name) = sink::open(
+            out,
+            head,
+            fields,
+            positions.as_ref(),
+            flags,
+            depth,
+            annotations,
+        )? {
+            if nested {
+                pending.push(Task::LeaveContainer);
+            }
+            pending.push(Task::Fields(Fields::new(
+                fields, positions, base, name, depth,
+            )));
         } else {
             self.attribute.truncate(base);
+            if nested {
+                out.leave();
+            }
         }
         Ok(())
     }
@@ -222,10 +247,10 @@ impl RecordXml {
         mut fields: Fields<'tree, 'source>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
-        if let Some(field) = fields.next(&self.attribute) {
+        if let Some((field, position)) = fields.next(&self.attribute) {
             let depth = fields.depth + 1;
             pending.push(Task::Fields(fields));
-            pending.push(Task::Child(field, depth));
+            pending.push(Task::Child(field, position, depth));
         } else {
             self.attribute.truncate(fields.base);
             sink::close(out, fields.name, fields.depth)?;
@@ -250,7 +275,7 @@ impl RecordXml {
         let name = sink::open_field(out, field, items.is_empty(), depth)?;
         if !items.is_empty() {
             pending.push(Task::CloseField { name, depth });
-            pending.push(Task::Items(items.iter(), depth + 1));
+            Self::array_items(out, items, depth + 1, pending)?;
         }
         Ok(())
     }
@@ -263,17 +288,38 @@ impl RecordXml {
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
         match value {
-            Value::Struct(structure) => pending.push(Task::Structure {
+            Value::Struct(structure) => pending.push(Task::Structure(Structure {
                 head: Head::Nested {
                     type_name: structure.type_name(),
                     value,
                 },
                 fields: structure.fields(),
+                positions: out
+                    .value()
+                    .map(|value| value.fields())
+                    .transpose()
+                    .map_err(io::Error::other)?
+                    .flatten(),
+                container: out.value(),
                 depth,
-            }),
-            Value::Array(items) => pending.push(Task::Items(items.iter(), depth)),
+            })),
+            Value::Array(items) => Self::array_items(out, items, depth, pending)?,
             leaf => sink::value_leaf(out, leaf, depth, annotations)?,
         }
+        Ok(())
+    }
+
+    fn array_items<'tree, 'source>(
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
+        items: &'tree [Value<'source>],
+        depth: usize,
+        pending: &mut Vec<Task<'tree, 'source>>,
+    ) -> io::Result<()> {
+        let position = out.value();
+        if position.is_some_and(|slot| matches!(slot.value(), Value::Array(_))) && out.enter()? {
+            pending.push(Task::LeaveContainer);
+        }
+        pending.push(Task::Items(Items::new(items, position), depth));
         Ok(())
     }
 }

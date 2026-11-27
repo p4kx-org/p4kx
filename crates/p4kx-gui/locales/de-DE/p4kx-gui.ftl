@@ -465,6 +465,7 @@ record-export-summary-errors = Records mit Fehlerwerten: { $erroneous }, Fehlerw
 record-export-summary-no-match = Kein Record passt zum Filter.
 record-export-summary-target = Ziel: { $path }
 record-export-summary-file-failed = { $path } lässt sich nicht schreiben: { $reason }
+record-export-summary-origin-failures = Fehlgeschlagene Herkunftsbelege ({ $number })
 record-export-summary-failed = Fehlgeschlagen ({ $number })
 record-export-summary-skipped = Übersprungen ({ $number })
 record-export-summary-failure = { $path } ({ $guid }): { $reason }

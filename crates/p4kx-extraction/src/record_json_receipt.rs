@@ -1,25 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Write};
+use std::io;
 
 use p4kx_dataforge::{
-    DataForge, PositionedRecord, RecordJson, RecordJsonObserver, RecordJsonSource, RecordJsonUse,
+    Annotations, DataForge, Guid, ObservedResolution, PositionedRecord, RecordJson,
+    RecordJsonObserver, RecordJsonSource, RecordJsonUse,
 };
 
+use super::field_receipt::{Capture, RecordFieldReceipt};
+use crate::resolved_texts::RecordLocalization;
 use crate::{
-    ConflictPolicy, DataForgeEntry, DataForgeOrigin, FieldOrigin, FieldPath, FilePublication,
-    FileReceipt, InputScope, OriginArtifactBinding, OriginOutputAddress, RecordJsonLocation,
-    SourceEvidenceError, SourceInput, SourceInventory, SourceScope, SourceUses,
-    write_origin_companion,
+    ConflictPolicy, DataForgeEntry, FieldPath, FilePublication, FileReceipt, ObservedTagTree,
+    OriginOutputAddress, RecordJsonLocation, TagPathOrigins,
 };
 
-/// Canonical, unannotated Record JSON and the contributors to its emitted fields.
-pub struct RecordJsonReceipt {
-    bytes: Vec<u8>,
-    fields: Vec<(OriginOutputAddress, FieldOrigin)>,
-    inventory: SourceInventory,
-}
+/// Canonical Record JSON and the contributors to its emitted fields.
+pub struct RecordJsonReceipt(RecordFieldReceipt);
 
 impl RecordJsonReceipt {
     /// Renders the positioned Record with the writer's layout and captures its original inputs.
@@ -32,31 +29,75 @@ impl RecordJsonReceipt {
         forge: &DataForge<'_>,
         record: &PositionedRecord<'_>,
     ) -> io::Result<Self> {
-        let original = forge
-            .record(record.tree().record_index())
-            .filter(|original| record.tree().is_from(original))
-            .and_then(|_| input.origin_of(forge))
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    SourceEvidenceError::ForeignEvidence,
-                )
-            })?;
-        let mut capture = Capture::new(original)?;
+        Self::render_file(writer, input, forge, record).map(Self)
+    }
+
+    pub(crate) fn render_file(
+        writer: &mut RecordJson,
+        input: &DataForgeEntry,
+        forge: &DataForge<'_>,
+        record: &PositionedRecord<'_>,
+    ) -> io::Result<RecordFieldReceipt> {
+        let mut capture = Capture::from_record(input, forge, record)?;
         let mut bytes = Vec::new();
         writer.write_observed(record, &mut bytes, &mut capture)?;
-        let inventory = capture.uses.freeze().map_err(io::Error::other)?;
-        Ok(Self {
-            bytes,
-            fields: capture.fields,
-            inventory,
-        })
+        capture.finish(bytes)
+    }
+
+    /// Renders a Record with origin evidence for the exact indexed language Entry.
+    ///
+    /// # Errors
+    /// Returns a source mismatch, serialization or evidence allocation error.
+    pub fn render_localized(
+        writer: &mut RecordJson,
+        input: &DataForgeEntry,
+        forge: &DataForge<'_>,
+        record: &PositionedRecord<'_>,
+        localization: &RecordLocalization<'_>,
+    ) -> io::Result<Self> {
+        Self::render_localized_file(writer, input, forge, record, localization).map(Self)
+    }
+
+    pub(crate) fn render_localized_file(
+        writer: &mut RecordJson,
+        input: &DataForgeEntry,
+        forge: &DataForge<'_>,
+        record: &PositionedRecord<'_>,
+        localization: &RecordLocalization<'_>,
+    ) -> io::Result<RecordFieldReceipt> {
+        Self::render_annotated_file(writer, input, forge, record, Some(localization), None)
+    }
+
+    pub(crate) fn render_annotated_file(
+        writer: &mut RecordJson,
+        input: &DataForgeEntry,
+        forge: &DataForge<'_>,
+        record: &PositionedRecord<'_>,
+        localization: Option<&RecordLocalization<'_>>,
+        tags: Option<&ObservedTagTree>,
+    ) -> io::Result<RecordFieldReceipt> {
+        let capture = Capture::from_record(input, forge, record)?;
+        let paths = tags
+            .map(|tags| tags.bind_paths(forge, capture.uses()))
+            .transpose()
+            .map_err(io::Error::other)?;
+        let mut observer = AnnotatedJsonObserver {
+            capture,
+            localization,
+            paths,
+        };
+        let annotations = Annotations::none()
+            .with_texts(localization.map(|source| source as &dyn p4kx_dataforge::TextResolver))
+            .with_tags(tags.map(|source| source as &dyn p4kx_dataforge::TagResolver));
+        let mut bytes = Vec::new();
+        writer.write_observed_annotated(record, annotations, &mut bytes, &mut observer)?;
+        observer.capture.finish(bytes)
     }
 
     /// Returns the exact JSON bytes that the receipt describes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+        self.0.bytes()
     }
 
     /// Publishes the observed JSON and its companion under the bound file's conflict policy.
@@ -68,83 +109,9 @@ impl RecordJsonReceipt {
         receipt: &FileReceipt<'_>,
         policy: ConflictPolicy,
     ) -> io::Result<FilePublication> {
-        receipt.publish_bytes(&self.bytes, policy, |out, binding| {
-            self.describe(out, binding)
+        receipt.publish_bytes(self.0.bytes(), policy, |out, binding| {
+            self.0.describe(out, binding)
         })
-    }
-
-    pub(crate) fn describe(
-        &self,
-        out: &mut dyn Write,
-        binding: &OriginArtifactBinding,
-    ) -> io::Result<()> {
-        write_origin_companion(
-            out,
-            binding,
-            &self.inventory,
-            self.fields
-                .iter()
-                .map(|(address, origin)| (address, origin)),
-        )
-    }
-}
-
-struct Capture {
-    uses: SourceUses,
-    scope: SourceScope,
-    complete: bool,
-    fields: Vec<(OriginOutputAddress, FieldOrigin)>,
-}
-
-impl Capture {
-    fn new(origin: &DataForgeOrigin) -> io::Result<Self> {
-        let (source, complete) = match origin {
-            DataForgeOrigin::Archive(entry) => (
-                SourceInput::Archive(entry),
-                entry.ancestors().all(|step| step.is_some()),
-            ),
-            DataForgeOrigin::File(file) => (SourceInput::File(file), true),
-            DataForgeOrigin::Unknown => (SourceInput::Unknown, false),
-        };
-        let uses = SourceUses::with_compact_use_refs();
-        let scope = uses
-            .observe(source, InputScope::Payload)
-            .map_err(io::Error::other)?;
-        Ok(Self {
-            uses,
-            scope,
-            complete,
-            fields: Vec::new(),
-        })
-    }
-
-    fn field(
-        &mut self,
-        pointer: &str,
-        sites: impl ExactSizeIterator<Item = Option<RecordJsonLocation>>,
-        complete: bool,
-    ) -> io::Result<()> {
-        let count = sites.len();
-        let mut contributors = Vec::new();
-        contributors
-            .try_reserve_exact(count)
-            .map_err(io::Error::other)?;
-        for site in sites.flatten() {
-            contributors.push(
-                self.scope
-                    .at(site.location, site.role)
-                    .map_err(io::Error::other)?,
-            );
-        }
-        let origin = self.uses.origin(
-            &contributors,
-            self.complete && complete && contributors.len() == count,
-        );
-        let path = FieldPath::parse(pointer).map_err(io::Error::other)?;
-        self.fields.try_reserve(1).map_err(io::Error::other)?;
-        self.fields
-            .push((OriginOutputAddress::JsonField { path }, origin));
-        Ok(())
     }
 }
 
@@ -156,7 +123,7 @@ impl RecordJsonObserver for Capture {
         complete: bool,
     ) -> io::Result<()> {
         self.field(
-            pointer,
+            json_address(pointer)?,
             sources.iter().copied().map(RecordJsonLocation::of),
             complete,
         )
@@ -169,9 +136,80 @@ impl RecordJsonObserver for Capture {
         complete: bool,
     ) -> io::Result<()> {
         self.field(
-            pointer,
+            json_address(pointer)?,
             sources.iter().map(RecordJsonLocation::of_use),
             complete,
         )
     }
+}
+
+struct AnnotatedJsonObserver<'job, 'source> {
+    capture: Capture,
+    localization: Option<&'job RecordLocalization<'source>>,
+    paths: Option<TagPathOrigins<'job>>,
+}
+
+impl RecordJsonObserver for AnnotatedJsonObserver<'_, '_> {
+    fn value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonSource<'_>],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.capture.value(pointer, sources, complete)
+    }
+
+    fn reference_value(
+        &mut self,
+        pointer: &str,
+        sources: &[RecordJsonUse],
+        complete: bool,
+    ) -> io::Result<()> {
+        self.capture.reference_value(pointer, sources, complete)
+    }
+
+    fn localization_observed(
+        &mut self,
+        pointer: &str,
+        _key: &str,
+        observation: &ObservedResolution<'_>,
+        selectors: &[RecordJsonUse],
+        selectors_complete: bool,
+    ) -> io::Result<()> {
+        let Some(localization) = self.localization else {
+            return self.reference_value(pointer, selectors, false);
+        };
+        self.capture.localized_field(
+            json_address(pointer)?,
+            selectors,
+            selectors_complete,
+            localization,
+            observation,
+        )
+    }
+
+    fn tag(
+        &mut self,
+        pointer: &str,
+        guid: Guid,
+        _path: &str,
+        selectors: &[RecordJsonUse],
+        selectors_complete: bool,
+    ) -> io::Result<()> {
+        let Some(paths) = &self.paths else {
+            return self.reference_value(pointer, selectors, false);
+        };
+        self.capture.tagged_field(
+            json_address(pointer)?,
+            selectors,
+            selectors_complete,
+            paths,
+            guid,
+        )
+    }
+}
+
+fn json_address(pointer: &str) -> io::Result<OriginOutputAddress> {
+    let path = FieldPath::parse(pointer).map_err(io::Error::other)?;
+    Ok(OriginOutputAddress::JsonField { path })
 }

@@ -3,8 +3,10 @@
 
 //! Addresses original DataForge inputs reported by the Query reader.
 
-use p4kx_dataforge::query::{QueryByteUse, QuerySource, RecordNameKind, TraversalInput};
+use p4kx_dataforge::DataForge;
+use p4kx_dataforge::query::{QueryByteUse, QuerySource, RecordNameKind, Row, TraversalInput};
 
+use crate::query_instance_bounds::InstanceBounds;
 use crate::{SourceEvidenceError, SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 /// An original Query input coordinate and its observed contribution role.
@@ -104,6 +106,99 @@ impl QuerySourceSite {
     }
 }
 
+/// The bound original inputs observed while evaluating one query cell.
+#[derive(Debug)]
+pub struct QueryCellEvidence {
+    uses: Vec<SourceUse>,
+    complete: bool,
+}
+
+impl QueryCellEvidence {
+    /// Borrows the registered inputs for this cell.
+    #[must_use]
+    pub const fn uses(&self) -> &[SourceUse] {
+        self.uses.as_slice()
+    }
+
+    /// Reports whether the observation stream mapped in full.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    /// Adds proved selectors of the same row to this observed cell input set.
+    #[must_use]
+    pub fn with_row_root(mut self, root: &Self) -> Self {
+        self.complete &= root.complete && !self.uses.is_empty();
+        self.uses.extend_from_slice(&root.uses);
+        self
+    }
+}
+
+/// Binds the original instance selectors recorded once for an observed row.
+///
+/// # Errors
+/// Returns an error if a proved use cannot be registered in the supplied scope.
+pub fn bind_row_root_inputs(
+    forge: &DataForge<'_>,
+    scope: &SourceScope,
+    row: &Row<'_>,
+) -> Result<QueryCellEvidence, SourceEvidenceError> {
+    let recorded = row.root_sources().unwrap_or_default();
+    let mut bound = bind_cell_inputs(forge, scope, recorded.iter().copied())?;
+    bound.complete &= !recorded.is_empty();
+    Ok(bound)
+}
+
+/// Binds the original observations from one query cell or one of its emitted values.
+///
+/// # Errors
+/// Returns an error if a proved use cannot be registered in the supplied scope.
+pub fn bind_cell_inputs(
+    forge: &DataForge<'_>,
+    scope: &SourceScope,
+    observations: impl IntoIterator<Item = QuerySource>,
+) -> Result<QueryCellEvidence, SourceEvidenceError> {
+    let mut result = QueryCellEvidence {
+        uses: Vec::new(),
+        complete: true,
+    };
+    let mut bounds = InstanceBounds::default();
+    for observation in observations {
+        match observation {
+            QuerySource::InstanceBlockBound { structure } => bounds.count(structure),
+            QuerySource::InstanceExtent {
+                structure,
+                resolved,
+            } => {
+                bounds.extent(structure, resolved);
+            }
+            QuerySource::ReferenceGap { .. } => {
+                result.complete = false;
+                if let Some(mut site) = QuerySourceSite::of(observation, SourceUseRole::Payload) {
+                    site.role = SourceUseRole::Attempted;
+                    result.uses.push(site.bind(scope)?);
+                }
+            }
+            _ => {
+                if let Some(site) = QuerySourceSite::of(observation, SourceUseRole::Payload) {
+                    result.uses.push(site.bind(scope)?);
+                } else {
+                    result.complete = false;
+                }
+            }
+        }
+    }
+    if let Some(sites) = bounds.sites(forge) {
+        for site in sites {
+            result.uses.push(site.bind(scope)?);
+        }
+    } else {
+        result.complete = false;
+    }
+    Ok(result)
+}
+
 fn bytes(
     start: u64,
     end: u64,
@@ -189,3 +284,7 @@ const fn record_column(kind: RecordNameKind) -> Option<&'static str> {
 #[cfg(test)]
 #[path = "query_source_evidence_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "query_cell_evidence_tests.rs"]
+mod cell_tests;

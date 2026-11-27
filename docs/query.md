@@ -73,9 +73,12 @@ and replaces an existing file; stdout then gets one summary line such as
 References that link to no Record ([Following References](#following-references)), or a JSON summary with `--json` (see
 [cli-json.md](cli-json.md)). A Record whose layout cannot be read gives no row in any format;
 it is reported on stderr and the exit code is 1. An `--out` that is the Archive itself is
-rejected with exit code 2, and so is `--json` with another format and without `--out`. A run
-that is killed, e.g. by Ctrl+C, can leave the temporary file `<file>.p4kx-<process id>.part`
-behind; the target itself is never half written.
+rejected with exit code 2, and so is `--json` with another format and without `--out`. An
+interrupted run can leave its staging file behind.
+
+For field origins, add `--origin-receipt` to a file export. With stdout, use
+`--origin-out <file>` or `--origin-stderr`. These flags publish the
+[DataForge Query companion](source-origin.md#dataforge-query-results) for the emitted rows.
 
 ### Table
 

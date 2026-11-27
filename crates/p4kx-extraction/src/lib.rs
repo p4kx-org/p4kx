@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Extraction service of P4KX and the Archive, `CryXml`, DataForge, localisation,
-//! texture, audio, chunk file, model and UI movie APIs front-ends use.
+//! Extraction services for P4KX front ends, including Archive, CryXml, DataForge and media.
 
 mod animation_listing;
 mod animation_load;
@@ -89,7 +88,6 @@ mod localization_set;
 pub mod material_source_info;
 mod material_source_mapping;
 mod material_source_owned;
-
 mod material_xml_info;
 mod model_chunk_source_info;
 mod model_companions;
@@ -124,6 +122,7 @@ mod portable_name;
 mod projection_schema;
 pub mod query_admission_evidence;
 mod query_export;
+mod query_instance_bounds;
 pub mod query_source_evidence;
 mod record_combined;
 mod record_existing;
@@ -356,10 +355,11 @@ pub use portable_name::{
 pub use query_export::{
     QUERY_PAGE_SIZE, QueryExport, QueryExportError, QueryExportOptions, export_query, is_same_file,
 };
-pub use record_combined::export_combined;
+pub use record_combined::{export_combined, export_combined_with_origins};
 pub use record_export::{
+    export_annotated_record_json_files, export_localized_record_xml_files,
     export_planned_record_files, export_planned_record_files_with_receipt, export_record_files,
-    export_record_json_files_with_origins, export_records,
+    export_record_json_files_with_origins, export_record_xml_files_with_origins, export_records,
 };
 pub use record_format::{RecordFileFormat, RecordJsonReceipt};
 pub use record_plan::RecordFilePlan;
@@ -368,7 +368,7 @@ pub use record_report::{
     RenameCause,
 };
 pub use report::{EntryFailure, ExtractionError, ExtractionReport, MergedTextureArtifact};
-pub use resolved_texts::LanguageTexts;
+pub use resolved_texts::{LanguageTexts, RecordLocalization};
 pub use selection::{UnknownEntries, select_entries};
 pub use sound::{ConvertedSoundArtifact, MAX_SOUND_LEN, OggFileReceipt, Sound};
 pub use source_provenance::*;

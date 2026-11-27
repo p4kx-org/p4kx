@@ -210,6 +210,14 @@ its place.
 
 ## Combined document
 
+The combined CLI export publishes the companion for unannotated output and for
+output localized with `--lang`. It writes
+`Game2.xml.p4kx-origin.jsonl` beside `Game2.xml`. Its byte ranges address the
+finished document, including the prefix before each Record. The digest binds
+the whole file, including its generated wrapper and namespace. See
+[Standalone field origins](source-origin.md#companion-records) for the
+companion format.
+
 `p4kx dcb export --combined` writes every selected Record into one file in the target folder,
 named after the DataForge Entry with `.xml`, e.g. `Game2.xml`:
 

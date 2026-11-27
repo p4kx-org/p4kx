@@ -141,19 +141,28 @@ standalone files.
  "error_values": 1, "records_with_errors": 1, "error": null}
 ```
 
-`format` is `xml`, `json`, `ndjson`, `flat-csv`, `flat-csv-raw` or `flat-ndjson`; the flat forms
-write one file of one row per value ([flat values](record-flat.md)) and count and list like
-`ndjson` with `values.csv` or `values.ndjson` for `records.ndjson`. `exported` counts the Record files written, or for
-`ndjson` the lines of `records.ndjson`. `skipped` lists the files, relative to `target` with `/`
-as separator, whose existing file was kept under `--conflict`; for `ndjson` it can only list
-`records.ndjson`. `failed` lists the Records not written with GUID, record path and the reason
-and its causes joined by `: `. Both are in definition order for `xml` and `json`; for `ndjson`,
-`failed` lists the Records of another DataForge first, then the others in record-path order.
-`error` is the reason and causes why `records.ndjson` could not be written, otherwise `null`.
+`format` is `xml`, `json`, `ndjson`, `flat-csv`, `flat-csv-raw`,
+`flat-csv-strict` or `flat-ndjson`. The flat forms write one file with one row
+per value. `exported` counts written Records for all formats, including the
+Records represented in `values.csv` or `values.ndjson`. For compact NDJSON,
+the count equals the number of lines in `records.ndjson`. `skipped` lists the
+files kept under `--conflict` as paths relative to `target` with `/` separators.
+For single-file formats the list can contain only the output file.
+`failed` lists unwritten Records with GUID, record path and the error chain.
+The lists use definition order for per-Record XML and JSON. Single-file
+exports list Records from another DataForge first, then the others in
+record-path order. `error` gives a single-file publication error or `null`.
 `error_values` counts the values written as errors (see
 [record-xml.md](record-xml.md#child-elements)) in the Records written or kept, and
-`records_with_errors` the Records holding at least one. The exit code is 1 when `failed` is not
-empty or `error` is set.
+`records_with_errors` the Records holding at least one. The exit code is 1
+when a Record failed, the export was cancelled, `error` is set or a companion
+could not be published.
+
+`origin_receipts` lists the paths of companions committed by the export.
+`origin_failures` lists companion publication errors, including errors that
+occurred after the Record data was committed. Each key is omitted when its
+list is empty. See [Record file origins](source-origin.md#record-files) for
+the companion addresses and conflict behavior.
 
 With `--lang <language>` the report also holds `"language": "de"`, the code of the language the
 texts were resolved in; without it the field is absent.
@@ -3167,6 +3176,9 @@ fields are absent. When `--convert` converted the DataForge Entry, the report al
 Record's file does not follow its name or record path, `renamed` as there
 (`{"guid", "path", "reason"}`); `skipped` lists
 the Record files relative to the folder of the DataForge Entry. Otherwise that field is absent.
+`records.origin_receipts` lists newly published XML companions relative to the
+output target, and `records.origin_failures` reports companion publication
+failures. Each field appears when it has entries.
 `texture_artifacts` contains the images published by this run when texture image conversion
 is enabled. Each texture groups its `images` with a shared `provenance` inventory. The group contains its declared `source_transfer`, encoded `output_transfer` and
 any `png_transform`, with their precise `field_origins`. Every image

@@ -3,9 +3,13 @@
 
 use std::io;
 
-use p4kx_extraction::{Annotations, FlatFormat, FlatValues, JsonLayout, RecordJson, RecordTree};
+use p4kx_extraction::{
+    Annotations, FlatFormat, FlatValues, JsonLayout, PositionedRecord, RecordJson,
+    RecordStreamRows, RecordTree,
+};
 
 use crate::RecordForm;
+use crate::ndjson::StreamEvidence;
 
 /// Writes the lines of one single-file Record export: a compact Record JSON object per Record, or
 /// the rows of a flat value export.
@@ -33,6 +37,25 @@ impl LineWriter {
         match self {
             Self::Json(_) => Ok(()),
             Self::Flat(flat) => flat.write_header(with_text, out),
+        }
+    }
+
+    pub(crate) fn write_observed<'input, 'locale>(
+        &mut self,
+        evidence: StreamEvidence<'input, '_, 'locale>,
+        record: &PositionedRecord<'_>,
+        out: &mut Vec<u8>,
+    ) -> io::Result<RecordStreamRows<'input, 'locale>> {
+        let StreamEvidence {
+            input,
+            locale,
+            tags,
+        } = evidence;
+        match self {
+            Self::Json(writer) => {
+                RecordStreamRows::write_json(input, writer, record, out, locale, tags)
+            }
+            Self::Flat(writer) => RecordStreamRows::write_flat(input, writer, record, out, locale),
         }
     }
 

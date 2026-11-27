@@ -16,6 +16,9 @@ use serde_json::Value;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+#[path = "dcb_export_localized_origins.rs"]
+mod origins;
+
 const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
 
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
@@ -81,10 +84,9 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
             "Data\\Localization\\english\\global.ini",
             english,
         ))
-        .entry(TestEntry::zstd(
-            "Data\\Localization\\german_(germany)\\global.ini",
-            german,
-        ))
+        .entry(
+            TestEntry::zstd("Data\\Localization\\german_(germany)\\global.ini", german).encrypted(),
+        )
         .write_to(&path)?;
     Ok(path)
 }

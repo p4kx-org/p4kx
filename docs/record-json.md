@@ -11,6 +11,13 @@ The JSON Schema (draft 2020-12) is
 [`schemas/record-json.schema.json`](../schemas/record-json.schema.json); a test validates every
 Record the export writes against it. The same Record always gives the same bytes.
 
+A per-Record JSON file published with original-field evidence carries a sibling
+[`p4kx-source-origin` companion](source-origin.md). For
+`dcb export --format json --lang <language>`, the companion addresses the emitted translation or
+missing marker by JSON Pointer and records the exact chosen language Entry
+and original DataForge key. A present empty value has a source byte position.
+An absent key retains the observed lookup without a value byte position.
+
 ## Example
 
 The Record of the [Record XML example](record-xml.md#example):
@@ -167,6 +174,12 @@ is no `tag` key and the output is byte for byte the output described above. The
 [Record XML](record-xml.md#files) with `.json` instead of `.xml`: `<record path>.json` for a
 Record alone at its record path, `<record path>/<Record name>.json` for Records that share one
 ([ADR-0008](adr/0008-record-files-by-record-path.md)). `--conflict` applies to every file.
+
+The compact NDJSON CLI export writes `records.ndjson.p4kx-origin.jsonl`
+alongside the output. Each field address identifies a zero-based physical
+line and a JSON Pointer relative to that line. The companion digest binds
+the complete file. Language and tag annotations carry the inputs selected
+for the emitted values.
 
 `--format ndjson` writes the one file `records.ndjson` into the target folder: one compact Record
 object per line, ordered by record path ignoring ASCII case with `/` and `\` alike, then by Record

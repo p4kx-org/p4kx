@@ -64,6 +64,8 @@ pub enum RecordExportText {
     SummaryTarget,
     /// The NDJSON file could not be written; takes `path` and `reason`.
     SummaryFileFailed,
+    /// The heading of companion publication failures; takes `number`.
+    SummaryOriginFailures,
     /// The heading of the failed Records; takes `number`.
     SummaryFailed,
     /// The heading of the kept files; takes `number`.
@@ -80,7 +82,7 @@ pub enum RecordExportText {
 
 impl RecordExportText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 36] = [
         Self::Menu,
         Self::Action,
         Self::SetupTitle,
@@ -110,6 +112,7 @@ impl RecordExportText {
         Self::SummaryNoMatch,
         Self::SummaryTarget,
         Self::SummaryFileFailed,
+        Self::SummaryOriginFailures,
         Self::SummaryFailed,
         Self::SummarySkipped,
         Self::SummaryFailure,
@@ -151,6 +154,7 @@ impl RecordExportText {
             Self::SummaryNoMatch => "record-export-summary-no-match",
             Self::SummaryTarget => "record-export-summary-target",
             Self::SummaryFileFailed => "record-export-summary-file-failed",
+            Self::SummaryOriginFailures => "record-export-summary-origin-failures",
             Self::SummaryFailed => "record-export-summary-failed",
             Self::SummarySkipped => "record-export-summary-skipped",
             Self::SummaryFailure => "record-export-summary-failure",

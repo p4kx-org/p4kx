@@ -105,11 +105,15 @@ fn dcb_export_writes_a_record_under_its_guid_and_escapes_the_record_path() -> Te
         files(&out)?,
         [
             "records/a%257Cb.xml",
+            "records/a%257Cb.xml.p4kx-origin.jsonl",
             "records/a%7Cb.xml",
+            "records/a%7Cb.xml.p4kx-origin.jsonl",
             "records/shared/00000000-0000-0000-0000-000000000001.xml",
+            "records/shared/00000000-0000-0000-0000-000000000001.xml.p4kx-origin.jsonl",
             "records/shared/Item.fine.xml",
+            "records/shared/Item.fine.xml.p4kx-origin.jsonl",
         ],
-        "every Record is written and no two paths share a file"
+        "each Record and its companion have distinct portable paths"
     );
     let stderr = String::from_utf8(output.stderr)?;
     assert!(

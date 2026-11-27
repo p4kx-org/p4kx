@@ -11,6 +11,9 @@ expression: "serde_json::to_string_pretty(&value)?"
   "exported": 3,
   "failed": [],
   "format": "ndjson",
+  "origin_receipts": [
+    "[DIR]/out/records.ndjson.p4kx-origin.jsonl"
+  ],
   "records_with_errors": 1,
   "skipped": [],
   "target": "[DIR]/out"

@@ -2,15 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    DataForge, DataForgeOrigin, EntryOrigin, Field, FieldOrigin, InputScope, PositionedFields,
-    PositionedRecord, PositionedSources, PositionedValue, RecordJsonLocation, RecordJsonUse,
-    SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses, Value,
+    DataForge, DataForgeOrigin, EntryOrigin, Field, FieldOrigin, InputScope, ObservedTagTree,
+    PositionedFields, PositionedRecord, PositionedSources, PositionedValue, RecordJsonLocation,
+    RecordJsonUse, SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope,
+    SourceUse, SourceUseRole, SourceUses, TagPathOrigins, Value,
 };
 
 use super::FieldLine;
 use super::xml_provenance::{PendingXml, RecordXmlFieldProvenance, RowPositions};
-use crate::forge_cache::ObservedTagTree;
 use crate::{TextLanguage, XmlPreviewOriginError};
 
 #[path = "line_provenance.rs"]
@@ -85,6 +84,9 @@ impl RecordPreviewProvenance {
         let header = binding.header(forge, record)?;
         let route = binding.root_route(record.tree().record_index())?;
         let locale = locale.map(|locale| binding.language(locale)).transpose()?;
+        let tags = tags
+            .map(|tags| tags.bind_paths(forge, &binding.uses))
+            .transpose()?;
         let mut capture = Capture {
             binding,
             locale,
@@ -316,7 +318,7 @@ impl Route {
 struct Capture<'a> {
     binding: Binding,
     locale: Option<LanguageBinding>,
-    tags: Option<&'a ObservedTagTree>,
+    tags: Option<TagPathOrigins<'a>>,
     lines: Vec<RecordFieldProvenance>,
     shown: std::slice::Iter<'a, FieldLine>,
     positions: Option<RowPositions>,

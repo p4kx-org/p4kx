@@ -68,6 +68,8 @@ pub struct RecordExportSummary {
     error_values: usize,
     records_with_errors: usize,
     error: Option<String>,
+    origin_receipts: Vec<PathBuf>,
+    origin_failures: Vec<String>,
     interrupted: bool,
     provenance: Option<Result<Box<RecordExportProvenance>, SourceEvidenceError>>,
 }
@@ -94,6 +96,12 @@ impl RecordExportSummary {
             error_values: summary.error_values(),
             records_with_errors: summary.records_with_errors(),
             error: summary.error().map(|error| describe(error)),
+            origin_receipts: summary.origin_receipts().to_vec(),
+            origin_failures: summary
+                .origin_failures()
+                .iter()
+                .map(|error| describe(error))
+                .collect(),
             interrupted: summary.cancelled() > 0,
             provenance,
         }
@@ -119,6 +127,8 @@ impl RecordExportSummary {
             error_values: 0,
             records_with_errors: 0,
             error: None,
+            origin_receipts: Vec::new(),
+            origin_failures: Vec::new(),
             interrupted,
             provenance: None,
         }
@@ -155,6 +165,18 @@ impl RecordExportSummary {
     #[must_use]
     pub const fn written(&self) -> usize {
         self.written
+    }
+
+    /// Returns the published companions of the newly written files.
+    #[must_use]
+    pub fn origin_receipts(&self) -> &[PathBuf] {
+        &self.origin_receipts
+    }
+
+    /// Reports companion publication failures separately from committed Record files.
+    #[must_use]
+    pub fn origin_failures(&self) -> &[String] {
+        &self.origin_failures
     }
 
     /// Returns the original DataForge contributors to the number of Records written.

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::PathBuf;
+
 use p4kx_extraction::{ExtractionError, RecordExportReport, RecordFailure, RecordRenamed};
 
 use crate::RecordForm;
@@ -45,6 +47,8 @@ pub struct RecordExportSummary {
     pub(crate) records_with_errors: usize,
     pub(crate) error: Option<ExtractionError>,
     pub(crate) receipt: Option<RecordExportReceipt>,
+    pub(crate) origin_receipts: Vec<PathBuf>,
+    pub(crate) origin_failures: Vec<ExtractionError>,
 }
 
 impl RecordExportSummary {
@@ -57,6 +61,8 @@ impl RecordExportSummary {
             cancelled: report.cancelled(),
             error_values: report.error_values(),
             records_with_errors: report.records_with_errors(),
+            origin_receipts: report.take_origin_receipts(),
+            origin_failures: report.take_origin_failures(),
             receipt: report
                 .take_written_record_indices()
                 .map(|indices| RecordExportReceipt {
@@ -143,9 +149,24 @@ impl RecordExportSummary {
         self.error.as_ref()
     }
 
-    /// Returns whether no Record failed, the file was written and the run was not cancelled.
+    /// Returns the companions published for the committed output.
+    #[must_use]
+    pub fn origin_receipts(&self) -> &[PathBuf] {
+        &self.origin_receipts
+    }
+
+    /// Returns failures to publish the companion after the output committed.
+    #[must_use]
+    pub fn origin_failures(&self) -> &[ExtractionError] {
+        &self.origin_failures
+    }
+
+    /// Returns whether the Record export and its requested companions completed.
     #[must_use]
     pub const fn is_complete(&self) -> bool {
-        self.failures.is_empty() && self.cancelled == 0 && self.error.is_none()
+        self.failures.is_empty()
+            && self.cancelled == 0
+            && self.error.is_none()
+            && self.origin_failures.is_empty()
     }
 }

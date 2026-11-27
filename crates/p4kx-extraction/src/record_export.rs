@@ -4,25 +4,44 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use p4kx_dataforge::{Annotations, DataForge, Record, RecordJson, RecordXml};
+use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml};
 use rayon::prelude::*;
 
 use crate::dependent::split_dependent;
 use crate::portable_name::fold;
 use crate::record_files::RecordFiles;
-use crate::record_format::RecordFileFormat;
+use crate::record_format::{RecordFileFormat, xml_receipt};
 use crate::record_plan::RecordFilePlan;
 use crate::{
     ConflictPolicy, DataForgeEntry, ExtractionError, RecordExportError, RecordExportOptions,
-    RecordExportReport, RecordJsonReceipt, RecordRenamed,
+    RecordExportReport, RecordRenamed,
 };
 
 #[path = "record_export_accounting.rs"]
 mod accounting;
 use accounting::summarise;
 
+#[path = "record_json_export.rs"]
+mod json_export;
+pub use json_export::{
+    export_annotated_record_json_files, export_planned_record_json_files_with_origins,
+    export_record_json_files_with_origins,
+};
+
+#[path = "record_xml_export.rs"]
+mod xml_export;
+pub use xml_export::{
+    export_annotated_record_xml_files, export_localized_record_xml_files,
+    export_planned_record_xml_files_with_origins, export_record_xml_files_with_origins,
+};
+
+#[path = "record_export_sources.rs"]
+mod sources;
+pub use sources::RecordExportSources;
+
 #[path = "record_artifact_writer.rs"]
 mod writer;
+pub(crate) use writer::replace_record;
 use writer::{Observation, Scratch, Writer};
 
 /// Writes `records` of `forge` as Record XML, one file per Record, below the existing folder
@@ -71,7 +90,7 @@ pub fn export_planned_record_files<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
-    write_planned(forge, plan, records, target, options, false)
+    write_planned(forge, plan, records, target, options, false, None)
 }
 
 /// Writes the planned Records and retains the definition positions of the committed files.
@@ -83,7 +102,7 @@ pub fn export_planned_record_files_with_receipt<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
-    write_planned(forge, plan, records, target, options, true)
+    write_planned(forge, plan, records, target, options, true, None)
 }
 
 fn write_planned<F: RecordFileFormat>(
@@ -93,6 +112,7 @@ fn write_planned<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
     retain_receipt: bool,
+    observation: Option<Observation<'_, F>>,
 ) -> RecordExportReport {
     let rebuilt;
     let files = if plan.fits(forge) {
@@ -101,19 +121,24 @@ fn write_planned<F: RecordFileFormat>(
         rebuilt = RecordFiles::plan(forge, F::EXTENSION);
         &rebuilt
     };
-    write_with_options::<F>(forge, files, records, target, options, retain_receipt, None)
+    write_with_options::<F>(
+        forge,
+        files,
+        records,
+        target,
+        options,
+        retain_receipt,
+        observation,
+    )
 }
 
-/// Writes an unannotated Record JSON file and its original field companion for each selected Record.
-///
-/// # Errors
-/// Returns an error when the supplied annotations do not have an observed source context.
-pub fn export_record_json_files_with_origins(
-    input: &DataForgeEntry,
+fn write_observed<F: RecordFileFormat>(
     forge: &DataForge<'_>,
     records: &[Record<'_>],
     target: &Path,
     options: &RecordExportOptions<'_>,
+    observation: Observation<'_, F>,
+    plan: Option<&RecordFilePlan<F>>,
 ) -> Result<RecordExportReport, ExtractionError> {
     if options.annotations().is_active() {
         return Err(crate::write::write_error(
@@ -124,9 +149,19 @@ pub fn export_record_json_files_with_origins(
             ),
         ));
     }
-    let plan = RecordFiles::plan(forge, RecordJson::EXTENSION);
-    let observation = Observation::new(input, RecordJsonReceipt::render);
-    Ok(write_with_options::<RecordJson>(
+    if let Some(plan) = plan {
+        return Ok(write_planned(
+            forge,
+            plan,
+            records,
+            target,
+            options,
+            true,
+            Some(observation),
+        ));
+    }
+    let plan = RecordFiles::plan(forge, F::EXTENSION);
+    Ok(write_with_options::<F>(
         forge,
         &plan,
         records,
@@ -181,16 +216,17 @@ pub(crate) struct RecordRun<'a> {
     pub(crate) ended: &'a (dyn Fn() + Sync),
 }
 
-/// Writes `records` of `forge` in the format `F` to the files of `plan` like
-/// [`export_record_files`], under the control of `run`.
-pub(crate) fn write_records<F: RecordFileFormat>(
+/// Writes converted Record XML files and their source evidence under the extraction run.
+pub(crate) fn write_converted_record_xml(
+    input: &DataForgeEntry,
     forge: &DataForge<'_>,
-    plan: &RecordFiles,
     records: &[Record<'_>],
     target: &Path,
     run: &RecordRun<'_>,
 ) -> RecordExportReport {
-    write_records_inner::<F>(forge, plan, records, target, run, false, None)
+    let plan = RecordFiles::plan(forge, RecordXml::EXTENSION);
+    let observation = Some(Observation::new(input, &xml_receipt::render));
+    write_records_inner(forge, &plan, records, target, run, false, observation)
 }
 
 fn write_records_inner<'f, F: RecordFileFormat>(

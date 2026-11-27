@@ -6,27 +6,34 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use p4kx_extraction::{
-    CancelToken, ExtractionError, OwnedFileToken, OwnedOutputError, RecordExportOptions,
-    check_protected_output, create_output_file,
+    CancelToken, ConflictPolicy, ExtractionError, OriginDigestWriter, OwnedFileToken,
+    OwnedOutputError, RecordExportOptions, RecordStreamCommit, RecordStreamInput,
+    RecordStreamReceipt, RecordStreamRows, RecordStreamSpool, create_output_file,
 };
 use tempfile::TempPath;
 
 const WRITE_BUFFER_LEN: usize = 64 << 10;
 
 /// The active descriptor and creation proof for one streamed Record file.
-pub(crate) struct Output {
+pub(crate) struct Output<'input> {
     file: Option<BufWriter<File>>,
     temporary: Option<TempPath>,
     ownership: OwnedFileToken,
     pub(crate) len: u64,
     pub(crate) crc: u32,
+    observed: Option<Observed<'input>>,
 }
 
-impl Output {
+impl<'input> Output<'input> {
     pub(crate) fn create(
         target: &Path,
         options: &RecordExportOptions<'_>,
+        original: Option<RecordStreamInput<'input, '_>>,
     ) -> Result<Self, ExtractionError> {
+        let observed = original
+            .map(Observed::new)
+            .transpose()
+            .map_err(|source| write_error(target, source))?;
         let file = tempfile::Builder::new()
             .prefix(".p4kx-")
             .suffix(".part")
@@ -51,6 +58,7 @@ impl Output {
             ownership,
             len: 0,
             crc: 0,
+            observed,
         })
     }
 
@@ -59,17 +67,79 @@ impl Output {
             .as_mut()
             .ok_or_else(|| io::Error::other("Record output is closed"))?
             .write_all(bytes)?;
+        if let Some(observed) = &mut self.observed {
+            observed.digest.write_all(bytes)?;
+        }
         self.len = self.len.saturating_add(bytes.len() as u64);
         self.crc = crc32c::crc32c_append(self.crc, bytes);
         Ok(())
     }
 
-    pub(crate) fn persist(
+    pub(crate) fn append_part(
+        &mut self,
+        bytes: &[u8],
+        rows: Option<Vec<RecordStreamRows<'input, '_>>>,
+    ) -> io::Result<()> {
+        let part_start = self.len;
+        self.append(bytes)?;
+        match (&mut self.observed, rows) {
+            (Some(observed), Some(rows)) => observed.spool.append_part(rows, part_start),
+            (None, None) => Ok(()),
+            _ => Err(io::Error::other(
+                "Record stream output and origin mode differ",
+            )),
+        }
+    }
+
+    pub(crate) fn persist_record_stream(
         &mut self,
         destination: &Path,
         replace: bool,
         options: &RecordExportOptions<'_>,
-    ) -> Result<bool, ExtractionError> {
+    ) -> Result<Option<RecordStreamCommit>, ExtractionError> {
+        self.sync(destination)?;
+        let path = self.temporary.as_ref().ok_or_else(|| {
+            write_error(destination, io::Error::other("Record temporary is closed"))
+        })?;
+        let proof = self
+            .observed
+            .take()
+            .map(Observed::finish)
+            .transpose()
+            .map_err(|source| write_error(destination, source))?;
+        let options = RecordExportOptions {
+            policy: if replace {
+                ConflictPolicy::Overwrite
+            } else {
+                ConflictPolicy::Skip
+            },
+            ..*options
+        };
+        let mut committed = p4kx_extraction::publish_record_stream(
+            path,
+            destination,
+            &self.ownership,
+            &options,
+            proof,
+        )?;
+        if let Some(commit) = &mut committed {
+            if !replace
+                && let Err(cleanup) = self.ownership.remove(path, cancel_flag(options.cancel))
+            {
+                commit.origin_failure = Some(ExtractionError::CleanupFailed {
+                    primary: commit
+                        .origin_failure
+                        .take()
+                        .map(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>),
+                    cleanup: Box::new(cleanup),
+                });
+            }
+            self.temporary = None;
+        }
+        Ok(committed)
+    }
+
+    fn sync(&mut self, destination: &Path) -> Result<(), ExtractionError> {
         if let Some(writer) = self.file.take() {
             writer
                 .into_inner()
@@ -77,31 +147,7 @@ impl Output {
                 .sync_all()
                 .map_err(|error| write_error(destination, error))?;
         }
-        let path = self.temporary.as_ref().ok_or_else(|| {
-            write_error(destination, io::Error::other("Record temporary is closed"))
-        })?;
-        self.ownership
-            .ensure_writable(path, cancel_flag(options.cancel))?;
-        check_protected_output(destination, options.protection, options.cancel)?;
-        let temporary = self.temporary.take().ok_or_else(|| {
-            write_error(destination, io::Error::other("Record temporary is closed"))
-        })?;
-        let persisted = if replace {
-            temporary.persist(destination)
-        } else {
-            temporary.persist_noclobber(destination)
-        };
-        match persisted {
-            Ok(()) => Ok(false),
-            Err(error) => {
-                self.temporary = Some(error.path);
-                if !replace && error.error.kind() == io::ErrorKind::AlreadyExists {
-                    Ok(true)
-                } else {
-                    Err(write_error(destination, error.error))
-                }
-            }
-        }
+        Ok(())
     }
 
     pub(crate) fn complete<T>(
@@ -122,6 +168,28 @@ impl Output {
                 cleanup: Box::new(cleanup),
             }),
         }
+    }
+}
+
+struct Observed<'input> {
+    digest: OriginDigestWriter<io::Sink>,
+    spool: RecordStreamSpool<'input>,
+}
+
+impl<'input> Observed<'input> {
+    fn new(input: RecordStreamInput<'input, '_>) -> io::Result<Self> {
+        let spool = RecordStreamSpool::new(input)?;
+        Ok(Self {
+            digest: OriginDigestWriter::new(io::sink()),
+            spool,
+        })
+    }
+
+    fn finish(self) -> io::Result<RecordStreamReceipt> {
+        Ok(RecordStreamReceipt::new(
+            self.digest.finish()?,
+            self.spool.finish()?,
+        ))
     }
 }
 

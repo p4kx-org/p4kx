@@ -5,6 +5,8 @@
 mod classification;
 #[path = "xml_observation.rs"]
 mod observation;
+#[path = "xml_positioned.rs"]
+mod positioned;
 #[path = "record_xml.rs"]
 mod record_xml;
 #[path = "xml_sink.rs"]
@@ -15,5 +17,8 @@ mod tasks;
 mod writer;
 
 pub(crate) use classification::classify;
-pub use observation::{RecordXmlHeaderMember, RecordXmlSite, RecordXmlSpan, RecordXmlValueMember};
+pub use observation::{
+    RecordXmlHeaderMember, RecordXmlObserver, RecordXmlSite, RecordXmlSpan, RecordXmlToken,
+    RecordXmlValueMember,
+};
 pub use record_xml::{RECORD_XML_NAMESPACE, RecordXml};

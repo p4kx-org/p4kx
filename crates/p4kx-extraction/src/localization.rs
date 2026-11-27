@@ -10,6 +10,11 @@ use thiserror::Error;
 
 use crate::entry_path::same_entry_path;
 
+#[path = "localization_value_source.rs"]
+mod value_source;
+
+pub(crate) use value_source::LocalizationValueEvidence;
+
 const INITIAL_RESERVE: u64 = 16 << 20;
 
 /// The text of a language's `global.ini` Entry, read into memory and decoded to UTF-8.
@@ -142,6 +147,13 @@ impl LocalizationEntry {
     #[must_use]
     pub const fn text(&self) -> &IniText<'static> {
         &self.text
+    }
+
+    pub(crate) fn index(&self) -> Result<GlobalIni<'_>, LocalizationLoadError> {
+        self.parse().map_err(|source| LocalizationLoadError::Index {
+            path: self.path().to_owned(),
+            source,
+        })
     }
 
     /// Indexes the file's texts by localisation key.

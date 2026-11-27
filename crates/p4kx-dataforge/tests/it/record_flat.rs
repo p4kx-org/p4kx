@@ -11,6 +11,8 @@ use p4kx_dataforge::{
 };
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
+#[path = "record_flat_observed.rs"]
+mod observed;
 #[path = "record_flat_strict.rs"]
 mod strict;
 

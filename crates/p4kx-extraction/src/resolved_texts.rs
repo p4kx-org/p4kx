@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::{Resolution, TextResolver};
-use p4kx_localization::{Language, Lookup, OwnedTextSet, TextSet, decode_line_breaks};
+use p4kx_dataforge::{ObservedResolution, Resolution, TextResolver};
+use p4kx_localization::{Language, OwnedTextSet, TextSet};
+use p4kx_localization::{decode_line_breaks, is_placeholder_key};
+
+#[path = "record_localization.rs"]
+mod record_localization;
+
+pub(crate) use record_localization::LocalizationLookupEvidence;
+pub use record_localization::RecordLocalization;
 
 #[derive(Debug, Clone, Copy)]
 enum Source<'t, 'a> {
@@ -49,14 +56,32 @@ impl<'t, 'a> LanguageTexts<'t, 'a> {
 
 impl TextResolver for LanguageTexts<'_, '_> {
     fn resolve<'r>(&'r self, key: &str) -> Resolution<'r> {
-        let found = match self.source {
-            Source::Borrowed(texts) => texts.lookup(key, self.language, None),
-            Source::Owned(texts) => texts.lookup(key, self.language, None),
-        };
-        match found {
-            Lookup::Found { text, .. } => Resolution::Text(decode_line_breaks(text)),
-            Lookup::Placeholder => Resolution::Keep,
-            _ => Resolution::Missing,
+        self.resolve_observed(key).into_resolution()
+    }
+
+    fn resolve_observed<'r>(&'r self, key: &str) -> ObservedResolution<'r> {
+        if is_placeholder_key(key) {
+            return ObservedResolution::unobserved(Resolution::Keep);
         }
+        match self.source {
+            Source::Borrowed(texts) => {
+                let Some(ini) = texts.ini(self.language) else {
+                    return ObservedResolution::unobserved(Resolution::Missing);
+                };
+                let original = ini.resolve(key);
+                ObservedResolution::from_lookup(display(original), original)
+            }
+            Source::Owned(texts) => {
+                let original = texts.text(key, self.language);
+                ObservedResolution::unobserved(display(original))
+            }
+        }
+    }
+}
+
+fn display(original: Option<&str>) -> Resolution<'_> {
+    match original {
+        Some(text) if !text.is_empty() => Resolution::Text(decode_line_breaks(text)),
+        _ => Resolution::Missing,
     }
 }

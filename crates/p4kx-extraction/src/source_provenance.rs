@@ -21,6 +21,8 @@ pub(crate) mod mode;
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
 pub(crate) mod model_material_origins;
+#[path = "observed_tag_tree.rs"]
+mod observed_tag_tree;
 #[path = "source_origin_applicability.rs"]
 mod origin_applicability;
 #[path = "record_json_location.rs"]
@@ -34,6 +36,7 @@ pub use self::entity_material_effects::{
     EntityMaterialEffects, EntityMaterialEffectsComponent, EntityMaterialEffectsError,
 };
 pub use self::mode::ProvenanceMode;
+pub use self::observed_tag_tree::{ObservedTagTree, TagPathOrigins};
 pub use self::origin_applicability::OriginApplicability;
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
@@ -63,6 +66,17 @@ pub use crate::origin_companion::{
 };
 pub use crate::origin_file_io::write_replacing_io_protected;
 pub use crate::origin_reader_limits::OriginReaderLimits;
+pub use crate::record_combined::{export_annotated_combined, export_localized_combined};
+pub use crate::record_export::export_annotated_record_xml_files;
+pub use crate::record_export::{
+    RecordExportSources, export_planned_record_json_files_with_origins,
+    export_planned_record_xml_files_with_origins,
+};
+pub use crate::record_format::record_stream_input::RecordStreamInput;
+pub use crate::record_format::record_stream_publication::{
+    RecordStreamCommit, RecordStreamReceipt, publish_record_stream,
+};
+pub use crate::record_format::stream_fields::{RecordStreamRows, RecordStreamSpool};
 pub use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 pub use crate::source_encryption_evidence::SourceDeclarationEvidence;
 pub use crate::source_evidence_error::SourceEvidenceError;

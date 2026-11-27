@@ -7,7 +7,7 @@ use crate::record::RecordNameKind;
 use crate::scalar::ScalarSource;
 use crate::{DataForge, Value};
 
-/// Original input coordinates actually used by the Query evaluator.
+/// Original input coordinates and incomplete reads observed by the Query evaluator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum QuerySource {
@@ -104,6 +104,12 @@ pub enum QuerySource {
     },
     /// An addressed traversal input could not be read as bytes.
     Unavailable(QueryUnavailable),
+    /// This cell reached the shared limit before all of its values were read.
+    #[non_exhaustive]
+    RowBudgetExhausted {
+        /// Maximum array elements allowed for this projected row.
+        limit: usize,
+    },
     /// A runtime type test could not establish the rest of its original ancestry.
     AncestorGap {
         /// Unresolved position, which may not exist in the original table.
@@ -216,7 +222,7 @@ pub struct QueryCellSources {
 }
 
 impl QueryCellSources {
-    /// Returns the distinct original inputs actually examined for this cell.
+    /// Returns the original inputs examined and any incomplete reads of this cell.
     pub fn traversed(&self) -> impl Iterator<Item = QuerySource> + '_ {
         self.traversed.iter().copied()
     }
@@ -265,11 +271,22 @@ impl CellTrace {
     }
 
     pub(super) fn value(&mut self, forge: &DataForge<'_>, bytes: Option<&[u8]>, value: &Value<'_>) {
-        let payload = value_sources(forge, bytes, value, false);
+        let [slot, text] = value_sources(forge, bytes, value, true);
+        let slot = if matches!(value, Value::Error(_)) {
+            bytes.and_then(|bytes| QuerySource::bytes(forge, bytes, QueryByteUse::AttemptedValue))
+        } else {
+            slot
+        };
         let mut sources = self.path.clone();
-        sources.extend(payload.into_iter().flatten());
+        sources.extend([slot, text].into_iter().flatten());
         self.evidence.traversed.extend(sources.iter().copied());
         self.evidence.values.push(sources.into_boxed_slice());
+    }
+
+    pub(super) fn row_budget_exhausted(&mut self, limit: usize) {
+        self.evidence
+            .traversed
+            .insert(QuerySource::RowBudgetExhausted { limit });
     }
 
     pub(super) fn finish(self) -> QueryCellSources {
