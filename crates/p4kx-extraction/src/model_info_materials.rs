@@ -8,7 +8,7 @@ use serde::Serialize;
 pub(crate) mod receipt;
 
 use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
-use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt};
+use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt, FieldOrigin};
 
 pub use receipt::{MaterialPageOrigins, model_material_selector};
 
@@ -44,6 +44,28 @@ impl<'a> LibraryInfo<'a> {
             authored: library.map(MaterialLibrarySourceInfo::of),
         }
     }
+}
+
+/// Original inputs of a model's material library name, read status and displayed detail.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MaterialSummaryOrigins {
+    /// The source of the decoded name, when the model names a library.
+    pub path: Option<FieldOrigin>,
+    /// The contributing inputs of the library read status.
+    pub status: FieldOrigin,
+    /// The original selection behind the displayed detail, when the read succeeded.
+    pub detail: Option<MaterialSummaryDetailOrigin>,
+}
+
+/// The material summary detail of a loaded library.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum MaterialSummaryDetailOrigin {
+    /// The library contains one material that applies to every material ID.
+    Single(FieldOrigin),
+    /// The number of sub-materials in the library.
+    Count(FieldOrigin),
 }
 
 /// One material of a model's library.

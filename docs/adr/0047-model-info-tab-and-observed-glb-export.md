@@ -17,6 +17,9 @@ Decided for issue #109.
   source encryption marker. The preview retains the physical sources and contributing
   uses from the same model read. Each chunk is bound to its admitted model or geometry
   Entry. The origin snapshot is discarded when the Archive changes.
+- The material row tooltip reports separate markers for the library name, read status and
+  displayed material count or single-material declaration. They use the library selected by
+  the drawn model reader. A failed library read retains its attempted use in the inventory.
 - Export as GLB reads the model again for the chosen level only, on its own thread, and writes
   through `ModelSource::write_glb_observed`. The stream reports the bytes written against the length
   the GLB header states and fails with a marker once the caller's `CancelToken` is set; the

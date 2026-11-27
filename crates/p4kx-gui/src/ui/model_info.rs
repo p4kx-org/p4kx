@@ -8,7 +8,7 @@ use egui::{
     WidgetInfo, pos2, vec2,
 };
 
-use p4kx_extraction::FieldOrigin;
+use p4kx_extraction::{FieldOrigin, MaterialSummaryDetailOrigin, MaterialSummaryOrigins};
 
 use super::model_info_rows::{Rows, facts, tables};
 use super::{model_preview, source_origin};
@@ -148,6 +148,7 @@ fn fact(
         )),
         _ => None,
     };
+    let is_material_library = *name == T::Materials;
     let height = key.1.size().y.max(value.1.size().y) + DETAIL_ROW_GAP;
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::hover());
     let content = rect.with_max_y(rect.bottom() - DETAIL_ROW_GAP);
@@ -169,7 +170,7 @@ fn fact(
         value,
         (on_baseline(value_rect, &value.1), palette::DATA_FG),
     );
-    if value.1.elided || proof.is_some() {
+    if value.1.elided || proof.is_some() || is_material_library {
         tooltip::hover(shown, |ui| {
             if value.1.elided {
                 tooltip::line(ui, value.0.as_str());
@@ -177,10 +178,35 @@ fn fact(
             if let Some((field, origin)) = proof {
                 source_origin::row(ui, texts, field, origin);
             }
+            if is_material_library {
+                material_origins(
+                    ui,
+                    texts,
+                    origins.map(ModelInfoProvenance::material_library),
+                );
+            }
         });
     }
     hairline_below(ui, key_rect);
     hairline_below(ui, value_rect);
+}
+
+fn material_origins(ui: &mut Ui, texts: &Texts, origins: Option<&MaterialSummaryOrigins>) {
+    if let Some(path) = origins.and_then(|summary| summary.path.as_ref()) {
+        source_origin::row(ui, texts, T::Materials, Some(path));
+    }
+    source_origin::row(
+        ui,
+        texts,
+        T::MaterialsStatus,
+        origins.map(|summary| &summary.status),
+    );
+    let (label, origin) = match origins.and_then(|summary| summary.detail.as_ref()) {
+        Some(MaterialSummaryDetailOrigin::Single(origin)) => (T::MaterialSingle, origin),
+        Some(MaterialSummaryDetailOrigin::Count(origin)) => (T::MaterialCount, origin),
+        _ => return,
+    };
+    source_origin::row(ui, texts, label, Some(origin));
 }
 
 fn grid(

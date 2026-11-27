@@ -258,9 +258,7 @@ pub use model_chunk_source_info::{
 };
 pub use model_info::{BoneInfo, ChunkInfo, ChunkJson, LodInfo, MeshInfo, ModelInfo, NodeInfo};
 pub use model_info_animations::{AnimationInfo, UnreadInfo};
-pub use model_info_materials::{
-    DefaultMaterialInfo, LibraryInfo, MaterialInfo, MaterialPageOrigins, model_material_selector,
-};
+pub use model_info_materials::*;
 pub use model_source::GlbGeometryPublication;
 pub use model_source::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState, ModelSource};
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};

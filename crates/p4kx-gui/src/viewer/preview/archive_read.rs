@@ -3,10 +3,8 @@
 
 use std::error::Error;
 
-use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox, companion_file_names};
-use p4kx_extraction::{
-    CancelToken, ConversionError, Entry, ModelSource, PathIndex, TextureVerdicts,
-};
+use p4kx_extraction::model::{LodSelection, companion_file_names};
+use p4kx_extraction::{CancelToken, ConversionError, Entry, ModelSource, PathIndex};
 
 use super::{Event, MODEL_FILE_LIMIT, finish_model};
 use crate::EntryIndex;
@@ -45,16 +43,8 @@ pub(super) fn load(index: &EntryIndex, id: u32, stop: &CancelToken, send: &impl 
 }
 
 fn read_archive_source(index: &PathIndex<'_>, path: &str) -> Result<ModelSource, ConversionError> {
-    let read = |lods| {
-        ModelSource::from_index_observing_model_sources(
-            index,
-            path,
-            lods,
-            PositionBox::default(),
-            MaterialReading::Drawn,
-            &TextureVerdicts::new(),
-        )
-    };
+    let read =
+        |lods| ModelSource::from_index_with_drawn_material_summary_origins(index, path, lods);
     read(LodSelection::All).or_else(|_| read(LodSelection::Only(0)))
 }
 

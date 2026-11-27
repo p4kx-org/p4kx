@@ -4,11 +4,40 @@
 use p4kx_archive::EntryOrigin;
 use p4kx_model::{MaterialReadField, Model};
 
-use super::{Observations, ReceiptError, model_material_selector};
+use super::{Observations, ReceiptError, Writer, model_material_selector};
 use crate::material_source_info::MaterialSourceEvidence;
-use crate::{ConversionError, FieldOrigins, FieldPath, SourceUses};
+use crate::{ConversionError, FieldOrigin, FieldOrigins, FieldPath, SourceUses};
 
 impl Observations {
+    pub(crate) fn loaded_summary_field(
+        &self,
+        model: &Model,
+        model_entry: Option<&EntryOrigin>,
+        library_entry: Option<&EntryOrigin>,
+        uses: &SourceUses,
+        field: MaterialReadField,
+    ) -> Result<FieldOrigin, ReceiptError> {
+        self.summary_writer(uses, model, model_entry, library_entry)?
+            .origin(0, &[field])
+    }
+
+    fn summary_writer<'a>(
+        &'a self,
+        uses: &'a SourceUses,
+        model: &Model,
+        model_entry: Option<&EntryOrigin>,
+        library_entry: Option<&EntryOrigin>,
+    ) -> Result<Writer<'a>, ReceiptError> {
+        let mut output = self.writer(
+            uses,
+            library_entry,
+            model_entry.zip(model_material_selector(model)),
+        )?;
+        // Library lookup decisions are outside the loaded payload observation.
+        output.complete = false;
+        Ok(output)
+    }
+
     pub(crate) fn project_loaded_summary(
         &self,
         model: &Model,
@@ -21,13 +50,7 @@ impl Observations {
         use MaterialReadField::{LibraryDefaultPalette, LibrarySingle, LibraryTotal};
         let project = || {
             let library = model.materials.library().ok_or(ReceiptError::MissingRows)?;
-            let mut output = self.writer(
-                uses,
-                library_entry,
-                model_entry.zip(model_material_selector(model)),
-            )?;
-            // The library lookup decisions are outside the loaded payload observation.
-            output.complete = false;
+            let mut output = self.summary_writer(uses, model, model_entry, library_entry)?;
             for (name, original) in [
                 ("single", LibrarySingle),
                 ("default_palette", LibraryDefaultPalette),

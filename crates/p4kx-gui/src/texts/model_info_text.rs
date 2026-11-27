@@ -19,6 +19,12 @@ pub enum ModelInfoText {
     Lods,
     /// The key of the material library.
     Materials,
+    /// The label of the library status in its origin tooltip.
+    MaterialsStatus,
+    /// The label of the sub-material count in its origin tooltip.
+    MaterialCount,
+    /// The label of the single-material selection in its origin tooltip.
+    MaterialSingle,
     /// The key of the material IDs the submeshes use.
     MaterialIds,
     /// The model has no submesh with a material ID.
@@ -87,7 +93,7 @@ pub enum ModelInfoText {
 
 impl ModelInfoText {
     /// Every text of the Info tab.
-    pub(crate) const ALL: [Self; 38] = [
+    pub(crate) const ALL: [Self; 41] = [
         Self::Tab,
         Self::Geometry,
         Self::GeometryInFile,
@@ -95,6 +101,9 @@ impl ModelInfoText {
         Self::Meshes,
         Self::Lods,
         Self::Materials,
+        Self::MaterialsStatus,
+        Self::MaterialCount,
+        Self::MaterialSingle,
         Self::MaterialIds,
         Self::MaterialIdsNone,
         Self::Bones,
@@ -139,6 +148,9 @@ impl ModelInfoText {
             Self::Meshes => "model-info-meshes",
             Self::Lods => "model-info-lods",
             Self::Materials => "model-info-materials",
+            Self::MaterialsStatus => "model-info-materials-status",
+            Self::MaterialCount => "model-info-material-count",
+            Self::MaterialSingle => "model-info-material-single",
             Self::MaterialIds => "model-info-material-ids",
             Self::MaterialIdsNone => "model-info-material-ids-none",
             Self::Bones => "model-info-bones",
