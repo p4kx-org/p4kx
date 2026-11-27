@@ -3451,6 +3451,15 @@ same Build and source inventory when interpreting source references. Compare a s
 Ship with the rows for its physical Record in the complete producer or an equivalent
 scope whose Record selection includes all reached flight owners.
 
+Use `equipment::visit_installed_configurations` for all admitted Ships in canonical
+Loadout order. Each callback receives the same snapshot shape as the selected
+query, with its physical Ship Record index, rows and local source inventory.
+An empty resolved Loadout can return zero configuration rows with complete
+coverage. A failed Loadout retains its physical owner and unreadable state.
+Use the decoded-Entry form or the equivalent session and parsed-view methods
+to reuse inputs. Check the final count and Ship admission coverage before
+committing staged results. Cancellation or a callback error stops the visit.
+
 A cold query on installed PTU `13260598` matched the twelve independently
 nominated Flight rows. It completed in 14.623 s with 1,114,664,960 peak private
 bytes and 1,032,646,656 peak working-set bytes. The witness retains the original

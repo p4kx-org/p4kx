@@ -45,7 +45,9 @@ mod installed_configurations;
 pub use installed_configurations::{
     FlightConfigurationKind, FlightConfigurationLink, InstalledConfiguration,
     InstalledConfigurationDependency, InstalledConfigurationSnapshot,
-    read_installed_configurations, read_installed_configurations_from,
+    InstalledConfigurationVisitSummary, read_installed_configurations,
+    read_installed_configurations_from, visit_installed_configurations,
+    visit_installed_configurations_from,
 };
 
 #[path = "equipment_loadout_scope.rs"]

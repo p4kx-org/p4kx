@@ -11,7 +11,6 @@ use p4kx_extraction::{
 use super::read::Query;
 use super::{LoadoutDependencyCoverage, scope};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, DatasetAvailability,
     ParsedCatalogQueries,
@@ -29,6 +28,13 @@ pub use crate::catalog_v3::facility_loadout_placements::{
     InstalledConfigurationDependency,
 };
 
+#[path = "equipment_installed_configuration_visit.rs"]
+mod visit;
+pub use visit::{
+    InstalledConfigurationVisitSummary, visit_installed_configurations,
+    visit_installed_configurations_from,
+};
+
 /// Installed Flight Controller, IFCS and Thruster links reached from one physical Ship Record.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -36,6 +42,8 @@ pub use crate::catalog_v3::facility_loadout_placements::{
 pub struct InstalledConfigurationSnapshot {
     /// The Build of the original Archive.
     pub build: Option<Build>,
+    /// Physical index of the selected Ship in the original DataForge.
+    pub ship_record_index: u32,
     /// Availability of the original flight component families.
     pub availability: DatasetAvailability,
     /// Whether the selected Loadout is present, absent or unreadable.
@@ -50,6 +58,27 @@ pub struct InstalledConfigurationSnapshot {
     pub loadout_dependencies: LoadoutDependencyCoverage,
     /// Flight configuration read coverage, ordered by the physical owner's Record index.
     pub configuration_dependencies: Vec<InstalledConfigurationDependency>,
+}
+
+impl InstalledConfigurationSnapshot {
+    /// Reports whether the required Loadout and flight configuration reads completed.
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.loadout_state != SourceValueState::Unreadable
+            && coverage_complete(&self.loadout_coverage)
+            && self.loadout_dependencies.is_complete()
+            && self.configuration_dependencies.iter().all(|dependency| {
+                coverage_complete(&dependency.flight_controllers)
+                    && coverage_complete(&dependency.ifcs)
+                    && coverage_complete(&dependency.thrusters)
+            })
+    }
+}
+
+const fn coverage_complete(coverage: &CatalogRecordCoverage) -> bool {
+    coverage.unreadable_headers.is_empty()
+        && coverage.unreadable_bodies.is_empty()
+        && coverage.incomplete_fields.is_empty()
 }
 
 /// Reads one physical Ship's installed flight configurations.
@@ -135,52 +164,66 @@ fn selected(
     let origins = query.entry.records(query.archive)?;
     let (loadouts, loadout_dependencies) =
         query.resolve(&origins, wanted, &mut loadout_coverage)?;
-    let mut configurations = BTreeMap::new();
-    let (loadout_state, projected) = match loadouts.as_slice() {
+    let (loadout_state, configurations) = match loadouts.as_slice() {
         [loadout] => (
             SourceValueState::Present,
-            read_placements(query, &origins, loadout, &mut configurations)?,
+            read_placements(
+                query,
+                &OriginalCatalogInput::new(query.forge, &origins),
+                loadout,
+            )?,
         ),
-        [] if admitted || !loadout_coverage.unreadable_headers.is_empty() => {
-            (SourceValueState::Unreadable, Vec::new())
-        }
-        [] => (SourceValueState::Absent, Vec::new()),
+        [] if admitted || !loadout_coverage.unreadable_headers.is_empty() => (
+            SourceValueState::Unreadable,
+            ProjectedConfigurations::default(),
+        ),
+        [] => (SourceValueState::Absent, ProjectedConfigurations::default()),
         _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
     };
-    let CatalogTable { availability, rows } = scoped_table(query.forge, projected);
-    loadout_coverage.incomplete_fields.sort_unstable();
-    loadout_coverage.incomplete_fields.dedup();
+    let CatalogTable { availability, rows } = scoped_table(query.forge, configurations.rows);
+    scope::finish_coverage(&mut loadout_coverage);
     let source_inventory = origins.uses.finish_with(|| checkpoint(query.cancel))?;
     checkpoint(query.cancel)?;
     Ok(InstalledConfigurationSnapshot {
         build: query.archive.build().cloned(),
+        ship_record_index,
         availability,
         loadout_state,
         rows,
         source_inventory,
         loadout_coverage,
         loadout_dependencies,
-        configuration_dependencies: configurations
-            .into_values()
-            .map(|record| record.coverage)
-            .collect(),
+        configuration_dependencies: configurations.dependencies,
     })
+}
+
+#[derive(Default)]
+struct ProjectedConfigurations {
+    rows: Vec<InstalledConfiguration>,
+    dependencies: Vec<InstalledConfigurationDependency>,
 }
 
 fn read_placements(
     query: &Query<'_>,
-    origins: &CatalogOrigins,
+    input: &OriginalCatalogInput<'_, '_>,
     loadout: &Loadout,
-    configurations: &mut BTreeMap<u32, ScopedFlightLinks>,
-) -> Result<Vec<InstalledConfiguration>, CatalogError> {
-    let input = OriginalCatalogInput::new(query.forge, origins);
-    project_installed_configurations(loadout, origins, query.cancel, &mut |index| {
-        let entry = match configurations.entry(index) {
-            Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => {
-                entry.insert(read_owner_links(query.forge, &input, index, query.cancel)?)
-            }
-        };
-        Ok(entry.links.clone())
+) -> Result<ProjectedConfigurations, CatalogError> {
+    let mut configurations: BTreeMap<u32, ScopedFlightLinks> = BTreeMap::new();
+    let rows =
+        project_installed_configurations(loadout, input.origins(), query.cancel, &mut |index| {
+            let entry = match configurations.entry(index) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => {
+                    entry.insert(read_owner_links(query.forge, input, index, query.cancel)?)
+                }
+            };
+            Ok(entry.links.clone())
+        })?;
+    Ok(ProjectedConfigurations {
+        rows,
+        dependencies: configurations
+            .into_values()
+            .map(|record| record.coverage)
+            .collect(),
     })
 }
